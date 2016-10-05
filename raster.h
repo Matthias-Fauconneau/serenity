@@ -301,8 +301,8 @@ template<class Shader> struct RenderPass {
                             float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
                             profile( int64 start = rdtsc(); )
                                     vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( userTime += rdtsc()-start; )
-                                    float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
+                            profile( userTime += rdtsc()-start; );
+                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
                             float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
                             float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
                             float& dstR = tile.red[pixelPtr/16][pixelPtr%16];

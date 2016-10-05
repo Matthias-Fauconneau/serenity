@@ -52,7 +52,7 @@ void Data::skip(const uint8 key) {
  if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
- if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data, peek(16));
+ if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data, peek(min(data.size-index,16ul)));
 }
 
 void Data::skip(const ref<uint8> key) {
