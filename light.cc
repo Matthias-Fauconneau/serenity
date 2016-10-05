@@ -27,6 +27,10 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+static uint64 miscStart; // Clear, Configuration
+static uint64 saveStart, saveTime; // PNG, Raw
+static uint64 totalTime;
+
 struct Scene {
     struct Face { vec3 position[3]; bgr3f color; };
     Face faces[6*2]; // Cube
@@ -71,6 +75,7 @@ struct Scene {
     RenderPass<Shader> pass {shader};
 
     void render(Image& final, mat4 view) {
+        profile( uint64 setupStart=readCycleCounter(); uint64 miscTime = setupStart-miscStart; )
         target.setup(int2(final.size/4u/*MSAA->4x*/));
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
@@ -79,8 +84,13 @@ struct Scene {
             vec3 attributes[0];
             pass.submit(A,B,C, attributes, {face.color});
         }
+        profile( uint64 renderStart=readCycleCounter(); uint64 setupTime = renderStart-setupStart; )
         pass.render(target);
+        profile( uint64 resolveStart=readCycleCounter(); uint64 renderTime = resolveStart-renderStart; )
         target.resolve(final);
+        profile( saveStart = readCycleCounter(); uint64 resolveTime = saveStart-resolveStart;
+                 totalTime = miscTime+setupTime+renderTime+resolveTime+saveTime; )
+
     }
 };
 
@@ -89,9 +99,13 @@ struct Render {
         Scene scene;
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
-        const int N = 33;
+        const int N = 65;
         Image target (512);
         Time time (true), lastReport(true);
+
+        // Profile counters
+        profile( miscStart=readCycleCounter(); saveTime=0; ) // profile cycles spent outside render
+
         for(int sIndex: range(N)) {
             if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
             for(int tIndex: range(N)) {
@@ -113,7 +127,7 @@ struct Render {
                 M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
                 if(0) {
-                    parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
+                    parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) {
                         for(int i: range(start, start+size)) {
                             int y = i/target.size.x, x = i%target.size.x;
                             const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
@@ -129,7 +143,8 @@ struct Render {
                     scene.render(target, NDC * M);
                 }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
-                writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+                if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+                profile( miscStart = readCycleCounter(); saveTime = miscStart-saveStart; )
             }
         }
         log(time);
@@ -180,7 +195,7 @@ struct Light {
     ImageT<Image> images;
     Scene scene;
 
-    bool sample = false, raycast = false, orthographic = false;
+    bool sample = true, raycast = true, orthographic = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -236,7 +251,7 @@ struct Light {
         }
 
         if(raycast) {
-            parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) { // TODO: SSAA
+            parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) {
                 for(int i: range(start, start+size)) {
                     int y = i/target.size.x, x = i%target.size.x;
                     const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);

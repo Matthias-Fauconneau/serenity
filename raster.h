@@ -17,6 +17,7 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include <pthread.h> //pthread
 #include "image.h"
 
+#define PROFILE
 #ifdef PROFILE
 #define profile(s) s
 #else
@@ -204,7 +205,7 @@ template<class Shader> struct RenderPass {
             struct DrawPixel { vec16 mask; vec2 pos; uint ptr; } pixels[16*16]; uint pixelCount=0;
             const Face& face = faces[faceIndex];
             {
-                profile( int64 start=rdtsc(); );
+                profile( int64 start=readCycleCounter(); );
                 float binReject[3], binAccept[3];
                 for(int e=0;e<3;e++) {
                     binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
@@ -272,13 +273,13 @@ template<class Shader> struct RenderPass {
                         }
                     }
                 }
-                profile( rasterTime += rdtsc()-start; )
+                profile( rasterTime += readCycleCounter()-start; )
             }
             // 4×4 xy steps from pixel origin to sample center
             static const vec16 X = vec16(0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3)+1./2;
             static const vec16 Y = vec16(0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3)+1./2;
             {
-                profile( int64 start = rdtsc(); int64 userTime=0; )
+                profile( int64 start = readCycleCounter(); int64 userTime=0; )
                 for(uint i=0; i<blockCount; i++) { // Blocks of fully covered pixels
                     const DrawBlock& draw = blocks[i];
                     const uint blockPtr = draw.ptr;
@@ -299,9 +300,9 @@ template<class Shader> struct RenderPass {
                             depth = z;
 
                             float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
-                            profile( int64 start = rdtsc(); )
+                            profile( int64 start = readCycleCounter(); )
                                     vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( userTime += rdtsc()-start; );
+                            profile( userTime += readCycleCounter()-start; );
                             float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
                             float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
                             float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
@@ -343,9 +344,9 @@ template<class Shader> struct RenderPass {
                                 centroid[i] = sum16(visible) / visibleSampleCount;
                             }
 
-                            profile( int64 start = rdtsc() );
+                            profile( int64 start = readCycleCounter() );
                             vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( userTime += rdtsc()-start );
+                            profile( userTime += readCycleCounter()-start );
                             float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
                             vec16& dstB = tile.subblue[pixelPtr];
                             vec16& dstG = tile.subgreen[pixelPtr];
@@ -362,10 +363,10 @@ template<class Shader> struct RenderPass {
                         }
                     }
                 }
-                profile( this->userTime+=userTime; pixelTime += rdtsc()-start - userTime; )
+                profile( this->userTime+=userTime; pixelTime += readCycleCounter()-start - userTime; )
             }
             {
-                profile( int64 start = rdtsc(); int64 userTime=0; )
+                profile( int64 start = readCycleCounter(); int64 userTime=0; )
                 for(uint i: range(pixelCount)) { // Partially covered pixel of samples
                     const DrawPixel& draw = pixels[i];
                     const uint pixelPtr = draw.ptr;
@@ -380,7 +381,7 @@ template<class Shader> struct RenderPass {
 
                     // Convert single sample pixel to subsampled pixel
                     if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                        profile( int64 start = rdtsc() );
+                        profile( int64 start = readCycleCounter() );
 
                         // Set subsampled pixel flag
                         tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
@@ -405,9 +406,9 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        profile( int64 userStart = rdtsc() );
+                        profile( int64 userStart = readCycleCounter() );
                         vec4 bgra = shader(face.faceAttributes,centroid);
-                        profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart );
+                        profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
                         float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
                         vec16& dstB = tile.subblue[pixelPtr];
                         vec16& dstG = tile.subgreen[pixelPtr];
@@ -424,9 +425,9 @@ template<class Shader> struct RenderPass {
                             dstG = blend16(pixelG, srcG, visibleMask);
                             dstR = blend16(pixelR, srcR, visibleMask);
                         }
-                        profile( sampleFirstTime += (userStart-start) + (rdtsc()-userEnd); )
+                        profile( sampleFirstTime += (userStart-start) + (readCycleCounter()-userEnd); )
                     } else {
-                        profile( int64 start = rdtsc() );
+                        profile( int64 start = readCycleCounter() );
 
                         // Performs Z-Test
                         vec16& subpixel = tile.subdepth[pixelPtr];
@@ -448,9 +449,9 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        profile( int64 userStart = rdtsc() );
+                        profile( int64 userStart = readCycleCounter() );
                         vec4 bgra = shader(face.faceAttributes,centroid);
-                        profile( int64 userEnd = rdtsc(); userTime += userEnd-userStart );
+                        profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
                         float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
                         vec16& dstB = tile.subblue[pixelPtr];
                         vec16& dstG = tile.subgreen[pixelPtr];
@@ -464,10 +465,10 @@ template<class Shader> struct RenderPass {
                             maskstore(dstG, visibleMask, srcG);
                             maskstore(dstR, visibleMask, srcR);
                         }
-                        profile( sampleOverTime += (userStart-start) + (rdtsc()-userEnd); )
+                        profile( sampleOverTime += (userStart-start) + (readCycleCounter()-userEnd); )
                     }
                 }
-                profile( this->userTime += userTime; sampleTime += rdtsc()-start - userTime; )
+                profile( this->userTime += userTime; sampleTime += readCycleCounter()-start - userTime; )
             }
         }
     }
@@ -482,7 +483,7 @@ template<class Shader> struct RenderPass {
         this->target = &target;
         // Reset counters
         nextBin=0;
-        profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}))
+        profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}));
         // Schedules all cores to process tiles
         const int N=8;
         pthread_t threads[N-1];
@@ -491,7 +492,7 @@ template<class Shader> struct RenderPass {
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
     }
     void run() {
-        profile( int64 start = rdtsc(); );
+        profile( int64 start = readCycleCounter(); );
         // Loops on all bins (64x64 samples (16x16 pixels)) then on passes (improves framebuffer access, passes have less locality)
         for(;;) {
             uint binI = __sync_fetch_and_add(&nextBin,1);
@@ -511,6 +512,6 @@ template<class Shader> struct RenderPass {
             const vec2 binXY = 64.f*vec2(binI%target->width,binI/target->width);
             render(tile, bins[binI], binXY);
         }
-        profile( totalTime += rdtsc()-start; );
+        profile( totalTime += readCycleCounter()-start; );
     }
 };
