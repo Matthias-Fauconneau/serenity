@@ -292,12 +292,12 @@ template<class Shader> struct RenderPass {
                         const uint pixelPtr = blockPtr+pixelI;
                         const vec2 pixelXY = blockXY+4.f*XY[0][pixelI];
 
-                        if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) { // Pixel coverage on single sample pixel
+                        if(!(tile.subsample[blockPtr]&(1<<pixelI))) { // Pixel coverage on single sample pixel
                             vec3 XY1 = vec3(pixelXY+vec2(4.f/2, 4.f/2), 1.f);
                             float w = 1/dot(face.i1,XY1);
                             float z = w*dot(face.iz,XY1);
 
-                            float& depth = tile.depth[pixelPtr/16][pixelPtr%16];
+                            float& depth = ((float*)tile.depth)[pixelPtr];
                             if(z > depth) continue;
                             depth = z;
 
@@ -305,9 +305,9 @@ template<class Shader> struct RenderPass {
                             //profile( int64 start = readCycleCounter(); );
                             bgra4f src = shader(face.faceAttributes,centroid);
                             //profile( userTime += readCycleCounter()-start; );
-                            float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
-                            float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
-                            float& dstR = tile.red[pixelPtr/16][pixelPtr%16];
+                            float& dstB = ((float*)tile.blue)[pixelPtr];
+                            float& dstG = ((float*)tile.green)[pixelPtr];
+                            float& dstR = ((float*)tile.red)[pixelPtr];
                             if(Shader::blend) {
                                 dstB=(1-src.a)*dstB+src.a*src.b;
                                 dstG=(1-src.a)*dstG+src.a*src.g;
@@ -387,7 +387,7 @@ template<class Shader> struct RenderPass {
                         tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
                         // Performs Z-Test
-                        float pixelZ = tile.depth[pixelPtr/16][pixelPtr%16];
+                        float pixelZ = ((float*)tile.depth)[pixelPtr];
                         const v16si visibleMask = (z <= pixelZ) & draw.mask;
 
                         // Blends accepted pixels in subsampled Z buffer
@@ -412,9 +412,9 @@ template<class Shader> struct RenderPass {
                         v16sf& dstB = tile.subblue[pixelPtr];
                         v16sf& dstG = tile.subgreen[pixelPtr];
                         v16sf& dstR = tile.subred[pixelPtr];
-                        float pixelB = tile.blue[pixelPtr/16][pixelPtr%16];
-                        float pixelG = tile.green[pixelPtr/16][pixelPtr%16];
-                        float pixelR = tile.red[pixelPtr/16][pixelPtr%16];
+                        float pixelB = ((float*)tile.blue)[pixelPtr];
+                        float pixelG = ((float*)tile.green)[pixelPtr];
+                        float pixelR = ((float*)tile.red)[pixelPtr];
                         if(Shader::blend) {
                             dstB = blend(pixelB, (1-src.a)*pixelB+src.a*src.b, visibleMask);
                             dstG = blend(pixelG, (1-src.a)*pixelG+src.a*src.g, visibleMask);

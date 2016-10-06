@@ -86,8 +86,8 @@ inline v16si operator>(v16sf a, v16sf b) { return v16si(a.r1 > b.r1, a.r2 > b.r2
 inline uint mask(v16si m) { return __builtin_ia32_movmskps256(m.r1)|(__builtin_ia32_movmskps256(m.r2)<<8); }
 
 typedef uint8 mask8;
-// FIXME
-inline v8si mask(const mask8 m) { return (v8si){m&(1<<0), m&(1<<1),m&(1<<2), m&(1<<3), m&(1<<4), m&(1<<5), m&(1<<6), m&(1<<7)}; }
+static const unused v8si selectMask {1<<7, 1<<6, 1<<5, 1<<4,  1<<3, 1<<2, 1<<1, 1<<0};
+inline v8si mask(const uint8 mask) { return (intX(mask) & selectMask) != _0i; }
 typedef uint16 mask16;
 inline v16si mask(const mask16 m) { return v16si(mask(mask8(m)), mask(mask8(m>>8))); }
 
