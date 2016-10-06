@@ -483,13 +483,17 @@ template<class Shader> struct RenderPass {
         this->target = &target;
         // Reset counters
         nextBin=0;
-        profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}));
+        //profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}));
+#ifdef PROFILE
+        run();
+#else
         // Schedules all cores to process tiles
         const int N=8;
         pthread_t threads[N-1];
         for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
         run();
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
+#endif
     }
     void run() {
         profile( int64 start = readCycleCounter(); );

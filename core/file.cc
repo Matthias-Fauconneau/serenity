@@ -54,30 +54,31 @@ static int getdents(int fd, void* entry, long size) { return syscall(SYS_getdent
 struct dirent { long ino, off; short len; char name[]; };
 enum { DT_UNKNOWN, DT_FIFO, DT_CHR, DT_DIR = 4, DT_BLK = 6, DT_REG = 8, DT_LNK = 10, DT_SOCK = 12, DT_WHT = 14 };
 buffer<String> Folder::list(uint flags) const {
- Folder fd(".",*this);
- array<String> list; byte buffer[0x1000];
- for(int size;(size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
-  for(byte* i=buffer,*end=buffer+size;i<end;i+=((dirent*)i)->len) { const dirent& entry=*(dirent*)i;
-   string name = str(entry.name);
-   if(!(flags&Hidden) && name[0]=='.') continue;
-   if(name=="." || name=="..") continue;
-   int type = *((byte*)&entry + entry.len - 1);
-   if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN))
-      || (flags&Folders && type==DT_DIR)
-      || (flags&Devices && type==DT_CHR)
-      || (flags&Drives && type==DT_BLK) ) {
-    if(flags&Sorted) list.insertSorted( copyRef(name) );
-    else list.append( copyRef(name) );
-   }
-   if(flags&Recursive && type==DT_DIR) {
-    for(const String& file: Folder(name,*this).list(flags)) {
-     if(flags&Sorted) list.insertSorted( name+'/'+file );
-     else list.append( name+'/'+file );
+    Folder fd(".",*this);
+    array<String> list (0x8000); byte buffer[0x8000*sizeof(dirent)];
+    for(int size; (size=check(getdents(fd.fd,&buffer,sizeof(buffer))))>0;) {
+        for(byte* i = buffer, *end = buffer+size; i < end; i += ((dirent*)i)->len) {
+            const dirent& entry=*(dirent*)i;
+            string name = str(entry.name);
+            if(!(flags&Hidden) && name[0]=='.') continue;
+            if(name=="." || name=="..") continue;
+            int type = *((byte*)&entry + entry.len - 1);
+            if((flags&Files && (type==DT_REG||type==DT_LNK||type==DT_UNKNOWN))
+                    || (flags&Folders && type==DT_DIR)
+                    || (flags&Devices && type==DT_CHR)
+                    || (flags&Drives && type==DT_BLK) ) {
+                if(flags&Sorted) list.insertSorted( copyRef(name) );
+                else list.append( copyRef(name) );
+            }
+            if(flags&Recursive && type==DT_DIR) {
+                for(const String& file: Folder(name,*this).list(flags)) {
+                    if(flags&Sorted) list.insertSorted( name+'/'+file );
+                    else list.append( name+'/'+file );
+                }
+            }
+        }
     }
-   }
-  }
- }
- return move(list);
+    return move(list);
 }
 
 bool existsFolder(const string folder, const Folder& at) { return Handle( openat(at.fd, strz(folder), O_RDONLY|O_DIRECTORY, 0) ).fd > 0; }

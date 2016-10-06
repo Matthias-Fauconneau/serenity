@@ -27,9 +27,10 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
-static uint64 miscStart; // Clear, Configuration
-static uint64 saveStart, saveTime; // PNG, Raw
-static uint64 totalTime;
+static uint64 miscStart = 0, miscTime = 0; // Clear, Configuration
+static uint64 setupTime = 0, renderTime = 0, resolveTime = 0;
+static uint64 saveStart = 0, saveTime = 0; // PNG, Raw
+static uint64 totalStart = 0;
 
 struct Scene {
     struct Face { vec3 position[3]; bgr3f color; };
@@ -75,8 +76,8 @@ struct Scene {
     RenderPass<Shader> pass {shader};
 
     void render(Image& final, mat4 view) {
-        profile( uint64 setupStart=readCycleCounter(); uint64 miscTime = setupStart-miscStart; )
-        target.setup(int2(final.size/4u/*MSAA->4x*/));
+        profile( uint64 setupStart=readCycleCounter(); miscTime += setupStart-miscStart; )
+        target.setup(int2(final.size)); // /4u/*MSAA->4x*/
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
             vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
@@ -84,13 +85,11 @@ struct Scene {
             vec3 attributes[0];
             pass.submit(A,B,C, attributes, {face.color});
         }
-        profile( uint64 renderStart=readCycleCounter(); uint64 setupTime = renderStart-setupStart; )
+        profile( uint64 renderStart=readCycleCounter(); setupTime += renderStart-setupStart; )
         pass.render(target);
-        profile( uint64 resolveStart=readCycleCounter(); uint64 renderTime = resolveStart-renderStart; )
+        profile( uint64 resolveStart=readCycleCounter(); renderTime += resolveStart-renderStart; )
         target.resolve(final);
-        profile( saveStart = readCycleCounter(); uint64 resolveTime = saveStart-resolveStart;
-                 totalTime = miscTime+setupTime+renderTime+resolveTime+saveTime; )
-
+        profile( saveStart = readCycleCounter(); resolveTime += saveStart-resolveStart; )
     }
 };
 
@@ -99,15 +98,33 @@ struct Render {
         Scene scene;
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
-        const int N = 65;
-        Image target (512);
+        const int N = 129;
+        Image target (128);
         Time time (true), lastReport(true);
 
         // Profile counters
-        profile( miscStart=readCycleCounter(); saveTime=0; ) // profile cycles spent outside render
+        profile( totalStart=miscStart=readCycleCounter(); saveTime=0; ) // profile cycles spent outside render
 
         for(int sIndex: range(N)) {
-            if(lastReport.seconds() > 1) { log(sIndex, "/", N, time); lastReport.reset(); }
+            if(lastReport.seconds() > 1) {
+                log(sIndex, "/", N, time);
+                uint64 totalTime = miscStart-totalStart;
+                //log("- Miscellaneous", strD(miscTime,totalTime));
+                //log("- Setup", strD(setupTime,totalTime));
+                //log("- Render", strD(renderTime,totalTime));
+                //log(" - Raster", strD(scene.pass.rasterTime, totalTime));
+                log(" - Pixel", strD(scene.pass.pixelTime, totalTime));
+                //log(" - Sample", strD(scene.pass.sampleTime, totalTime));
+                //log(" - SampleFirst", strD(scene.pass.sampleFirstTime, totalTime));
+                //log(" - SampleOver", strD(scene.pass.sampleOverTime, totalTime));
+                log(" - User", strD(scene.pass.userTime, totalTime));
+                //log(" - Total", strD(scene.pass.totalTime, totalTime));
+                log("- Resolve", strD(resolveTime,totalTime));
+                //log("- Save", strD(saveTime,totalTime));
+                uint64 accountedTime = miscTime+setupTime+renderTime+resolveTime+saveTime;
+                assert_(accountedTime==totalTime, accountedTime, totalTime);
+                lastReport.reset();
+            }
             for(int tIndex: range(N)) {
                 target.clear(0);
                 // Sheared perspective (rectification)
@@ -138,13 +155,13 @@ struct Render {
                     });
                 } else {
                     mat4 NDC;
-                    NDC.scale(vec3(vec2(target.size/**4u*/)/2.f, 1)); // 0, 2 -> subsample size
+                    NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
                     scene.render(target, NDC * M);
                 }
                 writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
                 if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
-                profile( miscStart = readCycleCounter(); saveTime = miscStart-saveStart; )
+                profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
             }
         }
         log(time);
@@ -204,7 +221,7 @@ struct Light {
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
             return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
         }
-        virtual vec2 sizeHint(vec2) override { return 512; }
+        virtual vec2 sizeHint(vec2) override { return 1024; }
         virtual shared<Graphics> graphics(vec2 size) override {
             this->image = _this.render(uint2(size));
             return ImageView::graphics(size);
@@ -324,7 +341,7 @@ struct Light {
             });
         } else {
             mat4 NDC;
-            NDC.scale(vec3(vec2(target.size/**4u*/)/2.f, 1)); // 0, 2 -> subsample size
+            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             scene.render(target, NDC * M);
         }
@@ -371,6 +388,7 @@ struct Light {
         images = ImageT<Image>(uint(xRange.size()), uint(yRange.size()));
         images.clear(Image());
 
+        buffer<String> tmpFiles = tmp.list(Files);
         for(string name: input.list(Files)) {
             TextData s (name);
             if(!s.isInteger()) s.until('_');
@@ -378,7 +396,7 @@ struct Light {
             s.match('_');
             uint x = uint(s.integer(false));
 
-            for(string mapName: tmp.list(Files)) {
+            for(string mapName: tmpFiles) {
                 if(endsWith(mapName, ".png")) continue;
                 TextData s (mapName);
                 if(!s.isInteger()) s.until('_');
