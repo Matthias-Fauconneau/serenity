@@ -75,9 +75,9 @@ struct Scene {
     } shader;
     RenderPass<Shader> pass {shader};
 
-    void render(Image& final, mat4 view) {
+    void render(const ImageH& B, const ImageH& G, const ImageH& R, mat4 view) {
         profile( uint64 setupStart=readCycleCounter(); miscTime += setupStart-miscStart; )
-        target.setup(int2(final.size)); // /4u/*MSAA->4x*/
+        target.setup(int2(B.size)); // /4u/*MSAA->4x*/
         pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
         for(const Face& face: faces) {
             vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
@@ -88,7 +88,7 @@ struct Scene {
         profile( uint64 renderStart=readCycleCounter(); setupTime += renderStart-setupStart; )
         pass.render(target);
         profile( uint64 resolveStart=readCycleCounter(); renderTime += resolveStart-renderStart; )
-        target.resolve(final);
+        target.resolve(B, G, R);
         profile( saveStart = readCycleCounter(); resolveTime += saveStart-resolveStart; )
     }
 };
@@ -99,7 +99,8 @@ struct Render {
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
         const int N = 129;
-        Image target (128);
+        ImageH B (128), G (128), R (128);
+        uint2 size = B.size;
         Time time (true), lastReport(true);
 
         // Profile counters
@@ -126,7 +127,6 @@ struct Render {
                 lastReport.reset();
             }
             for(int tIndex: range(N)) {
-                target.clear(0);
                 // Sheared perspective (rectification)
                 const float S = 2*sIndex/float(N-1)-1, T = 2*tIndex/float(N-1)-1; // [-1, 1]
                 const float left = (-1-S), right = (1-S);
@@ -143,24 +143,29 @@ struct Render {
                 M(3,3) = 0;
                 M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+#if 0
                 if(0) {
-                    parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) {
-                        for(int i: range(start, start+size)) {
-                            int y = i/target.size.x, x = i%target.size.x;
-                            const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
-                            const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
+                    parallel_chunk(size.y*size.x, [&](uint, size_t start, size_t sizeI) {
+                        for(int i: range(start, start+sizeI)) {
+                            int y = i/size.x, x = i%size.x;
+                            const vec3 O = M.inverse() * vec3(2.f*x/float(size.x-1)-1, 2.f*y/float(size.y-1)-1, -1);
+                            const vec3 P = M.inverse() * vec3(2.f*x/float(size.x-1)-1, 2.f*y/float(size.y-1)-1, 1);
                             const vec3 d = normalize(P-O);
                             target(x, y) = byte4(byte3(float(0xFF)*scene.raycast(O, d)), 0xFF);
                         }
                     });
-                } else {
+                } else
+#endif
+                {
                     mat4 NDC;
-                    NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
+                    NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-                    scene.render(target, NDC * M);
+                    scene.render(B, G, R, NDC * M);
                 }
-                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(target.size), cast<byte>(target), folder, true);
-                if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(target), folder, true);
+                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[B]", cast<byte>(B), folder, true);
+                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[G]", cast<byte>(G), folder, true);
+                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[R]", cast<byte>(R), folder, true);
+                //if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(), folder, true);
                 profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
             }
         }
@@ -209,7 +214,7 @@ struct Light {
     vec2 min, max;
     uint2 imageSize;
     array<Map> maps;
-    ImageT<Image> images;
+    ImageT<ImageH> B, G, R; // TODO: map 4D field to single 24GB file for gather
     Scene scene;
 
     bool sample = true, raycast = true, orthographic = true;
@@ -241,7 +246,6 @@ struct Light {
     Image render(uint2 size) {
         //if(inputs[view.value] != this->name) load(inputs[view.value]);
         Image target (size);
-        target.clear(0);
 
         mat4 M;
         if(orthographic) {
@@ -290,7 +294,7 @@ struct Light {
 
                         //if(name=="synthetic") {
                             //st *= vec2(images.size-uint2(1));
-                        const vec2 st = ST * vec2(images.size-uint2(1));
+                        const vec2 st = ST * vec2(B.size-uint2(1));
                         /*} else {
                             st[1] = 1-st[1];
                             if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
@@ -310,14 +314,24 @@ struct Light {
 
                         if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
                         int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
-                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0, is, it, iu, iv, st, uv, imageSize, images.size, Pst, Puv, O, d, nd, n_nd);
-                        if(is >= int(images.size.x)-1 || it >= int(images.size.y)-1) continue;
+                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
+                        if(is >= int(B.size.x)-1 || it >= int(B.size.y)-1) continue;
                         if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
                         float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
 
-                        bgr3f Sstuv [2][2][2][2];
+                        v16hf blue, green, red;
                         for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                            Sstuv[ds][dt][du][dv] = bgr3f(images(is+ds, it+dt)(iu+du, iv+dv).bgr());
+                            blue[((ds*2+dt)*2+du)*2+dv] = B(is+ds, it+dt)(iu+du, iv+dv);
+                            green[((ds*2+dt)*2+du)*2+dv] = G(is+ds, it+dt)(iu+du, iv+dv);
+                            red[((ds*2+dt)*2+du)*2+dv] = R(is+ds, it+dt)(iu+du, iv+dv);
+                        }
+
+                        bgr3f Sstuv [2][2][2][2];
+                        {
+                            v16sf B = toFloat(blue), G = toFloat(green), R = toFloat(red);
+                            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
+                                Sstuv[ds][dt][du][dv] = bgr3f( B[((ds*2+dt)*2+du)*2+dv], G[((ds*2+dt)*2+du)*2+dv], R[((ds*2+dt)*2+du)*2+dv] );
+                            }
                         }
 
                         bgr3f Sstu [2][2][2];
@@ -343,12 +357,13 @@ struct Light {
             mat4 NDC;
             NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-            scene.render(target, NDC * M);
+            ImageH B (target.size), G (target.size), R (target.size);
+            scene.render(B, G, R, NDC * M);
+            convert(target, B, G, R);
         }
         return target;
     }
     void load(string name) {
-        array<Image>(::move(images)).clear(); // Proper destruction in case heap allocated
         maps.clear();
         imageSize = 0;
         this->name = name;
@@ -385,8 +400,12 @@ struct Light {
         }
         if(0) log(min, max, max-min);
 
-        images = ImageT<Image>(uint(xRange.size()), uint(yRange.size()));
-        images.clear(Image());
+        B = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
+        B.clear(ImageH());
+        G = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
+        G.clear(ImageH());
+        R = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
+        R.clear(ImageH());
 
         buffer<String> tmpFiles = tmp.list(Files);
         for(string name: input.list(Files)) {
@@ -419,21 +438,24 @@ struct Light {
                 s.skip('x');
                 uint h = uint(s.integer(false));
 
+                s.skip('[');
+                int c = "BGR"_.indexOf(s.next());
+                s.skip(']');
+                assert_(c>=0&&c<=2);
                 assert_(!s);
 
-                images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
+                (*(ImageT<ImageH>*[]){&B,&G,&R}[c])(x, y) = ImageH(cast<half>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
                 goto break_;
-
             } /*else*/ {
-                log(name);
-                Image image = decodeImage(Map(name, input));
+                error(name);
+                /*Image image = decodeImage(Map(name, input));
                 assert_(image.stride == image.size.x);
                 String mapName = name+'.'+strx(image.size);
                 writeFile(mapName, cast<byte>(image), tmp);
-                images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), image.size);
+                images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), image.size);*/
             } break_:;
-            if(!imageSize) imageSize = images(x, y).size;
-            assert_(images(x,y).size == imageSize);
+            if(!imageSize) imageSize = B(x, y).size;
+            assert_(B(x,y).size == imageSize);
         }
         if(window) {
             window->setSize();

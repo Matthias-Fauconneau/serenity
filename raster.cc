@@ -1,66 +1,78 @@
 #include "raster.h"
 
-void RenderTarget::resolve(const Image& target) {
-    assert_(size);
-#if 0
-    constexpr float scale = 0xFFF;
-    extern uint8 sRGB_forward[0x1000];
-#else
-    constexpr float scale = 0xFF;
-    struct { uint8 operator[](uint v) { return v; } } sRGB_forward;
-#endif
-    const byte4 backgroundColor(
-                sRGB_forward[uint(this->backgroundColor.b*scale)],
-                sRGB_forward[uint(this->backgroundColor.g*scale)],
-                sRGB_forward[uint(this->backgroundColor.r*scale)], 0xFF);
-    const uint stride = target.stride;
+// Untiles render buffer, resolves (average samples of) multisampled pixels, and converts to half floats (linear RGB)
+void RenderTarget::resolve(const ImageH& B, const ImageH& G, const ImageH& R) {
+    const uint stride = B.stride;
     for(uint tileY: range(height)) for(uint tileX: range(width)) {
         Tile& tile = tiles[tileY*width+tileX];
-        byte4* const targetTilePtr = &target(tileX*16, tileY*16);
+        uint const targetTilePtr = tileY*16*stride + tileY*16;
         if(!tile.cleared) { // Empty
-            if(tile.lastCleared) for(uint y: range(16)) for(uint x: range(16)) targetTilePtr[y*stride+x] = backgroundColor;
+            if(tile.lastCleared) for(uint y: range(16)) for(uint x: range(16)) {
+                B[targetTilePtr+y*stride+x] = backgroundColor.b;
+                G[targetTilePtr+y*stride+x] = backgroundColor.g;
+                R[targetTilePtr+y*stride+x] = backgroundColor.r;
+            }
             // else was already empty on last frame
             continue;
         }
-        //static size_t block = 0, sample = 0;
         for(uint blockY: range(4)) for(uint blockX: range(4)) {
             const uint blockI = blockY*4+blockX;
             const uint blockPtr = blockI*(4*4);
-            byte4* const targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
-            //if(!tile.subsample[blockI]) block++; else sample++;
-            if(!tile.subsample[blockI]) { // Fast (vectorized) path to convert full block of non-multisampled pixels
-                v16sf blue = tile.blue[blockI]*scale;
-                v16sf green = tile.green[blockI]*scale;
-                v16sf red = tile.red[blockI]*scale;
-#if 0
-                // TODO: gather sRGB lookup or arithmetic convert
-#else // no sRGB
-                v16si B = cvtt(blue);
-                v16si G = cvtt(green);
-                v16si R = cvtt(red);
-                for(uint pixelY: range(4)) for(uint pixelX: range(4)) {
-                    const uint pixelI = pixelY*4+pixelX;
-                    targetBlockPtr[pixelY*stride+pixelX] = byte4(B[pixelI], G[pixelI], R[pixelI], 0xFF);
+            const uint targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
+            v16sf blue, green, red;
+            if(!tile.subsample[blockI]) { // No multisampled pixel in block => Directly load block without any multisampled pixels to blend
+                blue = tile.blue[blockI], green = tile.green[blockI], red = tile.red[blockI];
+            } else {
+                // Resolves (average samples of) multisampled pixels
+                const v16si seqI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+                const v16si pixelSeq = 16*seqI;
+                v16sf blue = 0, green = 0, red = 0;
+                for(uint sampleI: range(16)) {
+                    blue += gather((float*)(tile.subblue+blockPtr)+sampleI, pixelSeq);
+                    green += gather((float*)(tile.subgreen+blockPtr)+sampleI, pixelSeq);
+                    red += gather((float*)(tile.subred+blockPtr)+sampleI, pixelSeq);
                 }
-#endif
-            } else { // Resolves (average samples of) multisampled pixels
+                blend(tile.blue[blockI], blue, mask(tile.subsample[blockI]));
+                blend(tile.green[blockI], green, mask(tile.subsample[blockI]));
+                blend(tile.red[blockI], red, mask(tile.subsample[blockI]));
+            }
+            /*if(!tile.subsample[blockI])*/ { // Fast (vectorized) path to convert full block of non-multisampled pixels
+                v16hf blue = toHalf(tile.blue[blockI]);
+                v16hf green = toHalf(tile.green[blockI]);
+                v16hf red = toHalf(tile.red[blockI]);
+                for(uint pixelY: range(4)) for(uint pixelX: range(4)) { // FIXME: 4X
+                    const uint pixelI = pixelY*4+pixelX;
+                    const uint targetPixelI = targetBlockPtr+pixelY*stride+pixelX;
+                    B[targetPixelI] = blue[pixelI];
+                    G[targetPixelI] = green[pixelI];
+                    R[targetPixelI] = red[pixelI];
+                }
+            } /*else { // Resolves (average samples of) multisampled pixels
                 for(uint pixelY: range(4)) for(uint pixelX: range(4)) {
                     const uint pixelI = pixelY*4+pixelX;
                     const uint pixelPtr = blockPtr+pixelI;
+                    const uint targetPixelI = targetBlockPtr+pixelY*stride+pixelX;
                     float blue, green, red;
                     if(!(tile.subsample[blockI]&(1<<pixelI))) {
-                        blue = ((float*)tile.blue)[pixelPtr] * scale;
-                        green = ((float*)tile.green)[pixelPtr] * scale;
-                        red = ((float*)tile.red)[pixelPtr] * scale;
+                        blue = ((float*)tile.blue)[pixelPtr];
+                        green = ((float*)tile.green)[pixelPtr];
+                        red = ((float*)tile.red)[pixelPtr];
                     } else {
-                        blue = sum16(tile.subblue[pixelPtr]) * scale/(4*4);
-                        green = sum16(tile.subgreen[pixelPtr]) * scale/(4*4);
-                        red = sum16(tile.subred[pixelPtr]) * scale/(4*4);
+                        blue = sum16(tile.subblue[pixelPtr]) / (4*4);
+                        green = sum16(tile.subgreen[pixelPtr]) / (4*4);
+                        red = sum16(tile.subred[pixelPtr]) /(4*4);
                     }
-                    targetBlockPtr[pixelY*stride+pixelX] = byte4(sRGB_forward[uint(blue)], sRGB_forward[uint(green)], sRGB_forward[uint(red)], 0xFF);
+                    B[targetPixelI] = blue;
+                    G[targetPixelI] = green;
+                    R[targetPixelI] = red;
                 }
-            }
+            }*/
         }
-        //log(block, sample, (float)block/sample);
     }
+}
+
+void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R) {
+    extern uint8 sRGB_forward[0x1000];
+    for(size_t i: range(target.ref::size))
+        target[i] = byte4(sRGB_forward[uint(B[i]*0xFFF)], sRGB_forward[uint(G[i]*0xFFF)], sRGB_forward[uint(R[i]*0xFFF)], 0xFF);
 }

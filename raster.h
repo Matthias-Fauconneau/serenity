@@ -53,9 +53,11 @@ struct RenderTarget {
         for(Tile& tile: tiles) { tile.lastCleared=1; tile.cleared=0; } // Forces initial background blit to target
     }
 
-    // Resolves internal MSAA linear framebuffer to sRGB target
-    void resolve(const Image& target);
+    // Resolves internal MSAA linear framebuffer to RGB linear half buffers
+    void resolve(const ImageH& B, const ImageH& G, const ImageH& R);
 };
+
+void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R);
 
 // 4×4 xy steps constant mask for the 4 possible reject corner
 static constexpr vec2 XY[4][4*4] = {
@@ -89,7 +91,7 @@ template<class Shader> struct RenderPass {
     // Shading parameters
     typedef typename Shader::FaceAttributes FaceAttributes;
     static constexpr int V = Shader::V;
-    static constexpr bool blend = Shader::blend;
+    //static constexpr bool blend = Shader::blend;
     const Shader& shader;
 
     // Geometry to rasterize
@@ -264,9 +266,9 @@ template<class Shader> struct RenderPass {
 
                             // 4×4 samples mask
                             v16sf sampleMask =
-                                    (pixelReject[0][pixelI] > face.sampleStep[0]) &
-                                    (pixelReject[1][pixelI] > face.sampleStep[1]) &
-                                    (pixelReject[2][pixelI] > face.sampleStep[2]);
+                                    (v16sf(pixelReject[0][pixelI]) > face.sampleStep[0]) &
+                                    (v16sf(pixelReject[1][pixelI]) > face.sampleStep[1]) &
+                                    (v16sf(pixelReject[2][pixelI]) > face.sampleStep[2]);
                             const vec2 pixelXY = 4.f*XY[0][pixelI];
                             const uint16 pixelPtr = blockPtr+pixelI;
                             pixels[pixelCount++] = DrawPixel{sampleMask, blockXY+pixelXY, pixelPtr};
@@ -306,7 +308,7 @@ template<class Shader> struct RenderPass {
                             float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
                             float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
                             float& dstR = tile.red[pixelPtr/16][pixelPtr%16];
-                            if(blend) {
+                            if(Shader::blend) {
                                 dstB=(1-src.a)*dstB+src.a*src.b;
                                 dstG=(1-src.a)*dstG+src.a*src.g;
                                 dstR=(1-src.a)*dstR+src.a*src.r;
@@ -319,13 +321,13 @@ template<class Shader> struct RenderPass {
                             // 2D coordinates vector
                             const v16sf sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
                             // Interpolates w for perspective correction
-                            const v16sf w = 1/(face.i1.x*sampleX + face.i1.y*sampleY + face.i1.z);
+                            const v16sf w = 1/(v16sf(face.i1.x)*sampleX + v16sf(face.i1.y)*sampleY + v16sf(face.i1.z));
                             // Interpolates perspective correct z
-                            const v16sf z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
+                            const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
                             // Performs Z-Test
                             v16sf& subpixel = tile.subdepth[pixelPtr];
-                            const v16sf visibleMask = (z >= subpixel);
+                            const v16si visibleMask = (z >= subpixel);
 
                             // Stores accepted pixels in Z buffer
                             maskstore(subpixel, visibleMask, z);
@@ -336,7 +338,7 @@ template<class Shader> struct RenderPass {
 
                             // Computes vertex attributes at all samples
                             for(int i=0;i<V;i++) {
-                                const v16sf samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                                const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
                                 // Zeroes hidden samples
                                 const v16sf visible = samples & visibleMask;
                                 // Averages on the visible samples
@@ -349,10 +351,10 @@ template<class Shader> struct RenderPass {
                             v16sf& dstB = tile.subblue[pixelPtr];
                             v16sf& dstG = tile.subgreen[pixelPtr];
                             v16sf& dstR = tile.subred[pixelPtr];
-                            if(blend) {
-                                maskstore(dstB, visibleMask, (1-src.a)*dstB+src.a*src.b);
-                                maskstore(dstG, visibleMask, (1-src.a)*dstG+src.a*src.g);
-                                maskstore(dstR, visibleMask, (1-src.a)*dstR+src.a*src.r);
+                            if(Shader::blend) {
+                                maskstore(dstB, visibleMask, v16sf(1-src.a)*dstB+v16sf(src.a*src.b));
+                                maskstore(dstG, visibleMask, v16sf(1-src.a)*dstG+v16sf(src.a*src.g));
+                                maskstore(dstR, visibleMask, v16sf(1-src.a)*dstR+v16sf(src.a*src.r));
                             } else {
                                 maskstore(dstB, visibleMask, src.b);
                                 maskstore(dstG, visibleMask, src.g);
@@ -373,9 +375,9 @@ template<class Shader> struct RenderPass {
                     // 2D coordinates vector
                     const v16sf sampleX = pixelXY.x + X, sampleY = pixelXY.y + Y;
                     // Interpolates w for perspective correction
-                    const v16sf w = 1/(face.i1.x*sampleX + face.i1.y*sampleY + face.i1.z);
+                    const v16sf w = 1/(v16sf(face.i1.x)*sampleX + v16sf(face.i1.y)*sampleY + v16sf(face.i1.z));
                     // Interpolates perspective correct z
-                    const v16sf z = w*(face.iz.x*sampleX + face.iz.y*sampleY + face.iz.z);
+                    const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
                     // Convert single sample pixel to subsampled pixel
                     if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
@@ -386,10 +388,10 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         float pixelZ = tile.depth[pixelPtr/16][pixelPtr%16];
-                        const v16sf visibleMask = (z <= pixelZ) & draw.mask;
+                        const v16si visibleMask = (z <= pixelZ) & draw.mask;
 
                         // Blends accepted pixels in subsampled Z buffer
-                        tile.subdepth[pixelPtr] = blend16(pixelZ, z, visibleMask);
+                        tile.subdepth[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
 
                         // Counts visible samples
                         float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
@@ -397,7 +399,7 @@ template<class Shader> struct RenderPass {
                         // Computes vertex attributes at all samples
                         float centroid[V];
                         for(int i=0;i<V;i++) {
-                            const v16sf samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                            const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
                             // Averages on the visible samples
@@ -413,14 +415,14 @@ template<class Shader> struct RenderPass {
                         float pixelB = tile.blue[pixelPtr/16][pixelPtr%16];
                         float pixelG = tile.green[pixelPtr/16][pixelPtr%16];
                         float pixelR = tile.red[pixelPtr/16][pixelPtr%16];
-                        if(blend) {
-                            dstB = blend16(pixelB, (1-src.a)*pixelB+src.a*src.b, visibleMask);
-                            dstG = blend16(pixelG, (1-src.a)*pixelG+src.a*src.g, visibleMask);
-                            dstR = blend16(pixelR, (1-src.a)*pixelR+src.a*src.r, visibleMask);
+                        if(Shader::blend) {
+                            dstB = blend(pixelB, (1-src.a)*pixelB+src.a*src.b, visibleMask);
+                            dstG = blend(pixelG, (1-src.a)*pixelG+src.a*src.g, visibleMask);
+                            dstR = blend(pixelR, (1-src.a)*pixelR+src.a*src.r, visibleMask);
                         } else {
-                            dstB = blend16(pixelB, src.b, visibleMask);
-                            dstG = blend16(pixelG, src.g, visibleMask);
-                            dstR = blend16(pixelR, src.r, visibleMask);
+                            dstB = blend(pixelB, src.b, visibleMask);
+                            dstG = blend(pixelG, src.g, visibleMask);
+                            dstR = blend(pixelR, src.r, visibleMask);
                         }
                         //profile( sampleFirstTime += (userStart-start) + (readCycleCounter()-userEnd); )
                     } else {
@@ -428,7 +430,7 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         v16sf& subpixel = tile.subdepth[pixelPtr];
-                        const v16sf visibleMask = (z <= subpixel) & draw.mask;
+                        const v16si visibleMask = (z <= subpixel) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
                         maskstore(subpixel, visibleMask, z);
@@ -439,7 +441,7 @@ template<class Shader> struct RenderPass {
                         // Computes vertex attributes at all samples
                         float centroid[V];
                         for(int i=0;i<V;i++) {
-                            const v16sf samples = w*(face.varyings[i].x*sampleX + face.varyings[i].y*sampleY + face.varyings[i].z);
+                            const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
                             // Averages on the visible samples
@@ -452,10 +454,10 @@ template<class Shader> struct RenderPass {
                         v16sf& dstB = tile.subblue[pixelPtr];
                         v16sf& dstG = tile.subgreen[pixelPtr];
                         v16sf& dstR = tile.subred[pixelPtr];
-                        if(blend) {
-                            maskstore(dstB, visibleMask, (1-src.a)*dstB+src.a*src.b);
-                            maskstore(dstG, visibleMask, (1-src.a)*dstG+src.a*src.g);
-                            maskstore(dstR, visibleMask, (1-src.a)*dstR+src.a*src.r);
+                        if(Shader::blend) {
+                            maskstore(dstB, visibleMask, v16sf(1-src.a)*dstB+v16sf(src.a*src.b));
+                            maskstore(dstG, visibleMask, v16sf(1-src.a)*dstG+v16sf(src.a*src.g));
+                            maskstore(dstR, visibleMask, v16sf(1-src.a)*dstR+v16sf(src.a*src.r));
                         } else {
                             maskstore(dstB, visibleMask, src.b);
                             maskstore(dstG, visibleMask, src.g);

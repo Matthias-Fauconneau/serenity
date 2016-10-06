@@ -5,186 +5,114 @@
 #include <immintrin.h>
 typedef float v4sf __attribute((__vector_size__ (16)));
 typedef float v8sf __attribute((__vector_size__ (32)));
+typedef short v8hf __attribute((__vector_size__ (16)));
+typedef short v16hf __attribute((__vector_size__ (32)));
 
-#if 0
-typedef float v16sf __attribute((__vector_size__ (64)));
-
-inline v16sf float16(float f) { return (v16sf){f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f}; }
-static v16sf unused _0f = float16(0);
-static v16sf unused _1f = float16(1);
-
-typedef int v16si __attribute((__vector_size__ (64)));
-
-typedef uint16 mask16;
-
-inline mask16 mask(v16sf A) { return __builtin_ia32_movmskps256(__builtin_shufflevector(A, A, 0,1,2,3,4,5,6,7))|
-                                  (__builtin_ia32_movmskps256(__builtin_shufflevector(A, A, 8,9,10,11,12,13,14,15))<<8); }
-
-inline v16sf and(v16sf A, v16si M) { return (v16sf)((v16si)A&M); }
-
-static inline v16sf blend(mask16 k, v16sf a, v16sf b) { return _mm512_mask_blend_ps(k, a, b); }
-
-inline void store(v16sf& P, v16sf A, mask16 M) { __builtin_ia32_storeaps512_mask(&P, A, M); }
-
-inline float sum(v16sf A) {
-    v16sf t = A + _mm512_shuffle_f32x4(A,A,_MM_SHUFFLE(0,0,3,2));
-    v4sf r = _mm512_castps512_ps128(_mm512_add_ps(t,_mm512_shuffle_f32x4(t,t,_MM_SHUFFLE(0,0,0,1))));
-    r = _mm_hadd_ps(r,r);
-    return _mm_cvtss_f32(_mm_hadd_ps(r,r));
-}
-#else
-#pragma once
-#include "string.h"
-
-// AVX intrinsics
-#define __AVX__ 1
-#include <immintrin.h>
-#ifndef __GXX_EXPERIMENTAL_CXX0X__ //for QtCreator
-#include <avxintrin.h>
-#endif
-typedef int v8si __attribute((vector_size(32),may_alias));
 typedef float v8sf __attribute((vector_size(32),may_alias));
+inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
+
+typedef int v8si __attribute((vector_size(32),may_alias));
+inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
+static v8si unused _0i = intX(0);
+static v8si unused _1i = intX(-1);
+
+static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
+
+struct v16si;
 
 /// 16-wide vector operations using 2 v8sf AVX registers
 struct v16sf {
     v8sf r1,r2;
     v16sf(){}
-    v16sf(float x){r1=r2= _mm256_set1_ps(x);}
+    v16sf(float x){ r1 = r2 = float8(x);}
     v16sf(const v8sf& r1, const v8sf& r2):r1(r1),r2(r2){}
     v16sf(float x0, float x1, float x2, float x3, float x4, float x5, float x6, float x7, float x8, float x9, float x10, float x11, float x12, float x13, float x14, float x15):r1(__extension__ (__m256){x7,x6,x5,x4,x3,x2,x1,x0}),r2(__extension__ (__m256){x15,x14,x13,x12,x11,x10,x9,x8}){}
     float& operator [](uint i) { return ((float*)this)[i]; }
     const float& operator [](uint i) const { return ((float*)this)[i]; }
+    operator v16si() const;
 };
 
-inline v16sf operator +(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
-}
-inline v16sf operator +(v16sf b, float a) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_add_ps(A,b.r1),_mm256_add_ps(A,b.r2));
-}
-inline v16sf operator +(v16sf a, v16sf b) {
-    return v16sf(_mm256_add_ps(a.r1,b.r1),_mm256_add_ps(a.r2,b.r2));
-}
-
-inline v16sf operator *(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_mul_ps(A,b.r1),_mm256_mul_ps(A,b.r2));
-}
-inline v16sf operator *(v16sf a, v16sf b) {
-    return v16sf(_mm256_mul_ps(a.r1,b.r1),_mm256_mul_ps(a.r2,b.r2));
-}
-inline v16sf operator /(const int one unused, v16sf d) {
-    assert(one==1);
-    return v16sf(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2));
-}
-
-inline v16sf operator |(v16sf a, v16sf b) {
-    return v16sf(_mm256_or_ps(a.r1,b.r1),_mm256_or_ps(a.r2,b.r2));
-}
-inline v16sf operator &(v16sf a, v16sf b) {
-    return v16sf(_mm256_and_ps(a.r1,b.r1),_mm256_and_ps(a.r2,b.r2));
-}
-
-inline v16sf operator <(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(A, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LT_OQ));
-}
-inline v16sf operator <=(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(A, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_LE_OQ));
-}
-inline v16sf operator >=(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(A, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GE_OQ));
-}
-inline v16sf operator >(float a, v16sf b) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(A, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(A, b.r2, _CMP_GT_OQ));
-}
-
-inline v16sf operator <(v16sf b, float a) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(b.r1, A, _CMP_LT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LT_OQ));
-}
-inline v16sf operator <=(v16sf b, float a) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(b.r1, A, _CMP_LE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_LE_OQ));
-}
-inline v16sf operator >=(v16sf b, float a) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(b.r1, A, _CMP_GE_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GE_OQ));
-}
-inline v16sf operator >(v16sf b, float a) {
-    v8sf A=_mm256_set1_ps(a);
-    return v16sf(_mm256_cmp_ps(b.r1, A, _CMP_GT_OQ),_mm256_cmp_ps(b.r2, A, _CMP_GT_OQ));
-}
-
-inline v16sf operator <(v16sf a, v16sf b) {
-    return v16sf(_mm256_cmp_ps(a.r1, b.r1, _CMP_LT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LT_OQ));
-}
-inline v16sf operator <=(v16sf a, v16sf b) {
-    return v16sf(_mm256_cmp_ps(a.r1, b.r1, _CMP_LE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_LE_OQ));
-}
-inline v16sf operator >=(v16sf a, v16sf b) {
-    return v16sf(_mm256_cmp_ps(a.r1, b.r1, _CMP_GE_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GE_OQ));
-}
-inline v16sf operator >(v16sf a, v16sf b) {
-    return v16sf(_mm256_cmp_ps(a.r1, b.r1, _CMP_GT_OQ),_mm256_cmp_ps(a.r2, b.r2, _CMP_GT_OQ));
-}
-inline uint mask(v16sf m) { return _mm256_movemask_ps(m.r1)|(_mm256_movemask_ps(m.r2)<<8); }
+inline v16sf& operator+=(v16sf& a, v16sf b) { a.r1 += b.r1; a.r2 += b.r2; return a; }
+inline v16sf operator+(v16sf a, v16sf b) { return v16sf(a.r1 + b.r1, a.r2 + b.r2); }
+//inline v16sf operator+(float a, v16sf b) { return v16sf(float8(a) + b.r1, float8(a) + b.r2); }
+//inline v16sf operator+(v16sf b, float a) { return a+b; }
+//inline v16sf operator*(float a, v16sf b) { return v16sf(float8(a) * b.r1, float8(a) * b.r2); }
+inline v16sf operator*(v16sf a, v16sf b) { return v16sf(a.r1 * b.r1, a.r2 * b.r2); }
+inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return v16sf(_mm256_rcp_ps(d.r1),_mm256_rcp_ps(d.r2)); }
 
 inline float sum8(v8sf x) {
-    // hiQuad = ( x7, x6, x5, x4 )
-    const __m128 hiQuad = _mm256_extractf128_ps(x, 1);
-    // loQuad = ( x3, x2, x1, x0 )
-    const __m128 loQuad = _mm256_castps256_ps128(x);
-    // sumQuad = ( x3 + x7, x2 + x6, x1 + x5, x0 + x4 )
-    const __m128 sumQuad = _mm_add_ps(loQuad, hiQuad);
-    // loDual = ( -, -, x1 + x5, x0 + x4 )
-    const __m128 loDual = sumQuad;
-    // hiDual = ( -, -, x3 + x7, x2 + x6 )
-    const __m128 hiDual = _mm_movehl_ps(sumQuad, sumQuad);
-    // sumDual = ( -, -, x1 + x3 + x5 + x7, x0 + x2 + x4 + x6 )
-    const __m128 sumDual = _mm_add_ps(loDual, hiDual);
-    // lo = ( -, -, -, x0 + x2 + x4 + x6 )
-    const __m128 lo = sumDual;
-    // hi = ( -, -, -, x1 + x3 + x5 + x7 )
-    const __m128 hi = _mm_shuffle_ps(sumDual, sumDual, 0x1);
-    // sum = ( -, -, -, x0 + x1 + x2 + x3 + x4 + x5 + x6 + x7 )
-    const __m128 sum = _mm_add_ss(lo, hi);
-    return _mm_cvtss_f32(sum);
+    const v4sf sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7
+    const v4sf sumDual = sumQuad + __builtin_shufflevector(sumQuad, sumQuad, 2, 3, -1, -1); // 0+4 + 2+6, 1+5 + 3+7 (+movehl)
+    return (sumDual + __builtin_shufflevector(sumDual, sumDual, 1, -1, -1, -1))[0]; // 0+4+2+6 + 1+5+3+7
 }
 inline float sum16(v16sf v) { return sum8(v.r1+v.r2); }
 
-inline v16sf blend16(float a, v16sf b, v16sf mask) {
-    v8sf A = _mm256_set1_ps(a);
-    return v16sf(_mm256_blendv_ps(A,b.r1,mask.r1),_mm256_blendv_ps(A,b.r2,mask.r2));
-}
-inline v16sf blend16(float a, float b, v16sf mask) {
-    v8sf A = _mm256_set1_ps(a);
-    v8sf B = _mm256_set1_ps(b);
-    return v16sf(_mm256_blendv_ps(A,B,mask.r1),_mm256_blendv_ps(A,B,mask.r2));
-}
-
-inline void maskstore(v16sf& P, v16sf M, v16sf A) {
-    _mm256_maskstore_ps((float*)&P.r1,(__m256i)M.r1,A.r1);
-    _mm256_maskstore_ps((float*)&P.r2,(__m256i)M.r2,A.r2);
-}
-
-inline string str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
+//inline string str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
 
 /// 16-wide vector operations using 2 v8si AVX registers
 struct v16si {
     v8si r1,r2;
     v16si(){}
-    v16si(int x){r1=r2= _mm256_set1_epi32(x);}
-    v16si(const v8si& r1, const v8si& r2):r1(r1),r2(r2){}
+    explicit v16si(int x){ r1 = r2 = intX(x); }
+    v16si(const v8si r1, const v8si r2):r1(r1),r2(r2){}
+    v16si(int x0, int x1, int x2, int x3, int x4, int x5, int x6, int x7, int x8, int x9, int x10, int x11, int x12, int x13, int x14, int x15):r1((v8si){x7,x6,x5,x4,x3,x2,x1,x0}),r2((v8si){x15,x14,x13,x12,x11,x10,x9,x8}){}
     int& operator [](uint i) { return ((int*)this)[i]; }
     const int& operator [](uint i) const { return ((int*)this)[i]; }
+    operator v16sf() const;
 };
+
+inline v16sf::operator v16si() const { return {(v8si)r1, (v8si)r2}; }
+inline v16si::operator v16sf() const { return {(v8sf)r1, (v8sf)r2}; }
+
+inline v16si operator*(int a, v16si b) { return v16si(intX(a) * b.r1, intX(a) * b.r2); }
+
+static inline v16sf gather(const float* P, v16si i) { return v16sf(gather(P, i.r1), gather(P, i.r2)); }
+
+inline v16si operator<(float a, v16sf b) { return v16si(float8(a) < b.r1, float8(a) < b.r2); }
+inline v16si operator<=(float a, v16sf b) { return v16si(float8(a) <= b.r1, float8(a) <= b.r2); }
+inline v16si operator>=(float a, v16sf b) { return v16si(float8(a) >= b.r1, float8(a) >= b.r2); }
+inline v16si operator>(float a, v16sf b) { return v16si(float8(a) > b.r1, float8(a) > b.r2); }
+
+inline v16si operator<(v16sf b, float a) { return a > b; }
+inline v16si operator<=(v16sf b, float a) { return a >= b; }
+inline v16si operator>=(v16sf b, float a) { return a <= b; }
+inline v16si operator>(v16sf b, float a) { return a < b; }
+
+inline v16si operator<(v16sf a, v16sf b) { return v16si(a.r1 < b.r1, a.r2 < b.r2); }
+inline v16si operator<=(v16sf a, v16sf b) { return v16si(a.r1 <= b.r1, a.r2 <= b.r2); }
+inline v16si operator>=(v16sf a, v16sf b) { return v16si(a.r1 >= b.r1, a.r2 >= b.r2); }
+inline v16si operator>(v16sf a, v16sf b) { return v16si(a.r1 > b.r1, a.r2 > b.r2); }
+
+inline uint mask(v16si m) { return __builtin_ia32_movmskps256(m.r1)|(__builtin_ia32_movmskps256(m.r2)<<8); }
+
+typedef uint8 mask8;
+// FIXME
+inline v8si mask(const mask8 m) { return (v8si){m&(1<<0), m&(1<<1),m&(1<<2), m&(1<<3), m&(1<<4), m&(1<<5), m&(1<<6), m&(1<<7)}; }
+typedef uint16 mask16;
+inline v16si mask(const mask16 m) { return v16si(mask(mask8(m)), mask(mask8(m>>8))); }
+
+inline v16si operator &(v16si a, v16si b) { return v16si(a.r1 & b.r1, a.r2 & b.r2); }
+inline v16sf operator &(v16sf a, v16si b) { return (v16sf)((v16si)a & b); }
+
+inline v16sf blend(v16sf A, v16sf B, v16si mask) { return v16sf(__builtin_ia32_blendvps256(A.r1, B.r1, mask.r1),__builtin_ia32_blendvps256(A.r2, B.r2, mask.r2)); }
+
+inline void maskstore(v16sf& P, v16si M, v16sf A) {
+    __builtin_ia32_maskstoreps256(&P.r1, M.r1, A.r1);
+    __builtin_ia32_maskstoreps256(&P.r2, M.r2, A.r2);
+}
 
 inline v16si cvtt(const v16sf v) { return {__builtin_ia32_cvttps2dq256(v.r1), __builtin_ia32_cvttps2dq256(v.r2)}; }
 
-#endif
+/// 16-wide vector operations using 2 v8si AVX registers
+inline v16hf toHalf(const v16sf v) {
+    v4sf a = __builtin_ia32_vcvtps2ph256(v.r1, 0);
+    v4sf b = __builtin_ia32_vcvtps2ph256(v.r2, 0);
+    return __builtin_shufflevector(a, b, 0, 1, 2, 3, 4, 5, 6, 7);
+}
+
+/// 16-wide vector operations using 2 v8si AVX registers
+inline v16sf toFloat(const v16hf v) {
+    return v16sf(__builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 0+0, 0+1, 0+2, 0+3, 0+4, 0+5, 0+6, 0+7)),
+                 __builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 8+0, 8+1, 8+2, 8+3, 8+4, 8+5, 8+6, 8+7)));
+}
+
