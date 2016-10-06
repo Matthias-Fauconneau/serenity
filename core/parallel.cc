@@ -56,7 +56,7 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
-#if 1
+#if 0
 extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {

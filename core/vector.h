@@ -123,6 +123,7 @@ generic struct xyzw {
  vec< ::xyz,T,3> xyw() const { return vec3(x, y, w); }
 };
 typedef vec<xyzw,float,4> vec4;
+typedef vec<xyzw,uint,4> uint4;
 
 generic struct bgr { T b,g,r; };
 typedef vec<bgr,uint8,3> byte3;

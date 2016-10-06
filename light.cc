@@ -98,9 +98,17 @@ struct Render {
         Scene scene;
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
-        const int N = 129;
-        ImageH B (128), G (128), R (128);
-        uint2 size = B.size;
+
+        const size_t N = 129;
+        uint2 size = 128;
+
+        File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
+        size_t byteSize = 3*N*N*size.y*size.x*sizeof(half);
+        assert_(byteSize <= 24ull*1024*1024*1024);
+        file.resize(byteSize);
+        Map map (file, Map::Prot(Map::Read|Map::Write));
+        mref<half> field = mcast<half>(map);
+
         Time time (true), lastReport(true);
 
         // Profile counters
@@ -160,11 +168,14 @@ struct Render {
                     mat4 NDC;
                     NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+                    ImageH B (unsafeRef(field.slice((0*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+                    ImageH G (unsafeRef(field.slice((1*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+                    ImageH R (unsafeRef(field.slice((2*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
                     scene.render(B, G, R, NDC * M);
                 }
-                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[B]", cast<byte>(B), folder, true);
-                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[G]", cast<byte>(G), folder, true);
-                writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[R]", cast<byte>(R), folder, true);
+                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[B]", cast<byte>(B), folder, true);
+                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[G]", cast<byte>(G), folder, true);
+                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[R]", cast<byte>(R), folder, true);
                 //if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(), folder, true);
                 profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
             }
@@ -212,9 +223,10 @@ struct Light {
 
     string name;
     vec2 min, max;
+    uint2 imageCount;
     uint2 imageSize;
-    array<Map> maps;
-    ImageT<ImageH> B, G, R; // TODO: map 4D field to single 24GB file for gather
+    Map map;
+    ref<half> field;
     Scene scene;
 
     bool sample = true, raycast = true, orthographic = true;
@@ -244,7 +256,17 @@ struct Light {
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
     Image render(uint2 size) {
-        //if(inputs[view.value] != this->name) load(inputs[view.value]);
+        size_t fieldSize = imageCount.y*imageCount.x*imageSize.y*imageSize.x;
+        struct Image4DH : ref<half> {
+            uint4 size;
+            Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
+            const half& operator ()(int s, int t, int u, int v) const {
+                return operator[](((t*size[1]+s)*size[2]+v)*size[3]+u);
+            }
+        }   B {imageCount, imageSize, field.slice(0*fieldSize, fieldSize)},
+            G {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
+            R {imageCount, imageSize, field.slice(2*fieldSize, fieldSize)};
+
         Image target (size);
 
         mat4 M;
@@ -272,8 +294,8 @@ struct Light {
         }
 
         if(raycast) {
-            parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t size) {
-                for(int i: range(start, start+size)) {
+            ({ size_t start=0, sizeI=target.size.y*target.size.x; //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
+                for(int i: range(start, start+sizeI)) {
                     int y = i/target.size.x, x = i%target.size.x;
                     const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
                     const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
@@ -292,38 +314,21 @@ struct Light {
                         const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
                         const vec2 UV = (Puv+vec2(1))/2.f;
 
-                        //if(name=="synthetic") {
-                            //st *= vec2(images.size-uint2(1));
-                        const vec2 st = ST * vec2(B.size-uint2(1));
-                        /*} else {
-                            st[1] = 1-st[1];
-                            if(x==target.size.x/2 && y==target.size.y/2) log(1, st);
-                            st *= imageSize.y-1; // Pixel units
-                            if(x==target.size.x/2 && y==target.size.y/2) log(2, st, imageSize.y);
-                            //st += vec2(imageSize)/2.f; // Corner to center
-                            //if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min);
-                            st = (st-min)/(max-min) * vec2(images.size-uint2(1)); // Pixel to image indices
-                            if(x==target.size.x/2 && y==target.size.y/2) log(3, st, min, max, images.size);
-                            //st -= vec2(images.size-uint2(1))/2.f; // Center to corner
-                            //if(x==target.size.x/2 && y==target.size.y/2) log(5, st);
-                        }*/
-
-                        //if(name!="synthetic") uv[1] = 1-uv[1];
-                        //uv *= imageSize.x-1;
-                        const vec2 uv = UV * float(imageSize.x-1);
+                        const vec2 st = ST * vec2(imageCount-uint2(1));
+                        const vec2 uv = UV * vec2(imageSize-uint2(1));
 
                         if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
                         int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
                         assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
-                        if(is >= int(B.size.x)-1 || it >= int(B.size.y)-1) continue;
+                        if(is >= int(imageCount.x)-1 || it >= int(imageCount.y)-1) continue;
                         if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
                         float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
 
                         v16hf blue, green, red;
                         for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                            blue[((ds*2+dt)*2+du)*2+dv] = B(is+ds, it+dt)(iu+du, iv+dv);
-                            green[((ds*2+dt)*2+du)*2+dv] = G(is+ds, it+dt)(iu+du, iv+dv);
-                            red[((ds*2+dt)*2+du)*2+dv] = R(is+ds, it+dt)(iu+du, iv+dv);
+                            blue[((ds*2+dt)*2+du)*2+dv] = B(is+ds, it+dt, iu+du, iv+dv);
+                            green[((ds*2+dt)*2+du)*2+dv] = G(is+ds, it+dt, iu+du, iv+dv);
+                            red[((ds*2+dt)*2+du)*2+dv] = R(is+ds, it+dt, iu+du, iv+dv);
                         }
 
                         bgr3f Sstuv [2][2][2][2];
@@ -348,9 +353,9 @@ struct Light {
 
                         S = (1-fs) * Ss[0] + fs * Ss[1];
                     } else {
-                        S = float(0xFF)*scene.raycast(O, d);
+                        S = scene.raycast(O, d);
                     }
-                    target(x, y) = byte4(byte3(S), 0xFF);
+                    target(x, y) = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
         } else {
@@ -364,99 +369,29 @@ struct Light {
         return target;
     }
     void load(string name) {
-        maps.clear();
+        field = {};
+        map = Map();
+        imageCount = 0;
         imageSize = 0;
         this->name = name;
         Folder input (name);
         Folder tmp (name, ::tmp, true);
 
-        range xRange {0}, yRange {0};
-        min = vec2(inff), max = vec2(-inff);
-        for(string name: input.list(Files)) {
+        for(string name: tmp.list(Files)) {
             TextData s (name);
-            if(!s.isInteger()) s.until('_');
-            int y = s.integer();
-            s.skip('_');
-            int x = s.integer();
-
-            xRange.start = ::min(xRange.start, x);
-            xRange.stop = ::max(xRange.stop, x+1);
-
-            yRange.start = ::min(yRange.start, y);
-            yRange.stop = ::max(yRange.stop, y+1);
-
-            if(s.match('_')) {
-                float py = s.decimal();
-                s.match('_');
-                float px = s.decimal();
-                min = ::min(min, vec2(px, py));
-                max = ::max(max, vec2(px, py));
-            }
+            imageCount.x = s.integer(false);
+            s.skip('x');
+            imageCount.y = s.integer(false);
+            s.skip('x');
+            imageSize.x = s.integer(false);
+            s.skip('x');
+            imageSize.y = s.integer(false);
+            assert_(!s);
+            map = Map(name, tmp);
+            field = cast<half>(map);
+            break;
         }
-        if(1) {
-            min.y = -min.y;
-            max.y = -max.y;
-            swap(min.y, max.y);
-        }
-        if(0) log(min, max, max-min);
 
-        B = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
-        B.clear(ImageH());
-        G = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
-        G.clear(ImageH());
-        R = ImageT<ImageH>(uint(xRange.size()), uint(yRange.size()));
-        R.clear(ImageH());
-
-        buffer<String> tmpFiles = tmp.list(Files);
-        for(string name: input.list(Files)) {
-            TextData s (name);
-            if(!s.isInteger()) s.until('_');
-            uint y = uint(s.integer(false));
-            s.match('_');
-            uint x = uint(s.integer(false));
-
-            for(string mapName: tmpFiles) {
-                if(endsWith(mapName, ".png")) continue;
-                TextData s (mapName);
-                if(!s.isInteger()) s.until('_');
-                uint my = uint(s.integer(false));
-                if(my != y) continue;
-                s.skip('_');
-                uint mx = uint(s.integer(false));
-                if(mx != x) continue;
-
-                if(s.match('_')) {
-                    s.decimal();
-                    s.skip('_');
-                    s.decimal();
-                    s.skip('_');
-                }
-
-                if(!s.match(".png.")) s.skip('.');
-
-                uint w = uint(s.integer(false));
-                s.skip('x');
-                uint h = uint(s.integer(false));
-
-                s.skip('[');
-                int c = "BGR"_.indexOf(s.next());
-                s.skip(']');
-                assert_(c>=0&&c<=2);
-                assert_(!s);
-
-                (*(ImageT<ImageH>*[]){&B,&G,&R}[c])(x, y) = ImageH(cast<half>(unsafeRef(maps.append(mapName, tmp))), uint2(w, h));
-                goto break_;
-            } /*else*/ {
-                error(name);
-                /*Image image = decodeImage(Map(name, input));
-                assert_(image.stride == image.size.x);
-                String mapName = name+'.'+strx(image.size);
-                writeFile(mapName, cast<byte>(image), tmp);
-                images(x, y) = Image(cast<byte4>(unsafeRef(maps.append(mapName, tmp))), image.size);*/
-            } break_:;
-            if(!imageSize) imageSize = B(x, y).size;
-            assert_(B(x,y).size == imageSize);
-        }
         if(window) {
             window->setSize();
             window->setTitle(name);
