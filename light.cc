@@ -70,7 +70,7 @@ struct Scene {
         static constexpr bool blend = false; // Disables unnecessary blending
 
         bgra4f operator()(FaceAttributes face, float unused varying[V]) const {
-            return bgra4f(face.color,1.f);
+            return bgra4f(face.color, 1.f);
         }
     } shader;
     RenderPass<Shader> pass {shader};
@@ -117,7 +117,7 @@ struct Render {
                 //log(" - Sample", strD(scene.pass.sampleTime, totalTime));
                 //log(" - SampleFirst", strD(scene.pass.sampleFirstTime, totalTime));
                 //log(" - SampleOver", strD(scene.pass.sampleOverTime, totalTime));
-                log(" - User", strD(scene.pass.userTime, totalTime));
+                //log(" - User", strD(scene.pass.userTime, totalTime));
                 //log(" - Total", strD(scene.pass.totalTime, totalTime));
                 log("- Resolve", strD(resolveTime,totalTime));
                 //log("- Save", strD(saveTime,totalTime));

@@ -131,21 +131,21 @@ typedef vec<bgr,float,3> bgr3f;
 generic struct rgb { T r,g,b; };
 typedef vec<rgb,float,3> rgb3f;
 
-generic struct rgba;
+generic struct rgba { T r,g,b,a; };
 generic struct bgra {
     T b,g,r,a;
     vec<bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
     operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
-    operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
+    //operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
 };
-typedef vec<bgra,float,4> rgba4f;
-generic struct rgba { T r,g,b,a; };
-typedef vec<rgba,float,4> bgra4f;
+typedef vec<bgra,float,4> bgra4f;
 struct byte4 : vec<bgra,uint8,4> {
  using vec::vec;
  byte4() : vec() {}
  byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
+
+typedef vec<rgba,float,4> rgba4f;
 
 //template<template<Type> class V, Type T, uint N> inline T length(vec<V,T,N> a) { return sqrt(sq(a)); }
 template<template<Type> class V, Type T> inline

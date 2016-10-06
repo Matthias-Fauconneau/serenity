@@ -113,7 +113,7 @@ template<class Shader> struct RenderPass {
     buffer<Bin> bins=0;
 
     // Profiling counters
-    profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0; int64 userTime=0;)
+    profile(int64 rasterTime=0; int64 pixelTime=0; int64 sampleTime=0; int64 sampleFirstTime=0; int64 sampleOverTime=0;)// int64 userTime=0;)
     uint64 totalTime=0;
 
     RenderPass(const Shader& shader) : shader(shader) {}
@@ -300,21 +300,20 @@ template<class Shader> struct RenderPass {
                             depth = z;
 
                             float centroid[V]; for(int i=0;i<V;i++) centroid[i]=w*dot(face.varyings[i],XY1);
-                            profile( int64 start = readCycleCounter(); )
-                                    vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( userTime += readCycleCounter()-start; );
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA=bgra.w;
+                            //profile( int64 start = readCycleCounter(); );
+                            bgra4f src = shader(face.faceAttributes,centroid);
+                            //profile( userTime += readCycleCounter()-start; );
                             float& dstB = tile.blue[pixelPtr/16][pixelPtr%16];
                             float& dstG = tile.green[pixelPtr/16][pixelPtr%16];
                             float& dstR = tile.red[pixelPtr/16][pixelPtr%16];
                             if(blend) {
-                                dstB=(1-srcA)*dstB+srcA*srcB;
-                                dstG=(1-srcA)*dstG+srcA*srcG;
-                                dstR=(1-srcA)*dstR+srcA*srcR;
+                                dstB=(1-src.a)*dstB+src.a*src.b;
+                                dstG=(1-src.a)*dstG+src.a*src.g;
+                                dstR=(1-src.a)*dstR+src.a*src.r;
                             } else {
-                                dstB=srcB;
-                                dstG=srcG;
-                                dstR=srcR;
+                                dstB=src.b;
+                                dstG=src.g;
+                                dstR=src.r;
                             }
                         } else { // Subsample Z-Test
                             // 2D coordinates vector
@@ -344,21 +343,20 @@ template<class Shader> struct RenderPass {
                                 centroid[i] = sum16(visible) / visibleSampleCount;
                             }
 
-                            profile( int64 start = readCycleCounter() );
-                            vec4 bgra = shader(face.faceAttributes,centroid);
-                            profile( userTime += readCycleCounter()-start );
-                            float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                            //profile( int64 start = readCycleCounter() );
+                            bgra4f src = shader(face.faceAttributes,centroid);
+                            //profile( userTime += readCycleCounter()-start );
                             vec16& dstB = tile.subblue[pixelPtr];
                             vec16& dstG = tile.subgreen[pixelPtr];
                             vec16& dstR = tile.subred[pixelPtr];
                             if(blend) {
-                                maskstore(dstB, visibleMask, (1-srcA)*dstB+srcA*srcB);
-                                maskstore(dstG, visibleMask, (1-srcA)*dstG+srcA*srcG);
-                                maskstore(dstR, visibleMask, (1-srcA)*dstR+srcA*srcR);
+                                maskstore(dstB, visibleMask, (1-src.a)*dstB+src.a*src.b);
+                                maskstore(dstG, visibleMask, (1-src.a)*dstG+src.a*src.g);
+                                maskstore(dstR, visibleMask, (1-src.a)*dstR+src.a*src.r);
                             } else {
-                                maskstore(dstB, visibleMask, srcB);
-                                maskstore(dstG, visibleMask, srcG);
-                                maskstore(dstR, visibleMask, srcR);
+                                maskstore(dstB, visibleMask, src.b);
+                                maskstore(dstG, visibleMask, src.g);
+                                maskstore(dstR, visibleMask, src.r);
                             }
                         }
                     }
@@ -381,7 +379,7 @@ template<class Shader> struct RenderPass {
 
                     // Convert single sample pixel to subsampled pixel
                     if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                        profile( int64 start = readCycleCounter() );
+                        //profile( int64 start = readCycleCounter() );
 
                         // Set subsampled pixel flag
                         tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
@@ -406,10 +404,9 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        profile( int64 userStart = readCycleCounter() );
-                        vec4 bgra = shader(face.faceAttributes,centroid);
-                        profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
-                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        //profile( int64 userStart = readCycleCounter() );
+                        bgra4f src = shader(face.faceAttributes,centroid);
+                        //profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
                         vec16& dstB = tile.subblue[pixelPtr];
                         vec16& dstG = tile.subgreen[pixelPtr];
                         vec16& dstR = tile.subred[pixelPtr];
@@ -417,17 +414,17 @@ template<class Shader> struct RenderPass {
                         float pixelG = tile.green[pixelPtr/16][pixelPtr%16];
                         float pixelR = tile.red[pixelPtr/16][pixelPtr%16];
                         if(blend) {
-                            dstB = blend16(pixelB, (1-srcA)*pixelB+srcA*srcB, visibleMask);
-                            dstG = blend16(pixelG, (1-srcA)*pixelG+srcA*srcG, visibleMask);
-                            dstR = blend16(pixelR, (1-srcA)*pixelR+srcA*srcR, visibleMask);
+                            dstB = blend16(pixelB, (1-src.a)*pixelB+src.a*src.b, visibleMask);
+                            dstG = blend16(pixelG, (1-src.a)*pixelG+src.a*src.g, visibleMask);
+                            dstR = blend16(pixelR, (1-src.a)*pixelR+src.a*src.r, visibleMask);
                         } else {
-                            dstB = blend16(pixelB, srcB, visibleMask);
-                            dstG = blend16(pixelG, srcG, visibleMask);
-                            dstR = blend16(pixelR, srcR, visibleMask);
+                            dstB = blend16(pixelB, src.b, visibleMask);
+                            dstG = blend16(pixelG, src.g, visibleMask);
+                            dstR = blend16(pixelR, src.r, visibleMask);
                         }
-                        profile( sampleFirstTime += (userStart-start) + (readCycleCounter()-userEnd); )
+                        //profile( sampleFirstTime += (userStart-start) + (readCycleCounter()-userEnd); )
                     } else {
-                        profile( int64 start = readCycleCounter() );
+                        //profile( int64 start = readCycleCounter() );
 
                         // Performs Z-Test
                         vec16& subpixel = tile.subdepth[pixelPtr];
@@ -449,23 +446,22 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        profile( int64 userStart = readCycleCounter() );
-                        vec4 bgra = shader(face.faceAttributes,centroid);
-                        profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
-                        float srcB=bgra.x, srcG=bgra.y, srcR=bgra.z, srcA = bgra.w;
+                        //profile( int64 userStart = readCycleCounter() );
+                        bgra4f src = shader(face.faceAttributes, centroid);
+                        //profile( int64 userEnd = readCycleCounter(); userTime += userEnd-userStart );
                         vec16& dstB = tile.subblue[pixelPtr];
                         vec16& dstG = tile.subgreen[pixelPtr];
                         vec16& dstR = tile.subred[pixelPtr];
                         if(blend) {
-                            maskstore(dstB, visibleMask, (1-srcA)*dstB+srcA*srcB);
-                            maskstore(dstG, visibleMask, (1-srcA)*dstG+srcA*srcG);
-                            maskstore(dstR, visibleMask, (1-srcA)*dstR+srcA*srcR);
+                            maskstore(dstB, visibleMask, (1-src.a)*dstB+src.a*src.b);
+                            maskstore(dstG, visibleMask, (1-src.a)*dstG+src.a*src.g);
+                            maskstore(dstR, visibleMask, (1-src.a)*dstR+src.a*src.r);
                         } else {
-                            maskstore(dstB, visibleMask, srcB);
-                            maskstore(dstG, visibleMask, srcG);
-                            maskstore(dstR, visibleMask, srcR);
+                            maskstore(dstB, visibleMask, src.b);
+                            maskstore(dstG, visibleMask, src.g);
+                            maskstore(dstR, visibleMask, src.r);
                         }
-                        profile( sampleOverTime += (userStart-start) + (readCycleCounter()-userEnd); )
+                        //profile( sampleOverTime += (userStart-start) + (readCycleCounter()-userEnd); )
                     }
                 }
                 profile( this->userTime += userTime; sampleTime += readCycleCounter()-start - userTime; )
