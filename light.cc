@@ -69,6 +69,9 @@ struct Scene {
         static constexpr int V = 0;
         static constexpr bool blend = false; // Disables unnecessary blending
 
+        bgra4v16sf operator()(FaceAttributes face, v16sf unused varying[V]) const {
+            return {v16sf(face.color.b), v16sf(face.color.g), v16sf(face.color.r), _1f};
+        }
         bgra4f operator()(FaceAttributes face, float unused varying[V]) const {
             return bgra4f(face.color, 1.f);
         }
@@ -151,6 +154,11 @@ struct Render {
                 M(3,3) = 0;
                 M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+
+                ImageH B (unsafeRef(field.slice((0*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+                ImageH G (unsafeRef(field.slice((1*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+                ImageH R (unsafeRef(field.slice((2*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+
 #if 0
                 if(0) {
                     parallel_chunk(size.y*size.x, [&](uint, size_t start, size_t sizeI) {
@@ -168,21 +176,15 @@ struct Render {
                     mat4 NDC;
                     NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-                    ImageH B (unsafeRef(field.slice((0*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
-                    ImageH G (unsafeRef(field.slice((1*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
-                    ImageH R (unsafeRef(field.slice((2*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
                     scene.render(B, G, R, NDC * M);
                 }
-                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[B]", cast<byte>(B), folder, true);
-                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[G]", cast<byte>(G), folder, true);
-                //writeFile(str(tIndex)+'_'+str(sIndex)+'.'+strx(size)+"[R]", cast<byte>(R), folder, true);
-                //if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(), folder, true);
+                if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
                 profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
             }
         }
         log(time);
     }
-} render;
+} ;//render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -229,7 +231,8 @@ struct Light {
     ref<half> field;
     Scene scene;
 
-    bool sample = true, raycast = true, orthographic = true;
+    bool orthographic = true;
+    bool sample = false, raycast = sample;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -363,6 +366,7 @@ struct Light {
             NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
             NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             ImageH B (target.size), G (target.size), R (target.size);
+            B.clear(0); G.clear(0); R.clear(0); // DEBUG
             scene.render(B, G, R, NDC * M);
             convert(target, B, G, R);
         }
@@ -380,11 +384,11 @@ struct Light {
         for(string name: tmp.list(Files)) {
             TextData s (name);
             imageCount.x = s.integer(false);
-            s.skip('x');
+            if(!s.match('x')) continue;
             imageCount.y = s.integer(false);
-            s.skip('x');
+            if(!s.match('x')) continue;
             imageSize.x = s.integer(false);
-            s.skip('x');
+            if(!s.match('x')) continue;
             imageSize.y = s.integer(false);
             assert_(!s);
             map = Map(name, tmp);

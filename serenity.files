@@ -72,4 +72,4 @@ ui/color.h
 light.cc
 raster.h
 raster.cc
-vec16.h
+test.cc
