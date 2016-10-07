@@ -7,56 +7,10 @@
 #include "thread.h"
 #include "time.h"
 
-struct thread {
- pthread_t pthread;
- int64 id; int64* counter; int64 stop;
- function<void(uint, uint)>* delegate;
- uint64 time = 0;
-};
-
-//extern const int maxThreadCount;
-extern Semaphore jobs;
-extern Semaphore results;
-
 int threadCount();
 
 /// Runs a loop in parallel
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount = ::threadCount());
-#if 0
-static const int maxThreadCount = 8; // 32
-extern thread threads[::maxThreadCount];
-generic uint64 parallel_for(int64 start, int64 stop, T delegate, const int unused threadCount) {
- if(threadCount == 1) {
-  tsc time; time.start();
-  for(int64 i : range(start, stop)) delegate(0, i);
-  return time.cycleCount();
- } else {
-#if OPENMP
-  tsc time; time.start();
-  omp_set_num_threads(threadCount);
-  #pragma omp parallel for
-  for(int i=start; i<stop; i++) delegate(omp_get_thread_num(), i);
-  return time.cycleCount();
-#else
-  assert_(threadCount == ::threadCount());
-  for(int index: range(::threadCount())) {
-   threads[index].counter = &start;
-   threads[index].stop = stop;
-   threads[index].delegate = &delegate;
-   threads[index].time = 0;
-  }
-  int jobCount = ::min(threadCount, int(stop-start));
-  //Time time; time.start();
-  jobs.release(jobCount);
-  tsc time; time.start();
-  results.acquire(jobCount);
-  //return time.nanoseconds();
-  return time.cycleCount();
-  //uint64 time = 0; for(int index: range(::threadCount())) time += threads[index].time; return time;
-#endif
- }
-}
-#endif
 
 #if 0
 /// Runs a loop in parallel chunks with chunk-wise functor

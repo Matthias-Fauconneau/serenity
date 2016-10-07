@@ -6,3 +6,4 @@ core/parallel.cc
 light.cc
 raster.h
 raster.cc
+scene.h

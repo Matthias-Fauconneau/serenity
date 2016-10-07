@@ -7,13 +7,12 @@ void RenderTarget::resolve(const ImageH& B, const ImageH& G, const ImageH& R) {
     for(uint tileY: range(height)) for(uint tileX: range(width)) {
         Tile& tile = tiles[tileY*width+tileX];
         uint const targetTilePtr = tileY*16*stride + tileX*16;
-        if(!tile.cleared) { // Empty
-            if(tile.lastCleared) for(uint y: range(16)) for(uint x: range(16)) {
+        if(tile.needClear) { // Empty
+            for(uint y: range(16)) for(uint x: range(16)) {
                 B[targetTilePtr+y*stride+x] = backgroundColor.b;
                 G[targetTilePtr+y*stride+x] = backgroundColor.g;
                 R[targetTilePtr+y*stride+x] = backgroundColor.r;
             }
-            // else was already empty on last frame
             continue;
         }
         for(uint blockY: range(4)) for(uint blockX: range(4)) {
@@ -64,6 +63,7 @@ void RenderTarget::resolve(const ImageH& B, const ImageH& G, const ImageH& R) {
 }
 
 void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R) {
+    assert_(target.size == B.size);
     extern uint8 sRGB_forward[0x1000];
     for(size_t i: range(target.ref::size)) {
         target[i] = byte4(sRGB_forward[uint(B[i]*0xFFF)], sRGB_forward[uint(G[i]*0xFFF)], sRGB_forward[uint(R[i]*0xFFF)], 0xFF);

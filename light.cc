@@ -1,102 +1,30 @@
 #include "file.h"
-#include "image.h"
+#include "parallel.h"
+#include "scene.h"
 #include "png.h"
 #include "interface.h"
 #include "window.h"
-#include "raster.h"
-#include "parallel.h"
 
 Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
-static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
-    vec3 edge1 = B - A;
-    vec3 edge2 = C - A;
-    vec3 pvec = cross(d, edge2);
-    float det = dot(edge1, pvec);
-    if(det < 0) return false;
-    vec3 tvec = O - A;
-    u = dot(tvec, pvec);
-    if(u < 0 || u > det) return false;
-    vec3 qvec = cross(tvec, edge1);
-    v = dot(d, qvec);
-    if(v < 0 || u + v > det) return false;
-    t = dot(edge2, qvec);
-    t /= det;
-    u /= det;
-    v /= det;
-    return true;
+mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
+    const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
+    const float left = (-1-S), right = (1-S);
+    const float bottom = (-1-T), top = (1-T);
+    mat4 M;
+    M(0,0) = 2 / (right-left);
+    M(1,1) = 2 / (top-bottom);
+    M(0,2) = (right+left) / (right-left);
+    M(1,2) = (top+bottom) / (top-bottom);
+    const float near = 1-1./2, far = 1+1./2;
+    M(2,2) = - (far+near) / (far-near);
+    M(2,3) = - 2*far*near / (far-near);
+    M(3,2) = - 1;
+    M(3,3) = 0;
+    M.translate(vec3(-S,-T,0));
+    M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+    return M;
 }
-
-#if PROFILE
-static uint64 miscStart = 0, miscTime = 0; // Clear, Configuration
-static uint64 setupTime = 0, renderTime = 0, resolveTime = 0;
-static uint64 saveStart = 0, saveTime = 0; // PNG, Raw
-static uint64 totalStart = 0;
-#endif
-
-struct Scene {
-    struct Face { vec3 position[3]; bgr3f color; };
-    Face faces[6*2]; // Cube
-
-    Scene() {
-        vec3 position[8];
-        const float size = 1./2;
-        for(int i: range(8)) position[i] = size * (2.f * vec3(i/4, (i/2)%2, i%2) - vec3(1)); // -1, 1
-        const int indices[6*4] = { 0,2,3,1, 0,1,5,4, 0,4,6,2, 1,3,7,5, 2,6,7,3, 4,5,7,6};
-        const bgr3f colors[6] = {red, green, blue, cyan, magenta, yellow};
-        for(int i: range(6)) {
-            faces[i*2+0] = {{position[indices[i*4+2]], position[indices[i*4+1]], position[indices[i*4+0]]}, colors[i]};
-            faces[i*2+1] = {{position[indices[i*4+3]], position[indices[i*4+2]], position[indices[i*4+0]]}, colors[i]};
-        }
-    }
-
-    bgr3f raycast(vec3 O, vec3 d) const {
-        float nearestZ = inff; bgr3f color (0, 0, 0);
-        for(Face face: faces) {
-            float t, u, v;
-            if(!::intersect(face.position[0], face.position[1], face.position[2], O, d, t, u, v)) continue;
-            float z = t*d.z;
-            if(z > nearestZ) continue;
-            nearestZ = z;
-            color = face.color;
-        }
-        return color;
-    }
-
-    RenderTarget target; // Render target (RenderPass renders on these tiles)
-    /// Shader for flat surfaces
-    struct Shader {
-        // Shader specification (used by rasterizer)
-        struct FaceAttributes { bgr3f color; };
-        static constexpr int V = 0;
-        static constexpr bool blend = false; // Disables unnecessary blending
-
-        bgra4v16sf operator()(FaceAttributes face, v16sf unused varying[V]) const {
-            return {v16sf(face.color.b), v16sf(face.color.g), v16sf(face.color.r), _1f};
-        }
-        bgra4f operator()(FaceAttributes face, float unused varying[V]) const {
-            return bgra4f(face.color, 1.f);
-        }
-    } shader;
-    RenderPass<Shader> pass {shader};
-
-    void render(const ImageH& B, const ImageH& G, const ImageH& R, mat4 view) {
-        profile( uint64 setupStart=readCycleCounter(); miscTime += setupStart-miscStart; )
-        target.setup(int2(B.size)); // /4u/*MSAA->4x*/
-        pass.setup(target, ref<Face>(faces).size); // Resize if necessary and clears
-        for(const Face& face: faces) {
-            vec3 A = view*face.position[0], B = view*face.position[1], C = view*face.position[2];
-            if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
-            vec3 attributes[0];
-            pass.submit(A,B,C, attributes, {face.color});
-        }
-        profile( uint64 renderStart=readCycleCounter(); setupTime += renderStart-setupStart; )
-        pass.render(target);
-        profile( uint64 resolveStart=readCycleCounter(); renderTime += resolveStart-renderStart; )
-        target.resolve(B, G, R);
-        profile( saveStart = readCycleCounter(); resolveTime += saveStart-resolveStart; )
-    }
-};
 
 struct Render {
     Render() {
@@ -115,78 +43,25 @@ struct Render {
         mref<half> field = mcast<half>(map);
         profile( field.clear() ); /*Explicitly clears to avoid performance skew from clear on page faults*/
 
-        Time time (true), lastReport(true);
+        buffer<Scene::Renderer> renderers (threadCount());
+        for(Scene::Renderer& renderer: renderers) new (&renderer) Scene::Renderer(scene);
 
-        // Profile counters
-        profile( totalStart=miscStart=readCycleCounter(); saveTime=0; ) // profile cycles spent outside render
+        Time time (true);
+        parallel_for(0, N*N, [&](uint threadID, size_t stIndex) {
+            int sIndex = stIndex%N, tIndex = stIndex/N;
 
-        for(int sIndex: range(N)) {
-            if(lastReport.seconds() > 1) {
-                log(sIndex, "/", N, time);
-#if PROFILE
-                uint64 totalTime = miscStart-totalStart;
-                //log("- Miscellaneous", strD(miscTime,totalTime));
-                //log("- Setup", strD(setupTime,totalTime));
-                //log("- Render", strD(renderTime,totalTime));
-                //log(" - Raster", strD(scene.pass.rasterTime, totalTime));
-                 log(" - Pixel", strD(scene.pass.pixelTime, totalTime))
-                //log(" - Sample", strD(scene.pass.sampleTime, totalTime));
-                //log(" - SampleFirst", strD(scene.pass.sampleFirstTime, totalTime));
-                //log(" - SampleOver", strD(scene.pass.sampleOverTime, totalTime));
-                //log(" - User", strD(scene.pass.userTime, totalTime));
-                //log(" - Total", strD(scene.pass.totalTime, totalTime));
-                log("- Resolve", strD(resolveTime,totalTime))
-                //log("- Save", strD(saveTime,totalTime));
-                uint64 accountedTime = miscTime+setupTime+renderTime+resolveTime+saveTime;
-                assert_(accountedTime==totalTime, accountedTime, totalTime);
-#endif
-                lastReport.reset();
-            }
-            for(int tIndex: range(N)) {
-                // Sheared perspective (rectification)
-                const float S = 2*sIndex/float(N-1)-1, T = 2*tIndex/float(N-1)-1; // [-1, 1]
-                const float left = (-1-S), right = (1-S);
-                const float bottom = (-1-T), top = (1-T);
-                mat4 M;
-                M(0,0) = 2 / (right-left);
-                M(1,1) = 2 / (top-bottom);
-                M(0,2) = (right+left) / (right-left);
-                M(1,2) = (top+bottom) / (top-bottom);
-                const float near = 1-1./2, far = 1+1./2;
-                M(2,2) = - (far+near) / (far-near);
-                M(2,3) = - 2*far*near / (far-near);
-                M(3,2) = - 1;
-                M(3,3) = 0;
-                M.translate(vec3(-S,-T,0));
-                M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+            // Sheared perspective (rectification)
+            const float s = sIndex/float(N-1), t = tIndex/float(N-1);
+            mat4 M = shearedPerspective(s, t);
 
-                ImageH B (unsafeRef(field.slice(((0*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-                ImageH G (unsafeRef(field.slice(((1*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-                ImageH R (unsafeRef(field.slice(((2*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
+            ImageH B (unsafeRef(field.slice(((0ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
+            ImageH G (unsafeRef(field.slice(((1ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
+            ImageH R (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
 
-#if 0
-                if(0) {
-                    parallel_chunk(size.y*size.x, [&](uint, size_t start, size_t sizeI) {
-                        for(int i: range(start, start+sizeI)) {
-                            int y = i/size.x, x = i%size.x;
-                            const vec3 O = M.inverse() * vec3(2.f*x/float(size.x-1)-1, 2.f*y/float(size.y-1)-1, -1);
-                            const vec3 P = M.inverse() * vec3(2.f*x/float(size.x-1)-1, 2.f*y/float(size.y-1)-1, 1);
-                            const vec3 d = normalize(P-O);
-                            target(x, y) = byte4(byte3(float(0xFF)*scene.raycast(O, d)), 0xFF);
-                        }
-                    });
-                } else
-#endif
-                {
-                    mat4 NDC;
-                    NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
-                    NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-                    scene.render(B, G, R, NDC * M);
-                }
-                if(tIndex%32==0 && sIndex%32==0) writeFile(str(sIndex)+'_'+str(tIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
-                profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
-            }
-        }
+            scene.render(renderers[threadID], B, G, R, M);
+
+            if(sIndex%32==0 && tIndex%32==0) writeFile(str(sIndex)+'_'+str(tIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
+        });
         log(time);
     }
 } render;
@@ -217,8 +92,8 @@ struct ViewControl : virtual Widget {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
             viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
-            viewYawPitch.x = clamp<float>(-PI/3, viewYawPitch.x, PI/3);
-            viewYawPitch.y = clamp<float>(-PI/3, viewYawPitch.y, PI/3);
+            viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
+            viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
         }
         else return false;
         return true;
@@ -235,9 +110,10 @@ struct Light {
     Map map;
     ref<half> field;
     Scene scene;
+    Scene::Renderer renderer {scene};
 
     bool orthographic = true;
-    bool sample = true, raycast = sample;
+    bool sample = false, raycast = sample;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -263,7 +139,7 @@ struct Light {
         window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
-    Image render(uint2 size) {
+    Image render(uint2 targetSize) {
         size_t fieldSize = (size_t)imageCount.y*imageCount.x*imageSize.y*imageSize.x;
         struct Image4DH : ref<half> {
             uint4 size;
@@ -275,7 +151,7 @@ struct Light {
             G {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
             R {imageCount, imageSize, field.slice(2*fieldSize, fieldSize)};
 
-        Image target (size);
+        Image target (targetSize);
 
         mat4 M;
         if(orthographic) {
@@ -285,20 +161,7 @@ struct Light {
         } else {
             // Sheared perspective (rectification)
             const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
-            const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-            const float left = (-1-S), right = (1-S);
-            const float bottom = (-1-T), top = (1-T);
-            M(0,0) = 2 / (right-left);
-            M(1,1) = 2 / (top-bottom);
-            M(0,2) = (right+left) / (right-left);
-            M(1,2) = (top+bottom) / (top-bottom);
-            const float near = 1-1./2, far = 1+1./2;
-            M(2,2) = - (far+near) / (far-near);
-            M(2,3) = - 2*far*near / (far-near);
-            M(3,2) = - 1;
-            M(3,3) = 0;
-            M.translate(vec3(-S,-T,0));
-            M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+            M = shearedPerspective(s, t);
         }
 
         if(raycast) {
@@ -306,11 +169,16 @@ struct Light {
 
             {// DEBUG
                 const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
-                const int sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
-                ImageH B (unsafeRef(field.slice(((0*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
-                ImageH G (unsafeRef(field.slice(((1*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
-                ImageH R (unsafeRef(field.slice(((2*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
-                convert(target, B, G, R);
+                const uint sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
+                if(!(sIndex < imageCount.x && tIndex < imageCount.y)) return Image();
+                //assert_(sIndex < imageCount.x && tIndex < imageCount.y);
+                ImageH B (unsafeRef(field.slice(((0*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
+                ImageH G (unsafeRef(field.slice(((1*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
+                ImageH R (unsafeRef(field.slice(((2*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
+                Image BGR (B.size);
+                convert(BGR, B, G, R);
+                resize(target, BGR);
+                window->setTitle(str(sIndex)+" "+str(tIndex));
             }
 
             if(0)
@@ -381,12 +249,9 @@ struct Light {
                 }
             });
         } else {
-            mat4 NDC;
-            NDC.scale(vec3(vec2(target.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
-            NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
             ImageH B (target.size), G (target.size), R (target.size);
-            B.clear(0); G.clear(0); R.clear(0); // DEBUG
-            scene.render(B, G, R, NDC * M);
+            //B.clear(0); G.clear(0); R.clear(0); // DEBUG
+            scene.render(renderer, B, G, R, M);
             convert(target, B, G, R);
         }
         return target;

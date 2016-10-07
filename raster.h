@@ -14,14 +14,8 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include "thread.h"
 #include "time.h"
 #include "simd.h"
-#include <pthread.h> //pthread
 #include "image.h"
-#include "parallel.h"
 
-#define OPENMP 0
-#if OPENMP
-#include <omp.h> // omp
-#endif
 #define PROFILE 0
 #if PROFILE
 #define profile(s) s
@@ -34,7 +28,7 @@ struct Tile { // 64KB framebuffer (L1)
     v16sf depth[4*4],blue[4*4],green[4*4],red[4*4];
     v16sf subdepth[16*16],subblue[16*16],subgreen[16*16],subred[16*16];
     mask16 subsample[16]; // Per-pixel flag to trigger subpixel operations
-    bool cleared, lastCleared;
+    bool needClear;
     Tile();
 };
 
@@ -55,7 +49,7 @@ struct RenderTarget {
         }
         this->depth = depth;
         this->backgroundColor = backgroundColor;
-        for(Tile& tile: tiles) { tile.lastCleared = true; tile.cleared = false; } // Forces initial background blit to target
+        for(Tile& tile: tiles) { tile.needClear = true; } // Forces initial background blit to target
     }
 
     // Resolves internal MSAA linear framebuffer to RGB linear half buffers
@@ -146,6 +140,7 @@ template<class Shader> struct RenderPass {
     RenderPass(const Shader& shader) : shader(shader) {}
     /// Resets bins and faces for a new setup.
     void setup(const RenderTarget& target, uint faceCapacity) {
+        assert_(target.size);
         if(width != target.width || height != target.height) {
             width = target.width, height = target.height;
             bins = buffer<Bin>(width*height);
@@ -229,7 +224,7 @@ template<class Shader> struct RenderPass {
             {
                 profile( int64 start=readCycleCounter(); );
                 float binReject[3], binAccept[3];
-                for(int e=0;e<3;e++) {
+                for(int e: range(3)) {
                     binReject[e] = face.binReject[e] + dot(face.edges[e], binXY);
                     binAccept[e] = face.binAccept[e] + dot(face.edges[e], binXY);
                 }
@@ -244,15 +239,15 @@ template<class Shader> struct RenderPass {
                     v16sf blockX = v16sf(binXY.x)+v16sf(16)*X[0];
                     v16sf blockY = v16sf(binXY.y)+v16sf(16)*Y[0];
                     // Loops on 4×4 blocks
-                    for(uint blockI=0; blockI<4*4; blockI++) { // SIMD?
-                        float blockReject[3]; for(int e=0;e<3;e++) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
+                    for(uint blockI: range(4*4)) {
+                        float blockReject[3]; for(int e: range(3)) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
 
                         // Trivial reject
                         if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
 
                         const vec2 blockXY (blockX[blockI], blockY[blockI]);
 
-                        float blockAccept[3]; for(int e=0;e<3;e++) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
+                        float blockAccept[3]; for(int e: range(3)) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
                         // Full block accept
                         if(
                                 blockAccept[0] > 0 &&
@@ -264,7 +259,7 @@ template<class Shader> struct RenderPass {
 
                         // 4×4 pixel accept mask
                         uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
-                        for(int e=0;e<3;e++) {
+                        for(int e: range(3)) {
                             pixelAcceptMask &= mask(blockAccept[e] > face.pixelAcceptStep[e]);
                         }
 
@@ -275,7 +270,7 @@ template<class Shader> struct RenderPass {
                         // 4×4 pixel reject mask
                         uint16 pixelRejectMask=0; // partial block of full pixels
                         v16sf pixelReject[3]; //used to reject samples
-                        for(int e=0;e<3;e++) {
+                        for(int e: range(3)) {
                             pixelReject[e] = v16sf(blockReject[e]) + face.pixelRejectStep[e];
                             pixelRejectMask |= mask(pixelReject[e] <= 0);
                         }
@@ -414,7 +409,7 @@ template<class Shader> struct RenderPass {
 
                         // Computes vertex attributes at all samples
                         float centroid[V];
-                        for(int i=0;i<V;i++) {
+                        for(int i: range(V)) {
                             const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
@@ -451,7 +446,7 @@ template<class Shader> struct RenderPass {
 
                         // Computes vertex attributes at all samples
                         float centroid[V];
-                        for(int i=0;i<V;i++) {
+                        for(int i: range(V)) {
                             const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
@@ -480,55 +475,25 @@ template<class Shader> struct RenderPass {
     }
 
     /// Renders all tiles
-    //RenderTarget* target;
-    //uint64 nextBin;
-    static void* start_routine(void* this_) { ((RenderPass*)this_)->run(); return 0; }
     // For each bin, rasterizes and shades all triangles
     void render(RenderTarget& target) {
+        assert_(width == target.width && height == target.height);
         if(!bins || !faces) return;
-        //this->target = &target;
-        // Reset counters
-        //nextBin=0;
-        //profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}));
-#if PROFILE
-        run();
-#elif OPENMP
-        omp_set_num_threads(8);
-        assert_(omp_get_num_threads() == 8, omp_get_num_threads());
-        #pragma omp parallel for
-        for(uint binIndex=0; binIndex<width*height; binIndex++) {
-#elif 1
-        parallel_for(0, width*height, [&](uint, uint binIndex) {
-#else // FIXME: reuse pthreads
-        // Schedules all cores to process tiles
-        const int N=8;
-        pthread_t threads[N-1];
-        for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
-        run();
-        for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
-    }
-    void run() {
-        profile( int64 start = readCycleCounter(); );
-        // Loops on all bins (64x64 samples (16x16 pixels)) then on passes (improves framebuffer access, passes have less locality)
-        for(;;) {
-            uint binI = __sync_fetch_and_add(&nextBin,1);
-            if(binI>=width*height) break;
-#endif
-            if(!bins[binIndex].faceCount) return; //continue;
+        for(uint binIndex: range(width*height)) {
+            if(!bins[binIndex].faceCount) continue;
 
             Tile& tile = target.tiles[binIndex];
-            if(!tile.cleared) {
+            if(tile.needClear) {
                 mref<uint16>(tile.subsample).clear();
                 mref<v16sf>(tile.depth).clear(v16sf(target.depth));
                 mref<v16sf>(tile.blue).clear(v16sf(target.backgroundColor.b));
                 mref<v16sf>(tile.green).clear(v16sf(target.backgroundColor.g));
                 mref<v16sf>(tile.red).clear(v16sf(target.backgroundColor.r));
-                tile.cleared = true;
+                tile.needClear = false;
             }
 
             const vec2 binXY = 64.f*vec2(binIndex%target.width,binIndex/target.width);
             render(tile, bins[binIndex], binXY);
-        });
-        //profile( totalTime += readCycleCounter()-start; );
+        }
     }
 };

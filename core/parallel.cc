@@ -7,11 +7,16 @@ const int maxThreadCount = 60; //240;
 const int maxThreadCount = 1; //240;
 #endif
 #elif !DEBUG && 1
-const int maxThreadCount = 8; // 32
+const int maxThreadCount = 8;
 #else
 const int maxThreadCount = 1;
 #endif
-//extern thread threads[::maxThreadCount];
+struct thread {
+ pthread_t pthread;
+ int64 id; int64* counter; int64 stop;
+ function<void(uint, uint)>* delegate;
+ uint64 time = 0;
+};
 thread threads[::maxThreadCount];
 
 Semaphore jobs __attribute((init_priority(101)));
@@ -30,7 +35,7 @@ int threadCount() {
    threadCount = min(threadCount, (int)parseInteger(environmentVariable("THREADS"_)));
   min(threadCount, maxThreadCount);
  });
- //assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
+ assert_(threadCount == maxThreadCount, threadCount, maxThreadCount);
  return threadCount;
 }
 
@@ -56,20 +61,22 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
+#if OPENMP
 extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
-#if 1
+#endif
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
  if(threadCount == 1) {
   tsc time; time.start();
   for(int64 i : range(start, stop)) delegate(0, i);
+  //error(threadCount);
   return time.cycleCount();
  } else {
 #if OPENMP
   tsc time; time.start();
   omp_set_num_threads(threadCount);
   #pragma omp parallel for
-  for(int i=start; i<stop; i++) delegate(omp_get_thread_num(), i);
+  for(int i: range(start, stop)) delegate(omp_get_thread_num(), i);
   return time.cycleCount();
 #else
   assert_(threadCount == ::threadCount());
@@ -90,4 +97,3 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
 #endif
  }
 }
-#endif
