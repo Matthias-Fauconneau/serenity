@@ -56,9 +56,9 @@ __attribute((constructor(102))) void spawnWorkers() {
  }
 }
 
-#if 0
 extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
+#if 1
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
  if(threadCount == 1) {
   tsc time; time.start();

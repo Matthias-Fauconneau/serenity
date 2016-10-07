@@ -27,10 +27,12 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+#if PROFILE
 static uint64 miscStart = 0, miscTime = 0; // Clear, Configuration
 static uint64 setupTime = 0, renderTime = 0, resolveTime = 0;
 static uint64 saveStart = 0, saveTime = 0; // PNG, Raw
 static uint64 totalStart = 0;
+#endif
 
 struct Scene {
     struct Face { vec3 position[3]; bgr3f color; };
@@ -111,6 +113,7 @@ struct Render {
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> field = mcast<half>(map);
+        profile( field.clear() ); /*Explicitly clears to avoid performance skew from clear on page faults*/
 
         Time time (true), lastReport(true);
 
@@ -120,21 +123,23 @@ struct Render {
         for(int sIndex: range(N)) {
             if(lastReport.seconds() > 1) {
                 log(sIndex, "/", N, time);
+#if PROFILE
                 uint64 totalTime = miscStart-totalStart;
                 //log("- Miscellaneous", strD(miscTime,totalTime));
                 //log("- Setup", strD(setupTime,totalTime));
                 //log("- Render", strD(renderTime,totalTime));
                 //log(" - Raster", strD(scene.pass.rasterTime, totalTime));
-                log(" - Pixel", strD(scene.pass.pixelTime, totalTime));
+                 log(" - Pixel", strD(scene.pass.pixelTime, totalTime))
                 //log(" - Sample", strD(scene.pass.sampleTime, totalTime));
                 //log(" - SampleFirst", strD(scene.pass.sampleFirstTime, totalTime));
                 //log(" - SampleOver", strD(scene.pass.sampleOverTime, totalTime));
                 //log(" - User", strD(scene.pass.userTime, totalTime));
                 //log(" - Total", strD(scene.pass.totalTime, totalTime));
-                log("- Resolve", strD(resolveTime,totalTime));
+                log("- Resolve", strD(resolveTime,totalTime))
                 //log("- Save", strD(saveTime,totalTime));
                 uint64 accountedTime = miscTime+setupTime+renderTime+resolveTime+saveTime;
                 assert_(accountedTime==totalTime, accountedTime, totalTime);
+#endif
                 lastReport.reset();
             }
             for(int tIndex: range(N)) {
@@ -155,9 +160,9 @@ struct Render {
                 M.translate(vec3(-S,-T,0));
                 M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
 
-                ImageH B (unsafeRef(field.slice((0*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
-                ImageH G (unsafeRef(field.slice((1*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
-                ImageH R (unsafeRef(field.slice((2*N*N+(sIndex*N+tIndex))*size.y*size.x, size.y*size.x)), size);
+                ImageH B (unsafeRef(field.slice(((0*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
+                ImageH G (unsafeRef(field.slice(((1*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
+                ImageH R (unsafeRef(field.slice(((2*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
 
 #if 0
                 if(0) {
@@ -178,13 +183,13 @@ struct Render {
                     NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
                     scene.render(B, G, R, NDC * M);
                 }
-                if(tIndex%32==0 && sIndex%32==0) writeFile(str(tIndex)+'_'+str(sIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
+                if(tIndex%32==0 && sIndex%32==0) writeFile(str(sIndex)+'_'+str(tIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
                 profile( miscStart = readCycleCounter(); saveTime += miscStart-saveStart; )
             }
         }
         log(time);
     }
-} ;//render;
+} render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -232,7 +237,7 @@ struct Light {
     Scene scene;
 
     bool orthographic = true;
-    bool sample = false, raycast = sample;
+    bool sample = true, raycast = sample;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -259,12 +264,12 @@ struct Light {
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
     Image render(uint2 size) {
-        size_t fieldSize = imageCount.y*imageCount.x*imageSize.y*imageSize.x;
+        size_t fieldSize = (size_t)imageCount.y*imageCount.x*imageSize.y*imageSize.x;
         struct Image4DH : ref<half> {
             uint4 size;
             Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
-            const half& operator ()(int s, int t, int u, int v) const {
-                return operator[](((t*size[1]+s)*size[2]+v)*size[3]+u);
+            const half& operator ()(uint s, uint t, uint u, uint v) const {
+                return operator[]((((uint64)t*size[1]+s)*size[2]+v)*size[3]+u);
             }
         }   B {imageCount, imageSize, field.slice(0*fieldSize, fieldSize)},
             G {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
@@ -297,8 +302,20 @@ struct Light {
         }
 
         if(raycast) {
+            target.clear(); // DEBUG
+
+            {// DEBUG
+                const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+                const int sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
+                ImageH B (unsafeRef(field.slice(((0*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
+                ImageH G (unsafeRef(field.slice(((1*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
+                ImageH R (unsafeRef(field.slice(((2*imageCount.y+tIndex)*imageCount.x+sIndex)*size.y*size.x, size.y*size.x)), size);
+                convert(target, B, G, R);
+            }
+
+            if(0)
             ({ size_t start=0, sizeI=target.size.y*target.size.x; //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
-                for(int i: range(start, start+sizeI)) {
+                for(size_t i: range(start, start+sizeI)) {
                     int y = i/target.size.x, x = i%target.size.x;
                     const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
                     const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
@@ -308,12 +325,10 @@ struct Light {
                     if(sample) {
                         const vec3 n (0,0,-1);
                         const float nd = dot(n, d);
-                        assert_(nd);
                         const vec3 n_nd = n / nd;
 
                         const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
                         const vec2 ST = (Pst+vec2(1))/2.f;
-                        assert_(isNumber(ST), ST, Pst, n_nd, O, d);
                         const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
                         const vec2 UV = (Puv+vec2(1))/2.f;
 
@@ -321,8 +336,7 @@ struct Light {
                         const vec2 uv = UV * vec2(imageSize-uint2(1));
 
                         if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
-                        int is = st[0], it = st[1], iu = uv[0], iv = uv[1]; // Warning: Floors towards zero
-                        assert_(is >= 0 && it >= 0 && iu >= 0 && iv >= 0);
+                        int is = st[0], it = st[1], iu = uv[0], iv = uv[1];
                         if(is >= int(imageCount.x)-1 || it >= int(imageCount.y)-1) continue;
                         if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
                         float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
@@ -335,11 +349,9 @@ struct Light {
                         }
 
                         bgr3f Sstuv [2][2][2][2];
-                        {
-                            v16sf B = toFloat(blue), G = toFloat(green), R = toFloat(red);
-                            for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                                Sstuv[ds][dt][du][dv] = bgr3f( B[((ds*2+dt)*2+du)*2+dv], G[((ds*2+dt)*2+du)*2+dv], R[((ds*2+dt)*2+du)*2+dv] );
-                            }
+                        v16sf B = toFloat(blue), G = toFloat(green), R = toFloat(red);
+                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
+                            Sstuv[ds][dt][du][dv] = bgr3f( B[((ds*2+dt)*2+du)*2+dv], G[((ds*2+dt)*2+du)*2+dv], R[((ds*2+dt)*2+du)*2+dv] );
                         }
 
                         bgr3f Sstu [2][2][2];
@@ -355,6 +367,13 @@ struct Light {
                             Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
 
                         S = (1-fs) * Ss[0] + fs * Ss[1];
+
+                        if(0) S = bgr3f(st[0]/(imageCount[0]-1), st[1]/(imageCount[1]-1), 0);
+                        if(0) S = bgr3f(uv[0]/(imageSize[0]-1), uv[1]/(imageSize[1]-1), 0);
+                        //if(0) S = bgr3f(st[0]/(images.size[0]-1), uv[0]/(imageSize[0]-1), 0);
+                        //if(0) S = bgr3f(st[1]/(images.size[1]-1), uv[1]/(imageSize[1]-1), 0);
+                        if(1) S = Sstuv[0][0][0][0] != bgr3f(0);
+                        if(0) S *= bgr3f(it*16, iv, 0)/256.f;
                     } else {
                         S = scene.raycast(O, d);
                     }

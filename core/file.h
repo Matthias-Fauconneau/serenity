@@ -164,7 +164,7 @@ struct Map : mref<byte> {
  using mref::size;
 
  enum Prot {Read=1, Write=2};
- enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000};
+ enum Flags {Shared=1, Private=2, Anonymous=0x20, Populate=0x8000, HugeTLB=0x40000};
 
  Map(){}
  Map(Map&& o) : mref(o) { o.data=0; o.size=0; }

@@ -16,9 +16,14 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include "simd.h"
 #include <pthread.h> //pthread
 #include "image.h"
+#include "parallel.h"
 
-#define PROFILE
-#ifdef PROFILE
+#define OPENMP 0
+#if OPENMP
+#include <omp.h> // omp
+#endif
+#define PROFILE 0
+#if PROFILE
 #define profile(s) s
 #else
 #define profile(s)
@@ -28,7 +33,7 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 struct Tile { // 64KB framebuffer (L1)
     v16sf depth[4*4],blue[4*4],green[4*4],red[4*4];
     v16sf subdepth[16*16],subblue[16*16],subgreen[16*16],subred[16*16];
-    uint16 subsample[16]; // Per-pixel flag to trigger subpixel operations
+    mask16 subsample[16]; // Per-pixel flag to trigger subpixel operations
     bool cleared, lastCleared;
     Tile();
 };
@@ -475,26 +480,32 @@ template<class Shader> struct RenderPass {
     }
 
     /// Renders all tiles
-    RenderTarget* target;
-    uint nextBin;
+    //RenderTarget* target;
+    //uint64 nextBin;
     static void* start_routine(void* this_) { ((RenderPass*)this_)->run(); return 0; }
     // For each bin, rasterizes and shades all triangles
     void render(RenderTarget& target) {
         if(!bins || !faces) return;
-        this->target = &target;
+        //this->target = &target;
         // Reset counters
-        nextBin=0;
+        //nextBin=0;
         //profile(({rasterTime=0, pixelTime=0, sampleTime=0, sampleFirstTime=0, sampleOverTime=0, userTime=0, totalTime=0;}));
-#ifdef PROFILE
+#if PROFILE
         run();
-#else
+#elif OPENMP
+        omp_set_num_threads(8);
+        assert_(omp_get_num_threads() == 8, omp_get_num_threads());
+        #pragma omp parallel for
+        for(uint binIndex=0; binIndex<width*height; binIndex++) {
+#elif 1
+        parallel_for(0, width*height, [&](uint, uint binIndex) {
+#else // FIXME: reuse pthreads
         // Schedules all cores to process tiles
         const int N=8;
         pthread_t threads[N-1];
         for(int i=0;i<N-1;i++) pthread_create(&threads[i],0,start_routine,this);
         run();
         for(int i=0;i<N-1;i++) { void* status; pthread_join(threads[i],&status); }
-#endif
     }
     void run() {
         profile( int64 start = readCycleCounter(); );
@@ -502,21 +513,22 @@ template<class Shader> struct RenderPass {
         for(;;) {
             uint binI = __sync_fetch_and_add(&nextBin,1);
             if(binI>=width*height) break;
-            if(!bins[binI].faceCount) continue;
+#endif
+            if(!bins[binIndex].faceCount) return; //continue;
 
-            Tile& tile = target->tiles[binI];
+            Tile& tile = target.tiles[binIndex];
             if(!tile.cleared) {
                 mref<uint16>(tile.subsample).clear();
-                mref<v16sf>(tile.depth).clear(v16sf(target->depth));
-                mref<v16sf>(tile.blue).clear(v16sf(target->backgroundColor.b));
-                mref<v16sf>(tile.green).clear(v16sf(target->backgroundColor.g));
-                mref<v16sf>(tile.red).clear(v16sf(target->backgroundColor.r));
+                mref<v16sf>(tile.depth).clear(v16sf(target.depth));
+                mref<v16sf>(tile.blue).clear(v16sf(target.backgroundColor.b));
+                mref<v16sf>(tile.green).clear(v16sf(target.backgroundColor.g));
+                mref<v16sf>(tile.red).clear(v16sf(target.backgroundColor.r));
                 tile.cleared = true;
             }
 
-            const vec2 binXY = 64.f*vec2(binI%target->width,binI/target->width);
-            render(tile, bins[binI], binXY);
-        }
-        profile( totalTime += readCycleCounter()-start; );
+            const vec2 binXY = 64.f*vec2(binIndex%target.width,binIndex/target.width);
+            render(tile, bins[binIndex], binXY);
+        });
+        //profile( totalTime += readCycleCounter()-start; );
     }
 };
