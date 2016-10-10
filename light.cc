@@ -32,8 +32,8 @@ struct Render {
         Folder folder {"synthetic", tmp, true};
         for(string file: folder.list(Files)) remove(file, folder);
 
-        const size_t N = 129;
-        uint2 size = 128;
+        const size_t N = 256;
+        uint2 size = 256;
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
         size_t byteSize = 3*N*N*size.y*size.x*sizeof(half);
@@ -62,9 +62,9 @@ struct Render {
 
             if(sIndex%32==0 && tIndex%32==0) writeFile(str(sIndex)+'_'+str(tIndex)+".png", encodePNG(convert(B, G, R)), folder, true);
         });
-        log(time);
+        log("Rendered",N,"x",N,"x",size,"images in", time);
     }
-} ;//render;
+}; //render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -188,7 +188,8 @@ struct Light {
                     int sIndex = st[0], tIndex = st[1], uIndex = uv[0], vIndex = uv[1];
                     if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target[targetIndex] = byte4(byte3(0), 0xFF); continue; }
                     if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex] = byte4(byte3(0), 0xFF); continue; }
-                    const size_t base = tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
+                    const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
+                    assert_(base < size4);
                     v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
                     v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
                     v16sf R = toFloat((v16hf)gather((float*)(fieldR.data+base), sample4D));
