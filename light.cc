@@ -163,12 +163,13 @@ struct Light {
                 const ref<half> fieldB = field.slice(0*size4, size4);
                 const ref<half> fieldG = field.slice(1*size4, size4);
                 const ref<half> fieldR = field.slice(2*size4, size4);
-                v8si sample4D = {    0,       size1,       size2,       size2+size1,
-                                 size3, size3+size1, size3+size2, size3+size2+size1};
-                for(size_t i: range(start, start+sizeI)) {
-                    int y = i/targetStride, x = i%targetStride;
-                    const vec3 O = M.inverse() * vec3(2.f*x/float(targetStride-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
-                    const vec3 P = M.inverse() * vec3(2.f*x/float(targetStride-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
+                assert_(imageSize.x%2==0); // Gather 32bit / half
+                v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
+                                 size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                for(size_t targetIndex: range(start, start+sizeI)) {
+                    int targetY = targetIndex/targetStride, targetX = targetIndex%targetStride;
+                    const vec3 O = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
+                    const vec3 P = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, 1);
                     const vec3 d = normalize(P-O);
 
                     const vec3 n (0,0,-1);
@@ -183,24 +184,25 @@ struct Light {
                     const vec2 st = ST * vec2(imageCount-uint2(1));
                     const vec2 uv = UV * vec2(imageSize-uint2(1));
 
-                    if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) { target[targetIndex] = byte4(byte3(0), 0xFF); continue; }
                     int sIndex = st[0], tIndex = st[1], uIndex = uv[0], vIndex = uv[1];
-                    if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
-                    if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target[targetIndex] = byte4(byte3(0), 0xFF); continue; }
+                    if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex] = byte4(byte3(0), 0xFF); continue; }
                     const size_t base = tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
                     v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
                     v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
                     v16sf R = toFloat((v16hf)gather((float*)(fieldR.data+base), sample4D));
 
-                    v4sf v = {st[1], st[0], uv[1], uv[0]}; // tsvu
-                    v8sf V = __builtin_shufflevector(v, v, 0, 1, 2, 3, 0, 1, 2, 3);
+                    v4sf x = {st[1], st[0], uv[1], uv[0]}; // tsvu
+                    v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);
                     static v8sf _00001111f = {0,0,0,0,1,1,1,1};
-                    const v8sf w_1mw = abs(V - floor(V) - _00001111f); // fract(x), 1-fract(x)
+                    const v8sf w_1mw = abs(X - floor(X) - _00001111f); // fract(x), 1-fract(x)
                     const v16sf w01 = shuffle(w_1mw, w_1mw, 4,4,4,4,4,4,4,4, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
                                     * shuffle(w_1mw, w_1mw, 5,5,5,5,1,1,1,1, 5,5,5,5,1,1,1,1)  // ssssSSSSssssSSSS
                                     * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
                                     * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
-                    target(x, y) = byte4(byte3(float(0xFF)*bgr3f(dot(w01, B), dot(w01, G), dot(w01, R))), 0xFF);
+                    bgr3f S(dot(w01, B), dot(w01, G), dot(w01, R));
+                    target[targetIndex] = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
         } else {

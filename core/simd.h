@@ -116,8 +116,8 @@ inline void store(v16sf& P, v16sf A, v16si M) {
 
 inline v8sf floor(const v8sf v) { return __builtin_ia32_roundps256(v, 1/*-∞*/); }
 
-const v8si notSignBit8 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
-inline v8sf abs(v8sf a) { return (v8sf)(notSignBit8 & (v8si)a); }
+const v8si notSignBit = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
+inline v8sf abs(v8sf a) { return (v8sf)(notSignBit & (v8si)a); }
 
 inline v16hf toHalf(const v16sf v) {
     v4sf a = __builtin_ia32_vcvtps2ph256(v.r1, 0);
