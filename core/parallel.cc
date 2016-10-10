@@ -68,8 +68,8 @@ extern "C" void omp_set_num_threads(int threadCount);
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
  if(threadCount == 1) {
   tsc time; time.start();
-  for(int64 i : range(start, stop)) delegate(0, i);
-  //error(threadCount);
+  //for(int64 i : range(start, stop)) delegate(0, i);
+  error(threadCount);
   return time.cycleCount();
  } else {
 #if OPENMP

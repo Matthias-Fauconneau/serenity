@@ -112,8 +112,12 @@ inline v16hf toHalf(const v16sf v) {
 }
 
 inline v16sf toFloat(const v16hf v) {
+#if 0 // FIXME
     return v16sf(__builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 0+0, 0+1, 0+2, 0+3, 0+4, 0+5, 0+6, 0+7)),
                  __builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 8+0, 8+1, 8+2, 8+3, 8+4, 8+5, 8+6, 8+7)));
+#else
+    return v16sf(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]);
+#endif
 }
 
 static const unused v16si seqI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);

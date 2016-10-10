@@ -64,7 +64,7 @@ struct Render {
         });
         log(time);
     }
-} render;
+}; // render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -92,8 +92,8 @@ struct ViewControl : virtual Widget {
         if(event == Press) dragStart = {cursor, viewYawPitch};
         if(event==Motion && button==LeftButton) {
             viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
-            viewYawPitch.x = clamp<float>(-PI/2, viewYawPitch.x, PI/2);
-            viewYawPitch.y = clamp<float>(-PI/2, viewYawPitch.y, PI/2);
+            viewYawPitch.x = clamp<float>(-PI/3, viewYawPitch.x, PI/3);
+            viewYawPitch.y = clamp<float>(-PI/3, viewYawPitch.y, PI/3);
         }
         else return false;
         return true;
@@ -112,8 +112,8 @@ struct Light {
     Scene scene;
     Scene::Renderer renderer {scene};
 
-    bool orthographic = true;
-    bool sample = false, raycast = sample;
+    bool orthographic = false;
+    bool sample = true, raycast = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -145,11 +145,13 @@ struct Light {
             uint4 size;
             Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
             const half& operator ()(uint s, uint t, uint u, uint v) const {
-                return operator[]((((uint64)t*size[1]+s)*size[2]+v)*size[3]+u);
+                size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
+                assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
+                return operator[](index);
             }
-        }   B {imageCount, imageSize, field.slice(0*fieldSize, fieldSize)},
-            G {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
-            R {imageCount, imageSize, field.slice(2*fieldSize, fieldSize)};
+        }   fieldB {imageCount, imageSize, field.slice(0*fieldSize, fieldSize)},
+            fieldG {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
+            fieldR {imageCount, imageSize, field.slice(2*fieldSize, fieldSize)};
 
         Image target (targetSize);
 
@@ -165,23 +167,6 @@ struct Light {
         }
 
         if(raycast) {
-            target.clear(); // DEBUG
-
-            {// DEBUG
-                const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
-                const uint sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
-                if(!(sIndex < imageCount.x && tIndex < imageCount.y)) return Image();
-                //assert_(sIndex < imageCount.x && tIndex < imageCount.y);
-                ImageH B (unsafeRef(field.slice(((0*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
-                ImageH G (unsafeRef(field.slice(((1*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
-                ImageH R (unsafeRef(field.slice(((2*imageCount.y+tIndex)*imageCount.x+sIndex)*imageSize.y*imageSize.x, imageSize.y*imageSize.x)), imageSize);
-                Image BGR (B.size);
-                convert(BGR, B, G, R);
-                resize(target, BGR);
-                window->setTitle(str(sIndex)+" "+str(tIndex));
-            }
-
-            if(0)
             ({ size_t start=0, sizeI=target.size.y*target.size.x; //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
                 for(size_t i: range(start, start+sizeI)) {
                     int y = i/target.size.x, x = i%target.size.x;
@@ -203,17 +188,18 @@ struct Light {
                         const vec2 st = ST * vec2(imageCount-uint2(1));
                         const vec2 uv = UV * vec2(imageSize-uint2(1));
 
-                        if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) continue;
-                        int is = st[0], it = st[1], iu = uv[0], iv = uv[1];
-                        if(is >= int(imageCount.x)-1 || it >= int(imageCount.y)-1) continue;
-                        if(iu >= int(imageSize.x)-1 || iv >= int(imageSize.y)-1) continue;
+                        if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                        int sIndex = st[0], tIndex = st[1], uIndex = uv[0], vIndex = uv[1];
+                        if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+
                         float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
 
                         v16hf blue, green, red;
                         for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                            blue[((ds*2+dt)*2+du)*2+dv] = B(is+ds, it+dt, iu+du, iv+dv);
-                            green[((ds*2+dt)*2+du)*2+dv] = G(is+ds, it+dt, iu+du, iv+dv);
-                            red[((ds*2+dt)*2+du)*2+dv] = R(is+ds, it+dt, iu+du, iv+dv);
+                            blue[((ds*2+dt)*2+du)*2+dv] = fieldB(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
+                            green[((ds*2+dt)*2+du)*2+dv] = fieldG(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
+                            red[((ds*2+dt)*2+du)*2+dv] = fieldR(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
                         }
 
                         bgr3f Sstuv [2][2][2][2];
@@ -235,19 +221,13 @@ struct Light {
                             Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
 
                         S = (1-fs) * Ss[0] + fs * Ss[1];
-
-                        if(0) S = bgr3f(st[0]/(imageCount[0]-1), st[1]/(imageCount[1]-1), 0);
-                        if(0) S = bgr3f(uv[0]/(imageSize[0]-1), uv[1]/(imageSize[1]-1), 0);
-                        //if(0) S = bgr3f(st[0]/(images.size[0]-1), uv[0]/(imageSize[0]-1), 0);
-                        //if(0) S = bgr3f(st[1]/(images.size[1]-1), uv[1]/(imageSize[1]-1), 0);
-                        if(1) S = Sstuv[0][0][0][0] != bgr3f(0);
-                        if(0) S *= bgr3f(it*16, iv, 0)/256.f;
                     } else {
                         S = scene.raycast(O, d);
                     }
                     target(x, y) = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
+                //convert(BGR, B, G, R); resize(target, BGR);
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
             //B.clear(0); G.clear(0); R.clear(0); // DEBUG
