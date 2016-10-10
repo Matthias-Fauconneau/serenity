@@ -140,20 +140,6 @@ struct Light {
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
     Image render(uint2 targetSize) {
-        size_t fieldSize = (size_t)imageCount.y*imageCount.x*imageSize.y*imageSize.x;
-        struct Image4DH : ref<half> {
-            uint4 size;
-            Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
-            const half& operator ()(uint s, uint t, uint u, uint v) const {
-                assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3]);
-                size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
-                assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
-                return operator[](index);
-            }
-        }   fieldB {imageCount, imageSize, field.slice(0*fieldSize, fieldSize)},
-            fieldG {imageCount, imageSize, field.slice(1*fieldSize, fieldSize)},
-            fieldR {imageCount, imageSize, field.slice(2*fieldSize, fieldSize)};
-
         Image target (targetSize);
 
         mat4 M;
@@ -168,68 +154,53 @@ struct Light {
         }
 
         if(raycast) {
-            target.clear(); // DEBUG
-
-            ({ size_t start=0, sizeI=target.size.y*target.size.x;
-            //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
+            parallel_chunk(target.size.y*target.size.x, [this, &target, M](uint, size_t start, size_t sizeI) {
+                const int targetStride = target.size.x;
+                const int size1 = imageSize.x *1;
+                const int size2 = imageSize.y *size1;
+                const int size3 = imageCount.x*size2;
+                const size_t size4 = (size_t)imageCount.y*size3;
+                const ref<half> fieldB = field.slice(0*size4, size4);
+                const ref<half> fieldG = field.slice(1*size4, size4);
+                const ref<half> fieldR = field.slice(2*size4, size4);
+                v8si sample4D = {    0,       size1,       size2,       size2+size1,
+                                 size3, size3+size1, size3+size2, size3+size2+size1};
                 for(size_t i: range(start, start+sizeI)) {
-                    int y = i/target.size.x, x = i%target.size.x;
-                    const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
-                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
+                    int y = i/targetStride, x = i%targetStride;
+                    const vec3 O = M.inverse() * vec3(2.f*x/float(targetStride-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
+                    const vec3 P = M.inverse() * vec3(2.f*x/float(targetStride-1)-1, 2.f*y/float(target.size.y-1)-1, 1);
                     const vec3 d = normalize(P-O);
 
-                    bgr3f S;
-                    if(sample) {
-                        const vec3 n (0,0,-1);
-                        const float nd = dot(n, d);
-                        const vec3 n_nd = n / nd;
+                    const vec3 n (0,0,-1);
+                    const float nd = dot(n, d);
+                    const vec3 n_nd = n / nd;
 
-                        const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
-                        const vec2 ST = (Pst+vec2(1))/2.f;
-                        const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
-                        const vec2 UV = (Puv+vec2(1))/2.f;
+                    const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
+                    const vec2 ST = (Pst+vec2(1))/2.f;
+                    const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
+                    const vec2 UV = (Puv+vec2(1))/2.f;
 
-                        const vec2 st = ST * vec2(imageCount-uint2(1));
-                        const vec2 uv = UV * vec2(imageSize-uint2(1));
+                    const vec2 st = ST * vec2(imageCount-uint2(1));
+                    const vec2 uv = UV * vec2(imageSize-uint2(1));
 
-                        if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
-                        int sIndex = st[0], tIndex = st[1], uIndex = uv[0], vIndex = uv[1];
-                        if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
-                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    if(st[0] < 0 || st[1] < 0 || uv[0] < 0 || uv[1] < 0) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    int sIndex = st[0], tIndex = st[1], uIndex = uv[0], vIndex = uv[1];
+                    if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target(x,y)=byte4(byte3(0), 0xFF); continue; }
+                    const size_t base = tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
+                    v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
+                    v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
+                    v16sf R = toFloat((v16hf)gather((float*)(fieldR.data+base), sample4D));
 
-                        float fs = fract(st[0]), ft = fract(st[1]), fu = fract(uv[0]), fv = fract(uv[1]);
-
-                        v16hf blue, green, red;
-                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                            blue[((ds*2+dt)*2+du)*2+dv] = fieldB(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
-                            green[((ds*2+dt)*2+du)*2+dv] = fieldG(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
-                            red[((ds*2+dt)*2+du)*2+dv] = fieldR(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
-                        }
-
-                        bgr3f Sstuv [2][2][2][2];
-                        v16sf B = toFloat(blue), G = toFloat(green), R = toFloat(red);
-                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1}) for(const int dv: {0, 1}) {
-                            Sstuv[ds][dt][du][dv] = bgr3f( B[((ds*2+dt)*2+du)*2+dv], G[((ds*2+dt)*2+du)*2+dv], R[((ds*2+dt)*2+du)*2+dv] );
-                        }
-
-                        bgr3f Sstu [2][2][2];
-                        for(const int ds: {0, 1}) for(const int dt: {0, 1}) for(const int du: {0, 1})
-                            Sstu[ds][dt][du] = (1-fv) * Sstuv[ds][dt][du][0] + fv * Sstuv[ds][dt][du][1];
-
-                        bgr3f Sst [2][2];
-                        for(const int ds: {0, 1}) for(const int dt: {0, 1})
-                            Sst[ds][dt] = (1-fu) * Sstu[ds][dt][0] + fu * Sstu[ds][dt][1];
-
-                        bgr3f Ss [2];
-                        for(const int ds: {0, 1})
-                            Ss[ds] = (1-ft) * Sst[ds][0] + ft * Sst[ds][1];
-
-                        S = (1-fs) * Ss[0] + fs * Ss[1];
-                    } else {
-                        S = scene.raycast(O, d);
-                    }
-                    assert_(S>=bgr3f(0) && S<=bgr3f(1));
-                    target(x, y) = byte4(byte3(float(0xFF)*S), 0xFF);
+                    v4sf v = {st[1], st[0], uv[1], uv[0]}; // tsvu
+                    v8sf V = __builtin_shufflevector(v, v, 0, 1, 2, 3, 0, 1, 2, 3);
+                    static v8sf _00001111f = {0,0,0,0,1,1,1,1};
+                    const v8sf w_1mw = abs(V - floor(V) - _00001111f); // fract(x), 1-fract(x)
+                    const v16sf w01 = shuffle(w_1mw, w_1mw, 4,4,4,4,4,4,4,4, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
+                                    * shuffle(w_1mw, w_1mw, 5,5,5,5,1,1,1,1, 5,5,5,5,1,1,1,1)  // ssssSSSSssssSSSS
+                                    * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
+                                    * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
+                    target(x, y) = byte4(byte3(float(0xFF)*bgr3f(dot(w01, B), dot(w01, G), dot(w01, R))), 0xFF);
                 }
             });
         } else {

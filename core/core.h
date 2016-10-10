@@ -55,7 +55,7 @@ generic struct handle {
 
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
 
-// -- Integer types
+// -- Primitive types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -68,6 +68,7 @@ typedef unsigned long ptr;
 typedef signed long long int64;
 typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ size_t;
+typedef __fp16 half;
 constexpr size_t invalid = ~0; // Invalid index
 #define null nullptr
 

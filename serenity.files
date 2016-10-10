@@ -2,6 +2,7 @@ serenity.files
 
 core/parallel.h
 core/parallel.cc
+core/simd.h
 
 light.cc
 raster.h
