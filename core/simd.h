@@ -3,11 +3,11 @@
 #include "core.h"
 
 #include <immintrin.h>
-typedef short v4hf __attribute((__vector_size__ (8)));
+typedef __fp16 v4hf __attribute((__vector_size__ (8)));
 typedef float v4sf __attribute((__vector_size__ (16)));
 typedef float v8sf __attribute((__vector_size__ (32)));
-typedef short v8hf __attribute((__vector_size__ (16)));
-typedef short v16hf __attribute((__vector_size__ (32)));
+typedef __fp16 v8hf __attribute((__vector_size__ (16)));
+typedef __fp16 v16hf __attribute((__vector_size__ (32)));
 
 typedef float v8sf __attribute((vector_size(32),may_alias));
 inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }

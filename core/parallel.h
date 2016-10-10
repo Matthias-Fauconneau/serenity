@@ -12,7 +12,6 @@ int threadCount();
 /// Runs a loop in parallel
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount = ::threadCount());
 
-#if 0
 /// Runs a loop in parallel chunks with chunk-wise functor
 template<Type F> uint64 parallel_chunk(size_t jobCount, F f, const uint threadCount = ::threadCount()) {
  if(threadCount==1) {
@@ -39,4 +38,3 @@ template<Type F> uint64 parallel_chunk(int64 start, int64 stop, F f, const uint 
   f(id, start+I0, DI);
  }, threadCount);
 }
-#endif

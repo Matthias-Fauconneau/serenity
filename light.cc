@@ -64,7 +64,7 @@ struct Render {
         });
         log(time);
     }
-}; // render;
+} ;//render;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -80,7 +80,7 @@ struct ScrollValue : virtual Widget {
 };
 
 struct ViewControl : virtual Widget {
-    vec2 viewYawPitch = vec2(0, 0); // Current view angles
+    vec2 viewYawPitch = vec2(PI/3, PI/3); // Current view angles
 
     struct {
         vec2 cursor;
@@ -145,6 +145,7 @@ struct Light {
             uint4 size;
             Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
             const half& operator ()(uint s, uint t, uint u, uint v) const {
+                assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3]);
                 size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
                 assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
                 return operator[](index);
@@ -167,7 +168,10 @@ struct Light {
         }
 
         if(raycast) {
-            ({ size_t start=0, sizeI=target.size.y*target.size.x; //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
+            target.clear(); // DEBUG
+
+            ({ size_t start=0, sizeI=target.size.y*target.size.x;
+            //parallel_chunk(target.size.y*target.size.x, [&](uint, size_t start, size_t sizeI) {
                 for(size_t i: range(start, start+sizeI)) {
                     int y = i/target.size.x, x = i%target.size.x;
                     const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, 2.f*y/float(target.size.y-1)-1, -1);
@@ -224,13 +228,12 @@ struct Light {
                     } else {
                         S = scene.raycast(O, d);
                     }
+                    assert_(S>=bgr3f(0) && S<=bgr3f(1));
                     target(x, y) = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
-                //convert(BGR, B, G, R); resize(target, BGR);
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            //B.clear(0); G.clear(0); R.clear(0); // DEBUG
             scene.render(renderer, B, G, R, M);
             convert(target, B, G, R);
         }
