@@ -71,11 +71,11 @@ struct Scene {
         Renderer(const Scene& scene) : pass(scene.shader) {}
     };
 
-    void render(Renderer& renderer, const ImageH& B, const ImageH& G, const ImageH& R, mat4 M) {
-        renderer.target.setup(int2(B.size)); // Needs to be setup before pass
+    void render(Renderer& renderer, const ImageH& Z, const ImageH& B, const ImageH& G, const ImageH& R, mat4 M) {
+        renderer.target.setup(int2(Z.size)); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
-        NDC.scale(vec3(vec2(B.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
+        NDC.scale(vec3(vec2(Z.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
@@ -85,6 +85,22 @@ struct Scene {
             renderer.pass.submit(A,B,C, attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
-        renderer.target.resolve(B, G, R);
+        renderer.target.resolve(Z, B, G, R);
+    }
+    void render(Renderer& renderer, const ImageH& Z, mat4 M) {
+        renderer.target.setup(int2(Z.size)); // Needs to be setup before pass
+        renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
+        mat4 NDC;
+        NDC.scale(vec3(vec2(Z.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
+        NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+        M = NDC * M;
+        for(const Face& face: faces) {
+            vec3 A = M*face.position[0], B = M*face.position[1], C = M*face.position[2];
+            if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
+            vec3 attributes[0];
+            renderer.pass.submit(A,B,C, attributes, {face.color});
+        }
+        renderer.pass.render(renderer.target);
+        renderer.target.resolve(Z);
     }
 };

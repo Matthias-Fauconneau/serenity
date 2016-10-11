@@ -25,8 +25,8 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 
 /// 64×64 pixels tile for L1 cache locality (64×64×RGBZ×float~64KB)
 struct Tile { // 64KB framebuffer (L1)
-    v16sf depth[4*4],blue[4*4],green[4*4],red[4*4];
-    v16sf subdepth[16*16],subblue[16*16],subgreen[16*16],subred[16*16];
+    v16sf Z[4*4], B[4*4], G[4*4],R[4*4];
+    v16sf subZ[16*16], subB[16*16], subG[16*16], subR[16*16];
     mask16 subsample[16]; // Per-pixel flag to trigger subpixel operations
     bool needClear;
     Tile();
@@ -37,23 +37,25 @@ struct RenderTarget {
     int2 size = 0; // Pixels
     uint width = 0, height = 0; // Tiles
     buffer<Tile> tiles;
-    float depth; bgr3f backgroundColor;
+    float Z; bgr3f backgroundColor;
 
     // Allocates all bins, flags them to be cleared
-    void setup(int2 size, float depth=inff, bgr3f backgroundColor=0) {
+    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=0) {
         if(this->size != size) {
             this->size = size;
             width = align(64,size.x*4)/64;
             height = align(64,size.y*4)/64;
             tiles = buffer<Tile>(width*height);
         }
-        this->depth = depth;
+        this->Z = Z;
         this->backgroundColor = backgroundColor;
         for(Tile& tile: tiles) { tile.needClear = true; } // Forces initial background blit to target
     }
 
-    // Resolves internal MSAA linear framebuffer to RGB linear half buffers
-    void resolve(const ImageH& B, const ImageH& G, const ImageH& R);
+    // Resolves internal MSAA linear framebuffer to ZRGB linear half buffers
+    void resolve(const ImageH& Z, const ImageH& B, const ImageH& G, const ImageH& R);
+    // Resolves internal MSAA linear framebuffer to Z linear half buffer
+    void resolve(const ImageH& Z);
 };
 
 void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R);
@@ -307,16 +309,16 @@ template<class Shader> struct RenderPass {
                     const v16sf XY1y = pixelY+v16sf(4.f/2);
                     const v16sf w = 1/( v16sf(face.i1.x)*XY1x + v16sf(face.i1.y)*XY1y + v16sf(face.i1.z));
                     const v16sf z = w*( v16sf(face.iz.x)*XY1x + v16sf(face.iz.y)*XY1y + v16sf(face.iz.z));
-                    v16sf& depth = tile.depth[blockIndex];
-                    v16si mask = ::mask(draw.mask) & ~::mask(tile.subsample[blockIndex]) & z <= depth;
-                    store(depth, z, mask);
+                    v16sf& Z = tile.Z[blockIndex];
+                    v16si mask = ::mask(draw.mask) & ~::mask(tile.subsample[blockIndex]) & z <= Z;
+                    store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
                     bgra4v16sf src = shader(face.faceAttributes, centroid);
 
-                    v16sf& dstB = tile.blue[blockIndex];
-                    v16sf& dstG = tile.green[blockIndex];
-                    v16sf& dstR = tile.red[blockIndex];
+                    v16sf& dstB = tile.B[blockIndex];
+                    v16sf& dstG = tile.G[blockIndex];
+                    v16sf& dstR = tile.R[blockIndex];
                     if(Shader::blend) {
                         store(dstB, (_1f-src.a)*dstB + src.a*src.b, mask);
                         store(dstG, (_1f-src.a)*dstG + src.a*src.g, mask);
@@ -339,11 +341,12 @@ template<class Shader> struct RenderPass {
                             const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
                             // Performs Z-Test
-                            v16sf& subdepth = tile.subdepth[pixelPtr];
-                            const v16si visibleMask = (z >= subdepth);
+                            v16sf& subZ = tile.subZ[pixelPtr];
+                            const v16si visibleMask = (z <= subZ);
 
                             // Stores accepted pixels in Z buffer
-                            store(subdepth, z, visibleMask);
+                            //for(int i: range(16)) assert_(z[i] >= -2, "A", z[i]); // DEBUG
+                            store(subZ, z, visibleMask);
 
                             // Counts visible samples
                             float centroid[V];
@@ -361,9 +364,9 @@ template<class Shader> struct RenderPass {
                             //profile( int64 start = readCycleCounter() );
                             bgra4f src = shader(face.faceAttributes, centroid);
                             //profile( userTime += readCycleCounter()-start );
-                            v16sf& dstB = tile.subblue[pixelPtr];
-                            v16sf& dstG = tile.subgreen[pixelPtr];
-                            v16sf& dstR = tile.subred[pixelPtr];
+                            v16sf& dstB = tile.subB[pixelPtr];
+                            v16sf& dstG = tile.subG[pixelPtr];
+                            v16sf& dstR = tile.subR[pixelPtr];
                             if(Shader::blend) {
                                 store(dstB, v16sf(1-src.a)*dstB+v16sf(src.a*src.b), visibleMask);
                                 store(dstG, v16sf(1-src.a)*dstG+v16sf(src.a*src.g), visibleMask);
@@ -398,11 +401,12 @@ template<class Shader> struct RenderPass {
                         tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
                         // Performs Z-Test
-                        float pixelZ = ((float*)tile.depth)[pixelPtr];
+                        float pixelZ = ((float*)tile.Z)[pixelPtr];
                         const v16si visibleMask = (z <= pixelZ) & draw.mask;
 
                         // Blends accepted pixels in subsampled Z buffer
-                        tile.subdepth[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
+                        //for(int i: range(16)) assert_(blend(v16sf(pixelZ), z, visibleMask)[i] >= -2, "B", z[i], i, pixelZ, z[i], visibleMask[i], draw.mask[i]);
+                        tile.subZ[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
 
                         // Counts visible samples
                         float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
@@ -418,12 +422,12 @@ template<class Shader> struct RenderPass {
                         }
 
                         bgra4f src = shader(face.faceAttributes,centroid);
-                        v16sf& dstB = tile.subblue[pixelPtr];
-                        v16sf& dstG = tile.subgreen[pixelPtr];
-                        v16sf& dstR = tile.subred[pixelPtr];
-                        float pixelB = ((float*)tile.blue)[pixelPtr];
-                        float pixelG = ((float*)tile.green)[pixelPtr];
-                        float pixelR = ((float*)tile.red)[pixelPtr];
+                        v16sf& dstB = tile.subB[pixelPtr];
+                        v16sf& dstG = tile.subG[pixelPtr];
+                        v16sf& dstR = tile.subR[pixelPtr];
+                        float pixelB = ((float*)tile.B)[pixelPtr];
+                        float pixelG = ((float*)tile.G)[pixelPtr];
+                        float pixelR = ((float*)tile.R)[pixelPtr];
                         if(Shader::blend) {
                             dstB = blend(v16sf(pixelB), v16sf((1-src.a)*pixelB+src.a*src.b), visibleMask);
                             dstG = blend(v16sf(pixelG), v16sf((1-src.a)*pixelG+src.a*src.g), visibleMask);
@@ -435,11 +439,12 @@ template<class Shader> struct RenderPass {
                         }
                     } else {
                         // Performs Z-Test
-                        v16sf& subdepth = tile.subdepth[pixelPtr];
-                        const v16si visibleMask = (z <= subdepth) & draw.mask;
+                        v16sf& subZ = tile.subZ[pixelPtr];
+                        const v16si visibleMask = (z <= subZ) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
-                        store(subdepth, z, visibleMask);
+                        //for(int i: range(16)) assert_(z[i] >= -2, "C", z[i]); // DEBUG
+                        store(subZ, z, visibleMask);
 
                         // Counts visible samples
                         float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
@@ -455,9 +460,9 @@ template<class Shader> struct RenderPass {
                         }
 
                         bgra4f src = shader(face.faceAttributes, centroid);
-                        v16sf& dstB = tile.subblue[pixelPtr];
-                        v16sf& dstG = tile.subgreen[pixelPtr];
-                        v16sf& dstR = tile.subred[pixelPtr];
+                        v16sf& dstB = tile.subB[pixelPtr];
+                        v16sf& dstG = tile.subG[pixelPtr];
+                        v16sf& dstR = tile.subR[pixelPtr];
                         if(Shader::blend) {
                             store(dstB, v16sf(1-src.a)*dstB+v16sf(src.a*src.b), visibleMask);
                             store(dstG, v16sf(1-src.a)*dstG+v16sf(src.a*src.g), visibleMask);
@@ -485,10 +490,10 @@ template<class Shader> struct RenderPass {
             Tile& tile = target.tiles[binIndex];
             if(tile.needClear) {
                 mref<uint16>(tile.subsample).clear();
-                mref<v16sf>(tile.depth).clear(v16sf(target.depth));
-                mref<v16sf>(tile.blue).clear(v16sf(target.backgroundColor.b));
-                mref<v16sf>(tile.green).clear(v16sf(target.backgroundColor.g));
-                mref<v16sf>(tile.red).clear(v16sf(target.backgroundColor.r));
+                mref<v16sf>(tile.Z).clear(v16sf(target.Z));
+                mref<v16sf>(tile.B).clear(v16sf(target.backgroundColor.b));
+                mref<v16sf>(tile.G).clear(v16sf(target.backgroundColor.g));
+                mref<v16sf>(tile.R).clear(v16sf(target.backgroundColor.r));
                 tile.needClear = false;
             }
 

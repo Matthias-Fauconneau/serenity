@@ -57,8 +57,6 @@ inline float sum8(v8sf x) {
 }
 inline float sum16(v16sf v) { return sum8(v.r1+v.r2); }
 
-//inline string str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
-
 /// 16-wide vector operations using 2 v8si AVX registers
 struct v16si {
     v8si r1,r2;
@@ -141,3 +139,5 @@ inline float dot(v8sf a, v8sf b) {
     return (low(dot4)+high(dot4))[0];
 }
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
+
+inline String str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
