@@ -26,6 +26,7 @@ inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 static v8si unused _0i = intX(0);
 static v8si unused _1i = intX(-1);
 
+inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
 inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 inline v8sf float8(v4sf a, v4sf b) { return __builtin_shufflevector(a, b, 0,1,2,3,4,5,6,7); }
 
