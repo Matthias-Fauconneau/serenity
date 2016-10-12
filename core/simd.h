@@ -2,11 +2,19 @@
 /// \file simd.h SIMD intrinsics (SSE, AVX, ...)
 #include "core.h"
 
+#include <immintrin.h>
+
 typedef uint8 mask8;
 typedef uint16 mask16;
 
+typedef long long b64;
+typedef b64 v4x64 __attribute((vector_size(32)));
+
+typedef int v2si __attribute((vector_size(8)));
+typedef int v4si __attribute((vector_size(16)));
 typedef int v8si __attribute((vector_size(32)));
 
+typedef float v2sf __attribute((vector_size(8)));
 typedef float v4sf __attribute((vector_size(16)));
 typedef float v8sf __attribute((vector_size(32)));
 
@@ -19,7 +27,9 @@ static v8si unused _0i = intX(0);
 static v8si unused _1i = intX(-1);
 
 inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
+inline v8sf float8(v4sf a, v4sf b) { return __builtin_shufflevector(a, b, 0,1,2,3,4,5,6,7); }
 
+static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 
 struct v16si;
@@ -36,6 +46,7 @@ struct v16sf {
     explicit operator v16si() const;
 };
 
+static v4sf unused _0f {0,0,0,0};
 static v16sf unused _1f = v16sf(1);
 
 inline v16sf operator-(v16sf a) { return v16sf(-a.r1, -a.r2); }
@@ -110,12 +121,14 @@ inline void store(v16sf& P, v16sf A, v16si M) {
     __builtin_ia32_maskstoreps256(&P.r2, M.r2, A.r2);
 }
 
-//#include <immintrin.h>
-
+inline v4sf floor(const v4sf v) { return __builtin_ia32_roundps(v, 1/*-∞*/); }
 inline v8sf floor(const v8sf v) { return __builtin_ia32_roundps256(v, 1/*-∞*/); }
 
-const v8si notSignBit = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
-inline v8sf abs(v8sf a) { return (v8sf)(notSignBit & (v8si)a); }
+const v4si notSignBit4 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
+inline v4sf abs(v4sf a) { return (v4sf)(notSignBit4 & (v4si)a); }
+
+const v8si notSignBit8 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
+inline v8sf abs(v8sf a) { return (v8sf)(notSignBit8 & (v8si)a); }
 
 inline v16hf toHalf(const v16sf v) {
     v4sf a = __builtin_ia32_vcvtps2ph256(v.r1, 0);
@@ -123,6 +136,7 @@ inline v16hf toHalf(const v16sf v) {
     return __builtin_shufflevector(a, b, 0, 1, 2, 3, 4, 5, 6, 7);
 }
 
+inline v4sf toFloat(const v4hf v) { return {(float)v[0], (float)v[1], (float)v[2], (float)v[3]}; }
 inline v16sf toFloat(const v16hf v) {
     return v16sf(__builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 0+0, 0+1, 0+2, 0+3, 0+4, 0+5, 0+6, 0+7)),
                  __builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 8+0, 8+1, 8+2, 8+3, 8+4, 8+5, 8+6, 8+7)));
@@ -130,6 +144,7 @@ inline v16sf toFloat(const v16hf v) {
 
 static const unused v16si seqI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
+inline float dot(v4sf a, v4sf b) { return __builtin_ia32_dpps(a, b, 0xFF)[0]; }
 //inline v4sf low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
 //inline v4sf high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
 inline v4sf low(v8sf a) { return __builtin_shufflevector(a,a, 0,1,2,3); }

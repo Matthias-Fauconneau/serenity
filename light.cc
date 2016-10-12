@@ -122,7 +122,7 @@ struct Light {
     bool orthographic = false;
     bool sample = true;
     bool raycast = true;
-    bool depthCorrect = false;
+    bool depthCorrect = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -160,6 +160,8 @@ struct Light {
         } else {
             // Sheared perspective (rectification)
             const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+            //const float sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
+            //const float s_ = clamp(0, )
             M = shearedPerspective(s, t);
         }
 
@@ -176,7 +178,6 @@ struct Light {
                 const int size2 = imageSize.y *size1;
                 const int size3 = imageCount.x*size2;
                 const size_t size4 = (size_t)imageCount.y*size3;
-                //const ref<half> unused fieldZ = field.slice(0*size4, size4);
 #if 1
                 const struct Image4DH : ref<half> {
                     uint4 size;
@@ -187,17 +188,20 @@ struct Light {
                         assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
                         return operator[](index);
                     }
-                } fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
+                } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
+                  fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
                   fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
                   fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
 #else
+                //const ref<half> fieldZ = field.slice(0*size4, size4);
                 const ref<half> fieldB = field.slice(1*size4, size4);
                 const ref<half> fieldG = field.slice(2*size4, size4);
                 const ref<half> fieldR = field.slice(3*size4, size4);
 #endif
                 assert_(imageSize.x%2==0); // Gather 32bit / half
+                const v2si unused sample2D = {    0,           size1/2};
                 const v8si unused sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
-                                 size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                                                  size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
                 for(size_t targetIndex: range(start, start+sizeI)) {
                     int targetY = targetIndex/targetStride, targetX = targetIndex%targetStride;
                     const vec3 O = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
@@ -224,33 +228,86 @@ struct Light {
                         //v16sf Z = toFloat((v16hf)gather((float*)(fieldZ.data+base), sample4D));
                         //const float z = dot(w01, Z);
                         float z = Z(targetX, targetY);
-                        float B = 0, G = 0, R = 0;
+                        v4sf W[4]; float w = 0;
+                        v16hf B, G, R;
                         for(int dt: {0,1}) for(int ds: {0,1}) { // FIXME: SIMD
-                            vec2 uv_ = uv + scale * (fract(st) - vec2(ds, dt)) * (z) / (-2-z);
-                            uv_[0] = ::max(0.f, uv_[0]);
-                            uv_[1] = ::max(0.f, uv_[1]);
+                            vec2 uv_ = uv + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
+                            if(uv_[0] < 0 || uv_[1] < 0) { target[targetIndex]=0; continue; } // DEBUG
+                            //uv_[0] = ::max(0.f, uv_[0]);
+                            //uv_[1] = ::max(0.f, uv_[1]);
                             //if(uv_[0] < 0 || uv_[1] < 0) goto discard;
                             int uIndex = uv_[0], vIndex = uv_[1];
                             assert_(uIndex >= 0 && vIndex >= 0, uv_, z);
-                            //if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) goto discard;
-                            uIndex = ::min(uIndex, int(imageSize.x)-2);
-                            vIndex = ::min(vIndex, int(imageSize.y)-2);
-                            float sumB = 0, sumG = 0, sumR = 0;
+                            if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=0; continue; } // DEBUG
+                            //uIndex = ::min(uIndex, int(imageSize.x)-2);
+                            //vIndex = ::min(vIndex, int(imageSize.y)-2);
+                            //float sumB = 0, sumG = 0, sumR = 0;
+                            //float sumW = 0;
+#if 0
                             for(int dv: {0,1}) for(int du: {0,1}) { // FIXME: SIMD
+                                if(abs(fieldZ(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv) - z) > 1./2) continue; // Only close samples
                                 float w = (1-abs(fract(uv_[0]) - du)) * (1-abs(fract(uv_[1]) - dv));
+                                sumW += w;
                                 sumB += w * fieldB(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
                                 sumG += w * fieldG(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
                                 sumR += w * fieldR(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv);
                             }
+#else
+                            const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
+                            const v2sf x = {uv[1], uv[0]}; // vu
+                            const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
+                            static const v4sf _0011f = {0,0,1,1};
+                            const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                            const v4sf w01 = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVVvvVVvvVVvvVV
+                                           * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuUuUuUuUuUuUuU
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
+                            const float z2 = dot(w01, Z);
+#if 0
+                            if(abs(z2 - z) > 1./2) { W[dt*2+ds] = _0f; continue; } // Only close samples
+                            w++;
+
+                            W[dt*2+ds] = w01;
+                            ((v4x64&)B)[dt*2+ds] = (b64)gather((float*)(fieldB.data+base), sample2D);
+                            ((v4x64&)G)[dt*2+ds] = (b64)gather((float*)(fieldG.data+base), sample2D);
+                            ((v4x64&)R)[dt*2+ds] = (b64)gather((float*)(fieldR.data+base), sample2D);
+#else
+                            w++;
+                            W[dt*2+ds] = w01;
+                            ((v4x64&)B)[dt*2+ds] = (b64)gather((float*)(fieldB.data+base), sample2D);
+                            ((v4x64&)G)[dt*2+ds] = (b64)gather((float*)(fieldG.data+base), sample2D);
+                            ((v4x64&)R)[dt*2+ds] = (b64)gather((float*)(fieldR.data+base), sample2D);
+#endif
+#if 0
+                            sumW++;
+                            int du=0, dv=0; const float v = fieldZ(sIndex+ds, tIndex+dt, uIndex+du, vIndex+dv) - z;
+                            //const float v = z2 - z;
+                            sumB += ::max(0.f, -v);
+                            sumG += abs(v) > 1./8;
+                            sumR += ::max(0.f, v);
+#endif
+#endif
+#if 0
                             float w = (1-abs(fract(st[0]) - ds)) * (1-abs(fract(st[1]) - dt));
-                            B += w * sumB;
-                            G += w * sumG;
-                            R += w * sumR;
+                            B += w * sumB/sumW;
+                            G += w * sumG/sumW;
+                            R += w * sumR/sumW;
+#endif
                         }
-                        S = bgr3f(B, G, R);
+                        const v4sf x = {st[1], st[0]}; // ts
+                        const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
+                        static const v4sf _0011f = {0,0,1,1};
+                        const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                        const v16sf w01 = shuffle(w_1mw, w_1mw, 2,2,2,2,2,2,2,2, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
+                                        * shuffle(w_1mw, w_1mw, 3,3,3,3,1,1,1,1, 3,3,3,3,1,1,1,1)  // ssssSSSSssssSSSS
+                                        * v16sf(float8(W[0],W[1]),float8(W[2],W[3]))
+                                        * v16sf(4.f/w); // Scaling (in case of skipped samples)
+                        const float b = dot(w01, toFloat(B));
+                        const float g = dot(w01, toFloat(G));
+                        const float r = dot(w01, toFloat(R));
+                        S = bgr3f(b, g, r);
                     } else {
                         const int uIndex = uv[0], vIndex = uv[1];
-                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) goto discard;
+                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=0; continue; }
                         const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
                         const v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
                         const v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
