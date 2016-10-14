@@ -73,7 +73,7 @@ struct Render {
         });
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
     }
-}; //renderLightField;
+};// renderLightField;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -127,7 +127,7 @@ struct Light {
     bool orthographic = false;
     bool sample = true;
     bool raycast = true;
-    bool depthCorrect = false;
+    bool depthCorrect = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -209,7 +209,8 @@ struct Light {
 
             // FIXME: Z-Pass only
             ImageH Z (target.size);
-            if(depthCorrect) scene.render(renderer, Z, M);
+            ImageH WZ (target.size);
+            if(depthCorrect) scene.render(renderer, Z, WZ, WZ, WZ, M);
 
             array<char> debug; Image debugTarget (256+640, 1024); debugTarget.clear();
             //parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
@@ -249,7 +250,9 @@ struct Light {
                     if(depthCorrect) {
                         //v16sf Z = toFloat((v16hf)gather((float*)(fieldZ.data+base), sample4D));
                         //const float z = dot(w01, Z);
-                        float z = Z(targetX, targetY);
+                        //float z = Z(targetX, targetY);
+                        const float wZ = WZ(targetX, targetY);
+                        const float z = -2*(wZ*2-1);
                         float w = 0;
                         v4sf B, G, R;
                         float Z2[4]; // DEBUG
@@ -272,7 +275,9 @@ struct Light {
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                             const v4sf w01 = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                            * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
-                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
+                            //const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
+                            const v4sf wZ = toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D));
+                            const v4sf Z = float4(-2)*(wZ*float4(2)-float4(1));
                             const float z2 = dot(w01, Z);
                             Z2[dt*2+ds] = z2;
 #if 1
@@ -337,10 +342,14 @@ struct Light {
                                     if(uIndex < 0 || uIndex >= int(imageSize.x)) continue;
                                     const vec2 O(-2, (floor(st[1])+dt)/(imageCount.y-1)); // Origin of viewpoint
                                     const vec2 D0(0, (float)v/(imageSize.y-1)); // Pixel position on UV plane
-                                    float z0 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v);
+                                    //float z0 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v);
+                                    float wZ0 = fieldB(sIndex+ds, tIndex+dt, uIndex, v)*2-1;
+                                    float z0 = -2*wZ0;
                                     const vec2 p0 = O + (D0-O)*((2+z0)/2.f);
                                     const vec2 D1(0, (float)(v+1)/(imageSize.y-1)); // Pixel position on UV plane
-                                    float z1 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v+1);
+                                    //float z1 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v+1);
+                                    float wZ1 = fieldB(sIndex+ds, tIndex+dt, uIndex, v+1)*2-1;
+                                    float z1 = -2*wZ1;
                                     const vec2 p1 = O + (D1-O)*((2+z1)/2.f);
                                     line(target, p(p0.x, p0.y), p(p1.x, p1.y));
                                 }

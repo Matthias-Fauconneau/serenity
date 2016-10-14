@@ -40,7 +40,7 @@ struct RenderTarget {
     float Z; bgr3f backgroundColor;
 
     // Allocates all bins, flags them to be cleared
-    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=1) {
+    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=0) {
         if(this->size != size) {
             this->size = size;
             width = align(64,size.x*4)/64;

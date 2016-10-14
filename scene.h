@@ -49,7 +49,7 @@ struct Scene {
             return Y;
         }
         bgra4f operator()(FaceAttributes, float unused varying[V]) const {
-            //return bgra4f(vec3((1+varying[2])/2.f), 1.f); // Z
+            return bgra4f(vec3((1+varying[2])/2.f), 1.f); // Z
             const float u = varying[0], v = varying[1];
             const bool white = (int(16*u)+int(16*v))%2;
             return white ? bgra4f(1,1,1, 1.f) : bgra4f(0,0,0, 1.f);
