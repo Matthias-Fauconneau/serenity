@@ -26,62 +26,11 @@ struct Scene {
     struct Shader {
         // Shader specification (used by rasterizer)
         struct FaceAttributes { bgr3f color; };
-#define CHECK 1
-#if CHECK
-        static constexpr int V = 3;
-#else
-        static constexpr int V = 0;
-#endif
+        static constexpr int V = 3; // U,V,Z
         static constexpr bool blend = false; // Disables unnecessary blending
 
-#if CHECK
-#if 1
-        vecf<4> shade(FaceAttributes face, float varying[V]) const {
-            const float u = varying[0], v = varying[1];
-            static float cellCount (16);
-            const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
-            const float m = float(1./2)*n; // Half integer
-            const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-            //assert_(mod == 0 || mod == 1, mod, u, v);
-            //return vecf<4>{{varying[2], mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
-            return vecf<4>{{varying[2], float(face.color.b), float(face.color.g), float(face.color.r)}};
-        }
-        vec16f<4> shade(FaceAttributes face, v16sf varying[V]) const {
-            const v16sf u = varying[0], v = varying[1];
-            static v16sf cellCount (16);
-            const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
-            const v16sf m = v16sf(1./2)*n; // Half integer
-            const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-            //for(int i: range(16)) assert_(mod[i] == 0 || mod[i] == 1);
-            //return vec16f<4>{{varying[2], mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
-            return vec16f<4>{{varying[2], v16sf(face.color.b), v16sf(face.color.g), v16sf(face.color.r)}};
-        }
-#else
-        template<int C> vec16f<C> shade(FaceAttributes face, v16sf varying[V]) const {
-            vec16f<C> Y;
-            for(int i: range(16)) {
-                float x[V];
-                for(int j: range(V)) x[j] = varying[j][i];
-                vecf<C> y = shade<C>(face, x);
-                for(int c: range(C)) Y[c][i] = y[c];
-            }
-            return Y;
-        }
-        template<int C> vecf<C> shade(FaceAttributes, float varying[V]) const;
-        template<> vecf<4> shade<4>(FaceAttributes, float varying[V]) const {
-            const float u = varying[0], v = varying[1];
-            const bool white = (int(16*u)+int(16*v))%2;
-            return white ? vecf<4>{{varying[2], 1,1,1}} : vecf<4>{{varying[2], 0,0,0}};
-        }
-#endif
-#else
-        bgra4v16sf operator()(FaceAttributes face, v16sf unused varying[V]) const {
-            return {v16sf(face.color.b), v16sf(face.color.g), v16sf(face.color.r), _1f};
-        }
-        bgra4f operator()(FaceAttributes face, float unused varying[V]) const {
-            return bgra4f(face.color, 1.f);
-        }
-#endif
+        template<int C> vecf<C> shade(FaceAttributes face, float varying[V]) const;
+        template<int C> vec16f<C> shade(FaceAttributes face, v16sf varying[V]) const;
     } shader;
 
     struct Face { vec3 position[3]; vec3 attributes[Shader::V]; bgr3f color; };
@@ -114,17 +63,18 @@ struct Scene {
         return color;
     }
 
-    struct Renderer {
+    template<int C> struct Renderer {
         RenderPass<Scene::Shader> pass; // Face bins
-        RenderTarget<4> target; // Sample tiles
+        RenderTarget<C> target; // Sample tiles
         Renderer(const Scene& scene) : pass(scene.shader) {}
     };
 
-    void render(Renderer& renderer, const ImageH& Z, const ImageH& B, const ImageH& G, const ImageH& R, mat4 M) {
-        renderer.target.setup(int2(Z.size), 1, (float[4]){1,1,1,1}); // Needs to be setup before pass
+    template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[], const Args&... targets) {
+        uint2 size = (uint2[]){targets.size...}[0];
+        renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
-        NDC.scale(vec3(vec2(Z.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
+        NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
@@ -133,23 +83,31 @@ struct Scene {
             renderer.pass.submit(A,B,C, face.attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
-        renderer.target.resolve(Z, B, G, R);
-    }
-    void render(Renderer& renderer, const ImageH& Z, mat4 M) {
-        /*renderer.target.setup(int2(Z.size)); // Needs to be setup before pass
-        renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
-        mat4 NDC;
-        NDC.scale(vec3(vec2(Z.size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
-        NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
-        M = NDC * M;
-        for(const Face& face: faces) {
-            vec3 A = M*face.position[0], B = M*face.position[1], C = M*face.position[2];
-            if(cross(B-A,C-A).z <= 0) continue; // Backward face culling
-            vec3 attributes[0];
-            renderer.pass.submit(A,B,C, attributes, {face.color});
-        }
-        renderer.pass.render(renderer.target);
-        renderer.target.resolve(Z);*/
-        ImageH dummy(Z.size); return render(renderer, Z, dummy, dummy, dummy, M);
+        renderer.target.resolve(targets...);
     }
 };
+
+// FIXME: rasterizer Z without additionnal varying
+template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float varying[V]) const {
+    return vecf<1>{{varying[2]}};
+}
+template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf varying[V]) const {
+    return vec16f<1>{{varying[2]}};
+}
+
+template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float varying[V]) const {
+    const float u = varying[0], v = varying[1];
+    static float cellCount (16);
+    const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
+    const float m = float(1./2)*n; // Half integer
+    const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+    return vecf<4>{{varying[2], mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
+}
+template<> vec16f<4> Scene::Shader::shade<4>(FaceAttributes face, v16sf varying[V]) const {
+    const v16sf u = varying[0], v = varying[1];
+    static v16sf cellCount (16);
+    const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
+    const v16sf m = v16sf(1./2)*n; // Half integer
+    const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+    return vec16f<4>{{varying[2], mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
+}

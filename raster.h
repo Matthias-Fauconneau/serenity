@@ -201,11 +201,9 @@ template<class Shader> struct RenderPass {
         Face& face = faces[faceCount];
         mat3 E = mat3(vec3(A.xyw()), vec3(B.xyw()), vec3(C.xyw()));
         E = E.cofactor(); // Edge equations are now columns of E
-#if 1
-        if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z--;
-        if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z--;
-        if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z--;
-#endif
+        if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
+        if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
+        if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
 
         for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
@@ -352,7 +350,7 @@ template<class Shader> struct RenderPass {
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
-                    vec16f<C> src = shader.shade(face.faceAttributes, centroid);
+                    vec16f<C> src = shader.template shade<C>(face.faceAttributes, centroid);
                     for(uint c: range(C)) store(tile.pixels[c][blockIndex], src._[c], mask);
 
                     for(uint pixelI: range(4*4)) {
@@ -383,10 +381,10 @@ template<class Shader> struct RenderPass {
                                 // Zeroes hidden samples
                                 const v16sf visible = samples & visibleMask;
                                 // Averages on the visible samples
-                                centroid[i] = sum16(visible) / visibleSampleCount;
+                                centroid[i] = sum(visible) / visibleSampleCount;
                             }
 
-                            vecf<C> src = shader.shade(face.faceAttributes, centroid);
+                            vecf<C> src = shader.template shade<C>(face.faceAttributes, centroid);
                             for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                         }
                     }
@@ -430,10 +428,10 @@ template<class Shader> struct RenderPass {
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
                             // Averages on the visible samples
-                            centroid[i] = sum16(visible) / visibleSampleCount;
+                            centroid[i] = sum(visible) / visibleSampleCount;
                         }
 
-                        vecf<C> src = shader.shade(face.faceAttributes,centroid);
+                        vecf<C> src = shader.template shade<C>(face.faceAttributes,centroid);
                         for(uint c: range(C)) tile.samples[c][pixelPtr] = blend(v16sf(((float*)tile.pixels[c])[pixelPtr]), v16sf(src._[c]), visibleMask);
                     } else {
                         // Performs Z-Test
@@ -453,10 +451,10 @@ template<class Shader> struct RenderPass {
                             // Zeroes hidden samples
                             const v16sf visible = samples & visibleMask;
                             // Averages on the visible samples
-                            centroid[i] = sum16(visible) / visibleSampleCount;
+                            centroid[i] = sum(visible) / visibleSampleCount;
                         }
 
-                        vecf<C> src = shader.shade(face.faceAttributes, centroid);
+                        vecf<C> src = shader.template shade<C>(face.faceAttributes, centroid);
                         for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                     }
                 }

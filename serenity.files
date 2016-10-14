@@ -1,4 +1,6 @@
 serenity.files
+build.sh
+build.cc
 
 core/core.h
 core/image.h

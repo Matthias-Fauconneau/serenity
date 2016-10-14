@@ -62,12 +62,16 @@ inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return 
  v16sf(__builtin_shufflevector(a, b, i0, i1, i2, i3, i4, i5, i6, i7), \
        __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))
 
-inline float sum8(v8sf x) {
+inline float sum(v4sf v) { // movshdup, addps, movhlps, addss
+    v4sf t = v+__builtin_shufflevector(v,v, 1,1,3,3);
+    return t[0]+t[2];
+}
+inline float sum(v8sf x) {
     const v4sf sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7
     const v4sf sumDual = sumQuad + __builtin_shufflevector(sumQuad, sumQuad, 2, 3, -1, -1); // 0+4 + 2+6, 1+5 + 3+7 (+movehl)
     return (sumDual + __builtin_shufflevector(sumDual, sumDual, 1, -1, -1, -1))[0]; // 0+4+2+6 + 1+5+3+7
 }
-inline float sum16(v16sf v) { return sum8(v.r1+v.r2); }
+inline float sum(v16sf v) { return sum(v.r1+v.r2); }
 
 /// 16-wide vector operations using 2 v8si AVX registers
 struct v16si {

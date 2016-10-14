@@ -45,8 +45,8 @@ struct Render {
         mref<half> field = mcast<half>(map);
         profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
 
-        buffer<Scene::Renderer> renderers (threadCount());
-        for(Scene::Renderer& renderer: renderers) new (&renderer) Scene::Renderer(scene);
+        buffer<Scene::Renderer<4>> renderers (threadCount());
+        for(Scene::Renderer<4>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
 
         Time time (true);
         parallel_for(0, N*N, [&](uint threadID, size_t stIndex) {
@@ -61,13 +61,10 @@ struct Render {
             ImageH G (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
             ImageH R (unsafeRef(field.slice(((3ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
 
-            scene.render(renderers[threadID], Z, B, G, R, M);
+            scene.render(renderers[threadID], M, (float[]){0,1,1,1}, Z, B, G, R);
 
             ImageH Z01 (Z.size);
-            for(size_t i: range(Z.ref::size)) {
-                //assert_(Z[i] >= -2 && Z[i] <= 1, (float)Z[i], i%Z.size.x, i/Z.size.x, sIndex, tIndex);
-                Z01[i] = (Z[i]+1)/2;
-            }
+            for(size_t i: range(Z.ref::size)) Z01[i] = (Z[i]+1)/2;
             if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".Z.png", encodePNG(convert(Z01, Z01, Z01)), folder, true);
             if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".BGR.png", encodePNG(convert(B, G, R)), folder, true);
         });
@@ -122,11 +119,12 @@ struct Light {
     Map map;
     ref<half> field;
     Scene scene;
-    Scene::Renderer renderer {scene};
+    Scene::Renderer<1> Zrenderer {scene};
+    Scene::Renderer<4> ZBGRrenderer {scene};
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = false;
+    bool raycast = true;
     bool depthCorrect = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
@@ -156,7 +154,7 @@ struct Light {
     }
     Image render(uint2 targetSize) {
         Image target (targetSize);
-        target.clear(); // DEBUG
+        //target.clear(); // DEBUG
 
         mat4 M;
         if(orthographic) {
@@ -207,10 +205,8 @@ struct Light {
                 return target;
             }
 
-            // FIXME: Z-Pass only
-            ImageH Z (target.size);
             ImageH WZ (target.size);
-            if(depthCorrect) scene.render(renderer, Z, WZ, WZ, WZ, M);
+            if(depthCorrect) scene.render(Zrenderer, M, (float[]){0}, WZ); // FIXME: Rasterizer Z without additionnal Z varying
 
             array<char> debug; Image debugTarget (256+640, 1024); debugTarget.clear();
             //parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
@@ -252,8 +248,15 @@ struct Light {
                         //const float z = dot(w01, Z);
                         //float z = Z(targetX, targetY);
                         const float wZ = WZ(targetX, targetY);
-                        const float z = -2*(wZ*2-1);
-                        float w = 0;
+                        const float z = -2*wZ;
+
+                        const v4sf x = {st[1], st[0]}; // ts
+                        const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
+                        static const v4sf _0011f = {0,0,1,1};
+                        const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                        v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
+                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
+
                         v4sf B, G, R;
                         float Z2[4]; // DEBUG
                         for(int dt: {0,1}) for(int ds: {0,1}) {
@@ -276,14 +279,16 @@ struct Light {
                             const v4sf w01 = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                            * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                             //const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
-                            const v4sf wZ = toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D));
-                            const v4sf Z = float4(-2)*(wZ*float4(2)-float4(1));
+                            const v4sf wZ = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
+                            const v4sf Z = float4(-2)*wZ;
                             const float z2 = dot(w01, Z);
                             Z2[dt*2+ds] = z2;
 #if 1
-                            if(abs(z2 - z) > 1./8) continue; // Only close samples
-                            w++;
-
+                            if(abs(z2 - z) > 0x1p-8) { // Only close samples
+                                w01st[dt*2+ds] = 0;
+                                continue;
+                            }
+                            //w++;
                             B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
                             G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
                             R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
@@ -343,25 +348,19 @@ struct Light {
                                     const vec2 O(-2, (floor(st[1])+dt)/(imageCount.y-1)); // Origin of viewpoint
                                     const vec2 D0(0, (float)v/(imageSize.y-1)); // Pixel position on UV plane
                                     //float z0 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v);
-                                    float wZ0 = fieldB(sIndex+ds, tIndex+dt, uIndex, v)*2-1;
+                                    float wZ0 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v);
                                     float z0 = -2*wZ0;
                                     const vec2 p0 = O + (D0-O)*((2+z0)/2.f);
                                     const vec2 D1(0, (float)(v+1)/(imageSize.y-1)); // Pixel position on UV plane
                                     //float z1 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v+1);
-                                    float wZ1 = fieldB(sIndex+ds, tIndex+dt, uIndex, v+1)*2-1;
+                                    float wZ1 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v+1);
                                     float z1 = -2*wZ1;
                                     const vec2 p1 = O + (D1-O)*((2+z1)/2.f);
                                     line(target, p(p0.x, p0.y), p(p1.x, p1.y));
                                 }
                             }
                         }
-                        const v4sf x = {st[1], st[0]}; // ts
-                        const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                        static const v4sf _0011f = {0,0,1,1};
-                        const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                        const v4sf w01 = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
-                                       * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // sSsS
-                                       * float4(4.f/w); // Scaling (in case of skipped samples)
+                        const v4sf w01 = float4(1./sum(w01st)) * w01st; // Scaling (in case of skipped samples)
                         const float b = dot(w01, B);
                         const float g = dot(w01, G);
                         const float r = dot(w01, R);
@@ -398,7 +397,7 @@ struct Light {
             }
         } else {
             ImageH Z (target.size), B (target.size), G (target.size), R (target.size);
-            scene.render(renderer, Z, B, G, R, M);
+            scene.render(ZBGRrenderer, M, (float[]){1,1,1,1}, Z, B, G, R);
             convert(target, B, G, R);
             //for(half& z: Z) z = (z+1)/2; convert(target, Z, Z, Z);
             //window->setTitle(str(::min(apply(Z,[](const half& x){return float(x);})),::max(apply(Z,[](const half& x){return float(x);}))));
