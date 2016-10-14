@@ -240,19 +240,19 @@ struct Light {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf w01 = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
-                                           * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                             const v4sf Z = float4(-2)*toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
-                            const float z2 = dot(w01, Z);
-
-                            // Discards far samples
-                            if(abs(z2 - z) > 0x1p-7) { w01st[dt*2+ds] = 0; continue; }
-
+                            const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
+                                               * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
+                                               , abs(Z - float4(z)) < float4(0x1p-6)); // Discards far samples
+                            float sum = ::sum(w01uv);
+                            const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
+                            w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
+                            if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
                             B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
                             G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
                             R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
                         }
-                        const v4sf w01 = float4(1./sum(w01st)) * w01st; // Renormalize (in case of discarded samples)
+                        const v4sf w01 = float4(1./sum(w01st)) * w01st; // Renormalizes st interpolation (in case of discarded samples)
                         const float b = dot(w01, B);
                         const float g = dot(w01, G);
                         const float r = dot(w01, R);
