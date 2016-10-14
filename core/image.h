@@ -24,11 +24,20 @@ generic struct ImageT : buffer<T> {
   return buffer<T>::at(y*stride+x);
  }
 };
+
+generic void clear(const ImageT<T>& target, T v) {
+ for(size_t y: range(target.size.y)) target.slice(y*target.stride, target.size.x).clear(v);
+}
+
+
 generic ImageT<T> copy(const ImageT<T>& o) {
  if(o.width == o.stride) return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha);
  ImageT<T> target(o.size, o.alpha);
  for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
  return target;
+}
+generic void copy(const ImageT<T>& target, const ImageT<T>& o) {
+ for(size_t y: range(target.size.y)) target.slice(y*target.stride, target.size.x).copy(o.slice(y*o.stride, o.size.x));
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
@@ -37,8 +46,8 @@ generic ImageT<T> unsafeShare(const ImageT<T>& o) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, int2 size) {
- assert_(offset+size <= o.size, offset, size, o.size);
+generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
+ assert_(offset+int2(size) <= int2(o.size), offset, size, o.size);
  return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
 }
 

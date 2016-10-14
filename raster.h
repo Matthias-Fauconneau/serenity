@@ -40,7 +40,7 @@ struct RenderTarget {
     float Z; bgr3f backgroundColor;
 
     // Allocates all bins, flags them to be cleared
-    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=0) {
+    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=1) {
         if(this->size != size) {
             this->size = size;
             width = align(64,size.x*4)/64;
@@ -120,7 +120,7 @@ template<class Shader> struct RenderPass {
         v16sf blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3]; // Precomputed step grids
         vec2 edges[3]; // triangle edge equations
         float binReject[3], binAccept[3]; // Initial distance step at a bin reject/accept corner
-        vec3 i1, iz; vec3 varyings[V]; // Varying (perspective-interpolated) vertex attributes
+        vec3 iw, iz; vec3 varyings[V]; // Varying (perspective-interpolated) vertex attributes
         FaceAttributes faceAttributes; // Custom constant face attributes
     };
     uint faceCapacity;
@@ -160,14 +160,16 @@ template<class Shader> struct RenderPass {
 
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4·Width],[0..4·Height]
-    void submit(vec3 A, vec3 B, vec3 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
+    void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
         if(faceCount>=faceCapacity) { error("Face overflow"_); return; }
         Face& face = faces[faceCount];
-        mat3 E = mat3(vec3(A.xy(), 1), vec3(B.xy(), 1), vec3(C.xy(), 1));
+        mat3 E = mat3(vec3(A.xyw()), vec3(B.xyw()), vec3(C.xyw()));
         E = E.cofactor(); // Edge equations are now columns of E
+#if 0
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z--;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z--;
         if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z--;
+#endif
 
         for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
@@ -193,13 +195,13 @@ template<class Shader> struct RenderPass {
                 face.pixelAcceptStep[e] = v16sf(-4)*step; // Reversed to allow direct comparison
             }
         }
-        face.i1 = E[0]+E[1]+E[2];
+        face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
         for(uint i: range(V)) face.varyings[i] = E*vertexAttributes[i];
-        face.faceAttributes=faceAttributes;
+        face.faceAttributes = faceAttributes;
 
-        int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy(),B.xy()),C.xy())))/64);
-        int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy(),B.xy()),C.xy())))/64);
+        int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy()/A.w,B.xy()/B.w),C.xy()/C.w)))/64);
+        int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy()/A.w,B.xy()/B.w),C.xy()/C.w)))/64);
 
         for(int binY: range(min.y, max.y+1)) for(int binX: range(min.x, max.x+1)) {
             const vec2 binXY = 64.f*vec2(binX, binY);
@@ -270,8 +272,8 @@ template<class Shader> struct RenderPass {
                         // else all pixels were subsampled or rejected
 
                         // 4×4 pixel reject mask
-                        uint16 pixelRejectMask=0; // partial block of full pixels
-                        v16sf pixelReject[3]; //used to reject samples
+                        uint16 pixelRejectMask=0; // Partial block of full pixels
+                        v16sf pixelReject[3]; // Used to reject samples
                         for(int e: range(3)) {
                             pixelReject[e] = v16sf(blockReject[e]) + face.pixelRejectStep[e];
                             pixelRejectMask |= mask(pixelReject[e] <= 0);
@@ -307,7 +309,7 @@ template<class Shader> struct RenderPass {
                     const v16sf pixelY = v16sf(blockXY.y) + v16sf(4)*Y[0];
                     const v16sf XY1x = pixelX+v16sf(4.f/2);
                     const v16sf XY1y = pixelY+v16sf(4.f/2);
-                    const v16sf w = 1/( v16sf(face.i1.x)*XY1x + v16sf(face.i1.y)*XY1y + v16sf(face.i1.z));
+                    const v16sf w = 1/( v16sf(face.iw.x)*XY1x + v16sf(face.iw.y)*XY1y + v16sf(face.iw.z));
                     const v16sf z = w*( v16sf(face.iz.x)*XY1x + v16sf(face.iz.y)*XY1y + v16sf(face.iz.z));
                     v16sf& Z = tile.Z[blockIndex];
                     v16si mask = ::mask(draw.mask) & ~::mask(tile.subsample[blockIndex]) & z <= Z;
@@ -336,7 +338,7 @@ template<class Shader> struct RenderPass {
                             // 2D coordinates vector
                             const v16sf sampleX = v16sf(pixelX[pixelI]) + X0s, sampleY = v16sf(pixelY[pixelI]) + Y0s;
                             // Interpolates w for perspective correction
-                            const v16sf w = 1/(v16sf(face.i1.x)*sampleX + v16sf(face.i1.y)*sampleY + v16sf(face.i1.z));
+                            const v16sf w = 1/(v16sf(face.iw.x)*sampleX + v16sf(face.iw.y)*sampleY + v16sf(face.iw.z));
                             // Interpolates perspective correct z
                             const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
@@ -345,7 +347,6 @@ template<class Shader> struct RenderPass {
                             const v16si visibleMask = (z <= subZ);
 
                             // Stores accepted pixels in Z buffer
-                            //for(int i: range(16)) assert_(z[i] >= -2, "A", z[i]); // DEBUG
                             store(subZ, z, visibleMask);
 
                             // Counts visible samples
@@ -391,7 +392,7 @@ template<class Shader> struct RenderPass {
                     // 2D coordinates vector
                     const v16sf sampleX = v16sf(pixelXY.x) + X0s, sampleY = v16sf(pixelXY.y) + Y0s;
                     // Interpolates w for perspective correction
-                    const v16sf w = 1/(v16sf(face.i1.x)*sampleX + v16sf(face.i1.y)*sampleY + v16sf(face.i1.z));
+                    const v16sf w = 1/(v16sf(face.iw.x)*sampleX + v16sf(face.iw.y)*sampleY + v16sf(face.iw.z));
                     // Interpolates perspective correct z
                     const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
@@ -443,7 +444,6 @@ template<class Shader> struct RenderPass {
                         const v16si visibleMask = (z <= subZ) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
-                        //for(int i: range(16)) assert_(z[i] >= -2, "C", z[i]); // DEBUG
                         store(subZ, z, visibleMask);
 
                         // Counts visible samples

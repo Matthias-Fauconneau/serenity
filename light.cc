@@ -3,6 +3,8 @@
 #include "scene.h"
 #include "png.h"
 #include "interface.h"
+#include "text.h"
+#include "render.h"
 #include "window.h"
 
 Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
@@ -71,7 +73,7 @@ struct Render {
         });
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
     }
-};//render;
+}; //renderLightField;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -87,16 +89,19 @@ struct ScrollValue : virtual Widget {
 };
 
 struct ViewControl : virtual Widget {
-    vec2 viewYawPitch = vec2(PI/3, PI/3); // Current view angles
+    vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
     struct {
         vec2 cursor;
         vec2 viewYawPitch;
-    } dragStart;
+    } dragStart {0, 0};
 
     // Orbital ("turntable") view control
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
-        if(event == Press) dragStart = {cursor, viewYawPitch};
+        if(event == Press) {
+            dragStart = {cursor, viewYawPitch};
+            return true;
+        }
         if(event==Motion && button==LeftButton) {
             viewYawPitch = dragStart.viewYawPitch + float(2*PI) * (cursor - dragStart.cursor) / size;
             viewYawPitch.x = clamp<float>(-PI/3, viewYawPitch.x, PI/3);
@@ -121,7 +126,7 @@ struct Light {
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = true;
+    bool raycast = false;
     bool depthCorrect = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
@@ -131,9 +136,9 @@ struct Light {
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
             return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
         }
-        virtual vec2 sizeHint(vec2) override { return 1024; }
+        virtual vec2 sizeHint(vec2) override { return vec2(1024+256+640, 1024); }
         virtual shared<Graphics> graphics(vec2 size) override {
-            this->image = _this.render(uint2(size));
+            this->image = _this.render(uint2(/*size*/1024));
             return ImageView::graphics(size);
         }
     } view {*this};
@@ -159,7 +164,7 @@ struct Light {
             M.scale(vec3(1,1,-1)); // Z-
         } else {
             // Sheared perspective (rectification)
-            const float s = (view.viewYawPitch.x+PI/2)/PI, t = (view.viewYawPitch.y+PI/2)/PI;
+            const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
             //const float sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
             //const float s_ = clamp(0, )
             M = shearedPerspective(s, t);
@@ -170,6 +175,7 @@ struct Light {
             ImageH Z (target.size);
             if(depthCorrect) scene.render(renderer, Z, M);
 
+            array<char> debug; Image debugTarget (256+640, 1024); debugTarget.clear();
             //parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
             ({ size_t start=0, sizeI=target.size.y*target.size.x;
                 assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
@@ -233,7 +239,9 @@ struct Light {
                         v4sf B, G, R;
                         float Z2[4]; // DEBUG
                         for(int dt: {0,1}) for(int ds: {0,1}) {
+                            //if(z==-1) continue;
                             vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
+                                    //* (-z) / (z+2);
                             if(uv_[0] < 0 || uv_[1] < 0) { target[targetIndex]=0; continue; } // DEBUG
                             //uv_[0] = ::max(0.f, uv_[0]);
                             //uv_[1] = ::max(0.f, uv_[1]);
@@ -275,16 +283,55 @@ struct Light {
 #endif
                         }
                         /*if(!w && uv_uncorrected[0] >= imageSize.x/4 && uv_uncorrected[0] < imageSize.x*3/4 &&
-                                 uv_uncorrected[1] >= imageSize.y/4 && uv_uncorrected[1] < imageSize.x*3/4) {
-                            log("st", st[0], st[1]);
-                            log("uv", uv_uncorrected[0], uv_uncorrected[1]);
-                            log("z",  z);
-                            for(int dt: {0,1}) for(int ds: {0,1}) { // FIXME: SIMD
+                                 uv_uncorrected[1] >= imageSize.y/4 && uv_uncorrected[1] < imageSize.x*3/4) {*/
+                        if(1) if(targetX == view.dragStart.cursor.x && targetY == view.dragStart.cursor.y) {
+                            debug.append(str("st", st[0], st[1])+"\n");
+                            debug.append(str("uv", uv_uncorrected[0], uv_uncorrected[1])+"\n");
+                            debug.append(str("z",  z)+"\n");
+                            for(int dt: {0,1}) for(int ds: {0,1}) {
                                 vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
-                                log(ds, dt, uv_[0], uv_[1], Z2[dt*2+ds]);
+                                debug.append(str(ds, dt, (fract(st) - vec2(ds, dt)), (-z) / (z+2), scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2),
+                                                 uv_[0], uv_[1], Z2[dt*2+ds])+"\n");
+                                Image target = cropShare(debugTarget, int2(dt*2+ds)*int2(0, 256), uint2(256, 256));
+                                for(int y: range(256)) for(int x: range(256)) {
+                                    float b = fieldB(sIndex+ds, tIndex+dt, x*(imageSize.x-1)/(target.size.x-1), y*(imageSize.y-1)/(target.size.y-1));
+                                    float g = fieldG(sIndex+ds, tIndex+dt, x*(imageSize.x-1)/(target.size.x-1), y*(imageSize.y-1)/(target.size.y-1));
+                                    float r = fieldR(sIndex+ds, tIndex+dt, x*(imageSize.x-1)/(target.size.x-1), y*(imageSize.y-1)/(target.size.y-1));
+                                    b=g=r=(1+fieldZ(sIndex+ds, tIndex+dt, x*(imageSize.x-1)/(target.size.x-1), y*(imageSize.y-1)/(target.size.y-1)))/2;
+                                    S = bgr3f(b, g, r);
+                                    target(x, y) = byte4(byte3(float(0xFF)*S), 0xFF);
+                                }
+                                int tx = round(uv_[0]*(target.size.x-1)/(imageSize.x-1));
+                                int ty = round(uv_[1]*(target.size.y-1)/(imageSize.y-1));
+                                if(tx >= 1 && ty >= 1 && tx < int(target.size.x-1) && ty < int(target.size.y-1)) {
+                                    for(int x: range(tx-1, tx+1 +1))
+                                        target(x, ty) = byte4(0,0,0xFF,0xFF);
+                                    for(int y: range(ty-1, ty+1 +1))
+                                        target(tx, y) = byte4(0,0,0xFF,0xFF);
+                                }
                             }
-                            error("w");
-                        }*/
+                            Image target = cropShare(debugTarget, int2(256,0), uint2(640));
+                            clear(target, byte4(0xFF));
+                            auto p = [&target](float x, float y) { return vec2((x+2)/3*(target.size.x-1), y*(target.size.y-1)); };
+                            line(target, p(-2, st[1]/(imageCount.y-1)), p(0, uv_uncorrected[1]/(imageSize.y-1)), red);
+                            line(target, p(z, 0), p(z, 1));
+                            for(const int dt: {0,1}) for(const int ds: {0,1}) {
+                                const vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
+                                line(target, p(-2, (floor(st[1])+dt)/(imageCount.y-1)), p(0, uv_[1]/(imageSize.y-1)));
+                                for(int v: range(imageSize.y-1)) {
+                                    const int uIndex = uv_[0];
+                                    if(uIndex < 0 || uIndex >= int(imageSize.x)) continue;
+                                    const vec2 O(-2, (floor(st[1])+dt)/(imageCount.y-1)); // Origin of viewpoint
+                                    const vec2 D0(0, (float)v/(imageSize.y-1)); // Pixel position on UV plane
+                                    float z0 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v);
+                                    const vec2 p0 = O + (D0-O)*((2+z0)/2.f);
+                                    const vec2 D1(0, (float)(v+1)/(imageSize.y-1)); // Pixel position on UV plane
+                                    float z1 = fieldZ(sIndex+ds, tIndex+dt, uIndex, v+1);
+                                    const vec2 p1 = O + (D1-O)*((2+z1)/2.f);
+                                    line(target, p(p0.x, p0.y), p(p1.x, p1.y));
+                                }
+                            }
+                        }
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                         static const v4sf _0011f = {0,0,1,1};
@@ -317,6 +364,14 @@ struct Light {
                     target[targetIndex] = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
+            if(debug) {
+                ::render(target, Text(debug, 24, black).graphics(vec2(target.size)));
+                assert_(target.size.y == debugTarget.size.y);
+                Image target2 (target.size+uint2(debugTarget.size.x, 0));
+                copy(cropShare(target2,int2(0),target.size), target);
+                copy(cropShare(target2,int2(target.size.x, 0), debugTarget.size), debugTarget);
+                target = ::move(target2);
+            }
         } else {
             ImageH Z (target.size), B (target.size), G (target.size), R (target.size);
             scene.render(renderer, Z, B, G, R, M);

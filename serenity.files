@@ -1,6 +1,7 @@
 serenity.files
 
 core/core.h
+core/image.h
 core/parallel.h
 core/parallel.cc
 core/simd.h
