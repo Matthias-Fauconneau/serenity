@@ -124,6 +124,7 @@ inline void store(v16sf& P, v16sf A, v16si M) {
 
 inline v4sf floor(const v4sf v) { return __builtin_ia32_roundps(v, 1/*-∞*/); }
 inline v8sf floor(const v8sf v) { return __builtin_ia32_roundps256(v, 1/*-∞*/); }
+inline v16sf floor(const v16sf v) { return v16sf(floor(v.r1), floor(v.r2)); }
 
 const v4si notSignBit4 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
 inline v4sf abs(v4sf a) { return (v4sf)(notSignBit4 & (v4si)a); }

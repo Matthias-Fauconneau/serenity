@@ -24,39 +24,76 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #endif
 
 /// 64×64 pixels tile for L1 cache locality (64×64×RGBZ×float~64KB)
-struct Tile { // 64KB framebuffer (L1)
-    v16sf Z[4*4], B[4*4], G[4*4],R[4*4];
-    v16sf subZ[16*16], subB[16*16], subG[16*16], subR[16*16];
-    mask16 subsample[16]; // Per-pixel flag to trigger subpixel operations
+template<int C> struct Tile { // 64KB framebuffer (L1)
+    v16sf pixelZ[4*4], pixels[C][4*4];
+    v16sf sampleZ[16*16], samples[C][16*16];
+    mask16 multisample[16]; // Per-pixel flag to trigger multisample operations
     bool needClear;
     Tile();
 };
 
 /// Tiled render target
-struct RenderTarget {
+template<int C> struct RenderTarget {
     int2 size = 0; // Pixels
     uint width = 0, height = 0; // Tiles
-    buffer<Tile> tiles;
-    float Z; bgr3f backgroundColor;
+    buffer<Tile<C>> tiles;
+    float clearZ; float clear[C];
 
     // Allocates all bins, flags them to be cleared
-    void setup(int2 size, float Z=1/*inff*/, bgr3f backgroundColor=0) {
+    void setup(int2 size, float clearZ, float clear[C]) {
         if(this->size != size) {
             this->size = size;
             width = align(64,size.x*4)/64;
             height = align(64,size.y*4)/64;
-            tiles = buffer<Tile>(width*height);
+            tiles = buffer<Tile<C>>(width*height);
         }
-        this->Z = Z;
-        this->backgroundColor = backgroundColor;
-        for(Tile& tile: tiles) { tile.needClear = true; } // Forces initial background blit to target
+        this->clearZ = clearZ;
+        for(int c: range(C)) this->clear[c] = clear[c];
+        for(Tile<C>& tile: tiles) { tile.needClear = true; } // Forces initial background blit to target
     }
 
-    // Resolves internal MSAA linear framebuffer to ZRGB linear half buffers
-    void resolve(const ImageH& Z, const ImageH& B, const ImageH& G, const ImageH& R);
-    // Resolves internal MSAA linear framebuffer to Z linear half buffer
-    void resolve(const ImageH& Z);
+    // Resolves internal MSAA linear framebuffer to linear half buffers
+    void resolve(const ImageH targets[C]);
+    template<Type... Args> void resolve(const Args&... targets) { return resolve((const ImageH[C]){ unsafeShare(targets)... }); }
 };
+
+// Untiles render buffer, resolves (average samples of) multisampled pixels, and converts to half floats (linear RGB)
+template<int C> void RenderTarget<C>::resolve(const ImageH targets[C]) {
+    const uint stride = targets[0].stride;
+    const v16si pixelSeq = (4*4)*seqI;
+    for(uint tileY: range(height)) for(uint tileX: range(width)) {
+        Tile<C>& tile = tiles[tileY*width+tileX];
+        uint const targetTilePtr = tileY*16*stride + tileX*16;
+        if(tile.needClear) { // Empty
+            for(uint y: range(16)) for(uint x: range(16)) for(uint c: range(C)) targets[c][targetTilePtr+y*stride+x] = clear[c];
+            continue;
+        }
+        for(uint blockY: range(4)) for(uint blockX: range(4)) {
+            const uint blockI = blockY*4+blockX;
+            const uint blockPtr = blockI*(4*4);
+            v16sf pixels[C];
+            const mask16 multisample = tile.multisample[blockI];
+            if(!multisample) { // No multisampled pixel in block => Directly load block without any multisampled pixels to blend
+                for(uint c: range(C)) pixels[c] = tile.pixels[c][blockI];
+            } else {
+                // Resolves (average samples of) multisampled pixels
+                for(uint c: range(C)) {
+                    v16sf sum = v16sf(0);
+                    for(uint sampleI: range(4*4)) sum += gather((float*)(tile.samples[c]+blockPtr)+sampleI, pixelSeq);
+                    const v16sf scale = v16sf(1./(4*4));
+                    pixels[c] = blend(tile.pixels[c][blockI], scale*sum, mask(multisample));
+                }
+            }
+            // Converts to half and untiles block of pixels
+            const uint targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
+            for(uint c: range(C)) {
+                v16hf halfs = toHalf(pixels[c]);
+                #define o(j) *(v4hf*)(targets[c].data+targetBlockPtr+j*stride) = __builtin_shufflevector(halfs, halfs, j*4+0, j*4+1, j*4+2, j*4+3);
+                o(0)o(1)o(2)o(3)
+            }
+        }
+    }
+}
 
 void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R);
 inline Image convert(const ImageH& B, const ImageH& G, const ImageH& R) { Image target(B.size); convert(target, B, G, R); return target; }
@@ -102,9 +139,8 @@ static const v16sf Y[4] = {
 static const v16sf X0s = ::X[0]+v16sf(1./2);
 static const v16sf Y0s = ::Y[0]+v16sf(1./2);
 
-struct bgra4v16sf {
-    v16sf b, g, r, a;
-};
+template<uint C> struct vecf { float _[C]; };
+template<uint C> struct vec16f { v16sf _[C]; };
 
 template<class Shader> struct RenderPass {
     // Shading parameters
@@ -112,8 +148,8 @@ template<class Shader> struct RenderPass {
     static constexpr int V = Shader::V;
     //static constexpr bool blend = Shader::blend;
     const Shader& shader;
-     // implements bgra4f Shader::operator()(FaceAttributes, float[V] varyings);
-     // implements bgra4v16sf Shader::operator()(FaceAttributes, vec16f[V] varyings);
+     // implements vecf Shader::operator()(FaceAttributes, float[V] varyings);
+     // implements vec16f Shader::operator()(FaceAttributes, vec16f[V] varyings);
 
     // Geometry to rasterize
     struct Face { //~1K/face (streamed)
@@ -141,7 +177,7 @@ template<class Shader> struct RenderPass {
 
     RenderPass(const Shader& shader) : shader(shader) {}
     /// Resets bins and faces for a new setup.
-    void setup(const RenderTarget& target, uint faceCapacity) {
+    template<int C> void setup(const RenderTarget<C>& target, uint faceCapacity) {
         assert_(target.size);
         if(width != target.width || height != target.height) {
             width = target.width, height = target.height;
@@ -165,7 +201,7 @@ template<class Shader> struct RenderPass {
         Face& face = faces[faceCount];
         mat3 E = mat3(vec3(A.xyw()), vec3(B.xyw()), vec3(C.xyw()));
         E = E.cofactor(); // Edge equations are now columns of E
-#if 0
+#if 1
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z--;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z--;
         if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z--;
@@ -219,7 +255,7 @@ template<class Shader> struct RenderPass {
     }
 
     /// Renders one tile
-    void render(Tile& tile, const Bin& bin, const vec2 binXY) {
+    template<int C> void render(Tile<C>& tile, const Bin& bin, const vec2 binXY) {
         // Loops on all faces in the bin
         for(uint16 faceIndex: ref<uint16>(bin.faces, bin.faceCount)) {
             struct DrawBlock { vec2 pos; uint blockIndex; mask16 mask; } blocks[4*4]; uint blockCount=0;
@@ -269,7 +305,7 @@ template<class Shader> struct RenderPass {
 
                         if(pixelAcceptMask)
                             blocks[blockCount++] = DrawBlock{blockXY, blockI, pixelAcceptMask};
-                        // else all pixels were subsampled or rejected
+                        // else all pixels were multisampled or rejected
 
                         // 4×4 pixel reject mask
                         uint16 pixelRejectMask=0; // Partial block of full pixels
@@ -311,30 +347,18 @@ template<class Shader> struct RenderPass {
                     const v16sf XY1y = pixelY+v16sf(4.f/2);
                     const v16sf w = 1/( v16sf(face.iw.x)*XY1x + v16sf(face.iw.y)*XY1y + v16sf(face.iw.z));
                     const v16sf z = w*( v16sf(face.iz.x)*XY1x + v16sf(face.iz.y)*XY1y + v16sf(face.iz.z));
-                    v16sf& Z = tile.Z[blockIndex];
-                    v16si mask = ::mask(draw.mask) & ~::mask(tile.subsample[blockIndex]) & z <= Z;
+                    v16sf& Z = tile.pixelZ[blockIndex];
+                    v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z;
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
-                    bgra4v16sf src = shader(face.faceAttributes, centroid);
-
-                    v16sf& dstB = tile.B[blockIndex];
-                    v16sf& dstG = tile.G[blockIndex];
-                    v16sf& dstR = tile.R[blockIndex];
-                    if(Shader::blend) {
-                        store(dstB, (_1f-src.a)*dstB + src.a*src.b, mask);
-                        store(dstG, (_1f-src.a)*dstG + src.a*src.g, mask);
-                        store(dstR, (_1f-src.a)*dstR + src.a*src.r, mask);
-                    } else {
-                        store(dstB, src.b, mask);
-                        store(dstG, src.g, mask);
-                        store(dstR, src.r, mask);
-                    }
+                    vec16f<C> src = shader.shade(face.faceAttributes, centroid);
+                    for(uint c: range(C)) store(tile.pixels[c][blockIndex], src._[c], mask);
 
                     for(uint pixelI: range(4*4)) {
                         if(!(draw.mask&(1<<pixelI))) continue;
                         const uint pixelPtr = blockIndex*(4*4)+pixelI;
-                        if(tile.subsample[blockIndex]&(1<<pixelI)) { // Subsample Z-Test
+                        if(tile.multisample[blockIndex]&(1<<pixelI)) { // Subsample Z-Test
                             // 2D coordinates vector
                             const v16sf sampleX = v16sf(pixelX[pixelI]) + X0s, sampleY = v16sf(pixelY[pixelI]) + Y0s;
                             // Interpolates w for perspective correction
@@ -343,11 +367,11 @@ template<class Shader> struct RenderPass {
                             const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
                             // Performs Z-Test
-                            v16sf& subZ = tile.subZ[pixelPtr];
-                            const v16si visibleMask = (z <= subZ);
+                            v16sf& sampleZ = tile.sampleZ[pixelPtr];
+                            const v16si visibleMask = (z <= sampleZ);
 
                             // Stores accepted pixels in Z buffer
-                            store(subZ, z, visibleMask);
+                            store(sampleZ, z, visibleMask);
 
                             // Counts visible samples
                             float centroid[V];
@@ -362,21 +386,8 @@ template<class Shader> struct RenderPass {
                                 centroid[i] = sum16(visible) / visibleSampleCount;
                             }
 
-                            //profile( int64 start = readCycleCounter() );
-                            bgra4f src = shader(face.faceAttributes, centroid);
-                            //profile( userTime += readCycleCounter()-start );
-                            v16sf& dstB = tile.subB[pixelPtr];
-                            v16sf& dstG = tile.subG[pixelPtr];
-                            v16sf& dstR = tile.subR[pixelPtr];
-                            if(Shader::blend) {
-                                store(dstB, v16sf(1-src.a)*dstB+v16sf(src.a*src.b), visibleMask);
-                                store(dstG, v16sf(1-src.a)*dstG+v16sf(src.a*src.g), visibleMask);
-                                store(dstR, v16sf(1-src.a)*dstR+v16sf(src.a*src.r), visibleMask);
-                            } else {
-                                store(dstB, v16sf(src.b), visibleMask);
-                                store(dstG, v16sf(src.g), visibleMask);
-                                store(dstR, v16sf(src.r), visibleMask);
-                            }
+                            vecf<C> src = shader.shade(face.faceAttributes, centroid);
+                            for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                         }
                     }
                 }
@@ -396,18 +407,18 @@ template<class Shader> struct RenderPass {
                     // Interpolates perspective correct z
                     const v16sf z = w*(v16sf(face.iz.x)*sampleX + v16sf(face.iz.y)*sampleY + v16sf(face.iz.z));
 
-                    // Convert single sample pixel to subsampled pixel
-                    if(!(tile.subsample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                        // Set subsampled pixel flag
-                        tile.subsample[pixelPtr/16] |= (1<<(pixelPtr%16));
+                    // Convert single sample pixel to multisampled pixel
+                    if(!(tile.multisample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
+                        // Set multisampled pixel flag
+                        tile.multisample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
                         // Performs Z-Test
-                        float pixelZ = ((float*)tile.Z)[pixelPtr];
+                        float pixelZ = ((float*)tile.pixelZ)[pixelPtr];
                         const v16si visibleMask = (z <= pixelZ) & draw.mask;
 
-                        // Blends accepted pixels in subsampled Z buffer
+                        // Blends accepted pixels in multisampled Z buffer
                         //for(int i: range(16)) assert_(blend(v16sf(pixelZ), z, visibleMask)[i] >= -2, "B", z[i], i, pixelZ, z[i], visibleMask[i], draw.mask[i]);
-                        tile.subZ[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
+                        tile.sampleZ[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
 
                         // Counts visible samples
                         float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
@@ -422,29 +433,15 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        bgra4f src = shader(face.faceAttributes,centroid);
-                        v16sf& dstB = tile.subB[pixelPtr];
-                        v16sf& dstG = tile.subG[pixelPtr];
-                        v16sf& dstR = tile.subR[pixelPtr];
-                        float pixelB = ((float*)tile.B)[pixelPtr];
-                        float pixelG = ((float*)tile.G)[pixelPtr];
-                        float pixelR = ((float*)tile.R)[pixelPtr];
-                        if(Shader::blend) {
-                            dstB = blend(v16sf(pixelB), v16sf((1-src.a)*pixelB+src.a*src.b), visibleMask);
-                            dstG = blend(v16sf(pixelG), v16sf((1-src.a)*pixelG+src.a*src.g), visibleMask);
-                            dstR = blend(v16sf(pixelR), v16sf((1-src.a)*pixelR+src.a*src.r), visibleMask);
-                        } else {
-                            dstB = blend(v16sf(pixelB), v16sf(src.b), visibleMask);
-                            dstG = blend(v16sf(pixelG), v16sf(src.g), visibleMask);
-                            dstR = blend(v16sf(pixelR), v16sf(src.r), visibleMask);
-                        }
+                        vecf<C> src = shader.shade(face.faceAttributes,centroid);
+                        for(uint c: range(C)) tile.samples[c][pixelPtr] = blend(v16sf(((float*)tile.pixels[c])[pixelPtr]), v16sf(src._[c]), visibleMask);
                     } else {
                         // Performs Z-Test
-                        v16sf& subZ = tile.subZ[pixelPtr];
-                        const v16si visibleMask = (z <= subZ) & draw.mask;
+                        v16sf& sampleZ = tile.sampleZ[pixelPtr];
+                        const v16si visibleMask = (z <= sampleZ) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
-                        store(subZ, z, visibleMask);
+                        store(sampleZ, z, visibleMask);
 
                         // Counts visible samples
                         float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
@@ -459,19 +456,8 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum16(visible) / visibleSampleCount;
                         }
 
-                        bgra4f src = shader(face.faceAttributes, centroid);
-                        v16sf& dstB = tile.subB[pixelPtr];
-                        v16sf& dstG = tile.subG[pixelPtr];
-                        v16sf& dstR = tile.subR[pixelPtr];
-                        if(Shader::blend) {
-                            store(dstB, v16sf(1-src.a)*dstB+v16sf(src.a*src.b), visibleMask);
-                            store(dstG, v16sf(1-src.a)*dstG+v16sf(src.a*src.g), visibleMask);
-                            store(dstR, v16sf(1-src.a)*dstR+v16sf(src.a*src.r), visibleMask);
-                        } else {
-                            store(dstB, v16sf(src.b), visibleMask);
-                            store(dstG, v16sf(src.g), visibleMask);
-                            store(dstR, v16sf(src.r), visibleMask);
-                        }
+                        vecf<C> src = shader.shade(face.faceAttributes, centroid);
+                        for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                     }
                 }
                 profile( sampleTime += readCycleCounter()-start; )
@@ -481,19 +467,17 @@ template<class Shader> struct RenderPass {
 
     /// Renders all tiles
     // For each bin, rasterizes and shades all triangles
-    void render(RenderTarget& target) {
+    template<int C> void render(RenderTarget<C>& target) {
         assert_(width == target.width && height == target.height);
         if(!bins || !faces) return;
         for(uint binIndex: range(width*height)) {
             if(!bins[binIndex].faceCount) continue;
 
-            Tile& tile = target.tiles[binIndex];
+            Tile<C>& tile = target.tiles[binIndex];
             if(tile.needClear) {
-                mref<uint16>(tile.subsample).clear();
-                mref<v16sf>(tile.Z).clear(v16sf(target.Z));
-                mref<v16sf>(tile.B).clear(v16sf(target.backgroundColor.b));
-                mref<v16sf>(tile.G).clear(v16sf(target.backgroundColor.g));
-                mref<v16sf>(tile.R).clear(v16sf(target.backgroundColor.r));
+                mref<uint16>(tile.multisample).clear();
+                mref<v16sf>(tile.pixelZ).clear(v16sf(target.clearZ));
+                for(int c: range(C)) mref<v16sf>(tile.pixels[c]).clear(v16sf(target.clear[c]));
                 tile.needClear = false;
             }
 
