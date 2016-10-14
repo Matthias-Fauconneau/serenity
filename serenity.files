@@ -5,6 +5,7 @@ core/image.h
 core/parallel.h
 core/parallel.cc
 core/simd.h
+core/matrix.h
 
 light.cc
 raster.h

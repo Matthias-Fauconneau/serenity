@@ -126,8 +126,8 @@ struct Light {
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = false;
-    bool depthCorrect = true;
+    bool raycast = true;
+    bool depthCorrect = false;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -156,6 +156,7 @@ struct Light {
     }
     Image render(uint2 targetSize) {
         Image target (targetSize);
+        target.clear(); // DEBUG
 
         mat4 M;
         if(orthographic) {
@@ -171,6 +172,41 @@ struct Light {
         }
 
         if(raycast) {
+            assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
+            const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+            const int targetStride = target.size.x;
+            const int size1 = imageSize.x *1;
+            const int size2 = imageSize.y *size1;
+            const int size3 = imageCount.x*size2;
+            const size_t size4 = (size_t)imageCount.y*size3;
+            const struct Image4DH : ref<half> {
+                uint4 size;
+                Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
+                const half& operator ()(uint s, uint t, uint u, uint v) const {
+                    assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
+                    size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
+                    assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
+                    return operator[](index);
+                }
+            } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
+              fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
+              fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
+              fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
+
+            if(0) {// DEBUG
+                const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
+                const uint sIndex = s*(imageCount.x-1), tIndex = t*(imageCount.y-1);
+                if(!(sIndex < imageCount.x && tIndex < imageCount.y)) return Image();
+                ImageH B (unsafeRef(fieldB.slice(tIndex*size3+sIndex*size2, size3)), imageSize);
+                ImageH G (unsafeRef(fieldG.slice(tIndex*size3+sIndex*size2, size3)), imageSize);
+                ImageH R (unsafeRef(fieldR.slice(tIndex*size3+sIndex*size2, size3)), imageSize);
+                Image BGR (B.size);
+                convert(BGR, B, G, R);
+                if(target.size!=BGR.size) resize(target, BGR); else target=::move(BGR);
+                window->setTitle(str(sIndex)+" "+str(tIndex));
+                return target;
+            }
+
             // FIXME: Z-Pass only
             ImageH Z (target.size);
             if(depthCorrect) scene.render(renderer, Z, M);
@@ -178,33 +214,6 @@ struct Light {
             array<char> debug; Image debugTarget (256+640, 1024); debugTarget.clear();
             //parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
             ({ size_t start=0, sizeI=target.size.y*target.size.x;
-                assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
-                const int targetStride = target.size.x;
-                const int size1 = imageSize.x *1;
-                const int size2 = imageSize.y *size1;
-                const int size3 = imageCount.x*size2;
-                const size_t size4 = (size_t)imageCount.y*size3;
-#if 1
-                const struct Image4DH : ref<half> {
-                    uint4 size;
-                    Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
-                    const half& operator ()(uint s, uint t, uint u, uint v) const {
-                        assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
-                        size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
-                        assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
-                        return operator[](index);
-                    }
-                } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
-                  fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
-                  fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
-                  fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
-#else
-                //const ref<half> fieldZ = field.slice(0*size4, size4);
-                const ref<half> fieldB = field.slice(1*size4, size4);
-                const ref<half> fieldG = field.slice(2*size4, size4);
-                const ref<half> fieldR = field.slice(3*size4, size4);
-#endif
                 assert_(imageSize.x%2==0); // Gather 32bit / half
                 const v2si unused sample2D = {    0,           size1/2};
                 const v8si unused sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
@@ -224,12 +233,18 @@ struct Light {
                     const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
                     const vec2 UV = (Puv+vec2(1))/2.f;
 
-                    const vec2 st = ST * vec2(imageCount-uint2(1));
-                    const vec2 uv_uncorrected = UV * vec2(imageSize-uint2(1));
+                    const vec2 st = vec2(0x1p-16) + vec2(1-0x1p-16) * ST * vec2(imageCount-uint2(1));
+                    const vec2 uv_uncorrected = vec2(1-0x1p-16) * UV * vec2(imageSize-uint2(1));
 
-                    if(st[0] < 0 || st[1] < 0 || uv_uncorrected[0] < 0 || uv_uncorrected[1] < 0) { target[targetIndex]=0; continue; }
+                    if(st[0] < -0 || st[1] < -0) {
+                        assert_(st[0] < -0x1p-16 || st[1] < -0x1p-16, st);
+                        target[targetIndex]=byte4(0xFF,0,0,0xFF); continue;
+                    }
                     const int sIndex = st[0], tIndex = st[1]; //, uIndex = uv[0], vIndex = uv[1];
-                    if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target[targetIndex]=0; continue; }
+                    if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) {
+                        assert_(st[0] > int(imageCount.x)-1+0x1p-16 || st[1] > int(imageCount.y)-1+0x1p-16, st);
+                        target[targetIndex]=byte4(0,0xFF,0xFF,0xFF); continue;
+                    }
                     bgr3f S = 0;
                     if(depthCorrect) {
                         //v16sf Z = toFloat((v16hf)gather((float*)(fieldZ.data+base), sample4D));
@@ -241,14 +256,13 @@ struct Light {
                         for(int dt: {0,1}) for(int ds: {0,1}) {
                             //if(z==-1) continue;
                             vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
-                                    //* (-z) / (z+2);
-                            if(uv_[0] < 0 || uv_[1] < 0) { target[targetIndex]=0; continue; } // DEBUG
+                            if(uv_[0] < 0 || uv_[1] < 0) { target[targetIndex]=byte4(0xFF,0,0xFF,0xFF); continue; } // DEBUG
                             //uv_[0] = ::max(0.f, uv_[0]);
                             //uv_[1] = ::max(0.f, uv_[1]);
                             //if(uv_[0] < 0 || uv_[1] < 0) goto discard;
                             int uIndex = uv_[0], vIndex = uv_[1];
                             assert_(uIndex >= 0 && vIndex >= 0, uv_, z);
-                            if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=0; continue; } // DEBUG
+                            if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=byte4(0,0xFF,0,0xFF); continue; } // DEBUG
                             //uIndex = ::min(uIndex, int(imageSize.x)-2);
                             //vIndex = ::min(vIndex, int(imageSize.y)-2);
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
@@ -345,7 +359,8 @@ struct Light {
                         S = bgr3f(b, g, r);
                     } else {
                         const int uIndex = uv_uncorrected[0], vIndex = uv_uncorrected[1];
-                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=0; continue; }
+                        if(uv_uncorrected[0] < 0 || uv_uncorrected[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
+                        if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
                         const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
                         const v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
                         const v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
