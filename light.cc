@@ -61,7 +61,7 @@ struct Render {
             ImageH G (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
             ImageH R (unsafeRef(field.slice(((3ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
 
-            scene.render(renderers[threadID], M, (float[]){0,1,1,1}, Z, B, G, R);
+            scene.render(renderers[threadID], M, (float[]){1,1,1}, Z, B, G, R);
 
             ImageH Z01 (Z.size);
             for(size_t i: range(Z.ref::size)) Z01[i] = (Z[i]+1)/2;
@@ -70,7 +70,7 @@ struct Render {
         });
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
     }
-};// renderLightField;
+};//renderLightField;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -125,7 +125,7 @@ struct Light {
     bool orthographic = false;
     bool sample = true;
     bool raycast = true;
-    bool depthCorrect = false;
+    bool depthCorrect = true;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -220,8 +220,8 @@ struct Light {
 
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float z = Z(targetX, targetY)-1./2;
-                        //const float z = -2*Z(targetX, targetY);
+                        const float z = Z(targetX, targetY);
+                        const float z_ = z-1.f/2;
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -232,7 +232,7 @@ struct Light {
 
                         v4sf B, G, R;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
-                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
+                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z_) / (z_+2);
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             int uIndex = uv_[0], vIndex = uv_[1];
                             if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
@@ -241,10 +241,10 @@ struct Light {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Z = float4(-2)*toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
-                                               , abs(Z - float4(z)) < float4(0x1p-6)); // Discards far samples
+                                               , abs(Z - float4(z)) < float4(0x1p-5)); // Discards far samples (tradeoff between edge and anisotropic accuracy)
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
