@@ -45,8 +45,8 @@ struct Render {
         mref<half> field = mcast<half>(map);
         profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
 
-        buffer<Scene::Renderer<4>> renderers (threadCount());
-        for(Scene::Renderer<4>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
+        buffer<Scene::Renderer<3>> renderers (threadCount());
+        for(Scene::Renderer<3>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
 
         Time time (true);
         parallel_for(0, N*N, [&](uint threadID, size_t stIndex) {
@@ -119,13 +119,13 @@ struct Light {
     Map map;
     ref<half> field;
     Scene scene;
-    Scene::Renderer<1> Zrenderer {scene};
+    Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 
     bool orthographic = false;
     bool sample = true;
     bool raycast = true;
-    bool depthCorrect = true;
+    bool depthCorrect = false;
 
     struct View : ScrollValue, ViewControl, ImageView {
         Light& _this;
@@ -170,7 +170,7 @@ struct Light {
             assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
             ImageH Z (target.size);
-            if(depthCorrect) scene.render(Zrenderer, M, (float[]){1./2}, Z); // FIXME: Rasterizer Z without additionnal Z varying
+            if(depthCorrect) scene.render(Zrenderer, M, {}, Z);
 
             parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
                 const int targetStride = target.size.x;
@@ -220,7 +220,7 @@ struct Light {
 
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float z = (Z(targetX, targetY)-1./2);
+                        const float z = Z(targetX, targetY)-1./2;
                         //const float z = -2*Z(targetX, targetY);
 
                         const v4sf x = {st[1], st[0]}; // ts
@@ -282,7 +282,7 @@ struct Light {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            scene.render(BGRrenderer, M, (float[]){1,1,1}, B, G, R);
+            scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
             convert(target, B, G, R);
         }
         return target;

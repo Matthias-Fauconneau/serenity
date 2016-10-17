@@ -69,8 +69,16 @@ struct Scene {
         Renderer(const Scene& scene) : pass(scene.shader) {}
     };
 
-    template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[], const Args&... targets) {
-        uint2 size = (uint2[]){targets.size...}[0];
+    // Zero-length arrays are not permitted in C++
+    /*template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[sizeof...(Args)], const ImageH& Z, const Args&... targets) {
+        return render<sizeof...(Args)>(renderer, M, clear, Z, (const ImageH[sizeof...(Args)]){ unsafeShare(targets)... });
+    }
+    template<int C> void render(Renderer<C>& renderer, mat4 M, float clear[C], const ImageH& Z, const ImageH targets[C]) {
+        uint2 size = (C ? targets[0] : Z).size;*/
+    template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& Z, const Args&... targets_) {
+        //const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
+        //uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
+        uint2 size = sizeof...(Args) ? (uint2[]){targets_.size...}[0] : Z.size;
         renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
@@ -78,28 +86,22 @@ struct Scene {
         NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
-            vec4 A = M*vec4(face.position[0],1), B = M*vec4(face.position[1],1), C = M*vec4(face.position[2],1);
-            if(cross((B/B.w-A/A.w).xyz(),(C/C.w-A/A.w).xyz()).z <= 0) continue; // Backward face culling
-            renderer.pass.submit(A,B,C, face.attributes, {face.color});
+            vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1);
+            if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
+            renderer.pass.submit(a,b,c, face.attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
-        renderer.target.resolve(targets...);
+        //renderer.target.resolve(Z, (const ImageH[sizeof...(Args)]){ unsafeShare(targets_)... }); // Zero-length arrays are not permitted in C++
+        renderer.target.resolve(Z, targets_...);
     }
 };
 
 inline double log2(double x) { return __builtin_log2(x); }
 
-// FIXME: rasterizer Z without additionnal varying
-template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float unused z, float unused varying[V]) const {
-    assert_(!isNumber(varying[2]) || abs(-1.f/2*(z-1.f/2)-varying[2]) < 0x1p-13, -z, -1.f/2*(z-1.f/2), varying[2], abs(-1.f/2*(z-1.f/2)-varying[2]),
-            (float)log2(abs(-1./2*(z-1.f/2)-varying[2])));
-    return vecf<1>{{z}};
-}
-template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf unused z, v16sf unused varying[V]) const {
-    return vec16f<1>{{z}};
-}
+template<> vecf<0> Scene::Shader::shade<0>(FaceAttributes, float, float[V]) const { return {}; }
+template<> vec16f<0> Scene::Shader::shade<0>(FaceAttributes, v16sf, v16sf[V]) const { return {}; }
 
-template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float unused z, float unused varying[V]) const {
+template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float, float varying[V]) const {
     const float u = varying[0], v = varying[1];
     static float cellCount (16);
     const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
@@ -107,28 +109,11 @@ template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float unused z, 
     const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
     return vecf<3>{{mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
 }
-template<> vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf unused z, v16sf unused varying[V]) const {
+template<> vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf, v16sf varying[V]) const {
     const v16sf u = varying[0], v = varying[1];
     static v16sf cellCount (16);
     const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
     const v16sf m = v16sf(1./2)*n; // Half integer
     const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
     return vec16f<3>{{mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
-}
-
-template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float unused z, float varying[V]) const {
-    const float u = varying[0], v = varying[1];
-    static float cellCount (16);
-    const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
-    const float m = float(1./2)*n; // Half integer
-    const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-    return vecf<4>{{varying[2], mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
-}
-template<> vec16f<4> Scene::Shader::shade<4>(FaceAttributes face, v16sf unused z, v16sf varying[V]) const {
-    const v16sf u = varying[0], v = varying[1];
-    static v16sf cellCount (16);
-    const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
-    const v16sf m = v16sf(1./2)*n; // Half integer
-    const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-    return vec16f<4>{{varying[2], mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
 }

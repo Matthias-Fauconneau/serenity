@@ -53,43 +53,98 @@ template<int C> struct RenderTarget {
     }
 
     // Resolves internal MSAA linear framebuffer to linear half buffers
-    void resolve(const ImageH targets[C]);
-    template<Type... Args> void resolve(const Args&... targets) { return resolve((const ImageH[C]){ unsafeShare(targets)... }); }
+    void resolve(const ImageH& Z, const ImageH targets[C]);
+    template<Type... Args> void resolve(const ImageH& Z, const Args&... targets) { return resolve(Z, (const ImageH[C]){ unsafeShare(targets)... }); }
 };
 
 // Untiles render buffer, resolves (average samples of) multisampled pixels, and converts to half floats (linear RGB)
-template<int C> void RenderTarget<C>::resolve(const ImageH targets[C]) {
-    const uint stride = targets[0].stride;
-    const v16si pixelSeq = (4*4)*seqI;
-    for(uint tileY: range(height)) for(uint tileX: range(width)) {
-        Tile<C>& tile = tiles[tileY*width+tileX];
-        uint const targetTilePtr = tileY*16*stride + tileX*16;
-        if(tile.needClear) { // Empty
-            for(uint y: range(16)) for(uint x: range(16)) for(uint c: range(C)) targets[c][targetTilePtr+y*stride+x] = clear[c];
-            continue;
-        }
-        for(uint blockY: range(4)) for(uint blockX: range(4)) {
-            const uint blockI = blockY*4+blockX;
-            const uint blockPtr = blockI*(4*4);
-            v16sf pixels[C];
-            const mask16 multisample = tile.multisample[blockI];
-            if(!multisample) { // No multisampled pixel in block => Directly load block without any multisampled pixels to blend
-                for(uint c: range(C)) pixels[c] = tile.pixels[c][blockI];
-            } else {
-                // Resolves (average samples of) multisampled pixels
+template<int C> void RenderTarget<C>::resolve(const ImageH& Z, const ImageH targets[C]) {
+    if(Z) {
+        const uint stride = Z.stride;
+        const v16si pixelSeq = (4*4)*seqI;
+        for(uint tileY: range(height)) for(uint tileX: range(width)) {
+            Tile<C>& tile = tiles[tileY*width+tileX];
+            uint const targetTilePtr = tileY*16*stride + tileX*16;
+            if(tile.needClear) { // Empty
+                for(uint y: range(16)) for(uint x: range(16)) {
+                    Z[targetTilePtr+y*stride+x] = clearZ;
+                    for(uint c: range(C)) targets[c][targetTilePtr+y*stride+x] = clear[c];
+                }
+                continue;
+            }
+            for(uint blockY: range(4)) for(uint blockX: range(4)) {
+                const uint blockI = blockY*4+blockX;
+                const uint blockPtr = blockI*(4*4);
+                v16sf z, pixels[C];
+                const mask16 multisample = tile.multisample[blockI];
+                if(!multisample) { // No multisampled pixel in block => Directly load block without any multisampled pixels to blend
+                    z = tile.pixelZ[blockI];
+                    for(uint c: range(C)) pixels[c] = tile.pixels[c][blockI];
+                } else {
+                    // Resolves (average samples of) multisampled pixels
+                    {
+                        v16sf sum = v16sf(0);
+                        for(uint sampleI: range(4*4)) sum += gather((float*)(tile.sampleZ+blockPtr)+sampleI, pixelSeq);
+                        const v16sf scale = v16sf(1./(4*4));
+                        z = blend(tile.pixelZ[blockI], scale*sum, mask(multisample));
+                    }
+                    for(uint c: range(C)) {
+                        v16sf sum = v16sf(0);
+                        for(uint sampleI: range(4*4)) sum += gather((float*)(tile.samples[c]+blockPtr)+sampleI, pixelSeq);
+                        const v16sf scale = v16sf(1./(4*4));
+                        pixels[c] = blend(tile.pixels[c][blockI], scale*sum, mask(multisample));
+                    }
+                }
+                // Converts to half and untiles block of pixels
+                const uint targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
+                {
+                    v16hf halfs = toHalf(z);
+                    #define o(j) *(v4hf*)(Z.data+targetBlockPtr+j*stride) = __builtin_shufflevector(halfs, halfs, j*4+0, j*4+1, j*4+2, j*4+3);
+                    o(0)o(1)o(2)o(3)
+                    #undef o
+                }
                 for(uint c: range(C)) {
-                    v16sf sum = v16sf(0);
-                    for(uint sampleI: range(4*4)) sum += gather((float*)(tile.samples[c]+blockPtr)+sampleI, pixelSeq);
-                    const v16sf scale = v16sf(1./(4*4));
-                    pixels[c] = blend(tile.pixels[c][blockI], scale*sum, mask(multisample));
+                    v16hf halfs = toHalf(pixels[c]);
+                    #define o(j) *(v4hf*)(targets[c].data+targetBlockPtr+j*stride) = __builtin_shufflevector(halfs, halfs, j*4+0, j*4+1, j*4+2, j*4+3);
+                    o(0)o(1)o(2)o(3)
+                    #undef o
                 }
             }
-            // Converts to half and untiles block of pixels
-            const uint targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
-            for(uint c: range(C)) {
-                v16hf halfs = toHalf(pixels[c]);
-                #define o(j) *(v4hf*)(targets[c].data+targetBlockPtr+j*stride) = __builtin_shufflevector(halfs, halfs, j*4+0, j*4+1, j*4+2, j*4+3);
-                o(0)o(1)o(2)o(3)
+        }
+    } else { // Specific path without Z
+        const uint stride = targets[0].stride;
+        const v16si pixelSeq = (4*4)*seqI;
+        for(uint tileY: range(height)) for(uint tileX: range(width)) {
+            Tile<C>& tile = tiles[tileY*width+tileX];
+            uint const targetTilePtr = tileY*16*stride + tileX*16;
+            if(tile.needClear) { // Empty
+                for(uint y: range(16)) for(uint x: range(16)) for(uint c: range(C)) targets[c][targetTilePtr+y*stride+x] = clear[c];
+                continue;
+            }
+            for(uint blockY: range(4)) for(uint blockX: range(4)) {
+                const uint blockI = blockY*4+blockX;
+                const uint blockPtr = blockI*(4*4);
+                v16sf pixels[C];
+                const mask16 multisample = tile.multisample[blockI];
+                if(!multisample) { // No multisampled pixel in block => Directly load block without any multisampled pixels to blend
+                    for(uint c: range(C)) pixels[c] = tile.pixels[c][blockI];
+                } else {
+                    // Resolves (average samples of) multisampled pixels
+                    for(uint c: range(C)) {
+                        v16sf sum = v16sf(0);
+                        for(uint sampleI: range(4*4)) sum += gather((float*)(tile.samples[c]+blockPtr)+sampleI, pixelSeq);
+                        const v16sf scale = v16sf(1./(4*4));
+                        pixels[c] = blend(tile.pixels[c][blockI], scale*sum, mask(multisample));
+                    }
+                }
+                // Converts to half and untiles block of pixels
+                const uint targetBlockPtr = targetTilePtr+blockY*4*stride+blockX*4;
+                for(uint c: range(C)) {
+                    v16hf halfs = toHalf(pixels[c]);
+                    #define o(j) *(v4hf*)(targets[c].data+targetBlockPtr+j*stride) = __builtin_shufflevector(halfs, halfs, j*4+0, j*4+1, j*4+2, j*4+3);
+                    o(0)o(1)o(2)o(3)
+                    #undef o
+                }
             }
         }
     }
