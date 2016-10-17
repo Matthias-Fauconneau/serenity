@@ -1,76 +1,13 @@
+#include "light.h"
+#include "scene.h"
+
 #include "file.h"
 #include "parallel.h"
-#include "scene.h"
-#include "png.h"
+
 #include "interface.h"
 #include "text.h"
 #include "render.h"
 #include "window.h"
-
-Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
-
-mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
-    const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-    const float left = (-1-S), right = (1-S);
-    const float bottom = (-1-T), top = (1-T);
-    mat4 M;
-    M(0,0) = 2 / (right-left);
-    M(1,1) = 2 / (top-bottom);
-    M(0,2) = (right+left) / (right-left);
-    M(1,2) = (top+bottom) / (top-bottom);
-    const float near = 1-1./2, far = 1+1./2;
-    M(2,2) = - (far+near) / (far-near);
-    M(2,3) = - 2*far*near / (far-near);
-    M(3,2) = - 1;
-    M(3,3) = 0;
-    M.translate(vec3(-S,-T,0));
-    M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
-    return M;
-}
-
-struct Render {
-    Render() {
-        Scene scene;
-        Folder folder {"synthetic", tmp, true};
-        for(string file: folder.list(Files)) remove(file, folder);
-
-        const size_t N = 33;
-        uint2 size = 1024;
-
-        File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
-        size_t byteSize = 4*N*N*size.y*size.x*sizeof(half);
-        assert_(byteSize <= 16ull*1024*1024*1024);
-        file.resize(byteSize);
-        Map map (file, Map::Prot(Map::Read|Map::Write));
-        mref<half> field = mcast<half>(map);
-        profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
-
-        buffer<Scene::Renderer<3>> renderers (threadCount());
-        for(Scene::Renderer<3>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
-
-        Time time (true);
-        parallel_for(0, N*N, [&](uint threadID, size_t stIndex) {
-            int sIndex = stIndex%N, tIndex = stIndex/N;
-
-            // Sheared perspective (rectification)
-            const float s = sIndex/float(N-1), t = tIndex/float(N-1);
-            mat4 M = shearedPerspective(s, t);
-
-            ImageH Z (unsafeRef(field.slice(((0ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH B (unsafeRef(field.slice(((1ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH G (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH R (unsafeRef(field.slice(((3ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-
-            scene.render(renderers[threadID], M, (float[]){1,1,1}, Z, B, G, R);
-
-            ImageH Z01 (Z.size);
-            for(size_t i: range(Z.ref::size)) Z01[i] = (Z[i]+1)/2;
-            if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".Z.png", encodePNG(convert(Z01, Z01, Z01)), folder, true);
-            if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".BGR.png", encodePNG(convert(B, G, R)), folder, true);
-        });
-        log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
-    }
-};//renderLightField;
 
 struct ScrollValue : virtual Widget {
     int minimum = 0, maximum = 0;
@@ -109,9 +46,7 @@ struct ViewControl : virtual Widget {
     }
 };
 
-struct Light {
-    buffer<String> inputs = currentWorkingDirectory().list(Folders);
-
+struct View {);
     string name;
     vec2 min, max;
     uint2 imageCount;

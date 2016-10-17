@@ -69,16 +69,9 @@ struct Scene {
         Renderer(const Scene& scene) : pass(scene.shader) {}
     };
 
-    // Zero-length arrays are not permitted in C++
-    /*template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[sizeof...(Args)], const ImageH& Z, const Args&... targets) {
-        return render<sizeof...(Args)>(renderer, M, clear, Z, (const ImageH[sizeof...(Args)]){ unsafeShare(targets)... });
-    }
-    template<int C> void render(Renderer<C>& renderer, mat4 M, float clear[C], const ImageH& Z, const ImageH targets[C]) {
-        uint2 size = (C ? targets[0] : Z).size;*/
     template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& Z, const Args&... targets_) {
-        //const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
-        //uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
-        uint2 size = sizeof...(Args) ? (uint2[]){targets_.size...}[0] : Z.size;
+        const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
+        uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
         renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
@@ -91,8 +84,7 @@ struct Scene {
             renderer.pass.submit(a,b,c, face.attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
-        //renderer.target.resolve(Z, (const ImageH[sizeof...(Args)]){ unsafeShare(targets_)... }); // Zero-length arrays are not permitted in C++
-        renderer.target.resolve(Z, targets_...);
+        renderer.target.resolve(Z, targets);
     }
 };
 

@@ -13,7 +13,10 @@ core/matrix.h
 
 test.cc
 
-light.cc
+render.cc
 raster.h
 raster.cc
 scene.h
+analyze.cc
+light.h
+view.cc

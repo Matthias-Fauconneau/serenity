@@ -54,7 +54,6 @@ template<int C> struct RenderTarget {
 
     // Resolves internal MSAA linear framebuffer to linear half buffers
     void resolve(const ImageH& Z, const ImageH targets[C]);
-    template<Type... Args> void resolve(const ImageH& Z, const Args&... targets) { return resolve(Z, (const ImageH[C]){ unsafeShare(targets)... }); }
 };
 
 // Untiles render buffer, resolves (average samples of) multisampled pixels, and converts to half floats (linear RGB)
