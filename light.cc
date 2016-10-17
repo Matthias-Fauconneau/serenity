@@ -25,6 +25,7 @@ mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (
     M(3,3) = 0;
     M.translate(vec3(-S,-T,0));
     M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
+    log(M.inverse()*vec3(0,0,0), M.inverse()*vec3(0,0,1));
     return M;
 }
 

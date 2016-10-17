@@ -29,8 +29,8 @@ struct Scene {
         static constexpr int V = 3; // U,V,Z
         static constexpr bool blend = false; // Disables unnecessary blending
 
-        template<int C> vecf<C> shade(FaceAttributes face, float varying[V]) const;
-        template<int C> vec16f<C> shade(FaceAttributes face, v16sf varying[V]) const;
+        template<int C> vecf<C> shade(FaceAttributes face, float z, float varying[V]) const;
+        template<int C> vec16f<C> shade(FaceAttributes face, v16sf z, v16sf varying[V]) const;
     } shader;
 
     struct Face { vec3 position[3]; vec3 attributes[Shader::V]; bgr3f color; };
@@ -87,15 +87,19 @@ struct Scene {
     }
 };
 
+inline double log2(double x) { return __builtin_log2(x); }
+
 // FIXME: rasterizer Z without additionnal varying
-template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float varying[V]) const {
+template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float unused z, float varying[V]) const {
+    assert_(!isNumber(varying[2]) || abs(-1.f/2*(z-1.f/2)-varying[2]) < 0x1p-13, -z, -1.f/2*(z-1.f/2), varying[2], abs(-1.f/2*(z-1.f/2)-varying[2]),
+            (float)log2(abs(-1./2*(z-1.f/2)-varying[2])));
     return vecf<1>{{varying[2]}};
 }
-template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf varying[V]) const {
+template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf unused z, v16sf varying[V]) const {
     return vec16f<1>{{varying[2]}};
 }
 
-template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float varying[V]) const {
+template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float unused z, float varying[V]) const {
     const float u = varying[0], v = varying[1];
     static float cellCount (16);
     const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
@@ -103,7 +107,7 @@ template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float varying[V]
     const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
     return vecf<4>{{varying[2], mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
 }
-template<> vec16f<4> Scene::Shader::shade<4>(FaceAttributes face, v16sf varying[V]) const {
+template<> vec16f<4> Scene::Shader::shade<4>(FaceAttributes face, v16sf unused z, v16sf varying[V]) const {
     const v16sf u = varying[0], v = varying[1];
     static v16sf cellCount (16);
     const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer

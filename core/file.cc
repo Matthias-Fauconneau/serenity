@@ -238,9 +238,10 @@ void touchFile(const string path, const Folder& at, int64 time) {
  check(utimensat(at.fd, strz(path), times, 0), path);
 }
 
-void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName) {
+void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName, bool overwrite) {
  //FIXME: preserve executable flag
  File oldFile(oldName, oldAt);
+ assert_(overwrite || !existsFile(newName, newAt));
  File newFile(newName, newAt, Flags(WriteOnly|Create|Truncate), oldFile.stat().st_mode);
  for(size_t offset=0, size=oldFile.size(); offset<size;)
   offset+=check(sendfile(newFile.fd, oldFile.fd, (off_t*)offset, size-offset), (int)newFile.fd, (int)oldFile.fd, offset, size-offset, size);

@@ -196,7 +196,7 @@ void symlink(const string target,const string name, const Folder& at=currentWork
 /// Sets the last modified time for \a path to current time
 void touchFile(const string path, const Folder& at=currentWorkingDirectory(), int64 time=0);
 /// Copies a file replacing any existing files or links
-void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
+void copy(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName, bool overwrite=false);
 
 void link(const Folder& oldAt, const string oldName, const Folder& newAt, const string newName);
 

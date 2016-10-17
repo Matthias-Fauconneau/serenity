@@ -3,11 +3,15 @@ build.sh
 build.cc
 
 core/core.h
+core/memory.h
+core/string.h
 core/image.h
 core/parallel.h
 core/parallel.cc
 core/simd.h
 core/matrix.h
+
+test.cc
 
 light.cc
 raster.h
