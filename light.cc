@@ -25,7 +25,6 @@ mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (
     M(3,3) = 0;
     M.translate(vec3(-S,-T,0));
     M.translate(vec3(0,0,-1)); // 0 -> -1 (Z-)
-    log(M.inverse()*vec3(0,0,0), M.inverse()*vec3(0,0,1));
     return M;
 }
 
@@ -121,7 +120,7 @@ struct Light {
     ref<half> field;
     Scene scene;
     Scene::Renderer<1> Zrenderer {scene};
-    Scene::Renderer<4> ZBGRrenderer {scene};
+    Scene::Renderer<3> BGRrenderer {scene};
 
     bool orthographic = false;
     bool sample = true;
@@ -171,10 +170,9 @@ struct Light {
             assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
             ImageH Z (target.size);
-            if(depthCorrect) scene.render(Zrenderer, M, (float[]){0}, Z); // FIXME: Rasterizer Z without additionnal Z varying
+            if(depthCorrect) scene.render(Zrenderer, M, (float[]){1./2}, Z); // FIXME: Rasterizer Z without additionnal Z varying
 
             parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
                 const int targetStride = target.size.x;
                 const int size1 = imageSize.x *1;
                 const int size2 = imageSize.y *size1;
@@ -197,6 +195,7 @@ struct Light {
                 const v2si unused sample2D = {    0,           size1/2};
                 const v8si unused sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                                   size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
                 for(size_t targetIndex: range(start, start+sizeI)) {
                     int targetY = targetIndex/targetStride, targetX = targetIndex%targetStride;
                     const vec3 O = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
@@ -221,7 +220,8 @@ struct Light {
 
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float z = -2*Z(targetX, targetY);
+                        const float z = (Z(targetX, targetY)-1./2);
+                        //const float z = -2*Z(targetX, targetY);
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -241,7 +241,7 @@ struct Light {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Z = float4(-2)*toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D));
+                            const v4sf Z = float4(-2)*toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
                                                , abs(Z - float4(z)) < float4(0x1p-6)); // Discards far samples
@@ -281,8 +281,8 @@ struct Light {
                 }
             });
         } else {
-            ImageH Z (target.size), B (target.size), G (target.size), R (target.size);
-            scene.render(ZBGRrenderer, M, (float[]){1,1,1,1}, Z, B, G, R);
+            ImageH B (target.size), G (target.size), R (target.size);
+            scene.render(BGRrenderer, M, (float[]){1,1,1}, B, G, R);
             convert(target, B, G, R);
         }
         return target;
@@ -310,6 +310,7 @@ struct Light {
             field = cast<half>(map);
             break;
         }
+        assert_(imageCount && imageSize);
 
         if(window) {
             window->setSize();

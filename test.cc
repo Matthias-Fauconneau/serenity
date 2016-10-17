@@ -1,6 +1,7 @@
 #include "data.h"
 #include "file.h"
 #include "math.h"
+#include "time.h"
 
 string dirname(string x) { return x.contains('/') ? section(x,'/',0, -2) : ""_; }
 string basename(string x, string suffix="") {
@@ -18,27 +19,29 @@ string simplify(string x) {
     s.match('-');
     s.match(' ');
     if(find(s.slice(s.index)," - ")) s.until(" - ");
-    assert_(find(s.slice(s.index),".mp3"), x);
-    return s.until(".mp3");
+    return s.slice(s.index).contains('(') ? s.until('(') : s.until(".mp3");
 }
 
 struct Test {
     Test() {
+#if 0
         Folder store("Music", home());
         array<String> storeFiles = store.list(Files|Recursive);
 
         for(string storeFile: storeFiles) {
+#if 0
             Map file(storeFile, store);
             if(!(startsWith(file, "ID3") || startsWith(file, "\xff\xfb"))) {
                 log(storeFile, hex(file.slice(0,3)));
                 error("A");//remove(storeFile, store);
             }
-            assert_(storeFile);
             if(!endsWith(storeFile,".mp3")) continue;
+#endif
             if(basename(storeFile) == simplify(basename(storeFile))+".mp3") continue;
-            log(basename(storeFile), dirname(storeFile)+"/"+simplify(basename(storeFile))+".mp3");
-            error("B"); //rename(storeFile, dirname(storeFile)+"/"+simplify(basename(storeFile))+".mp3", store);
+            log(basename(storeFile), simplify(basename(storeFile))+".mp3");
+            rename(storeFile, simplify(basename(storeFile))+".mp3", store);
         }
+        return;
 
         for(size_t i=0; i<storeFiles.size; i++) { string storeFile = storeFiles[i]; // files mutates
             for(string other: storeFiles) {
@@ -72,13 +75,13 @@ struct Test {
             }
             assert_(endsWith(deviceFile,".mp3"));
         }
-
+#endif
         for(string deviceFile: deviceFiles) {
             if(basename(deviceFile) == simplify(basename(deviceFile))+".mp3") continue;
             log(basename(deviceFile), simplify(basename(deviceFile))+".mp3");
             rename(deviceFile, simplify(basename(deviceFile))+".mp3", device);
         }
-
+#if 0
         buffer<String> storeNames = apply(storeFiles, [](string path) { return copyRef(basename(path)); });
         for(string deviceFile: deviceFiles) {
             if(!storeNames.contains(deviceFile)) {
@@ -115,6 +118,15 @@ struct Test {
             progressCount += 1;
             progressSize += size;
             copy(store, storeFile, device, basename(storeFile), true);
+        }
+#endif
+        {
+                    array<String> deviceFiles = device.list(Files);
+                    array<String> randomSequence (deviceFiles.size);
+                    Random random; // Unseeded so that the random sequence only depends on collection
+                    while(deviceFiles) randomSequence.append(deviceFiles.take(random%deviceFiles.size));
+                    for(size_t index: range(randomSequence)) log(randomSequence[i], str(i)+" "+randomSequence[i]);
+
         }
     }
 } test;

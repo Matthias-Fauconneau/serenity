@@ -54,12 +54,14 @@ inline void* start_routine(thread* t) {
  }
 }
 
+#if !DEBUG
 __attribute((constructor(102))) void spawnWorkers() {
  for(uint index: range(threadCount())) {
   threads[index].id = index;
   pthread_create(&threads[index].pthread, 0, (void*(*)(void*))start_routine, &threads[index]);
  }
 }
+#endif
 
 #if OPENMP
 extern "C" int omp_get_thread_num();

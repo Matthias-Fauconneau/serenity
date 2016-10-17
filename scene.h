@@ -90,13 +90,30 @@ struct Scene {
 inline double log2(double x) { return __builtin_log2(x); }
 
 // FIXME: rasterizer Z without additionnal varying
-template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float unused z, float varying[V]) const {
+template<> vecf<1> Scene::Shader::shade<1>(FaceAttributes, float unused z, float unused varying[V]) const {
     assert_(!isNumber(varying[2]) || abs(-1.f/2*(z-1.f/2)-varying[2]) < 0x1p-13, -z, -1.f/2*(z-1.f/2), varying[2], abs(-1.f/2*(z-1.f/2)-varying[2]),
             (float)log2(abs(-1./2*(z-1.f/2)-varying[2])));
-    return vecf<1>{{varying[2]}};
+    return vecf<1>{{z}};
 }
-template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf unused z, v16sf varying[V]) const {
-    return vec16f<1>{{varying[2]}};
+template<> vec16f<1> Scene::Shader::shade<1>(FaceAttributes, v16sf unused z, v16sf unused varying[V]) const {
+    return vec16f<1>{{z}};
+}
+
+template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float unused z, float unused varying[V]) const {
+    const float u = varying[0], v = varying[1];
+    static float cellCount (16);
+    const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
+    const float m = float(1./2)*n; // Half integer
+    const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+    return vecf<3>{{mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
+}
+template<> vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf unused z, v16sf unused varying[V]) const {
+    const v16sf u = varying[0], v = varying[1];
+    static v16sf cellCount (16);
+    const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
+    const v16sf m = v16sf(1./2)*n; // Half integer
+    const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+    return vec16f<3>{{mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
 }
 
 template<> vecf<4> Scene::Shader::shade<4>(FaceAttributes face, float unused z, float varying[V]) const {
