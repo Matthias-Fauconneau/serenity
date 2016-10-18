@@ -7,6 +7,8 @@
 #include "render.h"
 #include "window.h"
 
+#include "analyze.h"
+
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
@@ -57,6 +59,7 @@ struct LightFieldViewApp : LightField {
     unique<Window> window = ::window(&view);
 
     LightFieldViewApp() {
+        analyze();
         window->actions[Key('s')] = [this]{ sample=!sample; window->render(); };
         window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };

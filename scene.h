@@ -89,10 +89,10 @@ struct Scene {
 
 inline double log2(double x) { return __builtin_log2(x); }
 
-template<> vecf<0> Scene::Shader::shade<0>(FaceAttributes, float, float[V]) const { return {}; }
-template<> vec16f<0> Scene::Shader::shade<0>(FaceAttributes, v16sf, v16sf[V]) const { return {}; }
+template<> inline vecf<0> Scene::Shader::shade<0>(FaceAttributes, float, float[V]) const { return {}; }
+template<> inline vec16f<0> Scene::Shader::shade<0>(FaceAttributes, v16sf, v16sf[V]) const { return {}; }
 
-template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float, float varying[V]) const {
+template<> inline vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float, float varying[V]) const {
     const float u = varying[0], v = varying[1];
     static float cellCount (16);
     const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
@@ -100,7 +100,7 @@ template<> vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float, float var
     const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
     return vecf<3>{{mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
 }
-template<> vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf, v16sf varying[V]) const {
+template<> inline vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf, v16sf varying[V]) const {
     const v16sf u = varying[0], v = varying[1];
     static v16sf cellCount (16);
     const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer

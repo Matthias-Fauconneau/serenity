@@ -2,7 +2,7 @@
 
 #include "matrix.h"
 
-mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
+inline mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
     const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
     const float left = (-1-S), right = (1-S);
     const float bottom = (-1-T), top = (1-T);
@@ -25,11 +25,11 @@ mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (
 #include "data.h"
 
 struct LightFieldFile {
-    const Folder& folder = currentWorkingDirectory();
+    const Folder folder;
     String name;
     uint2 imageCount;
     uint2 imageSize;
-    LightFieldFile() {
+    LightFieldFile(Folder&& folder_ = "."_) : folder(::move(folder_)) {
         for(string name: folder.list(Files)) {
             TextData s (name);
             int imageCountX = s.integer(false);
@@ -50,6 +50,7 @@ struct LightFieldFile {
 };
 
 struct LightField : LightFieldFile {
+    using LightFieldFile::LightFieldFile;
     Map map {name, folder};
     ref<half> field = cast<half>(map);
 

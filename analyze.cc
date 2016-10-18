@@ -1,10 +1,11 @@
+#include "analyze.h"
 #include "light.h"
 #include "scene.h"
 #include "math.h"
 #include "parallel.h"
 
 struct LightFieldAnalyze : LightField {
-    LightFieldAnalyze() {
+    LightFieldAnalyze(Folder&& folder_ = "."_) : LightField(endsWith(folder_.name(), "coverage")? Folder(folder_.name()+"/.."_) : ::move(folder_)) {
 #if 0
         float sum = 0;
         for(const Scene::Face& face: Scene().faces) {
@@ -22,14 +23,13 @@ struct LightFieldAnalyze : LightField {
 
         Time time (true);
         const size_t threadCount = ::threadCount();
-        uint64 sums[threadCount];//, maxs[threadCount];
+        uint64 sums[threadCount];
         mref<uint64>(sums, threadCount).clear(0);
-        //mref<uint64>(maxs, threadCount).clear(0);
         const uint M = 1, N = 32;
         const uint Cx = (imageCount.x-1)/M+1, Cy = (imageCount.y-1)/M+1;
         const uint Sx = (imageSize.x-1)/N+1, Sy = (imageSize.y-1)/N+1;
 
-        File file (strx(uint2(Cx, Cy))+'x'+strx(uint2(Sx, Sy)), Folder("coverage",currentWorkingDirectory(),true), Flags(ReadWrite|Create));
+        File file (strx(uint2(Cx, Cy))+'x'+strx(uint2(Sx, Sy)), Folder("coverage",folder,true), Flags(ReadWrite|Create));
         file.resize(4*Cx*Cy*Sy*Sx*sizeof(half));
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> field = mcast<half>(map);
@@ -50,14 +50,14 @@ struct LightFieldAnalyze : LightField {
                 const half* fieldZ = this->fieldZ.data;
                 const half* Zst = fieldZ + (size_t)tIndex*size3 + sIndex*size2;
                 const v2si sample2D = {    0,           size1/2};
-                const float zTolerance = 0x1p-2; // -5 ~N^?
+                const float zTolerance = 0x1p-5; // -5 ~N^?
 
                 ImageH Z (unsafeRef(field.slice(((0ull*Cy+tIndex)*Cx+sIndex)*Sy*Sx, Sy*Sx)), uint2(Sx, Sy));
                 ImageH B (unsafeRef(field.slice(((1ull*Cy+tIndex)*Cx+sIndex)*Sy*Sx, Sy*Sx)), uint2(Sx, Sy));
                 ImageH G (unsafeRef(field.slice(((2ull*Cy+tIndex)*Cx+sIndex)*Sy*Sx, Sy*Sx)), uint2(Sx, Sy));
                 ImageH R (unsafeRef(field.slice(((3ull*Cy+tIndex)*Cx+sIndex)*Sy*Sx, Sy*Sx)), uint2(Sx, Sy));
 
-                uint64 sum = 0;//, max = 0;
+                uint64 sum = 0;
                 const uint64 fixedPoint = sq(Cx*Cy);
 
                 for(size_t uvIndex: range(start, start+sizeI)) {
@@ -83,32 +83,25 @@ struct LightFieldAnalyze : LightField {
                                          * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                         const v4sf Z_ = toFloat((v4hf)gather((float*)(fieldZ+Zstuv_), sample2D));
                         const float Zw_ = dot(w01uv, Z_);
-                        /*if(sIndex==sIndex_ && tIndex==tIndex_) {
-                            assert_(uv_==uv && uIndex==uIndex_ && vIndex==vIndex_);
-                            assert_(abs(Zw - Zw_) < zTolerance, sIndex, tIndex, uIndex, vIndex, Zw, Zw_);
-                        }*/
-                        if(abs(Zw - Zw_) < zTolerance) hits++;
-                        //else log("miss", sIndex, tIndex, sIndex_, tIndex_);
+                        if(abs(Zw_ - Zw) < zTolerance) hits++;
                     }
-                    //assert_(hits, sIndex, vIndex, uIndex, vIndex, z); // Same view should hit at least
                     sum += fixedPoint/hits;
-                    //max = ::max(max, hits);
                     Z(uvIndex%Sx, uvIndex/Sx) = Zw;
-                    float v = (float)hits/(Cx*Cy); //1.f/hits;
+                    float v = (float)hits/(Cx*Cy);
                     B(uvIndex%Sx, uvIndex/Sx) = v;
                     G(uvIndex%Sx, uvIndex/Sx) = v;
                     R(uvIndex%Sx, uvIndex/Sx) = v;
                 }
                 sums[threadID] += sum;
-                //maxs[threadID] = ::max(maxs[threadID], max);
             });
             if(stIndex%Cx==0) log(stIndex,"/",Cy*Cx);
         }
         const uint64 fixedPoint = sq(imageCount.x*imageCount.y);
         size_t sum = ::sum(ref<uint64>(sums,threadCount)) / fixedPoint;
-        //size_t max = ::max(ref<uint64>(maxs,threadCount));
-        log( (float)M*M*N*N*sum/(1024*1024),"MP", (float)M*M*N*N*sum/(imageSize.x*imageSize.y)/*, max*/); // "unique" pixel count (relative to full UV frame pixel count)
+        log( (float)M*M*N*N*sum/(1024*1024),"MP", (float)M*M*N*N*sum/(imageSize.x*imageSize.y)); // "unique" pixel count (relative to full UV frame pixel count)
         log("Analyzed",strx(uint2(Cx, Cy)),"x",strx(uint2(Sx, Sy)),"images in", time);
 #endif
     }
-} analyze;
+};// analyzeApp;
+
+void analyze(Folder&& folder) { LightFieldAnalyze analyze(::move(folder)); }
