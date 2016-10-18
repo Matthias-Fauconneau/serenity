@@ -21,16 +21,15 @@ struct LightFieldAnalyze : LightField {
         assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
         Time time (true);
-        const size_t threadCount = 1; //::threadCount();
+        const size_t threadCount = ::threadCount();
         uint64 sums[threadCount];
         mref<uint64>(sums, threadCount).clear(0);
-        //parallel_for(0, imageCount.x*imageCount.y, [this, &sums](uint threadID, size_t stIndex) {{
         const uint M = 1, N = 32;
         const uint Cx = (imageCount.x-1)/M+1, Cy = (imageCount.y-1)/M+1;
         const uint Sx = (imageSize.x-1)/N+1, Sy = (imageSize.y-1)/N+1;
-        ({ const uint threadID = 0; for(size_t stIndex: range(Cy*Cx)) {
+        for(size_t stIndex: range(Cy*Cx)) {
             assert_(imageSize.x%2==0); // Gather 32bit / half
-            parallel_chunk(Sy*Sx, [this, Cx, Cy, Sx, Sy, stIndex, &sums](uint, size_t start, size_t sizeI) {
+            parallel_chunk(Sy*Sx, [this, Cx, Cy, Sx, Sy, stIndex, &sums](uint threadID, size_t start, size_t sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
@@ -41,7 +40,7 @@ struct LightFieldAnalyze : LightField {
                 const vec2 st = vec2(sIndex, tIndex);
                 const half* Zst = fieldZ.data + (size_t)tIndex*size3 + sIndex*size2;
                 const v2si sample2D = {    0,           size1/2};
-                const float zTolerance = N*N*0x1p-5;
+                const float zTolerance = N*0x1p-5;
 
                 uint64 sum = 0;
                 const uint64 fixedPoint = sq(imageCount.x*imageCount.y);
@@ -66,7 +65,7 @@ struct LightFieldAnalyze : LightField {
                         static const v4sf _0011f = {0,0,1,1};
                         const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                         const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
-                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                         const v4sf Z_ = toFloat((v4hf)gather((float*)(fieldZ.data+Zstuv_), sample2D));
                         const float z_ = dot(w01uv, Z_);
                         if(abs(z - z_) < zTolerance) hits++;
@@ -75,8 +74,8 @@ struct LightFieldAnalyze : LightField {
                 }
                 sums[threadID] += sum;
             });
-            if(stIndex%Cx==0) log(stIndex,"/",Cy*Cx, ":", stIndex%Cx, stIndex/Cx, "->", N*(stIndex%Cx), N*(stIndex/Cx));
-        }});
+            if(stIndex%Cx==0) log(stIndex,"/",Cy*Cx);
+        }
         const uint64 fixedPoint = sq(imageCount.x*imageCount.y);
         size_t sum = ::sum(ref<uint64>(sums,threadCount)) / fixedPoint;
         log( (float)M*M*N*N*sum/(1024*1024),"MP", (float)M*M*N*N*sum/(imageSize.x*imageSize.y) ); // "unique" pixel count (relative to full UV frame pixel count)
