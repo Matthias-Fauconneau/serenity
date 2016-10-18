@@ -145,7 +145,7 @@ struct LightFieldViewApp : LightField {
                             const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
-                                               , abs(Z - float4(z)) < float4(0x1p-5)); // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                               , abs(Z - float4(Zw)) < float4(0x1p-5)); // Discards far samples (tradeoff between edge and anisotropic accuracy)
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
