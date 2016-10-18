@@ -25,15 +25,12 @@ struct LightFieldAnalyze : LightField {
         uint64 sums[threadCount];
         mref<uint64>(sums, threadCount).clear(0);
         //parallel_for(0, imageCount.x*imageCount.y, [this, &sums](uint threadID, size_t stIndex) {{
-        const uint M = 1, N = 16;
+        const uint M = 1, N = 32;
         const uint Cx = (imageCount.x-1)/M+1, Cy = (imageCount.y-1)/M+1;
-        const uint Sx = (imageSize.x-1)/N+1, Sy = (imageSize.y-1)/M+1;
+        const uint Sx = (imageSize.x-1)/N+1, Sy = (imageSize.y-1)/N+1;
         ({ const uint threadID = 0; for(size_t stIndex: range(Cy*Cx)) {
-            //uint64 sum = 0;
-
             assert_(imageSize.x%2==0); // Gather 32bit / half
-            //for(size_t uvIndex: range(imageSize.x*imageSize.y)) {
-            parallel_chunk(Sy*Sx, [this, Cx, Cy, stIndex, &sums](uint, size_t start, size_t sizeI) {
+            parallel_chunk(Sy*Sx, [this, Cx, Cy, Sx, Sy, stIndex, &sums](uint, size_t start, size_t sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
@@ -44,20 +41,20 @@ struct LightFieldAnalyze : LightField {
                 const vec2 st = vec2(sIndex, tIndex);
                 const half* Zst = fieldZ.data + (size_t)tIndex*size3 + sIndex*size2;
                 const v2si sample2D = {    0,           size1/2};
+                const float zTolerance = N*N*0x1p-5;
 
                 uint64 sum = 0;
                 const uint64 fixedPoint = sq(imageCount.x*imageCount.y);
 
                 for(size_t uvIndex: range(start, start+sizeI)) {
-                    int uIndex = N*(uvIndex%Cx), vIndex = N*(uvIndex/Cx);
+                    const int uIndex = N*(uvIndex%Sx), vIndex = N*(uvIndex/Sx);
                     const vec2 uv = vec2(uIndex, vIndex);
                     const float Zw = Zst[vIndex*size1 + uIndex];
                     const float z = Zw-1.f/2;
 
                     size_t hits = 0;
-                    /*for(size_t stIndex_: range((imageCount.x*imageCount.y)) {
-                        const int sIndex_ = stIndex_%imageCount.x, tIndex_ = stIndex_/imageCount.x;*/
-                        {const int sIndex_ = imageCount.x/2, tIndex_ = imageCount.y/2;
+                    for(size_t stIndex_: range(Cy*Cx)) {
+                        const int sIndex_ = M*(stIndex_%Cx), tIndex_ = M*(stIndex_/Cx);
                         const vec2 st_ = vec2(sIndex_, tIndex_);
                         const vec2 uv_ = uv + scale * (st_ - st) * (-z) / (z+2);
                         if(uv_[0] < 0 || uv_[1] < 0) continue;
@@ -72,18 +69,18 @@ struct LightFieldAnalyze : LightField {
                                 * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                         const v4sf Z_ = toFloat((v4hf)gather((float*)(fieldZ.data+Zstuv_), sample2D));
                         const float z_ = dot(w01uv, Z_);
-                        if(abs(z - z_) < 0x1p-5) hits++;
+                        if(abs(z - z_) < zTolerance) hits++;
                     }
                     if(hits) sum += fixedPoint/hits;
                 }
                 sums[threadID] += sum;
             });
-            //sums[threadID] += sum;
+            if(stIndex%Cx==0) log(stIndex,"/",Cy*Cx, ":", stIndex%Cx, stIndex/Cx, "->", N*(stIndex%Cx), N*(stIndex/Cx));
         }});
         const uint64 fixedPoint = sq(imageCount.x*imageCount.y);
         size_t sum = ::sum(ref<uint64>(sums,threadCount)) / fixedPoint;
         log( (float)M*M*N*N*sum/(1024*1024),"MP", (float)M*M*N*N*sum/(imageSize.x*imageSize.y) ); // "unique" pixel count (relative to full UV frame pixel count)
-        log("Analyzed",strx(imageCount),"x",strx(imageSize),"images in", time);
+        log("Analyzed",strx(uint2(Cx, Cy)),"x",strx(uint2(Sx, Sy)),"images in", time);
 #endif
     }
 } analyze;
