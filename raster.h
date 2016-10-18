@@ -12,12 +12,12 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #pragma once
 #include "matrix.h"
 #include "thread.h"
-#include "time.h"
 #include "simd.h"
 #include "image.h"
 
 #define PROFILE 0
 #if PROFILE
+#include "time.h"
 #define profile(s) s
 #else
 #define profile(s)

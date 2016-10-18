@@ -1,26 +1,11 @@
 #include "light.h"
 #include "scene.h"
-
-#include "file.h"
 #include "parallel.h"
 
 #include "interface.h"
 #include "text.h"
 #include "render.h"
 #include "window.h"
-
-struct ScrollValue : virtual Widget {
-    int minimum = 0, maximum = 0;
-    int value = 1;
-    ScrollValue(int minimum, int maximum) : minimum(minimum), maximum(maximum) {}
-    virtual bool mouseEvent(vec2, vec2, Event event, Button button, Widget*&) override {
-        int value = this->value;
-        if(event == Press && (button == WheelUp || button == WheelDown))
-            value = int(this->value+maximum+(button==WheelUp?1:-1))%(maximum+1);
-        if(value != this->value) { this->value = value; return true; }
-        return false;
-    }
-};
 
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
@@ -46,13 +31,7 @@ struct ViewControl : virtual Widget {
     }
 };
 
-struct View {);
-    string name;
-    vec2 min, max;
-    uint2 imageCount;
-    uint2 imageSize;
-    Map map;
-    ref<half> field;
+struct LightFieldViewApp : LightField {
     Scene scene;
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
@@ -62,12 +41,12 @@ struct View {);
     bool raycast = true;
     bool depthCorrect = true;
 
-    struct View : ScrollValue, ViewControl, ImageView {
-        Light& _this;
-        View(Light& _this) : ScrollValue(0, _this.inputs.size-1), _this(_this) {}
+    struct LightFieldViewWidget : ViewControl, ImageView {
+        LightFieldViewApp& _this;
+        LightFieldViewWidget(LightFieldViewApp& _this) : _this(_this) {}
 
         virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
-            return ScrollValue::mouseEvent(cursor,size,event,button,widget) || ViewControl::mouseEvent(cursor,size,event,button,widget);
+            return ViewControl::mouseEvent(cursor,size,event,button,widget);
         }
         virtual vec2 sizeHint(vec2) override { return vec2(1024); }
         virtual shared<Graphics> graphics(vec2 size) override {
@@ -75,13 +54,9 @@ struct View {);
             return ImageView::graphics(size);
         }
     } view {*this};
-    unique<Window> window = nullptr;
+    unique<Window> window = ::window(&view);
 
-    Light() {
-        assert_(arguments() || inputs);
-        load(arguments() ? arguments()[0] : inputs[0]);
-        window = ::window(&view);
-        window->setTitle(name);
+    LightFieldViewApp() {
         window->actions[Key('s')] = [this]{ sample=!sample; window->render(); };
         window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
@@ -109,32 +84,25 @@ struct View {);
 
             parallel_chunk(target.size.y*target.size.x, [this, &target, M, &Z](uint, size_t start, size_t sizeI) {
                 const int targetStride = target.size.x;
-                const int size1 = imageSize.x *1;
-                const int size2 = imageSize.y *size1;
-                const int size3 = imageCount.x*size2;
-                const size_t size4 = (size_t)imageCount.y*size3;
-                const struct Image4DH : ref<half> {
-                    uint4 size;
-                    Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
-                    const half& operator ()(uint s, uint t, uint u, uint v) const {
-                        assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
-                        size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
-                        assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
-                        return operator[](index);
-                    }
-                } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
-                  fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
-                  fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
-                  fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
-                assert_(imageSize.x%2==0); // Gather 32bit / half
-                const v2si unused sample2D = {    0,           size1/2};
-                const v8si unused sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
-                                                  size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                const mat4 Mi = M.inverse();
+                const uint2 imageCount = this->imageCount;
+                const uint2 imageSize = this->imageSize;
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+                const half* fieldZ = this->fieldZ.data;
+                const half* fieldB = this->fieldB.data;
+                const half* fieldG = this->fieldG.data;
+                const half* fieldR = this->fieldR.data;
+                const int size1 = this->size1;
+                const int size2 = this->size2;
+                const int size3 = this->size3;
+                assert_(imageSize.x%2==0); // Gather 32bit / half
+                const v2si sample2D = {    0,           size1/2};
+                const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
+                                     size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
                 for(size_t targetIndex: range(start, start+sizeI)) {
-                    int targetY = targetIndex/targetStride, targetX = targetIndex%targetStride;
-                    const vec3 O = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
-                    const vec3 P = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, +1);
+                    int targetX = targetIndex%targetStride, targetY = targetIndex/targetStride;
+                    const vec3 O = Mi * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
+                    const vec3 P = Mi * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, +1);
                     const vec3 d = normalize(P-O);
 
                     const vec3 n (0,0,1);
@@ -147,7 +115,7 @@ struct View {);
                     const vec2 UV = (Puv+vec2(1))/2.f;
 
                     const vec2 st = vec2(0x1p-16) + vec2(1-0x1p-16) * ST * vec2(imageCount-uint2(1));
-                    const vec2 uv_uncorrected = vec2(1-0x1p-16) * UV * vec2(imageSize-uint2(1));
+                    const vec2 uv = vec2(1-0x1p-16) * UV * vec2(imageSize-uint2(1));
 
                     if(st[0] < -0 || st[1] < -0) { target[targetIndex]=byte4(0xFF,0,0,0xFF); continue; }
                     const int sIndex = st[0], tIndex = st[1];
@@ -155,28 +123,26 @@ struct View {);
 
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float z = Z(targetX, targetY);
-                        const float z_ = z-1.f/2;
+                        const float Zw = Z(targetX, targetY);
+                        const float z = Zw-1.f/2;
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                        static const v4sf _0011f = {0,0,1,1};
                         const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                         v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
 
                         v4sf B, G, R;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
-                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * (-z_) / (z_+2);
+                            vec2 uv_ = uv + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             int uIndex = uv_[0], vIndex = uv_[1];
                             if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                            static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
                                                , abs(Z - float4(z)) < float4(0x1p-5)); // Discards far samples (tradeoff between edge and anisotropic accuracy)
@@ -184,9 +150,9 @@ struct View {);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
                             if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
-                            B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
-                            G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
-                            R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
+                            B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB+base), sample2D)));
+                            G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG+base), sample2D)));
+                            R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR+base), sample2D)));
                         }
                         const v4sf w01 = float4(1./sum(w01st)) * w01st; // Renormalizes st interpolation (in case of discarded samples)
                         const float b = dot(w01, B);
@@ -194,15 +160,15 @@ struct View {);
                         const float r = dot(w01, R);
                         S = bgr3f(b, g, r);
                     } else {
-                        const int uIndex = uv_uncorrected[0], vIndex = uv_uncorrected[1];
-                        if(uv_uncorrected[0] < 0 || uv_uncorrected[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
+                        const int uIndex = uv[0], vIndex = uv[1];
+                        if(uv[0] < 0 || uv[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
                         if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
                         const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
-                        const v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
-                        const v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
-                        const v16sf R = toFloat((v16hf)gather((float*)(fieldR.data+base), sample4D));
+                        const v16sf B = toFloat((v16hf)gather((float*)(fieldB+base), sample4D));
+                        const v16sf G = toFloat((v16hf)gather((float*)(fieldG+base), sample4D));
+                        const v16sf R = toFloat((v16hf)gather((float*)(fieldR+base), sample4D));
 
-                        const v4sf x = {st[1], st[0], uv_uncorrected[1], uv_uncorrected[0]}; // tsvu
+                        const v4sf x = {st[1], st[0], uv[1], uv[0]}; // tsvu
                         const v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);
                         static const v8sf _00001111f = {0,0,0,0,1,1,1,1};
                         const v8sf w_1mw = abs(X - floor(X) - _00001111f); // fract(x), 1-fract(x)
@@ -221,35 +187,5 @@ struct View {);
             convert(target, B, G, R);
         }
         return target;
-    }
-    void load(string name) {
-        field = {};
-        map = Map();
-        imageCount = 0;
-        imageSize = 0;
-        this->name = name;
-        Folder input (name);
-        Folder tmp (name, ::tmp, true);
-
-        for(string name: tmp.list(Files)) {
-            TextData s (name);
-            imageCount.x = s.integer(false);
-            if(!s.match('x')) continue;
-            imageCount.y = s.integer(false);
-            if(!s.match('x')) continue;
-            imageSize.x = s.integer(false);
-            if(!s.match('x')) continue;
-            imageSize.y = s.integer(false);
-            assert_(!s);
-            map = Map(name, tmp);
-            field = cast<half>(map);
-            break;
-        }
-        assert_(imageCount && imageSize);
-
-        if(window) {
-            window->setSize();
-            window->setTitle(name);
-        }
     }
 } view;

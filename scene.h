@@ -1,6 +1,5 @@
 #pragma once
 #include "raster.h"
-#include "interface.h"
 
 static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
     vec3 edge1 = B - A;
