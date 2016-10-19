@@ -22,17 +22,23 @@ struct LightFieldAnalyze : LightField {
         assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
         Time time (true);
-        const uint M = 1, N = 8;
+        const uint M = 1, N = 2;
         const uint sSize = (imageCount.x-1)/M+1, tSize = (imageCount.y-1)/M+1;
         const uint uSize = (imageSize.x-1)/N+1, vSize = (imageSize.y-1)/N+1;
 
-        int3 gridSize (uSize, vSize, ::min(uSize,vSize)/8);
+        int3 gridSize (uSize/8, vSize/8, ::min(uSize,vSize)/32);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
         A.clear(0); // Just to be sure™
 
-        for(size_t stIndex: range(tSize*sSize)) {
+        //for(size_t stIndex: range(tSize*sSize)) {
+        Lock Alock;
+        parallel_for(0, tSize*sSize, [this, sSize, gridSize, uSize, vSize, &Alock, &A](uint, size_t stIndex) {
+            buffer<uint8> hitVoxels (gridSize.z*gridSize.y*gridSize.x/8); // 256 MB
+            hitVoxels.clear(0); // Just to be sure™
+
             assert_(imageSize.x%2==0); // Gather 32bit / half
-            parallel_chunk(vSize*uSize, [/*this, Cx, Cy, uSize, Sy, field, stIndex,*/ &](uint unused threadID, size_t start, size_t sizeI) {
+            //parallel_chunk(vSize*uSize, [/*this, Cx, Cy, uSize, Sy, field, stIndex,*/ &](uint unused threadID, size_t start, size_t sizeI) {
+            const size_t start = 0, sizeI = vSize*uSize;
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
@@ -48,24 +54,35 @@ struct LightFieldAnalyze : LightField {
 #if 1
                 for(size_t uvIndex: range(start, start+sizeI)) {
                     const int uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
+
                     const vec2 uv = vec2(uIndex, vIndex);
-                    //log(sIndex, tIndex, uIndex, vIndex);
-                    const float Zw = Zst[vIndex*size1 + uIndex]; // -1, 1
-                    const float a = - Zw / 2;
-                    const int zIndex = (Zw+1)/2*(gridSize.z-1);
-                    assert_(zIndex >= 0 && zIndex < gridSize.z);
-                    const vec2 xy = a * (scale*st) + (1-a) * uv;
-                    const int yIndex = xy.y * (gridSize.y-1)/(N*vSize-1);
-                    if(!(yIndex >= 0 && yIndex < gridSize.y)) continue;
-                    //assert_(yIndex >= 0 && yIndex < gridSize.y);
-                    const int xIndex = xy.x * (gridSize.x-1)/(N*uSize-1);
-                    if(!(xIndex >= 0 && xIndex < gridSize.x)) continue;
-                    //assert_(xIndex >= 0 && xIndex < gridSize.x, sIndex, tIndex, uIndex, vIndex, ",", Zw, a, ",", xIndex, yIndex, zIndex);
-                    A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]++; // Scatter (TODO: atomic)
+                    const float zv = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
+                    const float a = 1./2*zv + 3./4; // st, uv = 0, 1
+                    const vec2 xy = (1-a) * (scale*st) + a * uv;
+                    if(xy.y < 0) continue;
+                    if(xy.x < 0) continue;
+                    const int yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
+                    if(yIndex >= gridSize.y) continue;
+                    const int xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
+                    if(xIndex >= gridSize.x) continue;
+
+                    const float z = 1./2*zv + 1./4; // near, far = 0, 1
+                    const int zIndex = z*(gridSize.z-1);
+
+                    size_t bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
+                    hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)
+                    // Mark hit voxels per view instead of incrementing global A buffer to count once per view
+                    // i.e bin hit with different uv coordinates from same view (st) is incremented once
                 }
-            }, 1);
-        }
-        log("Analyzed",strx(uint2(sSize, tSize)),"x",strx(uint2(uSize, vSize)),"images in", time);
+            //}, 1);
+            Locker lock(Alock);
+            for(size_t byteIndex: range(hitVoxels.size)) {
+                for(size_t bit: range(8)) {
+                    if(hitVoxels[byteIndex] & (1<<bit)) A[byteIndex*8+bit]++;
+                }
+            }
+        });
+        log("Analyzed",strx(uint2(sSize, tSize)),"x",strx(uint2(uSize, vSize)),"images in", time.reset());
 #if 1 // Render voxel grid to light field ...
 
         Folder folder("coverage", this->folder, true);
@@ -79,7 +96,7 @@ struct LightFieldAnalyze : LightField {
         float maxA = ::max(A);
         log(maxA);
         for(size_t stIndex: range(tSize*sSize)) {
-            parallel_chunk(vSize*uSize, [/*this, Cx, Cy, uSize, Sy, field, stIndex,*/ &](uint unused threadID, size_t start, size_t sizeI) {
+            parallel_chunk(vSize*uSize, [this, stIndex, sSize, tSize, field, uSize, vSize, gridSize, &A, maxA](uint, size_t start, size_t sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
@@ -100,27 +117,28 @@ struct LightFieldAnalyze : LightField {
 
                 for(size_t uvIndex: range(start, start+sizeI)) {
                     const int uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
+
                     const vec2 uv = vec2(uIndex, vIndex);
-                    const float Zw = Zst[vIndex*size1 + uIndex]; // -1, 1
-                    //assert_(Zw >= -1 && Zw <= 1, Zw);
-                    const float a = - Zw / 2;
-                    const int zIndex = (Zw+1)/2*(gridSize.z-1);
-                    assert_(zIndex >= 0 && zIndex < gridSize.z);
-                    const vec2 xy = a * (scale*st) + (1-a) * uv;
-                    const int yIndex = xy.y * (gridSize.y-1)/(N*vSize-1);
-                    if(!(yIndex >= 0 && yIndex < gridSize.y)) continue;
-                    const int xIndex = xy.x * (gridSize.x-1)/(N*uSize-1);
-                    if(!(xIndex >= 0 && xIndex < gridSize.x)) continue;
-                    Z(uvIndex%uSize, uvIndex/uSize) = Zw;
-                    //const float v = ::min(1.f, (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/256);
-                    //const float v = (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/maxA;
-                    //const float v = A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex] ? 1 : 0;
-                    const float v = (1+Zw)/2;
+                    const float zv = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
+                    const float a = 1./2*zv + 3./4; // st, uv = 0, 1
+                    const vec2 xy = (1-a) * (scale*st) + a * uv;
+                    if(xy.y < 0) continue;
+                    if(xy.x < 0) continue;
+                    const int yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
+                    if(yIndex >= gridSize.y) continue;
+                    const int xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
+                    if(xIndex >= gridSize.x) continue;
+
+                    const float z = 1./2*zv + 1./4; // near, far = 0, 1
+                    const int zIndex = z*(gridSize.z-1);
+
+                    const float v = (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/maxA;
+                    Z(uvIndex%uSize, uvIndex/uSize) = zv;
                     B(uvIndex%uSize, uvIndex/uSize) = v;
                     G(uvIndex%uSize, uvIndex/uSize) = v;
                     R(uvIndex%uSize, uvIndex/uSize) = v;
                 }
-            }, 1);
+            });
         }
         log("Render", time);
 #else
@@ -150,8 +168,8 @@ struct LightFieldAnalyze : LightField {
                 for(size_t uvIndex: range(start, start+sizeI)) {
                     const int uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
                     const vec2 uv = vec2(uIndex, vIndex);
-                    const float Zw = Zst[vIndex*size1 + uIndex];
-                    const float z = Zw-1.f/2;
+                    const float zv = Zst[vIndex*size1 + uIndex];
+                    const float z = zv-1.f/2;
 
                     uint64 hits = 0;
                     for(size_t stIndex_: range(Cy*Cx)) {
@@ -169,11 +187,11 @@ struct LightFieldAnalyze : LightField {
                         const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                          * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                         const v4sf Z_ = toFloat((v4hf)gather((float*)(fieldZ+Zstuv_), sample2D));
-                        const float Zw_ = dot(w01uv, Z_);
-                        if(abs(Zw_ - Zw) < zTolerance) hits++;
+                        const float zv_ = dot(w01uv, Z_);
+                        if(abs(zv_ - zv) < zTolerance) hits++;
                     }
                     sum += fixedPoint/hits;
-                    Z(uvIndex%uSize, uvIndex/uSize) = Zw;
+                    Z(uvIndex%uSize, uvIndex/uSize) = zv;
                     float v = (float)hits/(Cx*Cy);
                     B(uvIndex%uSize, uvIndex/uSize) = v;
                     G(uvIndex%uSize, uvIndex/uSize) = v;

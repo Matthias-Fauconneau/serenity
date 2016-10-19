@@ -64,8 +64,9 @@ __attribute((constructor(102))) void spawnWorkers() {
 #endif
 
 #if OPENMP
-extern "C" int omp_get_thread_num();
 extern "C" void omp_set_num_threads(int threadCount);
+extern "C" int omp_get_num_threads();
+extern "C" int omp_get_thread_num();
 #endif
 uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate, const int unused threadCount) {
  if(threadCount == 1) {
@@ -76,9 +77,11 @@ uint64 parallel_for(int64 start, int64 stop, function<void(uint, uint)> delegate
  } else {
 #if OPENMP
   tsc time; time.start();
+  assert_(threadCount == 8);
   omp_set_num_threads(threadCount);
+  //assert_(omp_get_num_threads() == threadCount, omp_get_num_threads());
   #pragma omp parallel for
-  for(int i: range(start, stop)) delegate(omp_get_thread_num(), i);
+  for(uint i=start; i<stop; i++) delegate(omp_get_thread_num(), i);
   return time.cycleCount();
 #else
   assert_(threadCount == ::threadCount());

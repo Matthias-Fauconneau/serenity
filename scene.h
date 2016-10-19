@@ -71,7 +71,7 @@ struct Scene {
     template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& Z, const Args&... targets_) {
         const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
         uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
-        renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
+        renderer.target.setup(int2(size), 3./2, clear); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x

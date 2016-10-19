@@ -139,8 +139,8 @@ struct LightFieldViewApp : LightField {
 #endif
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float Zw = Z(targetX, targetY);
-                        const float z = Zw-1.f/2;
+                        const float zv = Z(targetX, targetY); // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
+                        const float z = zv-1.f/2; // 1, 0, -1, -2
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -158,10 +158,10 @@ struct LightFieldViewApp : LightField {
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
+                            const v4sf Zv = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
-                                               , abs(Z - float4(Zw)) < zTolerance); // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                               , abs(Zv - float4(zv)) < zTolerance); // Discards far samples (tradeoff between edge and anisotropic accuracy)
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation

@@ -48,7 +48,7 @@ struct Time {
     Time(bool start=false) : stopTime(start?0:startTime) {}
     void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
     void stop() { if(!stopTime) stopTime=realTime(); }
-    String reset() { stop(); String s=str((stopTime-startTime)/1000000000.f, 1u)+'s'; startTime=stopTime; stopTime=0; return s; }
+    Time reset() { stop(); Time time=*this; startTime=stopTime; stopTime=0; return time; }
     uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
     uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
     uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
