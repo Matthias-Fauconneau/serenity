@@ -7,7 +7,9 @@
 #include "render.h"
 #include "window.h"
 
+#if 0
 #include "analyze.h"
+#endif
 
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
@@ -94,11 +96,11 @@ struct LightFieldViewApp : LightField {
                 const int targetStride = target.size.x;
                 //const mat4 Mi = M.inverse();
 #if 1
-                const int sIndex = st[0], tIndex = st[1];
+                const uint sIndex = st[0], tIndex = st[1];
 #endif
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+                const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
                 const half* fieldZ = this->fieldZ.data;
                 const half* fieldB = this->fieldB.data;
                 const half* fieldG = this->fieldG.data;
@@ -148,12 +150,15 @@ struct LightFieldViewApp : LightField {
                         v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
 
-                        v4sf B, G, R;
+                        v4sf B = _0f, G = _0f, R = _0f;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
+                            if(sIndex+ds > imageCount.x-1) { w01st[dt*2+ds] = 0; continue; } // s == sSize-1
+                            if(tIndex+dt > imageCount.y-1) { w01st[dt*2+ds] = 0; continue; } // t == tSize-1
                             vec2 uv_ = uv + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
-                            int uIndex = uv_[0], vIndex = uv_[1];
-                            if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
+                            uint uIndex = uv_[0], vIndex = uv_[1];
+                            if( uIndex >= uint(imageSize.x)-2 || vIndex >= uint(imageSize.y)-2 ) { w01st[dt*2+ds] = 0; continue; }
+                            assert_(tIndex < imageCount.x && sIndex < imageCount.y);
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -165,7 +170,7 @@ struct LightFieldViewApp : LightField {
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
-                            if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
+                            if(!sum) { /*B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; w01st[dt*2+ds] = 0;*/ continue; }
                             B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB+base), sample2D)));
                             G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG+base), sample2D)));
                             R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR+base), sample2D)));

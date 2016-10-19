@@ -1,4 +1,3 @@
-#include "analyze.h"
 #include "light.h"
 #include "scene.h"
 #include "math.h"
@@ -6,6 +5,7 @@
 
 struct LightFieldAnalyze : LightField {
     LightFieldAnalyze(Folder&& folder_ = "."_) : LightField(endsWith(folder_.name(), "coverage")? Folder(folder_.name()+"/.."_) : ::move(folder_)) {
+        if(!endsWith(folder_.name(), "coverage")) return;
 #if 0
         float sum = 0;
         for(const Scene::Face& face: Scene().faces) {
@@ -41,7 +41,7 @@ struct LightFieldAnalyze : LightField {
             const size_t start = 0, sizeI = vSize*uSize;
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+                const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
                 const int size1 = this->size1;
                 const int size2 = this->size2;
                 const int size3 = this->size3;
@@ -99,7 +99,7 @@ struct LightFieldAnalyze : LightField {
             parallel_chunk(vSize*uSize, [this, stIndex, sSize, tSize, field, uSize, vSize, gridSize, &A, maxA](uint, size_t start, size_t sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+                const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
                 const int size1 = this->size1;
                 const int size2 = this->size2;
                 const int size3 = this->size3;

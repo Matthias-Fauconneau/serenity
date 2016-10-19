@@ -20,4 +20,3 @@ scene.h
 analyze.cc
 light.h
 view.cc
-analyze.h
