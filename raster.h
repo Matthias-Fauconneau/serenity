@@ -285,6 +285,7 @@ template<class Shader> struct RenderPass {
         }
         face.iw = E[0]+E[1]+E[2];
         face.iz = E*vec3(A.z,B.z,C.z);
+        // face.iz = E*vec3(A.z / A.w, B.z / B.w, C.z / C.w); // ?
         for(uint i: range(V)) face.varyings[i] = E*vertexAttributes[i];
         face.faceAttributes = faceAttributes;
 

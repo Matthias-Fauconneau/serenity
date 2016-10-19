@@ -1,13 +1,14 @@
 #include "light.h"
 #include "scene.h"
-
+#include "parallel.h"
 #include "file.h"
 #include "png.h"
 
 struct Render {
     Render() {
         Scene scene;
-        Folder folder {arguments()[0], currentWorkingDirectory(), true};
+        const Folder& folder = currentWorkingDirectory();
+        assert_(Folder(".",folder).name() == "/var/tmp/box", folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
         const size_t N = 33;

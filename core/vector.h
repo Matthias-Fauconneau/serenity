@@ -114,6 +114,7 @@ generic struct xyz {
 };
 /// Integer x,y,z vector
 typedef vec<xyz,int,3> int3;
+typedef vec<xyz,uint,3> uint3;
 typedef vec<xyz,float,3> vec3;
 
 generic struct xyzw {

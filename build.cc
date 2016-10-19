@@ -141,7 +141,7 @@ bool Build::compileModule(string target) {
   Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
   Stream stdout;
   //::log(args);
-  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-exceptions","-fno-operator-names",//"-mfp16-format",
+  int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-exceptions","-fno-operator-names", //"-stdlib=libc++", //"-mfp16-format",
                                      "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                      "-I/usr/include/freetype2","-I/usr/include/ffmpeg",
                                      "-I/var/tmp/include", "-iquote.",
@@ -233,6 +233,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
   array<String> args = (buffer<String>)(
      move(files) +
      mref<String>{"-o"__, unsafeRef(binary) /*, "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__*/
+		 ,"-stdlib=libc++"__, "-lcxxrt"__,"-lm"__
      /*,"-static-libstdc++"__*/} +
      apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
   if(execute(linkArgs.contains("-mmic")||1?CXX:LD, toRefs(args)+toRefs(linkArgs))) {
