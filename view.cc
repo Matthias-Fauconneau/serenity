@@ -7,8 +7,8 @@
 #include "render.h"
 #include "window.h"
 
-#if 0
-#include "analyze.h"
+#if 1
+//#include "analyze.h"
 #endif
 
 struct ViewControl : virtual Widget {
