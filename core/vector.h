@@ -3,6 +3,8 @@
 #include "string.h"
 #include "math.h"
 
+template<Type T, uint N> struct Vec { T _[N]; };
+
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {

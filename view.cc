@@ -42,7 +42,7 @@ struct LightFieldViewApp : LightField {
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = true;
+    bool raycast = false;
     bool depthCorrect = true;
 
     struct LightFieldViewWidget : ViewControl, ImageView {

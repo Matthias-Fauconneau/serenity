@@ -76,7 +76,6 @@ struct LightFieldAnalyze : LightField {
         file.resize(4*sSize*tSize*vSize*uSize*sizeof(half));
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> field = mcast<half>(map);
-        field.clear(0); // Just to be sure™
 
         float maxA = ::max(A);
         assert_(maxA == tSize*sSize);
@@ -100,8 +99,6 @@ struct LightFieldAnalyze : LightField {
                 ImageH G (unsafeRef(field.slice(((2ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
                 ImageH R (unsafeRef(field.slice(((3ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
 
-                /*for(const uint vIndex_: range(vSize)) for(const uint uIndex_: range(uSize)) {
-                    const uint vIndex = N*vIndex_, uIndex = N*uIndex_;*/
                 for(const uint uvIndex: range(start, start+sizeI)) {
                     const uint uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
 

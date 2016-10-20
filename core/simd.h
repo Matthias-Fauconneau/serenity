@@ -57,6 +57,7 @@ inline v16sf& operator+=(v16sf& a, v16sf b) { a.r1 += b.r1; a.r2 += b.r2; return
 inline v16sf operator+(v16sf a, v16sf b) { return v16sf(a.r1 + b.r1, a.r2 + b.r2); }
 inline v16sf operator-(v16sf a, v16sf b) { return v16sf(a.r1 - b.r1, a.r2 - b.r2); }
 inline v16sf operator*(v16sf a, v16sf b) { return v16sf(a.r1 * b.r1, a.r2 * b.r2); }
+inline v16sf operator/(v16sf a, v16sf b) { return v16sf(a.r1 / b.r1, a.r2 / b.r2); }
 inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return v16sf(__builtin_ia32_rcpps256(d.r1),__builtin_ia32_rcpps256(d.r2)); }
 
 //inline v16f shuffle() __builtin_shufflevector

@@ -20,16 +20,35 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+generic T squareWave(T x, const T frequency = T(16)) {
+    const T n = floor(frequency*x); // Integer
+    const T m = T(1./2)*n; // Half integer
+    return T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+}
+
 struct Scene {
     /// Shader for all surfaces
     struct Shader {
         // Shader specification (used by rasterizer)
         struct FaceAttributes { bgr3f color; };
-        static constexpr int V = 3; // U,V,Z
+        static constexpr int V = 3; // U,V,W
         static constexpr bool blend = false; // Disables unnecessary blending
 
-        template<int C> vecf<C> shade(FaceAttributes face, float z, float varying[V]) const;
-        template<int C> vec16f<C> shade(FaceAttributes face, v16sf z, v16sf varying[V]) const;
+        template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
+        // Function template partial specialization is not allowed
+        //template<Type T> inline Vec<T, 0> shade<0>(FaceAttributes, T, T[V]) const;
+        //template<Type T> inline Vec<T, 3> shade<3>(FaceAttributes face, T z, T varying[V]);
+        template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
+        template<Type T> inline Vec<T, 3> shade3(FaceAttributes face, T z, T varying[V]) const {
+            const T u = varying[0], v = varying[1], w = varying[2];
+            static T cellCount = T(16);
+            const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
+            const T m = T(1./2)*n; // Half integer
+            const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+            return Vec<T, 3>{{squareWave(z), squareWave(z), squareWave(z)}};
+            return Vec<T, 3>{{squareWave(z/w), squareWave(z/w), squareWave(z/w)}};
+            return Vec<T, 3>{{mod*T(face.color.b), mod*T(face.color.g), mod*T(face.color.r)}};
+        }
     } shader;
 
     struct Face { vec3 position[3]; vec3 attributes[Shader::V]; bgr3f color; };
@@ -44,8 +63,6 @@ struct Scene {
         for(int i: range(6)) {
             faces[i*2+0] = {{position[indices[i*4+2]], position[indices[i*4+1]], position[indices[i*4+0]]}, {vec3(1,0,0), vec3(1,1,0)}, colors[i]};
             faces[i*2+1] = {{position[indices[i*4+3]], position[indices[i*4+2]], position[indices[i*4+0]]}, {vec3(1,1,0), vec3(0,1,0)}, colors[i]};
-            {auto& f = faces[i*2+0]; f.attributes[2] = vec3(f.position[0].z, f.position[1].z, f.position[2].z);}
-            {auto& f = faces[i*2+1]; f.attributes[2] = vec3(f.position[0].z, f.position[1].z, f.position[2].z);}
         }
     }
 
@@ -77,9 +94,10 @@ struct Scene {
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
-        for(const Face& face: faces) {
+        for(Face face: faces) {
             vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
+            face.attributes[2] = vec3(a.w, b.w, c.w);
             renderer.pass.submit(a,b,c, face.attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
@@ -89,22 +107,8 @@ struct Scene {
 
 inline double log2(double x) { return __builtin_log2(x); }
 
-template<> inline vecf<0> Scene::Shader::shade<0>(FaceAttributes, float, float[V]) const { return {}; }
-template<> inline vec16f<0> Scene::Shader::shade<0>(FaceAttributes, v16sf, v16sf[V]) const { return {}; }
-
-template<> inline vecf<3> Scene::Shader::shade<3>(FaceAttributes face, float, float varying[V]) const {
-    const float u = varying[0], v = varying[1];
-    static float cellCount (16);
-    const float n = floor(cellCount*u)+floor(cellCount*v); // Integer
-    const float m = float(1./2)*n; // Half integer
-    const float mod = float(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-    return vecf<3>{{mod*float(face.color.b), mod*float(face.color.g), mod*float(face.color.r)}};
-}
-template<> inline vec16f<3> Scene::Shader::shade<3>(FaceAttributes face, v16sf, v16sf varying[V]) const {
-    const v16sf u = varying[0], v = varying[1];
-    static v16sf cellCount (16);
-    const v16sf n = floor(cellCount*u)+floor(cellCount*v); // Integer
-    const v16sf m = v16sf(1./2)*n; // Half integer
-    const v16sf mod = v16sf(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-    return vec16f<3>{{mod*v16sf(face.color.b), mod*v16sf(face.color.g), mod*v16sf(face.color.r)}};
-}
+// Explicit full function template specialization
+template <> inline Vec<float, 0> Scene::Shader::shade<0, float>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
+template <> inline Vec<v16sf, 0> Scene::Shader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
+template <> inline Vec<float, 3> Scene::Shader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3<float>(face, z, varying); }
+template <> inline Vec<v16sf, 3> Scene::Shader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade3<v16sf>(face, z, varying); }
