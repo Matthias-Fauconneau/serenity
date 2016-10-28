@@ -1,4 +1,4 @@
-#include "light.h"
+#include "field.h"
 #include "scene.h"
 #include "math.h"
 #include "parallel.h"

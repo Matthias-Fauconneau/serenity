@@ -8,7 +8,9 @@ template<Type T, uint N> struct Vec { T _[N]; };
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
- //static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
+ static_assert(sizeof(V<T>)==N*sizeof(T), ""/*req C++14*/);
+ typedef T _T;
+ static constexpr uint _N = N;
 
  /// Defaults initializes to zero
  inline vec() : vec(0) {}
@@ -121,7 +123,7 @@ typedef vec<xyz,float,3> vec3;
 
 generic struct xyzw {
  T x,y,z,w;
- vec< ::xy,T,2> xy() const { return *(vec< ::xyz,T,2>*)this; }
+ vec< ::xy,T,2> xy() const { return *(vec< ::xy,T,2>*)this; }
  vec< ::xyz,T,3> xyz() const { return *(vec< ::xyz,T,3>*)this; }
  vec< ::xyz,T,3> xyw() const { return vec3(x, y, w); }
 };

@@ -1,5 +1,6 @@
-#include "light.h"
+#include "field.h"
 #include "scene.h"
+#include "box.h"
 #include "parallel.h"
 
 #include "interface.h"
@@ -36,13 +37,14 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
-    Scene scene;
+    Scene scene {box(2, true)};
+    //Scene scene {parseScene(readFile("box.scene",home()))};
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = true;
+    bool raycast = false;
     bool depthCorrect = true;
 
     struct LightFieldViewWidget : ViewControl, ImageView {
@@ -77,7 +79,13 @@ struct LightFieldViewApp : LightField {
         } else {
             // Sheared perspective (rectification)
             const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
-            M = shearedPerspective(s, t);
+            // Fits scene
+            // Near/far planes
+            vec3 min = inff, max = -inff;
+            for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+            M = shearedPerspective(s, t, scene.viewpoint.z+min.z, scene.viewpoint.z+max.z);
+            M.scale(2./::max(max.x-min.x, max.y-min.y)); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint); // 0 -> -1 (Z-)
         }
 #if 1 // Optimized specialization for sheared perspective
         const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);

@@ -5,11 +5,12 @@ build.cc
 core/core.h
 core/memory.h
 core/string.h
+core/vector.h
 core/image.h
+core/matrix.h
+core/simd.h
 core/parallel.h
 core/parallel.cc
-core/simd.h
-core/matrix.h
 
 test.cc
 
@@ -18,5 +19,7 @@ raster.h
 raster.cc
 scene.h
 analyze.cc
-light.h
+field.h
 view.cc
+box.h
+scene.cc

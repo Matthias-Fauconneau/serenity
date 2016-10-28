@@ -1,4 +1,3 @@
-#include "light.h"
 #include "scene.h"
 #include "parallel.h"
 #include "file.h"
@@ -6,7 +5,8 @@
 
 struct Render {
     Render() {
-        Scene scene;
+        //Scene scene {Scene::box()};
+        Scene scene {Scene::box(1./2, true)};
         const Folder& folder = currentWorkingDirectory();
         assert_(Folder(".",folder).name() == "/var/tmp/box", folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
