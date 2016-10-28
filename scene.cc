@@ -18,7 +18,18 @@ Scene parseScene(ref<byte> scene) {
     TextData s (scene);
     vec3 viewpoint;
     while(s.match('#')) s.until('\n');
-
+    viewpoint = parse<vec3>(s);
+    s.skip('\n');
     array<Scene::Face> faces;
+    while(s) {
+        if(s.match('\n')) continue;
+        if(s.match('#')) { s.until('\n'); continue; }
+        array<vec3> polygon;
+        while(!s.match('\n')) { // Empty line
+            polygon.append(parse<vec3>(s));
+            s.skip('\n');
+        }
+        assert_(polygon.size == 4);
+    }
     return {viewpoint, ::move(faces)};
 }
