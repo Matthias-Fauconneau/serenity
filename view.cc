@@ -42,7 +42,7 @@ struct LightFieldViewApp : LightField {
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = false;
+    bool raycast = true;
     bool depthCorrect = true;
 
     struct LightFieldViewWidget : ViewControl, ImageView {
@@ -68,7 +68,6 @@ struct LightFieldViewApp : LightField {
     }
     Image render(uint2 targetSize) {
         Image target (targetSize);
-
 
         mat4 M;
         if(orthographic) {

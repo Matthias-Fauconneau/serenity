@@ -13,7 +13,7 @@ struct LightFieldAnalyze : LightField {
         const uint sSize = (imageCount.x-1)/M+1, tSize = (imageCount.y-1)/M+1;
         const uint uSize = (imageSize.x-1)/N+1, vSize = (imageSize.y-1)/N+1;
 
-        uint3 gridSize (uSize/2, vSize/2, ::min(uSize,vSize)/8);
+        uint3 gridSize (uSize/16, vSize/16, ::min(uSize,vSize)/16);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
         A.clear(0); // Just to be sure™
         Lock Alock;
@@ -41,8 +41,8 @@ struct LightFieldAnalyze : LightField {
                 const uint vIndex = N*vIndex_, uIndex = N*uIndex_;
 
                 const vec2 uv = vec2(uIndex, vIndex);
-                const float zv = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
-                const float a = 1./2*zv + 3./4; // st, uv = 0, 1
+                const float z = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
+                const float a = 1./2*z + 3./4; // st, uv = 0, 1
                 const vec2 xy = (1-a) * (scale*st) + a * uv;
                 if(xy.y < 0) continue;
                 if(xy.x < 0) continue;
@@ -51,8 +51,9 @@ struct LightFieldAnalyze : LightField {
                 const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
                 if(xIndex >= gridSize.x) continue;
 
-                const float z = 1./2*zv + 1./4; // near, far = 0, 1
-                const uint zIndex = z*(gridSize.z-1);
+                const float w = float(3./4)+float(1./2)*z;
+                const float ZoverW = z/w; // -1 .. 1
+                const uint zIndex = (ZoverW+1)/2*(gridSize.z-1);
 
                 uint64 bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
                 hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)
@@ -103,8 +104,8 @@ struct LightFieldAnalyze : LightField {
                     const uint uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
 
                     const vec2 uv = vec2(uIndex, vIndex);
-                    const float zv = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
-                    const float a = 1./2*zv + 3./4; // st, uv = 0, 1
+                    const float z = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
+                    const float a = 1./2*z + 3./4; // st, uv = 0, 1
                     const vec2 xy = (1-a) * (scale*st) + a * uv;
                     if(xy.y < 0) continue;
                     if(xy.x < 0) continue;
@@ -113,11 +114,13 @@ struct LightFieldAnalyze : LightField {
                     const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
                     if(xIndex >= gridSize.x) continue;
 
-                    const float z = 1./2*zv + 1./4; // near, far = 0, 1
-                    const uint zIndex = z*(gridSize.z-1);
+                    const float w = float(1./2)*z + float(3./4);
+                    const float ZoverW = z/w; // -1 .. 1
+                    const uint zIndex = (ZoverW+1)/2*(gridSize.z-1);
 
                     const float v = (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/maxA;
-                    Z[uvIndex] = zv;
+                    //const float v = (xIndex+yIndex+zIndex)%2;
+                    Z[uvIndex] = z;
                     B[uvIndex] = v;
                     G[uvIndex] = v;
                     R[uvIndex] = v;

@@ -31,7 +31,7 @@ struct Scene {
     struct Shader {
         // Shader specification (used by rasterizer)
         struct FaceAttributes { bgr3f color; };
-        static constexpr int V = 3; // U,V,W
+        static constexpr int V = 2; // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
 
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
@@ -40,12 +40,12 @@ struct Scene {
         //template<Type T> inline Vec<T, 3> shade<3>(FaceAttributes face, T z, T varying[V]);
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         template<Type T> inline Vec<T, 3> shade3(FaceAttributes face, T z, T varying[V]) const {
-            const T u = varying[0], v = varying[1], w = varying[2];
+            const T u = varying[0], v = varying[1], w = T(3./4)+T(1./2)*z;
             static T cellCount = T(16);
             const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
             const T m = T(1./2)*n; // Half integer
             const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-            return Vec<T, 3>{{squareWave(z), squareWave(z), squareWave(z)}};
+            //return Vec<T, 3>{{squareWave(z), squareWave(z), squareWave(z)}};
             return Vec<T, 3>{{squareWave(z/w), squareWave(z/w), squareWave(z/w)}};
             return Vec<T, 3>{{mod*T(face.color.b), mod*T(face.color.g), mod*T(face.color.r)}};
         }
@@ -94,10 +94,9 @@ struct Scene {
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
-        for(Face face: faces) {
+        for(const Face& face: faces) {
             vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
-            face.attributes[2] = vec3(a.w, b.w, c.w);
             renderer.pass.submit(a,b,c, face.attributes, {face.color});
         }
         renderer.pass.render(renderer.target);
