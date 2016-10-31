@@ -213,19 +213,8 @@ struct LightFieldViewApp : LightField {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-#if 1
-                scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
-                convert(target, B, G, R);
-#else
-                ImageH Z (target.size);
-                scene.render(Zrenderer, M, {}, Z);
-                //for(half& z: Z) z = (z+1)/2;
-                float min=inff,max=-inff;
-                for(half z: Z) if(isNumber(z)) { min=::min<float>(min, z); max=::max<float>(max, z); }
-                log(min, max);
-                for(half& z: Z) z = (z-min)/(max-min);
-                convert(target, Z, Z, Z);
-#endif
+            scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            convert(target, B, G, R);
         }
         return target;
     }

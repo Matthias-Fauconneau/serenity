@@ -207,7 +207,8 @@ template<class Shader> struct RenderPass {
         v16sf blockRejectStep[3], blockAcceptStep[3], pixelRejectStep[3], pixelAcceptStep[3], sampleStep[3]; // Precomputed step grids
         vec2 edges[3]; // triangle edge equations
         float binReject[3], binAccept[3]; // Initial distance step at a bin reject/accept corner
-        vec3 Eiw, Ez; vec3 varyings[V]; // Varying (perspective-interpolated (E/w)) vertex attributes
+        vec3 Eiw, Ez; // Linearly interpolated attributes (1/w, z)
+        vec3 varyings[V]; // Varying (perspective-interpolated (E/w)) vertex attributes
         FaceAttributes faceAttributes; // Custom constant face attributes
     };
     uint faceCapacity;
@@ -251,15 +252,18 @@ template<class Shader> struct RenderPass {
         if(faceCount>=faceCapacity) { error("Face overflow"_); return; }
         Face& face = faces[faceCount];
         mat3 M = mat3(vec3(A.xy()/A.w, 1), vec3(B.xy()/B.w, 1), vec3(C.xy()/C.w, 1));
-        //E = E.cofactor(); // Edge equations are now columns of E (FIXME: Optimize multiplications by 1s)
+        //E = E.cofactor(); // Edge equations are now columns of E
+        // Specialization without multiplications by 1s :
         mat3 E;
         E(0,0) =  (M(1,1) - M(1,2)), E(0,1) = -(M(1,0) - M(1,2)), E(0,2) =  (M(1,0) - M(1,1));
         E(1,0) = -(M(0,1) - M(0,2)), E(1,1) =  (M(0,0) - M(0,2)), E(1,2) = -(M(0,0) - M(0,1));
         E(2,0) =  (M(0,1) * M(1,2) - M(1,1) * M(0,2)), E(2,1) = -(M(0,0) * M(1,2) - M(1,0) * M(0,2)), E(2,2) =  (M(0,0) * M(1,1) - M(0,1) * M(1,0));
-        // FIXME: Accepts CCW winding in left-handed coordinates system
+
         if(E[0].x>0/*dy<0*/ || (E[0].x==0/*dy=0*/ && E[0].y<0/*dx<0*/)) E[0].z++;
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
         if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
+
+        // FIXME: This is CCW winding but in the left-handed coordinates system (Z-) i.e CW winding in original right-handed system
 
         for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
@@ -286,22 +290,9 @@ template<class Shader> struct RenderPass {
             }
         }
         const float S = E(2,0)+E(2,1)+E(2,2); // Normalization factor (area)
-        //vec3 iw = vec3(1);
         vec3 iw = vec3(1./A.w, 1./B.w, 1./C.w);
-        face.Eiw = E*iw;
-        //face.Eziw = E*vec3(A.z,B.z,C.z);
-        assert_(A.w && B.w && C.w);
-        face.Ez = E*(vec3(A.z/A.w, B.z/B.w, C.z/C.w)/S); //FIXME
-        //face.Ez = E*(vec3(0, 0, 1)); //FIXME
-        //log(A, B, C, vec3(A.z/A.w, B.z/B.w, C.z/C.w), face.Ez);
-        {vec3 z(A.z/A.w, B.z/B.w, C.z/C.w);
-            assert_(z[0] >= -1 && z[0] <= 1+0x1p-16, z[0], A);
-            assert_(z[1] >= -1 && z[1] <= 1+0x1p-16, z[1], B);
-            assert_(z[2] >= -1 && z[2] <= 1+0x1p-16, z[2], C);
-        }
-        //face.Eziw = E*(vec3(A.w/A.z, B.w/B.z, C.w/C.z)); //FIXME
-        //face.Eziw = E*(vec3(A.z/A.w, B.z/B.w, C.z/C.w)); //FIXME
-        //face.Eziw = E*vec3(A.z,B.z,C.z);
+        face.Eiw = E*iw; // No normalization required as factor is eliminated by division (Ev/Eiw)
+        face.Ez = E*(vec3(A.z/A.w, B.z/B.w, C.z/C.w)/S); // Normalization required as z is the direct end result
         for(uint i: range(V)) face.varyings[i] = E*(vertexAttributes[i]*iw);
         face.faceAttributes = faceAttributes;
 
@@ -414,16 +405,10 @@ template<class Shader> struct RenderPass {
                     const v16sf pixelY = v16sf(blockXY.y) + v16sf(4)*Y[0];
                     const v16sf XY1x = pixelX+v16sf(4.f/2);
                     const v16sf XY1y = pixelY+v16sf(4.f/2);
-                    const v16sf w = 1/( v16sf(face.Eiw.x)*XY1x + v16sf(face.Eiw.y)*XY1y + v16sf(face.Eiw.z));
-                    const v16sf z = v16sf(face.Ez.x)*XY1x + v16sf(face.Ez.y)*XY1y + v16sf(face.Ez.z);
-                    //const v16sf z = /*w**/1/( v16sf(face.Eziw.x)*XY1x + v16sf(face.Eziw.y)*XY1y + v16sf(face.Eziw.z));
-                    //const v16sf z = ( v16sf(face.Eziw.x)*XY1x + v16sf(face.Eziw.y)*XY1y + v16sf(face.Eziw.z));
+                    const v16sf w = 1/( v16sf(face.Eiw.x)*XY1x + v16sf(face.Eiw.y)*XY1y + v16sf(face.Eiw.z)); // Perspective correct interpolation E(w) E(v/w)
+                    const v16sf z = v16sf(face.Ez.x)*XY1x + v16sf(face.Ez.y)*XY1y + v16sf(face.Ez.z); // Linear interpolation Ez != E(w) E(z/w)
                     v16sf& Z = tile.pixelZ[blockIndex];
                     const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z;
-                    /*for(int i: range(16)) {
-                        if(z[i] < -1) mask[i] = 0;
-                        if(mask[i]) assert_(z[i] >= -1 && z[i] <= 1, z[i], face.Ez, XY1x[i], XY1y[i], face.Eiw, z);
-                    }*/
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
@@ -440,17 +425,10 @@ template<class Shader> struct RenderPass {
                             const v16sf w = 1/(v16sf(face.Eiw.x)*sampleX + v16sf(face.Eiw.y)*sampleY + v16sf(face.Eiw.z));
                             // Interpolates perspective correct z
                             const v16sf z = v16sf(face.Ez.x)*sampleX + v16sf(face.Ez.y)*sampleY + v16sf(face.Ez.z);
-                            //const v16sf z = /*w**/1/(v16sf(face.Eziw.x)*sampleX + v16sf(face.Eziw.y)*sampleY + v16sf(face.Eziw.z));
-                            //const v16sf z = ( v16sf(face.Eziw.x)*sampleX + v16sf(face.Eziw.y)*sampleY + v16sf(face.Eziw.z));
 
                             // Performs Z-Test
                             v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                            /*const*/ v16si visibleMask = (z <= sampleZ);
-
-                            /*for(int i: range(16)) {
-                                if(z[i] < -1) visibleMask[i] = 0;
-                                if(visibleMask[i]) assert_(z[i] >= -1 && z[i] <= 1, z[i], face.Ez, XY1x[i], XY1y[i], face.Eiw, z);
-                            }*/
+                            const v16si visibleMask = (z <= sampleZ);
 
                             // Stores accepted pixels in Z buffer
                             store(sampleZ, z, visibleMask);
@@ -489,8 +467,6 @@ template<class Shader> struct RenderPass {
                     const v16sf w = 1/(v16sf(face.Eiw.x)*sampleX + v16sf(face.Eiw.y)*sampleY + v16sf(face.Eiw.z));
                     // Interpolates perspective correct z
                     const v16sf z = v16sf(face.Ez.x)*sampleX + v16sf(face.Ez.y)*sampleY + v16sf(face.Ez.z);
-                    //const v16sf z = /*w**/1/(v16sf(face.Eziw.x)*sampleX + v16sf(face.Eziw.y)*sampleY + v16sf(face.Eziw.z));
-                    //const v16sf z = ( v16sf(face.Eziw.x)*sampleX + v16sf(face.Eziw.y)*sampleY + v16sf(face.Eziw.z));
 
                     // Convert single sample pixel to multisampled pixel
                     if(!(tile.multisample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
@@ -499,12 +475,7 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         const float pixelZ = ((float*)tile.pixelZ)[pixelPtr];
-                        /*const*/ v16si visibleMask = (z <= pixelZ) & draw.mask;
-
-                        /*for(int i: range(16)) {
-                            if(z[i] < -1) visibleMask[i] = 0;
-                            if(visibleMask[i]) assert_(z[i] >= -1 && z[i] <= 1);
-                        }*/
+                        const v16si visibleMask = (z <= pixelZ) & draw.mask;
 
                         // Blends accepted pixels in multisampled Z buffer
                         //for(int i: range(16)) assert_(blend(v16sf(pixelZ), z, visibleMask)[i] >= -2, "B", z[i], i, pixelZ, z[i], visibleMask[i], draw.mask[i]);
@@ -525,12 +496,7 @@ template<class Shader> struct RenderPass {
                     } else {
                         // Performs Z-Test
                         v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                        /*const*/ v16si visibleMask = (z <= sampleZ) & draw.mask;
-
-                        /*for(int i: range(16)) {
-                            if(z[i] < -1) visibleMask[i] = 0;
-                            if(visibleMask[i]) assert_(z[i] >= -1 && z[i] <= 1);
-                        }*/
+                        const v16si visibleMask = (z <= sampleZ) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
                         store(sampleZ, z, visibleMask);
