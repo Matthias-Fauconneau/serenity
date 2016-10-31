@@ -14,5 +14,5 @@ inline Scene box(const float size = 1, const bool reverse = false) {
         swap(face.position[0], face.position[2]);
         for(vec3& attribute: face.attributes) swap(attribute[0], attribute[2]);
     }
-    return {vec3(0,0,2*size), ::move(faces)};
+    return {vec3(0,0,-2*size), ::move(faces)};
 }

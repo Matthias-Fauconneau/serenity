@@ -37,8 +37,8 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
-    Scene scene {box(2, true)};
-    //Scene scene {parseScene(readFile("box.scene",home()))};
+    //Scene scene {box(1, false)};
+    Scene scene {parseScene(readFile("box.scene",home()))};
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 
@@ -75,7 +75,7 @@ struct LightFieldViewApp : LightField {
         if(orthographic) {
             M.rotateX(view.viewYawPitch.y); // Pitch
             M.rotateY(view.viewYawPitch.x); // Yaw
-            M.scale(vec3(1,1,-1)); // Z-
+            //M.scale(vec3(1,1,-1)); // Z-
         } else {
             // Sheared perspective (rectification)
             const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
@@ -83,9 +83,11 @@ struct LightFieldViewApp : LightField {
             // Near/far planes
             vec3 min = inff, max = -inff;
             for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-            M = shearedPerspective(s, t, scene.viewpoint.z+min.z, scene.viewpoint.z+max.z);
-            M.scale(2./::max(max.x-min.x, max.y-min.y)); // Fits scene within -1, 1
-            M.translate(-scene.viewpoint); // 0 -> -1 (Z-)
+            max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
+            const float scale = 2./::max(max.x-min.x, max.y-min.y);
+            M = shearedPerspective(s, t, scale*(-scene.viewpoint.z+min.z), scale*(-scene.viewpoint.z+max.z));
+            M.scale(scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
         }
 #if 1 // Optimized specialization for sheared perspective
         const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
@@ -211,8 +213,19 @@ struct LightFieldViewApp : LightField {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            convert(target, B, G, R);
+#if 1
+                scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
+                convert(target, B, G, R);
+#else
+                ImageH Z (target.size);
+                scene.render(Zrenderer, M, {}, Z);
+                //for(half& z: Z) z = (z+1)/2;
+                float min=inff,max=-inff;
+                for(half z: Z) if(isNumber(z)) { min=::min<float>(min, z); max=::max<float>(max, z); }
+                log(min, max);
+                for(half& z: Z) z = (z-min)/(max-min);
+                convert(target, Z, Z, Z);
+#endif
         }
         return target;
     }

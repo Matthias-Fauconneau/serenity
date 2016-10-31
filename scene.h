@@ -6,16 +6,16 @@ inline mat4 shearedPerspective(const float s, const float t, const float near, c
     const float left = (-1-S), right = (1-S);
     const float bottom = (-1-T), top = (1-T);
     mat4 M;
-    M(0,0) = 2 / (right-left);
-    M(1,1) = 2 / (top-bottom);
+    M(0,0) = 2*near / (right-left);
+    M(1,1) = 2*near / (top-bottom);
     M(0,2) = (right+left) / (right-left);
     M(1,2) = (top+bottom) / (top-bottom);
     M(2,2) = - (far+near) / (far-near);
     M(2,3) = - 2*far*near / (far-near);
     M(3,2) = - 1;
     M(3,3) = 0;
+    M.scale(vec3(1,1,-1)); // Z-
     M.translate(vec3(-S,-T,0));
-
     return M;
 }
 
@@ -92,11 +92,11 @@ struct Scene {
     template<Type... Args> void render(Renderer<sizeof...(Args)>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& Z, const Args&... targets_) {
         const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
         uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
-        renderer.target.setup(int2(size), 3./2, clear); // Needs to be setup before pass
+        renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
         renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
         mat4 NDC;
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
-        NDC.translate(vec3(vec2(1),0.f)); // -1, 1 -> 0, 2
+        NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
             vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1);
