@@ -37,14 +37,14 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
-    //Scene scene {box(1, false)};
-    Scene scene {parseScene(readFile("box.scene",home()))};
+    //Scene scene {::box()};
+    Scene scene {::parseScene(readFile("box.scene",home()))};
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 
     bool orthographic = false;
     bool sample = true;
-    bool raycast = false;
+    bool raycast = true;
     bool depthCorrect = true;
 
     struct LightFieldViewWidget : ViewControl, ImageView {
@@ -71,6 +71,15 @@ struct LightFieldViewApp : LightField {
     Image render(uint2 targetSize) {
         Image target (targetSize);
 
+        // Fits scene
+        vec3 min = inff, max = -inff;
+        for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
+        const float scale = 2./::max(max.x-min.x, max.y-min.y);
+        const float near = scale*(-scene.viewpoint.z+min.z);
+        const float far = scale*(-scene.viewpoint.z+max.z);
+        log(far/near);
+
         mat4 M;
         if(orthographic) {
             M.rotateX(view.viewYawPitch.y); // Pitch
@@ -79,13 +88,7 @@ struct LightFieldViewApp : LightField {
         } else {
             // Sheared perspective (rectification)
             const float s = (view.viewYawPitch.x+PI/3)/(2*PI/3), t = (view.viewYawPitch.y+PI/3)/(2*PI/3);
-            // Fits scene
-            // Near/far planes
-            vec3 min = inff, max = -inff;
-            for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-            max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
-            const float scale = 2./::max(max.x-min.x, max.y-min.y);
-            M = shearedPerspective(s, t, scale*(-scene.viewpoint.z+min.z), scale*(-scene.viewpoint.z+max.z));
+            M = shearedPerspective(s, t, near, far);
             M.scale(scale); // Fits scene within -1, 1
             M.translate(-scene.viewpoint);
         }
@@ -101,7 +104,7 @@ struct LightFieldViewApp : LightField {
             ImageH Z (target.size);
             if(depthCorrect) scene.render(Zrenderer, M, {}, Z);
 
-            parallel_chunk(target.size.y*target.size.x, [this, &target, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
+            parallel_chunk(target.size.y*target.size.x, [this, &target, near, far, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
                 const int targetStride = target.size.x;
                 //const mat4 Mi = M.inverse();
 #if 1
@@ -110,6 +113,8 @@ struct LightFieldViewApp : LightField {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
+                const float A = (far-near)/(2*far*scale);
+                const float B = - (3*far+near)/(2*far*scale);
                 const half* fieldZ = this->fieldZ.data;
                 const half* fieldB = this->fieldB.data;
                 const half* fieldG = this->fieldG.data;
@@ -150,8 +155,11 @@ struct LightFieldViewApp : LightField {
 #endif
                     bgr3f S = 0;
                     if(depthCorrect) {
-                        const float zv = Z(targetX, targetY); // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
-                        const float z = zv-1.f/2; // 1, 0, -1, -2
+                        const float z = Z(targetX, targetY);// -1, 1
+                        const float ze = - 2*far*near / ((far-near)*z - (far+near));
+                        assert_(ze > 0 && scale > 0 && near > 0);
+                        const float d = - scale * (ze - near) / ze;
+                        //const float d = 1 / (A*z + B); // duv/dst
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -163,7 +171,7 @@ struct LightFieldViewApp : LightField {
                         for(int dt: {0,1}) for(int ds: {0,1}) {
                             if(sIndex+ds > imageCount.x-1) { w01st[dt*2+ds] = 0; continue; } // s == sSize-1
                             if(tIndex+dt > imageCount.y-1) { w01st[dt*2+ds] = 0; continue; } // t == tSize-1
-                            vec2 uv_ = uv + scale * (fract(st) - vec2(ds, dt)) * (-z) / (z+2);
+                            vec2 uv_ = uv + d * (fract(st) - vec2(ds, dt));
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             uint uIndex = uv_[0], vIndex = uv_[1];
                             if( uIndex >= uint(imageSize.x)-2 || vIndex >= uint(imageSize.y)-2 ) { w01st[dt*2+ds] = 0; continue; }
@@ -172,10 +180,15 @@ struct LightFieldViewApp : LightField {
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Zv = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
+#if 1
+                            const v4sf w01uv =   __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
+                                               * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+#else
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
-                                               , abs(Zv - float4(zv)) < zTolerance); // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                               , abs(Z - float4(z)) < zTolerance); // Discards far samples (tradeoff between edge and anisotropic accuracy)
+#endif
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
@@ -189,6 +202,8 @@ struct LightFieldViewApp : LightField {
                         const float g = dot(w01, G);
                         const float r = dot(w01, R);
                         S = bgr3f(b, g, r);
+                        //S = bgr3f((ze-near)/(far-near));
+                        //S = bgr3f(d);
                     } else {
                         const int uIndex = uv[0], vIndex = uv[1];
                         if(uv[0] < 0 || uv[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }

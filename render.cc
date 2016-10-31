@@ -5,8 +5,8 @@
 
 struct Render {
     Render() {
-        //Scene scene {Scene::box()};
-        Scene scene {Scene::box(1./2, true)};
+        //Scene scene {::box()};
+        Scene scene {::parseScene(readFile("box.scene",home()))};
         const Folder& folder = currentWorkingDirectory();
         assert_(Folder(".",folder).name() == "/var/tmp/box", folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
@@ -25,13 +25,23 @@ struct Render {
         buffer<Scene::Renderer<3>> renderers (threadCount());
         for(Scene::Renderer<3>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
 
+        // Fits scene
+        vec3 min = inff, max = -inff;
+        for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
+        const float scale = 2./::max(max.x-min.x, max.y-min.y);
+        const float near = scale*(-scene.viewpoint.z+min.z);
+        const float far = scale*(-scene.viewpoint.z+max.z);
+
         Time time (true);
-        parallel_for(0, N*N, [&](uint threadID, size_t stIndex) {
+        parallel_for(0, N*N, [near, far, scale, &scene, field, size, &renderers, &folder](uint threadID, size_t stIndex) {
             int sIndex = stIndex%N, tIndex = stIndex/N;
 
             // Sheared perspective (rectification)
             const float s = sIndex/float(N-1), t = tIndex/float(N-1);
-            mat4 M = shearedPerspective(s, t);
+            mat4 M = shearedPerspective(s, t, near, far);
+            M.scale(scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
 
             ImageH Z (unsafeRef(field.slice(((0ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
             ImageH B (unsafeRef(field.slice(((1ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
