@@ -8,6 +8,15 @@ struct LightFieldAnalyze : LightField {
         if(!endsWith(folder_.name(), "coverage")) return;
         assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
+        // Fits scene
+        vec3 min = inff, max = -inff;
+        Scene scene {::parseScene(readFile("box.scene",home()))};
+        for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
+        const float scale = 2./::max(max.x-min.x, max.y-min.y);
+        const float near = scale*(-scene.viewpoint.z+min.z);
+        const float far = scale*(-scene.viewpoint.z+max.z);
+
         Time time (true);
         const uint M = 1, N = 2;
         const uint sSize = (imageCount.x-1)/M+1, tSize = (imageCount.y-1)/M+1;
@@ -20,7 +29,7 @@ struct LightFieldAnalyze : LightField {
 
         buffer<uint8> hitVoxelss (threadCount()*gridSize.z*gridSize.y*gridSize.x/8); // 2 GB
 
-        parallel_for(0, tSize*sSize, [this, sSize, gridSize, uSize, vSize, &Alock, &A, &hitVoxelss](uint threadID, uint stIndex) {
+        parallel_for(0, tSize*sSize, [this, sSize, gridSize, uSize, vSize, near, far, &Alock, &A, &hitVoxelss](uint threadID, uint stIndex) {
             mref<uint8> hitVoxels = hitVoxelss.slice(threadID*gridSize.z*gridSize.y*gridSize.x/8, gridSize.z*gridSize.y*gridSize.x/8);
             hitVoxels.clear(0);
 
@@ -41,8 +50,8 @@ struct LightFieldAnalyze : LightField {
                 const uint vIndex = N*vIndex_, uIndex = N*uIndex_;
 
                 const vec2 uv = vec2(uIndex, vIndex);
-                const float z = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
-                const float a = 1./2*z + 3./4; // st, uv = 0, 1
+                const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+                const float a = ((- 2*far*near / ((far-near)*z - (far+near)))-near)/(far-near); // Linear
                 const vec2 xy = (1-a) * (scale*st) + a * uv;
                 if(xy.y < 0) continue;
                 if(xy.x < 0) continue;
@@ -51,9 +60,7 @@ struct LightFieldAnalyze : LightField {
                 const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
                 if(xIndex >= gridSize.x) continue;
 
-                const float w = float(3./4)+float(1./2)*z;
-                const float ZoverW = z/w; // -1 .. 1
-                const uint zIndex = (ZoverW+1)/2*(gridSize.z-1);
+                const uint zIndex = ((z+1)/2)*(gridSize.z-1); // Perspective
 
                 uint64 bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
                 hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)

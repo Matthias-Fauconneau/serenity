@@ -78,7 +78,6 @@ struct LightFieldViewApp : LightField {
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
         const float near = scale*(-scene.viewpoint.z+min.z);
         const float far = scale*(-scene.viewpoint.z+max.z);
-        log(far/near);
 
         mat4 M;
         if(orthographic) {
@@ -113,8 +112,8 @@ struct LightFieldViewApp : LightField {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
-                const float A = (far-near)/(2*far*scale);
-                const float B = - (3*far+near)/(2*far*scale);
+                const float A = - scale*(0+(far-near)/(2*far));
+                const float B = - scale*(1-(far+near)/(2*far));
                 const half* fieldZ = this->fieldZ.data;
                 const half* fieldB = this->fieldB.data;
                 const half* fieldG = this->fieldG.data;
@@ -156,11 +155,7 @@ struct LightFieldViewApp : LightField {
                     bgr3f S = 0;
                     if(depthCorrect) {
                         const float z = Z(targetX, targetY);// -1, 1
-                        const float ze = - 2*far*near / ((far-near)*z - (far+near));
-                        assert_(ze > 0 && scale > 0 && near > 0);
-                        const float d = - scale * (ze - near) / ze;
-                        //const float d = 1 / (A*z + B); // duv/dst
-
+                        const float d = A*z + B;
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                         const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
@@ -202,8 +197,6 @@ struct LightFieldViewApp : LightField {
                         const float g = dot(w01, G);
                         const float r = dot(w01, R);
                         S = bgr3f(b, g, r);
-                        //S = bgr3f((ze-near)/(far-near));
-                        //S = bgr3f(d);
                     } else {
                         const int uIndex = uv[0], vIndex = uv[1];
                         if(uv[0] < 0 || uv[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
