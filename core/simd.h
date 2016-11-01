@@ -50,6 +50,7 @@ struct v16sf {
 };
 
 static v4sf unused _0f {0,0,0,0};
+static v16sf unused __1f = v16sf(-1);
 static v16sf unused _1f = v16sf(1);
 
 inline v16sf operator-(v16sf a) { return v16sf(-a.r1, -a.r2); }

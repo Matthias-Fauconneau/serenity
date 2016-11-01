@@ -408,7 +408,7 @@ template<class Shader> struct RenderPass {
                     const v16sf w = 1/( v16sf(face.Eiw.x)*XY1x + v16sf(face.Eiw.y)*XY1y + v16sf(face.Eiw.z)); // Perspective correct interpolation E(w) E(v/w)
                     const v16sf z = v16sf(face.Ez.x)*XY1x + v16sf(face.Ez.y)*XY1y + v16sf(face.Ez.z); // Linear interpolation Ez != E(w) E(z/w)
                     v16sf& Z = tile.pixelZ[blockIndex];
-                    const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z;
+                    const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z & (z >= /*-1*/__1f);
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
@@ -428,7 +428,7 @@ template<class Shader> struct RenderPass {
 
                             // Performs Z-Test
                             v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                            const v16si visibleMask = (z <= sampleZ);
+                            const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f);
 
                             // Stores accepted pixels in Z buffer
                             store(sampleZ, z, visibleMask);
@@ -475,7 +475,7 @@ template<class Shader> struct RenderPass {
 
                         // Performs Z-Test
                         const float pixelZ = ((float*)tile.pixelZ)[pixelPtr];
-                        const v16si visibleMask = (z <= pixelZ) & draw.mask;
+                        const v16si visibleMask = (z <= pixelZ) & (z >= /*-1*/__1f) & draw.mask;
 
                         // Blends accepted pixels in multisampled Z buffer
                         //for(int i: range(16)) assert_(blend(v16sf(pixelZ), z, visibleMask)[i] >= -2, "B", z[i], i, pixelZ, z[i], visibleMask[i], draw.mask[i]);
@@ -496,7 +496,7 @@ template<class Shader> struct RenderPass {
                     } else {
                         // Performs Z-Test
                         v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                        const v16si visibleMask = (z <= sampleZ) & draw.mask;
+                        const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f) & draw.mask;
 
                         // Stores accepted pixels in Z buffer
                         store(sampleZ, z, visibleMask);

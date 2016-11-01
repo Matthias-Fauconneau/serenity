@@ -22,7 +22,7 @@ struct LightFieldAnalyze : LightField {
         const uint sSize = (imageCount.x-1)/M+1, tSize = (imageCount.y-1)/M+1;
         const uint uSize = (imageSize.x-1)/N+1, vSize = (imageSize.y-1)/N+1;
 
-        uint3 gridSize (uSize/16, vSize/16, ::min(uSize,vSize)/16);
+        uint3 gridSize (uSize/4, vSize/4, ::min(uSize,vSize)/4);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
         A.clear(0); // Just to be sure™
         Lock Alock;
@@ -51,8 +51,10 @@ struct LightFieldAnalyze : LightField {
 
                 const vec2 uv = vec2(uIndex, vIndex);
                 const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-                const float a = ((- 2*far*near / ((far-near)*z - (far+near)))-near)/(far-near); // Linear
-                const vec2 xy = (1-a) * (scale*st) + a * uv;
+                const vec2 a = scale*st + vec2(1)/*FIXME*/;
+                const vec2 b = (-2*far/(far-near))*(uv-scale*st);
+                const float c = - (far+near)/(far-near);
+                const vec2 xy = a + b/(z+c);
                 if(xy.y < 0) continue;
                 if(xy.x < 0) continue;
                 const uint yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
@@ -88,7 +90,7 @@ struct LightFieldAnalyze : LightField {
         float maxA = ::max(A);
         assert_(maxA == tSize*sSize);
         for(const uint stIndex: range(tSize*sSize)) {
-            parallel_chunk(vSize*uSize, [this, stIndex, sSize, tSize, field, uSize, vSize, gridSize, &A, maxA](uint, uint start, uint sizeI) {
+            parallel_chunk(vSize*uSize, [this, stIndex, sSize, tSize, field, uSize, vSize, near, far, gridSize, &A, maxA](uint, uint start, uint sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
@@ -111,9 +113,12 @@ struct LightFieldAnalyze : LightField {
                     const uint uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
 
                     const vec2 uv = vec2(uIndex, vIndex);
-                    const float z = Zst[vIndex*size1 + uIndex]; // far, uv, near, st = 3/2, 1/2, -1/2, -1/2
-                    const float a = 1./2*z + 3./4; // st, uv = 0, 1
-                    const vec2 xy = (1-a) * (scale*st) + a * uv;
+                    const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+
+                    const vec2 a = scale*st + vec2(1)/*FIXME*/;
+                    const vec2 b = (-2*far/(far-near))*(uv-scale*st);
+                    const float c = - (far+near)/(far-near);
+                    const vec2 xy = a + b/(z+c);
                     if(xy.y < 0) continue;
                     if(xy.x < 0) continue;
                     const uint yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
@@ -121,9 +126,7 @@ struct LightFieldAnalyze : LightField {
                     const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
                     if(xIndex >= gridSize.x) continue;
 
-                    const float w = float(1./2)*z + float(3./4);
-                    const float ZoverW = z/w; // -1 .. 1
-                    const uint zIndex = (ZoverW+1)/2*(gridSize.z-1);
+                    const uint zIndex = ((z+1)/2)*(gridSize.z-1); // Perspective
 
                     const float v = (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/maxA;
                     //const float v = (xIndex+yIndex+zIndex)%2;

@@ -155,6 +155,7 @@ struct LightFieldViewApp : LightField {
                     bgr3f S = 0;
                     if(depthCorrect) {
                         const float z = Z(targetX, targetY);// -1, 1
+                        assert_(z >= -1 && z <= 1, z);
                         const float d = A*z + B;
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
