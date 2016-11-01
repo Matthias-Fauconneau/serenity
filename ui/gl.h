@@ -5,6 +5,8 @@
 #include "thread.h"
 #include "image.h"
 
+typedef vec<rgba,float,4> rgba4f;
+
 void glCheck_(string message);
 #define glCheck(message ...) glCheck_(str(__FILE__, __LINE__, ## message ))
 

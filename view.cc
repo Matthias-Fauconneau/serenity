@@ -1,6 +1,5 @@
 #include "field.h"
 #include "scene.h"
-#include "box.h"
 #include "parallel.h"
 
 #include "interface.h"
@@ -8,9 +7,16 @@
 #include "render.h"
 #include "window.h"
 
-#if 1
+#if 0
 //#include "analyze.h"
 #endif
+
+inline string basename(string x) {
+    string name = x.contains('/') ? section(x,'/',-2,-1) : x;
+    string basename = name.contains('.') ? section(name,'.',0,-2) : name;
+    assert_(basename);
+    return basename;
+}
 
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
@@ -37,8 +43,7 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
-    //Scene scene {::box()};
-    Scene scene {::parseScene(readFile("box.scene",home()))};
+    Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 
@@ -62,7 +67,7 @@ struct LightFieldViewApp : LightField {
     } view {*this};
     unique<Window> window = ::window(&view);
 
-    LightFieldViewApp() {
+    LightFieldViewApp() : LightField(Folder(basename(arguments()[0])+(arguments().contains("coverage")?"/coverage"_:""_),"/var/tmp"_,true)) {
         window->actions[Key('s')] = [this]{ sample=!sample; window->render(); };
         window->actions[Key('r')] = [this]{ raycast=!raycast; window->render(); };
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
@@ -78,6 +83,7 @@ struct LightFieldViewApp : LightField {
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
         const float near = scale*(-scene.viewpoint.z+min.z);
         const float far = scale*(-scene.viewpoint.z+max.z);
+        //log(min, max, near, far, far/near);
 
         mat4 M;
         if(orthographic) {
@@ -97,7 +103,7 @@ struct LightFieldViewApp : LightField {
         const vec2 scaleTargetUV = vec2(imageSize-uint2(1)) / vec2(target.size-uint2(1));
 #endif
 
-        if(raycast) {
+        if(raycast && imageCount) {
             assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
             ImageH Z (target.size);

@@ -8,7 +8,7 @@ struct LightFieldFile {
     String name;
     uint2 imageCount;
     uint2 imageSize;
-    LightFieldFile(Folder&& folder_ = "."_) : folder(::move(folder_)) {
+    LightFieldFile(Folder&& folder_) : folder(::move(folder_)) {
         for(string name: folder.list(Files)) {
             TextData s (name);
             int imageCountX = s.integer(false);
@@ -24,13 +24,15 @@ struct LightFieldFile {
             this->imageSize = uint2(imageSizeX, imageSizeY);
             return;
         }
-        error("");
+        log("No field found");
+        imageCount = 0;
+        imageSize = 0;
     }
 };
 
 struct LightField : LightFieldFile {
     using LightFieldFile::LightFieldFile;
-    Map map {name, folder};
+    Map map = name ? Map{name, folder} : Map{};
     ref<half> field = cast<half>(map);
 
     const int size1 = imageSize.x *1;

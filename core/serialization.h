@@ -56,7 +56,7 @@ template<template<Type> /*Type*/class V, Type T, uint N> vec<V,T,N> parseVector/
 	vec<V,T,N> value;
 	value[0] = parse<T>(s); // Assigns a single value to all components
 	if(!bracket && !s) return value[0];
-	for(uint index: range(1, N)) { s.whileAny("x, "); value[index] = parse<T>(s); }
+        for(uint index: range(1, N)) { s.whileAny("x, \t"); value[index] = parse<T>(s); }
 	if(bracket) s.skip(')');
 	return value;
 }

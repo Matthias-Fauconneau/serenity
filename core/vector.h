@@ -96,8 +96,9 @@ generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) r
 
 template<template<Type> class V, Type T, uint N> inline String str(const vec& v) {
  buffer<char> s(16*N, 0);
- s.append('(');
- for(uint i: range(N)) { s.append(str(v[i])); if(i<N-1) s.append(", "); } s.append(')');
+ //s.append('(');
+ for(uint i: range(N)) { s.append(str(v[i],2u)); if(i<N-1) s.append(" "); }
+ //s.append(')');
  return move(s);
 }
 
@@ -142,7 +143,6 @@ generic struct bgra {
     T b,g,r,a;
     vec<bgr,T,3>& bgr() const { return *(vec< ::bgr,T,3>*)this; }
     operator vec<rgb,T,3>() const { return vec<rgb,T,3>{r,g,b}; }
-    //operator vec<rgba,T,4>() const { return vec<rgba,T,4>{r,g,b,a}; }
 };
 typedef vec<bgra,float,4> bgra4f;
 struct byte4 : vec<bgra,uint8,4> {
@@ -151,22 +151,6 @@ struct byte4 : vec<bgra,uint8,4> {
  byte4(vec<rgb,uint8,3> rgb) : vec(rgb.b, rgb.g, rgb.r, 0xFF) {}
 };
 
-typedef vec<rgba,float,4> rgba4f;
-
-//template<template<Type> class V, Type T, uint N> inline T length(vec<V,T,N> a) { return sqrt(sq(a)); }
-template<template<Type> class V, Type T> inline
-vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) {
- return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y);
-}
+template<template<Type> class V, Type T> inline vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) { return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
 
 inline String strx(uint2 N) { return str(N.x)+'x'+str(N.y); }
-
-inline vec4 conjugate(vec4 q) { return vec4(-q.xyz(), q.w); }
-inline vec4 qmul(vec4 a, vec4 b) { return vec4( a[3] * b.xyz() + b[3] * a.xyz() + cross(a.xyz(), b.xyz()), a[3]*b[3] - dot(a.xyz(), b.xyz())); }
-inline vec3 qapply(vec4 q, vec3 v) { return qmul(q, qmul(vec4(v, 0), conjugate(q))).xyz(); }
-inline vec4 angleVector(float a, vec3 v) {
- float l = length(v);
- if(!l) return vec4(vec3(0), 1);
- vec3 b = sin(a/2*l)/l*v;
- return vec4(b, cos(a/2*l));
-}

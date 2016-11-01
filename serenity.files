@@ -13,8 +13,9 @@ core/parallel.h
 core/parallel.cc
 core/function.h
 
-test.cc
+ui/gl.h
 
+test.cc
 render.cc
 raster.h
 raster.cc
@@ -24,3 +25,5 @@ field.h
 view.cc
 box.h
 scene.cc
+test.cc
+filesync.cc

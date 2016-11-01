@@ -4,7 +4,6 @@
 #include "data.h"
 #include "file.h"
 #include "function.h"
-#include "thread.h"
 #include "time.h"
 
 int threadCount();

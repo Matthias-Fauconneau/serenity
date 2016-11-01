@@ -11,7 +11,6 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 */
 #pragma once
 #include "matrix.h"
-#include "thread.h"
 #include "simd.h"
 #include "image.h"
 
@@ -219,7 +218,7 @@ template<class Shader> struct RenderPass {
     uint width, height; // Tiles
     struct Bin {
         uint16 faceCount = 0;
-        uint16 faces[15]; //511
+        uint16 faces[13318];
     };
     buffer<Bin> bins=0;
 

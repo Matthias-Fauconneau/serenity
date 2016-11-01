@@ -4,13 +4,13 @@
 #include "parallel.h"
 
 struct LightFieldAnalyze : LightField {
-    LightFieldAnalyze(Folder&& folder_ = "."_) : LightField(endsWith(folder_.name(), "coverage")? Folder(folder_.name()+"/.."_) : ::move(folder_)) {
-        if(!endsWith(folder_.name(), "coverage")) return;
+    LightFieldAnalyze(Folder&& folder_ = Folder("/var/tmp/"_+basename(arguments()[0]))) : LightField(::move(folder_)) {
+        if(arguments().contains("coverage")) return;
         assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
         // Fits scene
         vec3 min = inff, max = -inff;
-        Scene scene {::parseScene(readFile("box.scene",home()))};
+        Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
         for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
         max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
