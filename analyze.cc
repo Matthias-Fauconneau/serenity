@@ -28,9 +28,10 @@ struct LightFieldAnalyze : LightField {
         const uint sSize = imageCount.x, tSize = imageCount.y;
         const uint uSize = imageSize.x, vSize = imageSize.y;
 
-        const uint G = 16;
+        const uint G = 4;
         uint3 gridSize (uSize/G, vSize/G, ::min(uSize,vSize)/G);
         assert_(imageCount.x * imageCount.y < 1<<16);
+        assert_(gridSize.z*gridSize.y*gridSize.x < 1024*1024*1024);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
         A.clear(0); // Just to be sure™
         Lock Alock;
@@ -55,8 +56,8 @@ struct LightFieldAnalyze : LightField {
             const half* fieldZ = this->fieldZ.data;
             const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
 
-            const vec2 a = (scale*st + vec2(1)/*FIXME*/) * vec2(gridSize.xy()-uint2(1)) / (vec2(uSize,vSize)-vec2(1)) + vec2(1./2);
-            const vec2 b = ((-2*far/(far-near))) * vec2(gridSize.xy()-uint2(1)) / (vec2(uSize,vSize)-vec2(1));
+            const vec2 a = (scale*st + vec2(1)/*FIXME*/) * vec2(gridSize.xy()-uint2(2)) / (vec2(uSize,vSize)-vec2(1)) + vec2(1./2); // -2 to avoid boundary filtering issues
+            const vec2 b = ((-2*far/(far-near))) * vec2(gridSize.xy()-uint2(2)) / (vec2(uSize,vSize)-vec2(1));
             const float c = - (far+near)/(far-near);
             const vec2 d = scale*st;
 
@@ -71,7 +72,7 @@ struct LightFieldAnalyze : LightField {
                 const uint xIndex = xy.x;
                 if(xIndex >= gridSize.x) continue;
 
-                const uint zIndex = ((z+1)/2)*(gridSize.z-1) + 1./2; // Perspective
+                const uint zIndex = ((z+1)/2)*(gridSize.z-2) + 1./2; // Perspective // -2 to avoid boundary filtering issues
 
                 uint64 bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
                 hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)
@@ -136,19 +137,20 @@ struct LightFieldAnalyze : LightField {
                     const vec2 xy = a + b/(z+c);
                     if(xy.y < 0) continue;
                     if(xy.x < 0) continue;
-                    const float yF = xy.y * (gridSize.y-1) / ((vSize-1));
+                    const float yF = xy.y * (gridSize.y-2) / ((vSize-1)); // -2 to avoid boundary filtering issues
                     const uint yIndex = yF;
-                    const float yf = fract(yF);
-                    if(yIndex >= gridSize.y) continue;
-                    const float xF = xy.x * (gridSize.x-1) / ((uSize-1));
-                    const float xf = fract(xF);
+                    if(yIndex >= gridSize.y-1) continue;
+                    const float xF = xy.x * (gridSize.x-2) / ((uSize-1)); // -2 to avoid boundary filtering issues
                     const uint xIndex = xF;
-                    if(xIndex >= gridSize.x) continue;
+                    if(xIndex >= gridSize.x-1) continue;
 
-                    const float zF = ((z+1)/2)*(gridSize.z-1);
+                    const float zF = ((z+1)/2)*(gridSize.z-2); // -2 to avoid boundary filtering issues
+
+#if 0 // Trilinear interpolation of non-zero samples
+                    const float xf = fract(xF);
+                    const float yf = fract(yF);
                     const float zf = fract(zF);
                     const uint zIndex = zF; // Perspective // Floor not round (no +1/2)
-
                     float Sw = 0, Sa = 0;
                     for(uint dz: range(2)) for(uint dy: range(2)) for(uint dx: range(2)) {
                         const uint16 a = A[((zIndex+dz)*gridSize.y+(yIndex+dy))*gridSize.x+(xIndex+dx)];
@@ -159,6 +161,18 @@ struct LightFieldAnalyze : LightField {
                         }
                     }
                     const float v = Sa/(Sw*maxA);
+#elif 0
+                    const float v = A[(uint(zF+1./2)*gridSize.y+uint(yF+1./2))*gridSize.x+uint(xF+1./2)]/maxA;
+#else // Max
+                    const uint zIndex = zF; // Perspective // Floor not round (no +1/2)
+                    //assert(zIndex < gridSize.z-1); //if(zIndex >= gridSize.z-1) continue;
+                    uint16 max = 0;
+                    for(uint dz: range(2)) for(uint dy: range(2)) for(uint dx: range(2)) {
+                        const uint16 a = A[((zIndex+dz)*gridSize.y+(yIndex+dy))*gridSize.x+(xIndex+dx)];
+                        if(a > max) max = a;
+                    }
+                    const float v = max/maxA;
+#endif
                     Z[uvIndex] = z;
                     B[uvIndex] = v;
                     G[uvIndex] = v;

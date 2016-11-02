@@ -44,7 +44,6 @@ struct ViewControl : virtual Widget {
 
 struct LightFieldViewApp : LightField {
 #if 0
-    //Scene scene {::parseScene(readFile(basename(arguments()[0])+".blend"))};
     Scene scene {::parseScene(readFile(basename(arguments()[0])+".ply"))};
 #else
     Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};

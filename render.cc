@@ -3,16 +3,27 @@
 #include "file.h"
 #include "png.h"
 
+inline string basename(string x) {
+    string name = x.contains('/') ? section(x,'/',-2,-1) : x;
+    string basename = name.contains('.') ? section(name,'.',0,-2) : name;
+    assert_(basename);
+    return basename;
+}
+
 struct Render {
     Render() {
-        //Scene scene {::box()};
-        Scene scene {::parseScene(readFile("box.scene",home()))};
-        const Folder& folder = currentWorkingDirectory();
-        assert_(Folder(".",folder).name() == "/var/tmp/box", folder.name());
+        Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
+        const Folder& folder = Folder("/var/tmp/"_+basename(arguments()[0]));
+        assert_(Folder(".",folder).name() == "/var/tmp/Box", folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
+#if 0
         const size_t N = 33;
-        uint2 size = 1024;
+        const uint2 size = 1024;
+#else
+        const size_t N = 129;
+        const uint2 size = 256;
+#endif
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
         size_t byteSize = 4*N*N*size.y*size.x*sizeof(half);
