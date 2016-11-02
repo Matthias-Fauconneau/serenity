@@ -62,10 +62,10 @@ void Data::skip(const string key) {
  if(!match(key)) error("Expected '"+escape(key)+"', got '"+escape(peek(key.size))+'\'', escape(data.slice(index, 128)));
 }
 
-ref<uint8> BinaryData::whileNot(uint8 key) {
+ref<byte> BinaryData::whileNot(uint8 key) {
  uint start=index;
  while(available(1) && (uint8)peek() != key) advance(1);
- return cast<uint8>(slice(start, index-start));
+ return slice(start, index-start);
 }
 
 /*TextData::Text(ref<byte> data) : Data(data) {

@@ -7,7 +7,7 @@
 #include "render.h"
 #include "window.h"
 
-#if 0
+#if 1
 //#include "analyze.h"
 #endif
 
@@ -43,7 +43,12 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
+#if 0
+    //Scene scene {::parseScene(readFile(basename(arguments()[0])+".blend"))};
+    Scene scene {::parseScene(readFile(basename(arguments()[0])+".ply"))};
+#else
     Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
+#endif
     Scene::Renderer<0> Zrenderer {scene};
     Scene::Renderer<3> BGRrenderer {scene};
 

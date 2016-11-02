@@ -92,6 +92,9 @@ struct BinaryData : Data {
  /// Seeks to /a index
  void seek(size_t index) { assert(index<data.size); this->index=index; }
 
+ /// Seeks to next aligned position
+ void align(uint width) { index=::align(width,index); }
+
  /// Reads one raw \a T element
  generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
  int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
@@ -133,7 +136,7 @@ struct BinaryData : Data {
  //generic void read(T buffer[], size_t size) { for(size_t i: range(size)) buffer[i]=(T)read(); }
 
  /// Advances while input doesn't match \a key.
- ref<uint8> whileNot(uint8 key);
+ ref<byte> whileNot(uint8 key);
 };
 
 String escape(string s);

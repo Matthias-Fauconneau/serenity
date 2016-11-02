@@ -3,9 +3,16 @@
 #include "math.h"
 #include "parallel.h"
 
+string basename(string x) {
+    string name = x.contains('/') ? section(x,'/',-2,-1) : x;
+    string basename = name.contains('.') ? section(name,'.',0,-2) : name;
+    assert_(basename);
+    return basename;
+}
+
 struct LightFieldAnalyze : LightField {
     LightFieldAnalyze(Folder&& folder_ = Folder("/var/tmp/"_+basename(arguments()[0]))) : LightField(::move(folder_)) {
-        if(arguments().contains("coverage")) return;
+        if(!arguments().contains("coverage")) return;
         assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
 
         // Fits scene
@@ -18,17 +25,19 @@ struct LightFieldAnalyze : LightField {
         const float far = scale*(-scene.viewpoint.z+max.z);
 
         Time time (true);
-        const uint M = 1, N = 2;
-        const uint sSize = (imageCount.x-1)/M+1, tSize = (imageCount.y-1)/M+1;
-        const uint uSize = (imageSize.x-1)/N+1, vSize = (imageSize.y-1)/N+1;
+        const uint sSize = imageCount.x, tSize = imageCount.y;
+        const uint uSize = imageSize.x, vSize = imageSize.y;
 
-        uint3 gridSize (uSize/4, vSize/4, ::min(uSize,vSize)/4);
+        const uint G = 16;
+        uint3 gridSize (uSize/G, vSize/G, ::min(uSize,vSize)/G);
+        assert_(imageCount.x * imageCount.y < 1<<16);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
         A.clear(0); // Just to be sure™
         Lock Alock;
 
         buffer<uint8> hitVoxelss (threadCount()*gridSize.z*gridSize.y*gridSize.x/8); // 2 GB
 
+        // Projects depth buffers to mark surfaces on voxel grid
         parallel_for(0, tSize*sSize, [this, sSize, gridSize, uSize, vSize, near, far, &Alock, &A, &hitVoxelss](uint threadID, uint stIndex) {
             mref<uint8> hitVoxels = hitVoxelss.slice(threadID*gridSize.z*gridSize.y*gridSize.x/8, gridSize.z*gridSize.y*gridSize.x/8);
             hitVoxels.clear(0);
@@ -40,33 +49,33 @@ struct LightFieldAnalyze : LightField {
             const int size2 = this->size2;
             const int size3 = this->size3;
 
-            const int sIndex = M*(stIndex%sSize), tIndex = M*(stIndex/sSize);
+            const int sIndex = stIndex%sSize, tIndex = stIndex/sSize;
             const vec2 st = vec2(sIndex, tIndex);
 
             const half* fieldZ = this->fieldZ.data;
             const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
 
-            for(const uint vIndex_: range(vSize)) for(const uint uIndex_: range(uSize)) {
-                const uint vIndex = N*vIndex_, uIndex = N*uIndex_;
+            const vec2 a = (scale*st + vec2(1)/*FIXME*/) * vec2(gridSize.xy()-uint2(1)) / (vec2(uSize,vSize)-vec2(1)) + vec2(1./2);
+            const vec2 b = ((-2*far/(far-near))) * vec2(gridSize.xy()-uint2(1)) / (vec2(uSize,vSize)-vec2(1));
+            const float c = - (far+near)/(far-near);
+            const vec2 d = scale*st;
 
+            for(const uint vIndex: range(vSize)) for(const uint uIndex: range(uSize)) {
                 const vec2 uv = vec2(uIndex, vIndex);
                 const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-                const vec2 a = scale*st + vec2(1)/*FIXME*/;
-                const vec2 b = (-2*far/(far-near))*(uv-scale*st);
-                const float c = - (far+near)/(far-near);
-                const vec2 xy = a + b/(z+c);
+                const vec2 xy = a + b*(uv-d)/(z+c);
                 if(xy.y < 0) continue;
                 if(xy.x < 0) continue;
-                const uint yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
+                const uint yIndex = xy.y;
                 if(yIndex >= gridSize.y) continue;
-                const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
+                const uint xIndex = xy.x;
                 if(xIndex >= gridSize.x) continue;
 
-                const uint zIndex = ((z+1)/2)*(gridSize.z-1); // Perspective
+                const uint zIndex = ((z+1)/2)*(gridSize.z-1) + 1./2; // Perspective
 
                 uint64 bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
                 hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)
-                // Mark hit voxels per view instead of incrementing global A buffer to count once per view
+                // Marks hit voxels per view instead of incrementing global A buffer to count once per view
                 // i.e bin hit with different uv coordinates from same view (st) is incremented once
             }
 
@@ -79,18 +88,22 @@ struct LightFieldAnalyze : LightField {
         });
         log("Analyzed",strx(uint2(sSize, tSize)),"x",strx(uint2(uSize, vSize)),"images in", time.reset());
 
+        size_t count = 0;
+        for(const uint i: range(A.size)) if(A[i]) count++;
+        log(gridSize, count, A.size, (float)count/A.size, (float)count/(imageSize.x*imageSize.y));
+
         // Render voxel grid to light field ...
         Folder folder("coverage", this->folder, true);
         for(string file: folder.list(Files)) remove(file, folder);
         File file (strx(uint2(sSize, tSize))+'x'+strx(uint2(uSize, vSize)), folder, Flags(ReadWrite|Create));
-        file.resize(4*sSize*tSize*vSize*uSize*sizeof(half));
+        file.resize(4ull*sSize*tSize*vSize*uSize*sizeof(half));
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> field = mcast<half>(map);
 
         float maxA = ::max(A);
         assert_(maxA == tSize*sSize);
         for(const uint stIndex: range(tSize*sSize)) {
-            parallel_chunk(vSize*uSize, [this, stIndex, sSize, tSize, field, uSize, vSize, near, far, gridSize, &A, maxA](uint, uint start, uint sizeI) {
+            parallel_chunk(vSize, [this, stIndex, sSize, tSize, field, uSize, vSize, near, far, gridSize, &A, maxA](uint, uint start, uint sizeI) {
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
@@ -98,38 +111,54 @@ struct LightFieldAnalyze : LightField {
                 const int size2 = this->size2;
                 const int size3 = this->size3;
 
-                const int sIndex = M*(stIndex%sSize), tIndex = M*(stIndex/sSize);
+                const uint sIndex = (stIndex%sSize), tIndex = (stIndex/sSize);
                 const vec2 st = vec2(sIndex, tIndex);
 
                 const half* fieldZ = this->fieldZ.data;
                 const half* Zst = fieldZ + (size_t)tIndex*size3 + sIndex*size2;
 
-                ImageH Z (unsafeRef(field.slice(((0ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
-                ImageH B (unsafeRef(field.slice(((1ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
-                ImageH G (unsafeRef(field.slice(((2ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
-                ImageH R (unsafeRef(field.slice(((3ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize)), uint2(uSize, vSize));
+                mref<half> Z = field.slice(((0ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize);
+                mref<half> B = field.slice(((1ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize);
+                mref<half> G = field.slice(((2ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize);
+                mref<half> R = field.slice(((3ull*tSize+tIndex)*sSize+sIndex)*vSize*uSize, vSize*uSize);
 
-                for(const uint uvIndex: range(start, start+sizeI)) {
-                    const uint uIndex = N*(uvIndex%uSize), vIndex = N*(uvIndex/uSize);
+                const vec2 a = scale*st + vec2(1)/*FIXME*/; // Floor not round (no +1/2)
+                const vec2 ba = (-2*far/(far-near));
+                const vec2 bb = -ba*scale*st;
+                const float c = - (far+near)/(far-near);
+
+                for(const uint vIndex: range(start, start+sizeI)) for(const uint uIndex: range(uSize)) {
+                    const size_t uvIndex = vIndex*size1 + uIndex;
+                    const float z = Zst[uvIndex]; // -1, 1
 
                     const vec2 uv = vec2(uIndex, vIndex);
-                    const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-
-                    const vec2 a = scale*st + vec2(1)/*FIXME*/;
-                    const vec2 b = (-2*far/(far-near))*(uv-scale*st);
-                    const float c = - (far+near)/(far-near);
+                    const vec2 b = ba*uv+bb;
                     const vec2 xy = a + b/(z+c);
                     if(xy.y < 0) continue;
                     if(xy.x < 0) continue;
-                    const uint yIndex = xy.y * (gridSize.y-1) / (N*(vSize-1));
+                    const float yF = xy.y * (gridSize.y-1) / ((vSize-1));
+                    const uint yIndex = yF;
+                    const float yf = fract(yF);
                     if(yIndex >= gridSize.y) continue;
-                    const uint xIndex = xy.x * (gridSize.x-1) / (N*(uSize-1));
+                    const float xF = xy.x * (gridSize.x-1) / ((uSize-1));
+                    const float xf = fract(xF);
+                    const uint xIndex = xF;
                     if(xIndex >= gridSize.x) continue;
 
-                    const uint zIndex = ((z+1)/2)*(gridSize.z-1); // Perspective
+                    const float zF = ((z+1)/2)*(gridSize.z-1);
+                    const float zf = fract(zF);
+                    const uint zIndex = zF; // Perspective // Floor not round (no +1/2)
 
-                    const float v = (float)A[(zIndex*gridSize.y+yIndex)*gridSize.x+xIndex]/maxA;
-                    //const float v = (xIndex+yIndex+zIndex)%2;
+                    float Sw = 0, Sa = 0;
+                    for(uint dz: range(2)) for(uint dy: range(2)) for(uint dx: range(2)) {
+                        const uint16 a = A[((zIndex+dz)*gridSize.y+(yIndex+dy))*gridSize.x+(xIndex+dx)];
+                        if(a) {
+                            float w = (dz?zf:1-zf) * (dy?yf:1-yf) * (dx?xf:1-xf);
+                            Sw += w;
+                            Sa += w*a;
+                        }
+                    }
+                    const float v = Sa/(Sw*maxA);
                     Z[uvIndex] = z;
                     B[uvIndex] = v;
                     G[uvIndex] = v;

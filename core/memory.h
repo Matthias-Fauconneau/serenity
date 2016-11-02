@@ -212,3 +212,6 @@ struct shareable {
  virtual uint removeUser() { return --userCount; }
  uint userCount = 1;
 };
+
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline size_t align(size_t width, size_t offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }

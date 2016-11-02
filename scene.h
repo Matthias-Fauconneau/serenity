@@ -61,12 +61,16 @@ struct Scene {
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         template<Type T> inline Vec<T, 3> shade3(FaceAttributes face, T, T varying[V]) const {
+#if 1 // Checkerboard
             const T u = varying[0], v = varying[1];
             static T cellCount = T(16);
             const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
             const T m = T(1./2)*n; // Half integer
             const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
             return Vec<T, 3>{{mod*T(face.color.b), mod*T(face.color.g), mod*T(face.color.r)}};
+#else
+            return Vec<T, 3>{{T(face.color.b), T(face.color.g), T(face.color.r)}};
+#endif
         }
     } shader {};
 
