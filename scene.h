@@ -48,14 +48,14 @@ generic T squareWave(T x, const T frequency = T(16)) {
 
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[3]; vec3 attributes[2]; bgr3f color; };
+    struct Face { vec3 position[4]; float u[4], v[4]; bgr3f color; };
     buffer<Face> faces;
 
     /// Shader for all surfaces
     struct Shader {
         // Shader specification (used by rasterizer)
         struct FaceAttributes { bgr3f color; };
-        static constexpr int V = sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
+        static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
 
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
@@ -63,7 +63,7 @@ struct Scene {
         template<Type T> inline Vec<T, 3> shade3(FaceAttributes face, T, T varying[V]) const {
 #if 1 // Checkerboard
             const T u = varying[0], v = varying[1];
-            static T cellCount = T(16);
+            static T cellCount = T(1); //static T cellCount = T(16);
             const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
             const T m = T(1./2)*n; // Half integer
             const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
@@ -97,15 +97,16 @@ struct Scene {
         const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
         uint2 size = (sizeof...(Args) ? targets[0] : Z).size;
         renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
-        renderer.pass.setup(renderer.target, ref<Face>(faces).size); // Clears bins face counter
+        renderer.pass.setup(renderer.target, ref<Face>(faces).size * 2 /* 1 quad face = 2 triangles */ ); // Clears bins face counter
         mat4 NDC;
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
-            vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1);
+            vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
-            renderer.pass.submit(a,b,c, face.attributes, {face.color});
+            renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),vec3(face.v[0],face.v[1],face.v[2])}, {face.color});
+            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),vec3(face.v[0],face.v[2],face.v[3])}, {face.color});
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(Z, targets);

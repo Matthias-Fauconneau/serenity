@@ -30,12 +30,15 @@ Scene parseScene(ref<byte> file) {
             if(!s) break;
             s.skip('\n');
         }
-        assert_(polygon.size == 3 || polygon.size == 4);
+        assert_(polygon.size == 4);
+        //faces.append({{polygon[0], polygon[1], polygon[2], polygon[3]},{0,1,1,0},{0,0,1,1},1});
+        faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},1});
+        /*assert_(polygon.size == 3 || polygon.size == 4);
         // Fan
         for(size_t i : range(1, polygon.size-1)) {
             //faces.append({{polygon[0], polygon[i], polygon[i+1]},{vec3(0,1,i==1), vec3(0,i==2,1)},1});
             faces.append({{polygon[i+1], polygon[i], polygon[0]},{vec3(i==1,1,0), vec3(1,i==2,0)},1});
-        }
+        }*/
     }
     log(viewpoint, faces.size);
     return {viewpoint, ::move(faces)};
