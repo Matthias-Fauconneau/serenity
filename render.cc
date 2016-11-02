@@ -22,7 +22,7 @@ struct Render {
         const uint2 size = 1024;
 #else
         const size_t N = 129;
-        const uint2 size = 256;
+        const uint2 size = 128;
 #endif
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));

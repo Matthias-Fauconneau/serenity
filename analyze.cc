@@ -28,8 +28,8 @@ struct LightFieldAnalyze : LightField {
         const uint sSize = imageCount.x, tSize = imageCount.y;
         const uint uSize = imageSize.x, vSize = imageSize.y;
 
-        const uint G = 4;
-        uint3 gridSize (uSize/G, vSize/G, ::min(uSize,vSize)/G);
+        const uint G = 1;
+        uint3 gridSize (uSize/G+1, vSize/G+1, ::min(uSize,vSize)/G+1); // +1 to avoid boundary filtering issues but still keep aligned image and voxel grids
         assert_(imageCount.x * imageCount.y < 1<<16);
         assert_(gridSize.z*gridSize.y*gridSize.x < 1024*1024*1024);
         buffer<uint16> A (gridSize.z*gridSize.y*gridSize.x); // 2 GB
@@ -75,6 +75,7 @@ struct LightFieldAnalyze : LightField {
                 const uint zIndex = ((z+1)/2)*(gridSize.z-2) + 1./2; // Perspective // -2 to avoid boundary filtering issues
 
                 uint64 bitIndex = (zIndex*gridSize.y+yIndex)*gridSize.x+xIndex;
+                //assert_(hitVoxels[bitIndex/8] & (1<<(bitIndex%8)) == 0, xIndex, yIndex, zIndex); // Maximum one hit per cell (pixels projects at least to full cell on near plane)
                 hitVoxels[bitIndex/8] |= 1<<(bitIndex%8); // Scatter (TODO: atomic)
                 // Marks hit voxels per view instead of incrementing global A buffer to count once per view
                 // i.e bin hit with different uv coordinates from same view (st) is incremented once
@@ -102,7 +103,8 @@ struct LightFieldAnalyze : LightField {
         mref<half> field = mcast<half>(map);
 
         float maxA = ::max(A);
-        assert_(maxA == tSize*sSize);
+        //assert_(maxA == tSize*sSize, maxA, tSize*sSize);
+        //assert_(maxA >= 15330 && maxA <= /*16641*/tSize*sSize, maxA, tSize*sSize);
         for(const uint stIndex: range(tSize*sSize)) {
             parallel_chunk(vSize, [this, stIndex, sSize, tSize, field, uSize, vSize, near, far, gridSize, &A, maxA](uint, uint start, uint sizeI) {
                 const uint2 imageCount = this->imageCount;
@@ -146,7 +148,7 @@ struct LightFieldAnalyze : LightField {
 
                     const float zF = ((z+1)/2)*(gridSize.z-2); // -2 to avoid boundary filtering issues
 
-#if 0 // Trilinear interpolation of non-zero samples
+#if 1 // Trilinear interpolation of non-zero samples
                     const float xf = fract(xF);
                     const float yf = fract(yF);
                     const float zf = fract(zF);
