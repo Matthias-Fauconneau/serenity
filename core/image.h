@@ -92,8 +92,11 @@ void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
 inline Image resize(uint2 size, const Image& source) { return resize(Image(size, source.alpha), source); }
 
-/// 2D array of 32bit floating-point pixels
+/// 2D array of 32bit floating-point samples
 typedef ImageT<float> ImageF;
 
-/// 2D array of 16bit floating-point pixels
+/// 2D array of 16bit floating-point samples
 typedef ImageT<half> ImageH;
+
+/// 2D array of 8bit integer samples
+typedef ImageT<uint8> Image8;

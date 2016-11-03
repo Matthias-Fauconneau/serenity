@@ -251,7 +251,7 @@ template<class Shader> struct RenderPass {
         if(faceCount>=faceCapacity) { error("Face overflow"_); return; }
         Face& face = faces[faceCount];
         mat3 M = mat3(vec3(A.xy()/A.w, 1), vec3(B.xy()/B.w, 1), vec3(C.xy()/C.w, 1));
-        //E = E.cofactor(); // Edge equations are now columns of E
+        // E = E.cofactor(); // Edge equations are now columns of E
         // Specialization without multiplications by 1s :
         mat3 E;
         E(0,0) =  (M(1,1) - M(1,2)), E(0,1) = -(M(1,0) - M(1,2)), E(0,2) =  (M(1,0) - M(1,1));
@@ -288,12 +288,6 @@ template<class Shader> struct RenderPass {
                 face.pixelAcceptStep[e] = v16sf(-4)*step; // Reversed to allow direct comparison
             }
         }
-        const float S = E(2,0)+E(2,1)+E(2,2); // Normalization factor (area)
-        vec3 iw = vec3(1./A.w, 1./B.w, 1./C.w);
-        face.Eiw = E*iw; // No normalization required as factor is eliminated by division (Ev/Eiw)
-        face.Ez = E*(vec3(A.z/A.w, B.z/B.w, C.z/C.w)/S); // Normalization required as z is the direct end result
-        for(uint i: range(V)) face.varyings[i] = E*(vertexAttributes[i]*iw);
-        face.faceAttributes = faceAttributes;
 
         int2 min = ::max(int2(0,0),int2(floor(::min(::min(A.xy()/A.w,B.xy()/B.w),C.xy()/C.w)))/64);
         int2 max = ::min(int2(width-1,height-1),int2(ceil(::max(::max(A.xy()/A.w,B.xy()/B.w),C.xy()/C.w)))/64);
@@ -310,6 +304,14 @@ template<class Shader> struct RenderPass {
             if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { error("Index overflow"); return; }
             bin.faces[bin.faceCount++] = faceCount;
         }
+
+        const float S = E(2,0)+E(2,1)+E(2,2); // Normalization factor (area)
+        vec3 iw = vec3(1./A.w, 1./B.w, 1./C.w);
+        face.Eiw = E*iw; // No normalization required as factor is eliminated by division (Ev/Eiw)
+        face.Ez = E*(vec3(A.z/A.w, B.z/B.w, C.z/C.w)/S); // Normalization required as z is the direct end result
+        for(uint i: range(V)) face.varyings[i] = E*(vertexAttributes[i]*iw);
+        face.faceAttributes = faceAttributes;
+
         faceCount++;
     }
 

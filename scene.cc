@@ -32,7 +32,7 @@ Scene parseScene(ref<byte> file) {
         }
         assert_(polygon.size == 4);
         //faces.append({{polygon[0], polygon[1], polygon[2], polygon[3]},{0,1,1,0},{0,0,1,1},1});
-        faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},1});
+        faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},Image8()});
         /*assert_(polygon.size == 3 || polygon.size == 4);
         // Fan
         for(size_t i : range(1, polygon.size-1)) {

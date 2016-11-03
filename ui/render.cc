@@ -155,7 +155,7 @@ static void trapezoidY(const Image& target, TrapezoidY::Span s0, TrapezoidY::Spa
  }
 }
 
-// 8bit signed integer (for edge flags)
+/*// 8bit signed integer (for edge flags)
 struct Image8 {
  Image8(uint width, uint height) : width(width), height(height) {
   assert(width); assert(height);
@@ -165,7 +165,7 @@ struct Image8 {
  int8& operator()(uint x, uint y) {assert(x<width && y<height, x, y, width, height); return data[y*width+x]; }
  buffer<int8> data;
  uint width, height;
-};
+};*/
 // FIXME: Coverage integration
 static int lastStepY = 0; // Do not flag first/last point twice but cancel on direction changes
 static void line(Image8& raster, int2 p0, int2 p1) {
