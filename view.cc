@@ -93,10 +93,22 @@ struct ViewApp {
             const vec2 uvD = (M*d).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-            // Scales uv
-            const float cellCount = 16; // for visualization
-            for(float& u: face.u) u *= maxU*cellCount;
-            for(float& v: face.v) v *= maxV*cellCount;
+            const float cellCount = 16;
+            const uint U = maxU*cellCount, V = maxV*cellCount;
+
+            // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
+            for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
+                const float v = (float)vIndex/V;
+                const float u = (float)uIndex/U;
+                const vec3 AD = (1-v)*a + v*d;
+                const vec3 BC = (1-v)*b + v*c;
+                const vec3 P = (1-u)*AD + u*BC;
+
+            }
+
+            // Scales uv for texture sampling (unnormalized)
+            for(float& u: face.u) u *= U;
+            for(float& v: face.v) v *= V;
         }
     }
 
@@ -110,7 +122,6 @@ struct ViewApp {
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
         const float near = scale*(-scene.viewpoint.z+min.z);
         const float far = scale*(-scene.viewpoint.z+max.z);
-        //log(min, max, near, far, far/near);
 
         mat4 M;
         // Sheared perspective (rectification)
