@@ -73,6 +73,7 @@ struct LightFieldViewApp : LightField {
             const float far = scale*(-scene.viewpoint.z+max.z);
 
             // Fits face UV to maximum projected sample rate
+            Time time;
             for(Scene::Face& face: scene.faces) {
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
                 const vec3 O = (a+b+c+d)/4.f;
@@ -99,9 +100,10 @@ struct LightFieldViewApp : LightField {
                 const vec2 uvD = (M*d).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-                const float cellCount = 16;
+                const float cellCount = 32;
                 const uint U = maxU*cellCount, V = maxV*cellCount;
                 face.image = Image8(U, V);
+                //face.image.clear(0); // Just to be sure™
 
                 // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
                 for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
@@ -110,8 +112,11 @@ struct LightFieldViewApp : LightField {
                     const vec3 AD = (1-v)*a + v*d;
                     const vec3 BC = (1-v)*b + v*c;
                     const vec3 P = (1-u)*AD + u*BC;
+#if 1
                     uint hit = 0;
-                    for(uint tIndex: range(imageCount.y)) for(uint sIndex: range(imageCount.x)) {
+                    const int n = 2; // Subsample
+                    for(uint tIndex_ : range(imageCount.y/n)) for(uint sIndex_: range(imageCount.x/n)) {
+                        const uint tIndex = tIndex_*n, sIndex = sIndex_*n;
                         const float s = sIndex/float(imageCount.x-1), t = tIndex/float(imageCount.y-1);
                         mat4 M = shearedPerspective(s*2-1, t*2-1, near, far);
                         M.scale(scale); // Fits scene within -1, 1
@@ -121,17 +126,30 @@ struct LightFieldViewApp : LightField {
                         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
                         M = NDC * M;
                         vec3 uvz = M*P;
-                        assert_(uvz[0] < imageSize.x && uvz[1] < imageSize.y, P, uvz);
+                        //assert_(uvz[0] < imageSize.x && uvz[1] < imageSize.y, P, uvz);
                         float z = fieldZ(sIndex, tIndex, uvz[0], uvz[1]);
                         if(uvz.z < z) hit++;
                     }
-                    face.image[vIndex*U+uIndex] = hit*255/(imageCount.y*imageCount.x);
+                    face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y/n*imageCount.x/n);
+#else
+                    mat4 M = shearedPerspective(0, 0, near, far);
+                    M.scale(scale); // Fits scene within -1, 1
+                    M.translate(-scene.viewpoint);
+                    mat4 NDC;
+                    NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
+                    NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+                    M = NDC * M;
+                    vec3 uvz = M*P; // -1, 1
+                    assert_(uvz.z >= -1 && uvz.z <= 1, uvz);
+                    face.image[vIndex*U+uIndex] = (uvz.z+1)/2 * 0xFF;
+#endif
                 }
 
                 // Scales uv for texture sampling (unnormalized)
                 for(float& u: face.u) u *= U;
                 for(float& v: face.v) v *= V;
             }
+            log(time);
         }
 
         window->actions[Key('s')] = [this]{ displayField=!displayField; window->render(); };

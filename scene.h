@@ -34,7 +34,7 @@ struct Scene {
     /// Shader for all surfaces
     struct Shader {
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; };
+        struct FaceAttributes { uint stride; const uint8* image; uint height;/*DEBUG*/ };
         static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -43,7 +43,11 @@ struct Scene {
 #if 1
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
             const float u = varying[0], v = varying[1];
-            const float s = face.image[int(v)*face.stride+int(u)]; // Nearest // FIXME: bilinear
+            int vIndex = v, uIndex = u;
+            //assert_(vIndex >= 0 && uIndex < 0 && uint(uIndex)<face.stride && uint(vIndex)<face.height, u, v, face.stride, face.height);
+            uIndex = clamp(0, uIndex, (int)face.stride-1);
+            vIndex = clamp(0, vIndex, (int)face.height-1);
+            const float s = (float)face.image[vIndex*face.stride+uIndex]/float(0xFF); // Nearest // FIXME: bilinear
             return Vec<float, 3>{{s, s, s}};
         }
 #else
@@ -80,8 +84,8 @@ struct Scene {
         for(const Face& face: faces) {
             vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
-            renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),vec3(face.v[0],face.v[1],face.v[2])}, {face.image.stride, face.image.data});
-            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),vec3(face.v[0],face.v[2],face.v[3])}, {face.image.stride, face.image.data});
+            renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),vec3(face.v[0],face.v[1],face.v[2])}, {face.image.stride, face.image.data, face.image.size.y});
+            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),vec3(face.v[0],face.v[2],face.v[3])}, {face.image.stride, face.image.data, face.image.size.y});
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(Z, targets);
