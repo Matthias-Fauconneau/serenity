@@ -50,7 +50,7 @@ struct Render {
 
             // Sheared perspective (rectification)
             const float s = sIndex/float(N-1), t = tIndex/float(N-1);
-            mat4 M = shearedPerspective(s, t, near, far);
+            mat4 M = shearedPerspective(s*2-1, t*2-1, near, far);
             M.scale(scale); // Fits scene within -1, 1
             M.translate(-scene.viewpoint);
 

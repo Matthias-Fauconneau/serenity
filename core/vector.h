@@ -96,9 +96,9 @@ generic bool isNumber(const vec& v){ for(uint i: range(N)) if(!isNumber(v[i])) r
 
 template<template<Type> class V, Type T, uint N> inline String str(const vec& v) {
  buffer<char> s(16*N, 0);
- //s.append('(');
+ s.append('(');
  for(uint i: range(N)) { s.append(str(v[i],2u)); if(i<N-1) s.append(" "); }
- //s.append(')');
+ s.append(')');
  return move(s);
 }
 

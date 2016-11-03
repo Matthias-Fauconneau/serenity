@@ -2,9 +2,8 @@
 #include "matrix.h"
 
 inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
-    const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
-    const float left = (-1-S), right = (1-S);
-    const float bottom = (-1-T), top = (1-T);
+    const float left = (-1-s), right = (1-s);
+    const float bottom = (-1-t), top = (1-t);
     mat4 M;
     M(0,0) = 2*near / (right-left);
     M(1,1) = 2*near / (top-bottom);
@@ -15,7 +14,7 @@ inline mat4 shearedPerspective(const float s, const float t, const float near, c
     M(3,2) = - 1;
     M(3,3) = 0;
     M.scale(vec3(1,1,-1)); // Z-
-    M.translate(vec3(-S,-T,0));
+    M.translate(vec3(-s,-t,0));
     return M;
 }
 

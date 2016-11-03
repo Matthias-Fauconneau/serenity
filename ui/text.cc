@@ -255,7 +255,7 @@ TextLayout::TextLayout(const ref<uint> text, float size, float wrap, string font
     }
 }
 
-Text::Text(buffer<uint>&& text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int align, int2 minimalSizeHint,
+Text::Text(buffer<uint>&& text, float size, bgr3f color, float opacity, float wrap, string font, bool hint, float interline, int2 align, int2 minimalSizeHint,
            bool justify, bool justifyExplicitLineBreak)
     : text(move(text)), size(size), color(color), opacity(opacity), wrap(wrap), font(font), hint(hint), interline(interline), align(align),
       justify(justify), justifyExplicitLineBreak(justifyExplicitLineBreak), minimalSizeHint(minimalSizeHint) {}
@@ -264,7 +264,7 @@ const TextLayout& Text::layout(float wrap) {
     wrap = max(0.f, wrap);
     assert_(wrap >= 0, wrap);
     if(!lastTextLayout || wrap != lastTextLayout.wrap)
-        lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align, justify, justifyExplicitLineBreak, true, color);
+        lastTextLayout = TextLayout(text, size, wrap, font, hint, interline, align.x, justify, justifyExplicitLineBreak, true, color);
     return lastTextLayout;
 }
 
@@ -275,8 +275,8 @@ vec2 Text::sizeHint(vec2 size) {
 
 shared<Graphics> Text::graphics(vec2 size) {
     const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
-    vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
-    vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+    vec2 textSize = ceil(layout.bbMax - /*min(vec2(0),*/layout.bbMin/*)*/);
+    vec2 offset = /*max(vec2(0),*/ vec2(align.x==0 ? size.x/2 : (size.x-textSize.x)/2.f, /*align.y==0 ? size.y/2 :*/ (size.y-textSize.y)/2.f);//);
     //if(align == -1) offset.x = 0;
 
     shared<Graphics> graphics;
@@ -308,7 +308,7 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line) {
 Cursor Text::cursorFromPosition(vec2 size, vec2 position) {
     const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);
     vec2 textSize = ceil(layout.bbMax - min(vec2(0),layout.bbMin));
-    vec2 offset = max(vec2(0), vec2(align==0 ? size.x/2 : (size.x-textSize.x)/2.f, (size.y-textSize.y)/2.f));
+    vec2 offset = max(vec2(0), vec2(align.x==0 ? size.x/2 : (size.x-textSize.x)/2.f, align.y==0 ? size.y/2 : (size.y-textSize.y)/2.f));
     position -= offset;
     if(position.y < 0) return {0, 0};
     const auto& lines = lastTextLayout.glyphs;
