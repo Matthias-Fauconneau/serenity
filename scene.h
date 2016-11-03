@@ -43,7 +43,7 @@ struct Scene {
 #if 1
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
             const float u = varying[0], v = varying[1];
-            int vIndex = v, uIndex = u;
+            int vIndex = v+1./2, uIndex = u+1./2; // Round
             //assert_(vIndex >= 0 && uIndex < 0 && uint(uIndex)<face.stride && uint(vIndex)<face.height, u, v, face.stride, face.height);
             uIndex = clamp(0, uIndex, (int)face.stride-1);
             vIndex = clamp(0, vIndex, (int)face.height-1);

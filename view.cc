@@ -107,12 +107,15 @@ struct LightFieldViewApp : LightField {
 
                 // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
                 for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
-                    const float v = (float)vIndex/V;
-                    const float u = (float)uIndex/U;
-                    const vec3 AD = (1-v)*a + v*d;
-                    const vec3 BC = (1-v)*b + v*c;
-                    const vec3 P = (1-u)*AD + u*BC;
-#if 1
+                    const float v = (float(vIndex)+1.f/2)/float(V);
+                    const float u = (float(uIndex)+1.f/2)/float(U);
+                    const vec3 P = a + (b-a)*u + (d-a)*v + (a-b+c-d)*u*v;
+#if 0
+                    float min = ::min(::min(::min(a.z,b.z),c.z),d.z);
+                    float max = ::max(::max(::max(a.z,b.z),c.z),d.z);
+                    face.image[vIndex*U+uIndex] = (P.z-min)/(max-min)*0xFF;
+                    //face.image[vIndex*U+uIndex] = v*0xFF;
+#elif 1
                     uint hit = 0;
                     const int n = 2; // Subsample
                     for(uint tIndex_ : range(imageCount.y/n)) for(uint sIndex_: range(imageCount.x/n)) {
@@ -127,7 +130,7 @@ struct LightFieldViewApp : LightField {
                         M = NDC * M;
                         vec3 uvz = M*P;
                         //assert_(uvz[0] < imageSize.x && uvz[1] < imageSize.y, P, uvz);
-                        float z = fieldZ(sIndex, tIndex, uvz[0], uvz[1]);
+                        float z = fieldZ(sIndex, tIndex, uvz[0]+1.f/2, uvz[1]+1.f/2);
                         if(uvz.z < z) hit++;
                     }
                     face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y/n*imageCount.x/n);
