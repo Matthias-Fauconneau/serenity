@@ -72,8 +72,31 @@ struct LightFieldViewApp : LightField {
             const float near = scale*(-scene.viewpoint.z+min.z);
             const float far = scale*(-scene.viewpoint.z+max.z);
 
+            /*mat4 Mst[4];
+            for(int sIndex: range(2)) for(int tIndex: range(2)) {
+                mat4 M = shearedPerspective(sIndex*2-1, tIndex*2-1, near, far);
+                M.scale(scale); // Fits scene within -1, 1
+                M.translate(-scene.viewpoint);
+                mat4 NDC;
+                NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
+                NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+                M = NDC * M;
+                Mst[tIndex*2+sIndex] = M;
+                log(sIndex, tIndex);
+                log(Mst[tIndex*2+sIndex]);
+            }*/
+#if 1
+            mat4 M1 = shearedPerspective(1, 1, near, far);
+            M1.scale(scale); // Fits scene within -1, 1
+            M1.translate(-scene.viewpoint);
+            mat4 NDC;
+            NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
+            NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+            M1 = NDC * M1;
+#endif
+
             // Fits face UV to maximum projected sample rate
-            Time time;
+            Time time {true};
             for(Scene::Face& face: scene.faces) {
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
                 const vec3 O = (a+b+c+d)/4.f;
@@ -90,8 +113,7 @@ struct LightFieldViewApp : LightField {
                 const vec2 uvB = st + scale*(b.z-scene.viewpoint.z)/near * (scale*(b.xy()-scene.viewpoint.xy())-st);
                 const vec2 uvC = st + scale*(c.z-scene.viewpoint.z)/near * (scale*(c.xy()-scene.viewpoint.xy())-st);
                 const vec2 uvD = st + scale*(d.z-scene.viewpoint.z)/near * (scale*(d.xy()-scene.viewpoint.xy())-st);*/
-                mat4 M;
-                M = shearedPerspective(st[0], st[1], near, far);
+                mat4 M = shearedPerspective(st[0], st[1], near, far);
                 M.scale(scale); // Fits scene within -1, 1
                 M.translate(-scene.viewpoint);
                 const vec2 uvA = (M*a).xy();
@@ -111,7 +133,7 @@ struct LightFieldViewApp : LightField {
                     const float u = (float(uIndex)+1.f/2)/float(U);
                     const vec3 P = a + (b-a)*u + (d-a)*v + (a-b+c-d)*u*v;
                     uint hit = 0;
-                    const int n = 2; // Subsample
+                    const int n = 4; // Subsample
                     for(uint tIndex_ : range(imageCount.y/n)) for(uint sIndex_: range(imageCount.x/n)) {
                         const uint tIndex = tIndex_*n, sIndex = sIndex_*n;
                         const float s = sIndex/float(imageCount.x-1), t = tIndex/float(imageCount.y-1);
@@ -122,10 +144,29 @@ struct LightFieldViewApp : LightField {
                         NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
                         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
                         M = NDC * M;
+#if 0
                         vec3 uvz = M*P;
-                        //assert_(uvz[0] < imageSize.x && uvz[1] < imageSize.y, P, uvz);
-                        float z = fieldZ(sIndex, tIndex, uvz[0]+1.f/2, uvz[1]+1.f/2);
-                        if(uvz.z <= z+1./imageSize.x) hit++;
+                        const float Pu = uvz.x;
+                        const float Pv = uvz.y;
+                        const float Pz = uvz.z;
+#elif 0
+                        assert_(M(3,0)==0 && M(3,1)==0);
+                        const float Pw = M(3,2)*P.z + M(3,3);
+                        assert_(M(0,1)==0, M);
+                        //assert_(M(0,3)<=0x1p-16, (float)__builtin_log2(M(0,3)));
+                        const float Pu = (M(0,0)*P.x + s*M(0,2)*P.z + M(0,3))/Pw;
+                        assert_(M(1,0)==0);
+                        const float Pv = (M(1,1)*P.y + t*M(1,2)*P.z + M(1,3) /*?*/)/Pw;
+                        assert_(M(2,0)==0 && M(2,1)==0);
+                        const float Pz = (M(2,2)*P.z + M(2,3))/Pw;
+#else
+                        const float Pw = M1(3,2)*P.z + M1(3,3);
+                        const float Pu = (M1(0,0)*P.x + s*M1(0,2)*P.z + M1(0,3))/Pw;
+                        const float Pv = (M1(1,1)*P.y + t*M1(1,2)*P.z + M1(1,3))/Pw;
+                        const float Pz = (M1(2,2)*P.z + M1(2,3))/Pw;
+#endif
+                        const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
+                        if(Pz <= z+1./imageSize.x) hit++;
                     }
                     face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y/n*imageCount.x/n);
                 }
