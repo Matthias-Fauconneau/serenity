@@ -7,13 +7,6 @@
 #include "render.h"
 #include "window.h"
 
-inline string basename(string x) {
-    string name = x.contains('/') ? section(x,'/',-2,-1) : x;
-    string basename = name.contains('.') ? section(name,'.',0,-2) : name;
-    assert_(basename);
-    return basename;
-}
-
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
 
@@ -39,9 +32,9 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
-    Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
-    Scene::Renderer<0> Zrenderer {scene};
-    Scene::Renderer<3> BGRrenderer {scene};
+    Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
+    Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
+    Scene::Renderer<Scene::TextureShader, 3> BGRrenderer {scene};
 
     bool displayField = false; // or rasterize geometry
     bool displayCoverage = true; // or checkerboard pattern (when rasterizing)
@@ -71,12 +64,34 @@ struct LightFieldViewApp : LightField {
         const float near = scale*(-scene.viewpoint.z+min.z);
         const float far = scale*(-scene.viewpoint.z+max.z);
 
-        mat4 M1 = shearedPerspective(1, 1, near, far);
-        M1.scale(scale); // Fits scene within -1, 1
-        M1.translate(-scene.viewpoint);
+#if 0
+        mat4 Mst[4];
+        for(int sIndex: range(2)) for(int tIndex: range(2)) {
+            mat4 M = shearedPerspective(sIndex*2-1, tIndex*2-1, near, far);
+            M.scale(scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
+            mat4 NDC;
+            NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
+            NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+            M = NDC * M;
+            Mst[tIndex*2+sIndex] = M;
+            log(sIndex, tIndex);
+            log(Mst[tIndex*2+sIndex]);
+        }
+#endif
+
         mat4 NDC;
         NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+
+        mat4 M0 = shearedPerspective(-1, -1, near, far);
+        M0.scale(scale); // Fits scene within -1, 1
+        M0.translate(-scene.viewpoint);
+        M0 = NDC * M0;
+
+        mat4 M1 = shearedPerspective(1, 1, near, far);
+        M1.scale(scale); // Fits scene within -1, 1
+        M1.translate(-scene.viewpoint);
         M1 = NDC * M1;
 
         // Fits face UV to maximum projected sample rate
@@ -84,7 +99,7 @@ struct LightFieldViewApp : LightField {
         log("Start");
         time.start();
         //uint64 totalTime[threadCount()], innerTime[threadCount()];
-        parallel_chunk(0, scene.faces.size, [this, M1, scale, near, far/*, &totalTime, &innerTime*/](uint unused id, uint start, uint sizeI) {
+        parallel_chunk(0, scene.faces.size, [this, M0, M1, scale, near, far/*, &totalTime, &innerTime*/](uint unused id, uint start, uint sizeI) {
             //tsc totalTSC, innerTSC;
             //totalTSC.start();
             const uint sSize = imageCount.x, tSize = imageCount.y;
@@ -93,8 +108,12 @@ struct LightFieldViewApp : LightField {
             const int size1 = imageSize.x *1;
             const int size2 = imageSize.y *size1;
             const int size3 = imageCount.x*size2;
-            const float zBias = 1./imageSize.x;
-            const float m32 = M1(3,2), m33 = M1(3,3), m00 = M1(0,0), m02 = M1(0,2), m03 = M1(0,3), m11 = M1(1,1), m12 = M1(1,2), m13 = M1(1,3), m22 = M1(2,2), m23 = M1(2,3);
+            assert_(imageSize.x == imageSize.y);
+            const float zBias = 2./imageSize.x;
+            const float m32 = M1(3,2), m33 = M1(3,3);
+            const float m00 = M1(0,0), m02 = M1(0,2), m030 = M0(0,3), m03d = M1(0,3)-M0(0,3);
+            const float m11 = M1(1,1), m12 = M1(1,2), m130 = M0(1,3), m13d = M1(1,3)-M0(1,3);
+            const float m22 = M1(2,2), m23 = M1(2,3);
             const int projectionCount = imageCount.y*imageCount.x;
 
             for(const uint faceIndex: range(start, start+sizeI)) {
@@ -124,10 +143,11 @@ struct LightFieldViewApp : LightField {
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
                 const float cellCount = 32;
-                const uint U = maxU*cellCount, V = maxV*cellCount;
+                const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+                assert_(U && V);
                 // Scales uv for texture sampling (unnormalized)
-                for(float& u: face.u) u *= U;
-                for(float& v: face.v) v *= V;
+                for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
+                for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
                 // Allocates image (FIXME)
                 face.image = Image8(U, V);
 
@@ -137,25 +157,45 @@ struct LightFieldViewApp : LightField {
 
                 // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
                 //innerTSC.start();
-                for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
-                    const float v = (float(vIndex)+1.f/2)/float(V);
-                    const float u = (float(uIndex)+1.f/2)/float(U);
+                for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                    const float v = (float(svIndex)+1.f/2)/float(V);
+                    const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = a + ad*v + (ab + badc*v) * u;
                     uint hit = 0;
                     for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
                         const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
                         const float iPw = 1.f/(m32*P.z + m33);
-                        const float Pu = (m00*P.x + s*m02*P.z + m03)*iPw;
-                        const float Pv = (m11*P.y + t*m12*P.z + m13)*iPw;
+                        const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
+                        const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
                         const float Pz = (m22*P.z + m23)*iPw;
                         //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
                         const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
                         const int uIndex = Pu+1.f/2;
                         const int vIndex = Pv+1.f/2;
+                        if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) continue;
+                        assert_(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y, uIndex, vIndex);
                         const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
                         if(Pz <= z+zBias) hit++;
                     }
-                    face.image[vIndex*U+uIndex] = hit*0xFF/projectionCount;
+                    face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
+#if 0 // DEBUG
+                    {
+                        const float iPw = 1.f/(m32*P.z + m33);
+                        const float s = 1./2, t = 1./2;
+                        const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
+                        const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
+                        const half* Zst = fieldZ + (uint64)(tSize/2)*size3 + (sSize/2)*size2;
+                        const int uIndex = Pu+1.f/2;
+                        const int vIndex = Pv+1.f/2;
+                        if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) {
+                            face.image[vIndex*U+uIndex] = 0;
+                            continue;
+                        }
+                        const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+                        face.image[svIndex*U+suIndex] = (z+1)/2*0xFF;
+                        face.image[svIndex*U+suIndex] = 0;
+                    }
+#endif
                 }
                 //innerTSC.stop();
             }
@@ -185,7 +225,7 @@ struct LightFieldViewApp : LightField {
         mat4 M = shearedPerspective(s, t, near, far);
         M.scale(scale); // Fits scene within -1, 1
         M.translate(-scene.viewpoint);
-        const vec2 st = vec2(s, t) * vec2(imageCount-uint2(1));
+        const vec2 st = vec2((s+1)/2, (t+1)/2) * vec2(imageCount-uint2(2));
         const vec2 scaleTargetUV = vec2(imageSize-uint2(1)) / vec2(target.size-uint2(1));
 
         if(displayField && imageCount) {
@@ -234,7 +274,7 @@ struct LightFieldViewApp : LightField {
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             uint uIndex = uv_[0], vIndex = uv_[1];
                             if( uIndex >= uint(imageSize.x)-2 || vIndex >= uint(imageSize.y)-2 ) { w01st[dt*2+ds] = 0; continue; }
-                            assert_(tIndex < imageCount.x && sIndex < imageCount.y);
+                            assert_(tIndex < imageCount.x && sIndex < imageCount.y, sIndex, tIndex);
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -258,6 +298,8 @@ struct LightFieldViewApp : LightField {
                         const int uIndex = uv[0], vIndex = uv[1];
                         if(uv[0] < 0 || uv[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
                         if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
+                        //if(tIndex >= int(imageCount.y)-1 || sIndex >= int(imageSize.x)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
+                        //assert_(tIndex < imageCount.x-1 && sIndex < imageCount.y-1, sIndex, tIndex);
                         const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
                         const v16sf B = toFloat((v16hf)gather((float*)(fieldB+base), sample4D));
                         const v16sf G = toFloat((v16hf)gather((float*)(fieldG+base), sample4D));
@@ -272,6 +314,10 @@ struct LightFieldViewApp : LightField {
                                         * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
                                         * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
                         S = bgr3f(dot(w01, B), dot(w01, G), dot(w01, R));
+
+                        // DEBUG
+                        const v16sf Z = toFloat((v16hf)gather((float*)(fieldR+base), sample4D));
+                        S = bgr3f((dot(w01, Z)+1)/2);
                     }
                     target[targetIndex] = byte4(byte3(float(0xFF)*S), 0xFF);
                 }

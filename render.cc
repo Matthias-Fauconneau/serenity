@@ -3,23 +3,16 @@
 #include "file.h"
 #include "png.h"
 
-inline string basename(string x) {
-    string name = x.contains('/') ? section(x,'/',-2,-1) : x;
-    string basename = name.contains('.') ? section(name,'.',0,-2) : name;
-    assert_(basename);
-    return basename;
-}
-
 struct Render {
     Render() {
-        Scene scene {::parseScene(readFile(basename(arguments()[0])+".scene"))};
-        const Folder& folder = Folder("/var/tmp/"_+basename(arguments()[0]));
-        assert_(Folder(".",folder).name() == "/var/tmp/Box", folder.name());
+        Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
+        const Folder& folder = Folder(basename(arguments()[0]), "/var/tmp/"_, true);
+        assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 0
         const size_t N = 33;
-        const uint2 size = 1024;
+        const uint2 size = 512;
 #else
         const size_t N = 129;
         const uint2 size = 128;
@@ -33,12 +26,12 @@ struct Render {
         mref<half> field = mcast<half>(map);
         profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
 
-        buffer<Scene::Renderer<3>> renderers (threadCount());
-        for(Scene::Renderer<3>& renderer: renderers) new (&renderer) Scene::Renderer<4>(scene);
+        buffer<Scene::Renderer<Scene::CheckerboardShader, 3>> renderers (threadCount());
+        for(auto& renderer: renderers) new (&renderer) Scene::Renderer<Scene::CheckerboardShader, 4>(scene);
 
         // Fits scene
         vec3 min = inff, max = -inff;
-        for(Scene::Face f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+        for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
         max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
         const float near = scale*(-scene.viewpoint.z+min.z);
