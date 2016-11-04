@@ -60,48 +60,49 @@ struct LightFieldViewApp : LightField {
             return ImageView::graphics(size);
         }
     } view {*this};
-    unique<Window> window = ::window(&view);
+    unique<Window> window = nullptr;
 
     LightFieldViewApp() : LightField(Folder(basename(arguments()[0])+(arguments().contains("coverage")?"/coverage"_:""_),"/var/tmp"_,true)) {
-        {
-            // Fits scene
-            vec3 min = inff, max = -inff;
-            for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-            max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
-            const float scale = 2./::max(max.x-min.x, max.y-min.y);
-            const float near = scale*(-scene.viewpoint.z+min.z);
-            const float far = scale*(-scene.viewpoint.z+max.z);
+        // Fits scene
+        vec3 min = inff, max = -inff;
+        for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
+        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
+        const float scale = 2./::max(max.x-min.x, max.y-min.y);
+        const float near = scale*(-scene.viewpoint.z+min.z);
+        const float far = scale*(-scene.viewpoint.z+max.z);
 
-            /*mat4 Mst[4];
-            for(int sIndex: range(2)) for(int tIndex: range(2)) {
-                mat4 M = shearedPerspective(sIndex*2-1, tIndex*2-1, near, far);
-                M.scale(scale); // Fits scene within -1, 1
-                M.translate(-scene.viewpoint);
-                mat4 NDC;
-                NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
-                NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
-                M = NDC * M;
-                Mst[tIndex*2+sIndex] = M;
-                log(sIndex, tIndex);
-                log(Mst[tIndex*2+sIndex]);
-            }*/
-#if 1
-            mat4 M1 = shearedPerspective(1, 1, near, far);
-            M1.scale(scale); // Fits scene within -1, 1
-            M1.translate(-scene.viewpoint);
-            mat4 NDC;
-            NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
-            NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
-            M1 = NDC * M1;
-#endif
+        mat4 M1 = shearedPerspective(1, 1, near, far);
+        M1.scale(scale); // Fits scene within -1, 1
+        M1.translate(-scene.viewpoint);
+        mat4 NDC;
+        NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
+        NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
+        M1 = NDC * M1;
 
-            // Fits face UV to maximum projected sample rate
-            Time time {true};
-            for(Scene::Face& face: scene.faces) { // TODO: parallel
+        // Fits face UV to maximum projected sample rate
+        Time time {true};
+        log("Start");
+        time.start();
+        //uint64 totalTime[threadCount()], innerTime[threadCount()];
+        parallel_chunk(0, scene.faces.size, [this, M1, scale, near, far/*, &totalTime, &innerTime*/](uint unused id, uint start, uint sizeI) {
+            //tsc totalTSC, innerTSC;
+            //totalTSC.start();
+            const uint sSize = imageCount.x, tSize = imageCount.y;
+            const float sSizeScale = 1./float(sSize-1), tSizeScale = 1./float(tSize-1);
+            const half* fieldZ = this->fieldZ.data;
+            const int size1 = imageSize.x *1;
+            const int size2 = imageSize.y *size1;
+            const int size3 = imageCount.x*size2;
+            const float zBias = 1./imageSize.x;
+            const float m32 = M1(3,2), m33 = M1(3,3), m00 = M1(0,0), m02 = M1(0,2), m03 = M1(0,3), m11 = M1(1,1), m12 = M1(1,2), m13 = M1(1,3), m22 = M1(2,2), m23 = M1(2,3);
+            const int projectionCount = imageCount.y*imageCount.x;
+
+            for(const uint faceIndex: range(start, start+sizeI)) {
+                Scene::Face& face = scene.faces[faceIndex];
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
                 const vec3 O = (a+b+c+d)/4.f;
                 const vec3 N = cross(c-a, b-a);
-                  // Viewpoint st with maximum projection
+                // Viewpoint st with maximum projection
                 vec2 st = clamp(vec2(-1), scale*(O.xy()-scene.viewpoint.xy()) + (scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
                 if(!N.z) {
                     if(!N.x) st.x = 0;
@@ -110,9 +111,9 @@ struct LightFieldViewApp : LightField {
                 // Projects vertices along st view rays on uv plane (perspective)
                 // FIXME
                 /*const vec2 uvA = st + scale*(a.z-scene.viewpoint.z)/near * (scale*(a.xy()-scene.viewpoint.xy())-st);
-                const vec2 uvB = st + scale*(b.z-scene.viewpoint.z)/near * (scale*(b.xy()-scene.viewpoint.xy())-st);
-                const vec2 uvC = st + scale*(c.z-scene.viewpoint.z)/near * (scale*(c.xy()-scene.viewpoint.xy())-st);
-                const vec2 uvD = st + scale*(d.z-scene.viewpoint.z)/near * (scale*(d.xy()-scene.viewpoint.xy())-st);*/
+                      const vec2 uvB = st + scale*(b.z-scene.viewpoint.z)/near * (scale*(b.xy()-scene.viewpoint.xy())-st);
+                      const vec2 uvC = st + scale*(c.z-scene.viewpoint.z)/near * (scale*(c.xy()-scene.viewpoint.xy())-st);
+                      const vec2 uvD = st + scale*(d.z-scene.viewpoint.z)/near * (scale*(d.xy()-scene.viewpoint.xy())-st);*/
                 mat4 M = shearedPerspective(st[0], st[1], near, far);
                 M.scale(scale); // Fits scene within -1, 1
                 M.translate(-scene.viewpoint);
@@ -124,22 +125,18 @@ struct LightFieldViewApp : LightField {
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
                 const float cellCount = 32;
                 const uint U = maxU*cellCount, V = maxV*cellCount;
+                // Scales uv for texture sampling (unnormalized)
+                for(float& u: face.u) u *= U;
+                for(float& v: face.v) v *= V;
+                // Allocates image (FIXME)
                 face.image = Image8(U, V);
-
-                const uint sSize = imageCount.x, tSize = imageCount.y;
-                const float sSizeScale = 1./float(sSize-1), tSizeScale = 1./float(tSize-1);
-                const half* fieldZ = this->fieldZ.data;
-                const int size1 = imageSize.x *1;
-                const int size2 = imageSize.y *size1;
-                const int size3 = imageCount.x*size2;
-                const float zBias = 1./imageSize.x;
-                const float m32 = M1(3,2), m33 = M1(3,3), m00 = M1(0,0), m02 = M1(0,2), m03 = M1(0,3), m11 = M1(1,1), m12 = M1(1,2), m13 = M1(1,3), m22 = M1(2,2), m23 = M1(2,3);
 
                 const vec3 ab = b-a;
                 const vec3 ad = d-a;
                 const vec3 badc = a-b+c-d;
 
                 // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
+                //innerTSC.start();
                 for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
                     const float v = (float(vIndex)+1.f/2)/float(V);
                     const float u = (float(uIndex)+1.f/2)/float(U);
@@ -158,16 +155,16 @@ struct LightFieldViewApp : LightField {
                         const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
                         if(Pz <= z+zBias) hit++;
                     }
-                    face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y*imageCount.x);
+                    face.image[vIndex*U+uIndex] = hit*0xFF/projectionCount;
                 }
-
-                // Scales uv for texture sampling (unnormalized)
-                for(float& u: face.u) u *= U;
-                for(float& v: face.v) v *= V;
+                //innerTSC.stop();
             }
-            log(time);
-        }
+            //totalTime[id] = totalTSC;
+            //innerTime[id] = innerTSC;
+        });
+        log(time);//, strD(sum(ref<uint64>(innerTime, threadCount())),sum(ref<uint64>(totalTime, threadCount()))));
 
+        window = ::window(&view);
         window->actions[Key('s')] = [this]{ displayField=!displayField; window->render(); };
         window->actions[Key('c')] = [this]{ displayCoverage=!displayCoverage; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
