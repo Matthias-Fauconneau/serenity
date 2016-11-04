@@ -32,8 +32,10 @@ struct Scene {
     buffer<Face> faces;
 
     struct TextureShader {
+        TextureShader(const Scene&) {}
+
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ };
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
         static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -51,8 +53,10 @@ struct Scene {
     };
 
     struct CheckerboardShader {
+        CheckerboardShader(const Scene&) {}
+
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ };
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
         static constexpr int V = 2;
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -68,11 +72,32 @@ struct Scene {
         }
     };
 
+    struct RaycastShader {
+        // Shader specification (used by rasterizer)
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
+        static constexpr int V = 5;
+        static constexpr bool blend = false; // Disables unnecessary blending
+        const ref<Face> faces;
+        RaycastShader(const Scene& scene) : faces(scene.faces) {}
+
+        template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
+        template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
+        inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
+            const float x = varying[2], y = varying[3], z = varying[4];
+            vec3 D = normalize(vec3(x, y, z));
+            //const float x = (face.N.x+1)/2, y = (face.N.y+1)/2, z = (face.N.z+1)/2;
+            vec3 R = D - 2*dot(face.N, D)*face.N;
+            const float X = R.x, Y = R.y, Z = R.z;
+            const float r = (X+1)/2, g = (Y+1)/2, b = (Z+1)/2;
+            return Vec<float, 3>{{r, g, b}};
+        }
+    };
+
     template<Type Shader, int C> struct Renderer {
         Shader shader; // Instance holds any uniforms (currently none)
         RenderPass<Shader> pass; // Face bins
         RenderTarget<C> target; // Sample tiles
-        Renderer(const Scene& unused scene) : pass(shader) {}
+        Renderer(const Scene& unused scene) : shader(scene), pass(shader) {}
     };
 
     template<Type Shader, Type... Args>
@@ -86,10 +111,20 @@ struct Scene {
         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
         for(const Face& face: faces) {
-            vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
+            const vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
-            renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),vec3(face.v[0],face.v[1],face.v[2])}, {face.image.stride, face.image.data, face.image.size.y});
-            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),vec3(face.v[0],face.v[2],face.v[3])}, {face.image.stride, face.image.data, face.image.size.y});
+            const vec3 A = face.position[0]-viewpoint, B = face.position[1]-viewpoint, C = face.position[2]-viewpoint, D = face.position[3]-viewpoint;
+            const vec3 N = normalize(cross(B-A,C-A)); // FIXME: store
+            renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),
+                                                 vec3(face.v[0],face.v[1],face.v[2]),
+                                                 vec3(A.x,B.x,C.x),
+                                                 vec3(A.y,B.y,C.y),
+                                                 vec3(A.z,B.z,C.z)}, {face.image.stride, face.image.data, face.image.size.y, N});
+            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
+                                                 vec3(face.v[0],face.v[2],face.v[3]),
+                                                 vec3(A.x,C.x,D.x),
+                                                 vec3(A.y,C.y,D.y),
+                                                 vec3(A.z,C.z,D.z)}, {face.image.stride, face.image.data, face.image.size.y, N});
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(Z, targets);
@@ -106,6 +141,21 @@ template <> inline Vec<float, 0> Scene::TextureShader::shade<0, float>(FaceAttri
 template <> inline Vec<v16sf, 0> Scene::TextureShader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
 template <> inline Vec<float, 3> Scene::TextureShader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
 template <> inline Vec<v16sf, 3> Scene::TextureShader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const {
+    Vec<v16sf, 3> Y;
+    for(uint i: range(16)) {
+        float x[V];
+        for(uint v: range(V)) x[v] = varying[v][i];
+        Vec<float, 3> y = shade3(face, z[i], x);
+        for(uint c: range(3)) Y._[c][i] = y._[c];
+    }
+    return Y;
+}
+
+template <> inline Vec<float, 0> Scene::RaycastShader::shade<0, float>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
+template <> inline Vec<v16sf, 0> Scene::RaycastShader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
+template <> inline Vec<float, 3> Scene::RaycastShader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
+// FIXME: duplicate definition with TextureShader
+template <> inline Vec<v16sf, 3> Scene::RaycastShader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const {
     Vec<v16sf, 3> Y;
     for(uint i: range(16)) {
         float x[V];

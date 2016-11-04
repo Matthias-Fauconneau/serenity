@@ -35,11 +35,13 @@ struct LightFieldViewApp : LightField {
     Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
     Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
     Scene::Renderer<Scene::TextureShader, 3> TexRenderer {scene};
-    Scene::Renderer<Scene::CheckerboardShader, 3> BGRrenderer {scene};
+    Scene::Renderer<Scene::CheckerboardShader, 3> UVRenderer {scene};
+    Scene::Renderer<Scene::RaycastShader, 3> BGRRenderer {scene};
 
     bool displayField = false; // or rasterize geometry
-    bool displayCoverage = true; // or checkerboard pattern (when rasterizing)
     bool depthCorrect = true; // when displaying field
+    bool displayCoverage = false; // or raycast shader (when rasterizing)
+    bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     struct LightFieldViewWidget : ViewControl, ImageView {
         LightFieldViewApp& _this;
@@ -64,22 +66,6 @@ struct LightFieldViewApp : LightField {
         const float scale = 2./::max(max.x-min.x, max.y-min.y);
         const float near = scale*(-scene.viewpoint.z+min.z);
         const float far = scale*(-scene.viewpoint.z+max.z);
-
-#if 0
-        mat4 Mst[4];
-        for(int sIndex: range(2)) for(int tIndex: range(2)) {
-            mat4 M = shearedPerspective(sIndex*2-1, tIndex*2-1, near, far);
-            M.scale(scale); // Fits scene within -1, 1
-            M.translate(-scene.viewpoint);
-            mat4 NDC;
-            NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
-            NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
-            M = NDC * M;
-            Mst[tIndex*2+sIndex] = M;
-            log(sIndex, tIndex);
-            log(Mst[tIndex*2+sIndex]);
-        }
-#endif
 
         mat4 NDC;
         NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
@@ -143,7 +129,7 @@ struct LightFieldViewApp : LightField {
                 const vec2 uvD = (M*d).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-                const float cellCount = 128;
+                const float cellCount = 1;
                 const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
                 assert_(U && V);
                 // Scales uv for texture sampling (unnormalized)
@@ -182,7 +168,7 @@ struct LightFieldViewApp : LightField {
                         face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
                     }
                 } else {
-                    for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                    /*for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
                         const float v = (float(svIndex)+1.f/2)/float(V);
                         const float u = (float(suIndex)+1.f/2)/float(U);
                         const vec3 P = a + ad*v + (ab + badc*v) * u;
@@ -197,9 +183,9 @@ struct LightFieldViewApp : LightField {
                             face.image[svIndex*U+suIndex] = 0;
                             continue;
                         }
-                        const float z = P.z; //Zst[vIndex*size1 + uIndex]; // -1, 1
+                        const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
                         face.image[svIndex*U+suIndex] = (z+1)/2*0xFF;
-                    }
+                    }*/ error("projectionCount");
                 }
                 //innerTSC.stop();
             }
@@ -210,8 +196,9 @@ struct LightFieldViewApp : LightField {
 
         window = ::window(&view);
         window->actions[Key('s')] = [this]{ displayField=!displayField; window->render(); };
-        window->actions[Key('c')] = [this]{ displayCoverage=!displayCoverage; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
+        window->actions[Key('c')] = [this]{ displayCoverage=!displayCoverage; window->render(); };
+        window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
     }
     Image render(uint2 targetSize) {
         Image target (targetSize);
@@ -330,8 +317,10 @@ struct LightFieldViewApp : LightField {
             ImageH B (target.size), G (target.size), R (target.size);
             if(displayCoverage)
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            else if(displayParametrization)
+                scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else
-                scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
+                scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             convert(target, B, G, R);
         }
         return target;
