@@ -43,9 +43,9 @@ struct LightField : LightFieldFile {
         uint4 size;
         Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
         const half& operator ()(uint s, uint t, uint u, uint v) const {
-            assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
+            //assert(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
             size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
-            assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
+            //assert(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
             return operator[](index);
         }
     } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},

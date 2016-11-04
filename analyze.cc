@@ -43,12 +43,10 @@ struct LightFieldAnalyze : LightField {
             mref<uint8> hitVoxels = hitVoxelss.slice(threadID*gridSize.z*gridSize.y*gridSize.x/8, gridSize.z*gridSize.y*gridSize.x/8);
             hitVoxels.clear(0);
 
-            const uint2 imageCount = this->imageCount;
-            const uint2 imageSize = this->imageSize;
             const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
-            const int size1 = this->size1;
-            const int size2 = this->size2;
-            const int size3 = this->size3;
+            const int size1 = imageSize.x *1;
+            const int size2 = imageSize.y *size1;
+            const int size3 = imageCount.x*size2;
 
             const int sIndex = stIndex%sSize, tIndex = stIndex/sSize;
             const vec2 st = vec2(sIndex, tIndex);

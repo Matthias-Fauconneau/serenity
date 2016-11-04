@@ -97,7 +97,7 @@ struct LightFieldViewApp : LightField {
 
             // Fits face UV to maximum projected sample rate
             Time time {true};
-            for(Scene::Face& face: scene.faces) {
+            for(Scene::Face& face: scene.faces) { // TODO: parallel
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
                 const vec3 O = (a+b+c+d)/4.f;
                 const vec3 N = cross(c-a, b-a);
@@ -125,50 +125,40 @@ struct LightFieldViewApp : LightField {
                 const float cellCount = 32;
                 const uint U = maxU*cellCount, V = maxV*cellCount;
                 face.image = Image8(U, V);
-                //face.image.clear(0); // Just to be sure™
+
+                const uint sSize = imageCount.x, tSize = imageCount.y;
+                const float sSizeScale = 1./float(sSize-1), tSizeScale = 1./float(tSize-1);
+                const half* fieldZ = this->fieldZ.data;
+                const int size1 = imageSize.x *1;
+                const int size2 = imageSize.y *size1;
+                const int size3 = imageCount.x*size2;
+                const float zBias = 1./imageSize.x;
+                const float m32 = M1(3,2), m33 = M1(3,3), m00 = M1(0,0), m02 = M1(0,2), m03 = M1(0,3), m11 = M1(1,1), m12 = M1(1,2), m13 = M1(1,3), m22 = M1(2,2), m23 = M1(2,3);
+
+                const vec3 ab = b-a;
+                const vec3 ad = d-a;
+                const vec3 badc = a-b+c-d;
 
                 // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
                 for(uint vIndex: range(V)) for(uint uIndex: range(U)) {
                     const float v = (float(vIndex)+1.f/2)/float(V);
                     const float u = (float(uIndex)+1.f/2)/float(U);
-                    const vec3 P = a + (b-a)*u + (d-a)*v + (a-b+c-d)*u*v;
+                    const vec3 P = a + ad*v + (ab + badc*v) * u;
                     uint hit = 0;
-                    const int n = 4; // Subsample
-                    for(uint tIndex_ : range(imageCount.y/n)) for(uint sIndex_: range(imageCount.x/n)) {
-                        const uint tIndex = tIndex_*n, sIndex = sIndex_*n;
-                        const float s = sIndex/float(imageCount.x-1), t = tIndex/float(imageCount.y-1);
-                        mat4 M = shearedPerspective(s*2-1, t*2-1, near, far);
-                        M.scale(scale); // Fits scene within -1, 1
-                        M.translate(-scene.viewpoint);
-                        mat4 NDC;
-                        NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
-                        NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
-                        M = NDC * M;
-#if 0
-                        vec3 uvz = M*P;
-                        const float Pu = uvz.x;
-                        const float Pv = uvz.y;
-                        const float Pz = uvz.z;
-#elif 0
-                        assert_(M(3,0)==0 && M(3,1)==0);
-                        const float Pw = M(3,2)*P.z + M(3,3);
-                        assert_(M(0,1)==0, M);
-                        //assert_(M(0,3)<=0x1p-16, (float)__builtin_log2(M(0,3)));
-                        const float Pu = (M(0,0)*P.x + s*M(0,2)*P.z + M(0,3))/Pw;
-                        assert_(M(1,0)==0);
-                        const float Pv = (M(1,1)*P.y + t*M(1,2)*P.z + M(1,3) /*?*/)/Pw;
-                        assert_(M(2,0)==0 && M(2,1)==0);
-                        const float Pz = (M(2,2)*P.z + M(2,3))/Pw;
-#else
-                        const float Pw = M1(3,2)*P.z + M1(3,3);
-                        const float Pu = (M1(0,0)*P.x + s*M1(0,2)*P.z + M1(0,3))/Pw;
-                        const float Pv = (M1(1,1)*P.y + t*M1(1,2)*P.z + M1(1,3))/Pw;
-                        const float Pz = (M1(2,2)*P.z + M1(2,3))/Pw;
-#endif
-                        const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
-                        if(Pz <= z+1./imageSize.x) hit++;
+                    for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
+                        const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
+                        const float iPw = 1.f/(m32*P.z + m33);
+                        const float Pu = (m00*P.x + s*m02*P.z + m03)*iPw;
+                        const float Pv = (m11*P.y + t*m12*P.z + m13)*iPw;
+                        const float Pz = (m22*P.z + m23)*iPw;
+                        //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
+                        const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
+                        const int uIndex = Pu+1.f/2;
+                        const int vIndex = Pv+1.f/2;
+                        const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+                        if(Pz <= z+zBias) hit++;
                     }
-                    face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y/n*imageCount.x/n);
+                    face.image[vIndex*U+uIndex] = hit*0xFF/(imageCount.y*imageCount.x);
                 }
 
                 // Scales uv for texture sampling (unnormalized)
