@@ -11,6 +11,7 @@ template<Type V> V parseVec(TextData& s) {
     for(uint index: range(V::_N)) { s.whileAny(" \t"); value[index] = parse<Type V::_T>(s); }
     return value;
 }
+template<> inline uint3 parse<uint3>(TextData& s) { return parseVec<uint3>(s); }
 template<> inline uint4 parse<uint4>(TextData& s) { return parseVec<uint4>(s); }
 template<> inline vec3 parse<vec3>(TextData& s) { return parseVec<vec3>(s); }
 
@@ -42,16 +43,21 @@ Scene parseScene(ref<byte> file) {
         buffer<uint4> indices (faceCount);
         for(size_t i : range(faceCount)) {
             uint length = s.integer();
-            assert_(length == 4);
-            indices[i] = parse<uint4>(s);
+            if(length==3) {
+                indices[i] = uint4(parse<uint3>(s), 0);
+                indices[i][3] = indices[i][2]; // FIXME
+            } else {
+                assert_(length == 4, length);
+                indices[i] = parse<uint4>(s);
+            }
             s.until('\n');
         }
 
-        const vec3 viewpoint (0,0,-4);
+        const vec3 viewpoint (0,0,-64);
         buffer<Scene::Face> faces (faceCount, 0);
         for(uint4 face: indices) {
-            //faces.append({{vertices[face[0]], vertices[face[1]], vertices[face[2]], vertices[face[3]]},{0,1,1,0},{0,0,1,1},Image8()});
-            faces.append({{vertices[face[3]], vertices[face[2]], vertices[face[1]], vertices[face[0]]},{0,1,1,0},{0,0,1,1},Image8()});
+            faces.append({{vertices[face[0]], vertices[face[1]], vertices[face[2]], vertices[face[3]]},{0,1,1,0},{0,0,1,1},Image8()});
+            //faces.append({{vertices[face[3]], vertices[face[2]], vertices[face[1]], vertices[face[0]]},{0,1,1,0},{0,0,1,1},Image8()});
         }
         return {viewpoint, ::move(faces)};
     } else {

@@ -34,7 +34,8 @@ struct ViewControl : virtual Widget {
 struct LightFieldViewApp : LightField {
     Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
     Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
-    Scene::Renderer<Scene::TextureShader, 3> BGRrenderer {scene};
+    Scene::Renderer<Scene::TextureShader, 3> TexRenderer {scene};
+    Scene::Renderer<Scene::CheckerboardShader, 3> BGRrenderer {scene};
 
     bool displayField = false; // or rasterize geometry
     bool displayCoverage = true; // or checkerboard pattern (when rasterizing)
@@ -142,7 +143,7 @@ struct LightFieldViewApp : LightField {
                 const vec2 uvD = (M*d).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-                const float cellCount = 32;
+                const float cellCount = 128;
                 const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
                 assert_(U && V);
                 // Scales uv for texture sampling (unnormalized)
@@ -155,31 +156,36 @@ struct LightFieldViewApp : LightField {
                 const vec3 ad = d-a;
                 const vec3 badc = a-b+c-d;
 
-                // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
-                //innerTSC.start();
-                for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
-                    const float v = (float(svIndex)+1.f/2)/float(V);
-                    const float u = (float(suIndex)+1.f/2)/float(U);
-                    const vec3 P = a + ad*v + (ab + badc*v) * u;
-                    uint hit = 0;
-                    for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
-                        const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
-                        const float iPw = 1.f/(m32*P.z + m33);
-                        const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
-                        const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
-                        const float Pz = (m22*P.z + m23)*iPw;
-                        //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
-                        const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
-                        const int uIndex = Pu+1.f/2;
-                        const int vIndex = Pv+1.f/2;
-                        if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) continue;
-                        assert_(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y, uIndex, vIndex);
-                        const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-                        if(Pz <= z+zBias) hit++;
+                if(projectionCount) {
+                    // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
+                    //innerTSC.start();
+                    for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                        const float v = (float(svIndex)+1.f/2)/float(V);
+                        const float u = (float(suIndex)+1.f/2)/float(U);
+                        const vec3 P = a + ad*v + (ab + badc*v) * u;
+                        uint hit = 0;
+                        for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
+                            const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
+                            const float iPw = 1.f/(m32*P.z + m33);
+                            const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
+                            const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
+                            const float Pz = (m22*P.z + m23)*iPw;
+                            //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
+                            const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
+                            const int uIndex = Pu+1.f/2;
+                            const int vIndex = Pv+1.f/2;
+                            if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) continue;
+                            assert_(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y, uIndex, vIndex);
+                            const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+                            if(Pz <= z+zBias) hit++;
+                        }
+                        face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
                     }
-                    face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
-#if 0 // DEBUG
-                    {
+                } else {
+                    for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                        const float v = (float(svIndex)+1.f/2)/float(V);
+                        const float u = (float(suIndex)+1.f/2)/float(U);
+                        const vec3 P = a + ad*v + (ab + badc*v) * u;
                         const float iPw = 1.f/(m32*P.z + m33);
                         const float s = 1./2, t = 1./2;
                         const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
@@ -188,14 +194,12 @@ struct LightFieldViewApp : LightField {
                         const int uIndex = Pu+1.f/2;
                         const int vIndex = Pv+1.f/2;
                         if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) {
-                            face.image[vIndex*U+uIndex] = 0;
+                            face.image[svIndex*U+suIndex] = 0;
                             continue;
                         }
-                        const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
+                        const float z = P.z; //Zst[vIndex*size1 + uIndex]; // -1, 1
                         face.image[svIndex*U+suIndex] = (z+1)/2*0xFF;
-                        face.image[svIndex*U+suIndex] = 0;
                     }
-#endif
                 }
                 //innerTSC.stop();
             }
@@ -324,7 +328,10 @@ struct LightFieldViewApp : LightField {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            if(displayCoverage)
+                scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            else
+                scene.render(BGRrenderer, M, (float[]){1,1,1}, {}, B, G, R);
             convert(target, B, G, R);
         }
         return target;

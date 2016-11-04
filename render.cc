@@ -10,9 +10,9 @@ struct Render {
         assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
-#if 0
+#if 1
         const size_t N = 33;
-        const uint2 size = 512;
+        const uint2 size = 1024;
 #else
         const size_t N = 129;
         const uint2 size = 128;
