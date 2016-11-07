@@ -83,7 +83,7 @@ struct LightFieldViewApp : LightField {
 
         // Fits face UV to maximum projected sample rate
         Time time {true};
-        log("Start");
+        log("Surface parametrized visibility estimation from planar viewpoint array");
         time.start();
         //uint64 totalTime[threadCount()], innerTime[threadCount()];
         parallel_chunk(0, scene.faces.size, [this, M0, M1, scale, near, far/*, &totalTime, &innerTime*/](uint unused id, uint start, uint sizeI) {
