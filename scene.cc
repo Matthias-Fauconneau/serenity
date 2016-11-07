@@ -56,7 +56,12 @@ Scene parseScene(ref<byte> file) {
         const vec3 viewpoint (0,0,-64);
         buffer<Scene::Face> faces (faceCount, 0);
         for(uint4 face: indices) {
-            faces.append({{vertices[face[0]], vertices[face[1]], vertices[face[2]], vertices[face[3]]},{0,1,1,0},{0,0,1,1},Image8()});
+            float reflect = faces.size%2==0;
+            log(faces.size);
+            const vec3 A = vertices[face[0]], B = vertices[face[1]], C = vertices[face[2]], D = vertices[face[3]];
+            const vec3 N = normalize(cross(B-A, C-A));
+            const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
+            faces.append({{vertices[face[0]], vertices[face[1]], vertices[face[2]], vertices[face[3]]},{0,1,1,0},{0,0,1,1},Image8(),color,reflect});
             //faces.append({{vertices[face[3]], vertices[face[2]], vertices[face[1]], vertices[face[0]]},{0,1,1,0},{0,0,1,1},Image8()});
         }
         return {viewpoint, ::move(faces)};
@@ -74,7 +79,11 @@ Scene parseScene(ref<byte> file) {
                 s.skip('\n');
             }
             assert_(polygon.size == 4);
-            faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},Image8()});
+            const vec3 A = polygon[3], B = polygon[2], C = polygon[1], D = polygon[0];
+            const vec3 N = normalize(cross(B-A, C-A));
+            float reflect = N.z == 1; //faces.size%2==0;
+            const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
+            faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},Image8(),color,reflect});
         }
         log(viewpoint, faces.size);
         return {viewpoint, ::move(faces)};

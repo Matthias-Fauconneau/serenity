@@ -319,8 +319,10 @@ struct LightFieldViewApp : LightField {
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            else
+            else {
+                BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;
                 scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            }
             convert(target, B, G, R);
         }
         return target;

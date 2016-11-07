@@ -18,24 +18,53 @@ inline mat4 shearedPerspective(const float s, const float t, const float near, c
     return M;
 }
 
-generic T squareWave(T x, const T frequency = T(16)) {
-    const T n = floor(frequency*x); // Integer
-    const T m = T(1./2)*n; // Half integer
-    return T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-}
-
 #include "raster.h"
+
+static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
+    vec3 edge1 = B - A;
+    vec3 edge2 = C - A;
+    vec3 pvec = cross(d, edge2);
+    float det = dot(edge1, pvec);
+    if(det < 0) return false;
+    vec3 tvec = O - A;
+    u = dot(tvec, pvec);
+    if(u < 0 || u > det) return false;
+    vec3 qvec = cross(tvec, edge1);
+    v = dot(d, qvec);
+    if(v < 0 || u + v > det) return false;
+    t = dot(edge2, qvec);
+    if(!(t > 0)) return false;
+    //assert_(t >= 0, t);
+    t /= det;
+    u /= det;
+    v /= det;
+    return true;
+}
 
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[4]; float u[4], v[4]; Image8 image; };
+    struct Face { vec3 position[4]; float u[4], v[4]; Image8 image; bgr3f color; float reflect; };
     buffer<Face> faces;
+
+    static bgr3f raycast(ref<Face> faces, vec3 O, vec3 d) {
+        float nearestZ = inff; bgr3f color (0, 0, 0);
+        for(const Face& face: faces) {
+            const vec3 A = face.position[0], B = face.position[1], C = face.position[2], D = face.position[3];
+            float t, u, v;
+            if(!::intersect(A, C, B, O, d, t, u, v) && !::intersect(A, D, C, O, d, t, u, v)) continue; // FIXME: quads
+            float z = -t*d.z; // FIXME
+            if(z > nearestZ) continue;
+            nearestZ = z;
+            color = face.color; //face.reflect==0 ?  face.color : 0; // FIXME: single bounce
+        }
+        return color;
+    }
 
     struct TextureShader {
         TextureShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -56,7 +85,7 @@ struct Scene {
         CheckerboardShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2;
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -74,22 +103,25 @@ struct Scene {
 
     struct RaycastShader {
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; };
+        struct FaceAttributes { uint stride; const uint8* image; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 5;
         static constexpr bool blend = false; // Disables unnecessary blending
+        vec3 viewpoint; // scene.viewpoint + st / scale
         const ref<Face> faces;
-        RaycastShader(const Scene& scene) : faces(scene.faces) {}
+        RaycastShader(const Scene& scene) : viewpoint(scene.viewpoint), faces(scene.faces) {}
 
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
-            const float x = varying[2], y = varying[3], z = varying[4];
-            vec3 D = normalize(vec3(x, y, z));
-            //const float x = (face.N.x+1)/2, y = (face.N.y+1)/2, z = (face.N.z+1)/2;
-            vec3 R = D - 2*dot(face.N, D)*face.N;
-            const float X = R.x, Y = R.y, Z = R.z;
+            if(!face.reflect) return Vec<float, 3>{{face.color.b, face.color.g, face.color.r}};
+            const vec3 O = vec3(varying[2], varying[3], varying[4]);
+            const vec3 D = normalize(O-viewpoint);
+            const vec3 R = D - 2*dot(face.N, D)*face.N;
+            bgr3f color = Scene::raycast(faces, O, normalize(R));
+            return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
+            /*const float X = R.x, Y = R.y, Z = R.z;
             const float r = (X+1)/2, g = (Y+1)/2, b = (Z+1)/2;
-            return Vec<float, 3>{{r, g, b}};
+            return Vec<float, 3>{{r, g, b}};*/
         }
     };
 
@@ -113,18 +145,19 @@ struct Scene {
         for(const Face& face: faces) {
             const vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
-            const vec3 A = face.position[0]-viewpoint, B = face.position[1]-viewpoint, C = face.position[2]-viewpoint, D = face.position[3]-viewpoint;
+            //const vec3 A = face.position[0]-viewpoint, B = face.position[1]-viewpoint, C = face.position[2]-viewpoint, D = face.position[3]-viewpoint;
+            const vec3 A = face.position[0], B = face.position[1], C = face.position[2], D = face.position[3];
             const vec3 N = normalize(cross(B-A,C-A)); // FIXME: store
             renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),
                                                  vec3(face.v[0],face.v[1],face.v[2]),
                                                  vec3(A.x,B.x,C.x),
                                                  vec3(A.y,B.y,C.y),
-                                                 vec3(A.z,B.z,C.z)}, {face.image.stride, face.image.data, face.image.size.y, N});
+                                                 vec3(A.z,B.z,C.z)}, {face.image.stride, face.image.data, face.image.size.y, N, face.color, face.reflect});
             renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
                                                  vec3(face.v[0],face.v[2],face.v[3]),
                                                  vec3(A.x,C.x,D.x),
                                                  vec3(A.y,C.y,D.y),
-                                                 vec3(A.z,C.z,D.z)}, {face.image.stride, face.image.data, face.image.size.y, N});
+                                                 vec3(A.z,C.z,D.z)}, {face.image.stride, face.image.data, face.image.size.y, N, face.color, face.reflect});
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(Z, targets);
