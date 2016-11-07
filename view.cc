@@ -32,15 +32,17 @@ struct ViewControl : virtual Widget {
 };
 
 struct LightFieldViewApp : LightField {
+    Map surfaceMap; // Needs to stay memory mapped for face B,G,R references
+
     Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
     Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
     Scene::Renderer<Scene::TextureShader, 3> TexRenderer {scene};
     Scene::Renderer<Scene::CheckerboardShader, 3> UVRenderer {scene};
     Scene::Renderer<Scene::RaycastShader, 3> BGRRenderer {scene};
 
-    bool displayField = true; // or rasterize geometry
+    bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displayCoverage = false; // or raycast shader (when rasterizing)
+    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     struct LightFieldViewWidget : ViewControl, ImageView {
@@ -83,12 +85,11 @@ struct LightFieldViewApp : LightField {
 
         // Fits face UV to maximum projected sample rate
         Time time {true};
-        log("Surface parametrized visibility estimation from planar viewpoint array");
+        log("Surface parametrization");
         time.start();
-        //uint64 totalTime[threadCount()], innerTime[threadCount()];
-        parallel_chunk(0, scene.faces.size, [this, M0, M1, scale, near, far/*, &totalTime, &innerTime*/](uint unused id, uint start, uint sizeI) {
-            //tsc totalTSC, innerTSC;
-            //totalTSC.start();
+#if 0
+        // Visibility estimation from planar viewpoint array
+        parallel_chunk(0, scene.faces.size, [this, M0, M1, scale, near, far](uint unused id, uint start, uint sizeI) {
             const uint sSize = imageCount.x, tSize = imageCount.y;
             const float sSizeScale = 1./float(sSize-1), tSizeScale = 1./float(tSize-1);
             const half* fieldZ = this->fieldZ.data;
@@ -115,11 +116,6 @@ struct LightFieldViewApp : LightField {
                     if(!N.y) st.y = 0;
                 }
                 // Projects vertices along st view rays on uv plane (perspective)
-                // FIXME
-                /*const vec2 uvA = st + scale*(a.z-scene.viewpoint.z)/near * (scale*(a.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvB = st + scale*(b.z-scene.viewpoint.z)/near * (scale*(b.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvC = st + scale*(c.z-scene.viewpoint.z)/near * (scale*(c.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvD = st + scale*(d.z-scene.viewpoint.z)/near * (scale*(d.xy()-scene.viewpoint.xy())-st);*/
                 mat4 M = shearedPerspective(st[0], st[1], near, far);
                 M.scale(scale); // Fits scene within -1, 1
                 M.translate(-scene.viewpoint);
@@ -142,62 +138,93 @@ struct LightFieldViewApp : LightField {
                 const vec3 ad = d-a;
                 const vec3 badc = a-b+c-d;
 
-                if(projectionCount) {
-                    // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
-                    //innerTSC.start();
-                    for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
-                        const float v = (float(svIndex)+1.f/2)/float(V);
-                        const float u = (float(suIndex)+1.f/2)/float(U);
-                        const vec3 P = a + ad*v + (ab + badc*v) * u;
-                        uint hit = 0;
-                        for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
-                            const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
-                            const float iPw = 1.f/(m32*P.z + m33);
-                            const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
-                            const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
-                            const float Pz = (m22*P.z + m23)*iPw;
-                            //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
-                            const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
-                            const int uIndex = Pu+1.f/2;
-                            const int vIndex = Pv+1.f/2;
-                            if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) continue;
-                            assert_(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y, uIndex, vIndex);
-                            const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-                            if(Pz <= z+zBias) hit++;
-                        }
-                        face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
-                    }
-                } else {
-                    /*for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
-                        const float v = (float(svIndex)+1.f/2)/float(V);
-                        const float u = (float(suIndex)+1.f/2)/float(U);
-                        const vec3 P = a + ad*v + (ab + badc*v) * u;
+                assert_(projectionCount);
+                // Integrates surface visibility over projection (Tests surface UV samples against depth buffers)
+                for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                    const float v = (float(svIndex)+1.f/2)/float(V);
+                    const float u = (float(suIndex)+1.f/2)/float(U);
+                    const vec3 P = a + ad*v + (ab + badc*v) * u;
+                    uint hit = 0;
+                    for(uint tIndex : range(tSize)) for(uint sIndex: range(sSize)) {
+                        const float s = sSizeScale*float(sIndex), t = tSizeScale*float(tIndex);
                         const float iPw = 1.f/(m32*P.z + m33);
-                        const float s = 1./2, t = 1./2;
                         const float Pu = (m00*P.x + m030 + (m02*P.z + m03d)*s)*iPw;
                         const float Pv = (m11*P.y + m130 + (m12*P.z + m13d)*t)*iPw;
-                        const half* Zst = fieldZ + (uint64)(tSize/2)*size3 + (sSize/2)*size2;
+                        const float Pz = (m22*P.z + m23)*iPw;
+                        //const float z = fieldZ(sIndex, tIndex, Pu+1.f/2, Pv+1.f/2);
+                        const half* Zst = fieldZ + (uint64)tIndex*size3 + sIndex*size2;
                         const int uIndex = Pu+1.f/2;
                         const int vIndex = Pv+1.f/2;
-                        if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) {
-                            face.image[svIndex*U+suIndex] = 0;
-                            continue;
-                        }
+                        if(!(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y)) continue;
+                        assert_(uIndex >= 0 && uint(uIndex) < imageSize.x && vIndex >= 0 && uint(vIndex) < imageSize.y, uIndex, vIndex);
                         const float z = Zst[vIndex*size1 + uIndex]; // -1, 1
-                        face.image[svIndex*U+suIndex] = (z+1)/2*0xFF;
-                    }*/ error("projectionCount");
+                        if(Pz <= z+zBias) hit++;
+                    }
+                    face.image[svIndex*U+suIndex] = hit*0xFF/projectionCount;
                 }
-                //innerTSC.stop();
             }
-            //totalTime[id] = totalTSC;
-            //innerTime[id] = innerTSC;
         });
-        log(time);//, strD(sum(ref<uint64>(innerTime, threadCount())),sum(ref<uint64>(totalTime, threadCount()))));
+#else
+
+        float cellCount = 0;
+        for(string name: folder.list(Files)) {
+            TextData s (name);
+            const uint cellCount_ = s.integer(false);
+            if(s) continue;
+            cellCount = cellCount_;
+            break;
+        }
+        assert_(cellCount);
+        surfaceMap = Map(str(uint(cellCount)), folder);
+        assert_(surfaceMap.size%3 == 0);
+        size_t sampleCount = surfaceMap.size / 3; // per component
+        ref<uint8> BGR = cast<uint8>(surfaceMap);
+        ref<uint8> B = BGR.slice(0*sampleCount, sampleCount);
+        ref<uint8> G = BGR.slice(1*sampleCount, sampleCount);
+        ref<uint8> R = BGR.slice(2*sampleCount, sampleCount);
+
+        size_t index = 0;
+        for(Scene::Face& face: scene.faces) {
+            const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
+            const vec3 O = (a+b+c+d)/4.f;
+            const vec3 N = cross(c-a, b-a);
+            // Viewpoint st with maximum projection
+            vec2 st = clamp(vec2(-1), scale*(O.xy()-scene.viewpoint.xy()) + (scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
+            if(!N.z) {
+                if(!N.x) st.x = 0;
+                if(!N.y) st.y = 0;
+            }
+            // Projects vertices along st view rays on uv plane (perspective)
+            mat4 M = shearedPerspective(st[0], st[1], near, far);
+            M.scale(scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
+            const vec2 uvA = (M*a).xy();
+            const vec2 uvB = (M*b).xy();
+            const vec2 uvC = (M*c).xy();
+            const vec2 uvD = (M*d).xy();
+            const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
+            const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+            const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+            assert_(U && V);
+            // Scales uv for texture sampling (unnormalized)
+            for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
+            for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
+
+            // No copy (surface samples needs to stay memory mapped)
+            face.B = Image8(unsafeRef(B.slice(index,V*U)), uint2(U, V));
+            face.G = Image8(unsafeRef(G.slice(index,V*U)), uint2(U, V));
+            face.R = Image8(unsafeRef(R.slice(index,V*U)), uint2(U, V));
+
+            index += face.B.ref::size;
+        }
+        assert_(index == sampleCount);
+#endif
+        log(time);
 
         window = ::window(&view);
-        window->actions[Key('s')] = [this]{ displayField=!displayField; window->render(); };
+        window->actions[Key('f')] = [this]{ displayField=!displayField; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
-        window->actions[Key('c')] = [this]{ displayCoverage=!displayCoverage; window->render(); };
+        window->actions[Key('s')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
     }
     Image render(uint2 targetSize) {
@@ -321,7 +348,7 @@ struct LightFieldViewApp : LightField {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            if(displayCoverage)
+            if(displaySurfaceParametrized)
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);

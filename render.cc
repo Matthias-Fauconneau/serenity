@@ -68,28 +68,28 @@ struct Render {
                     //const float v = (float(svIndex)+1.f/2)/float(V);
                     //const float u = (float(suIndex)+1.f/2)/float(U);
                     //const vec3 P = a + ad*v + (ab + badc*v) * u;
-                    face.B[svIndex*U+suIndex] = face.color.b;
-                    face.G[svIndex*U+suIndex] = face.color.g;
-                    face.R[svIndex*U+suIndex] = face.color.r;
+                    face.B[svIndex*U+suIndex] = 0xFF*face.color.b;
+                    face.G[svIndex*U+suIndex] = 0xFF*face.color.g;
+                    face.R[svIndex*U+suIndex] = 0xFF*face.color.r;
                     // TODO: mirror shader
-                    // TODO: view dependent representation
+                    // TODO: View dependent representation
                 }
             }
         });
-        size_t size = 0;
-        for(const Scene::Face& face: scene.faces) size += face.B.ref::size;
-        log(size);
+        size_t sampleCount = 0;
+        for(const Scene::Face& face: scene.faces) sampleCount += face.B.ref::size;
+        log(sampleCount, "samples (per component)");
 
         assert_(uint(cellCount) == cellCount);
         File file(str(uint(cellCount)), folder, Flags(ReadWrite|Create));
-        size_t byteSize = 3*size;
+        size_t byteSize = 3*sampleCount;
         assert_(byteSize <= 12ull*1024*1024*1024);
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<uint8> BGR = mcast<uint8>(map);
-        mref<uint8> B = BGR.slice(0*size, 1*size);
-        mref<uint8> G = BGR.slice(1*size, 1*size);
-        mref<uint8> R = BGR.slice(2*size, 1*size);
+        mref<uint8> B = BGR.slice(0*sampleCount, sampleCount);
+        mref<uint8> G = BGR.slice(1*sampleCount, sampleCount);
+        mref<uint8> R = BGR.slice(2*sampleCount, sampleCount);
         size_t index = 0;
         for(const Scene::Face& face: scene.faces) { // FIXME: direct no copy storage
             B.slice(index,face.B.ref::size).copy(face.B);
@@ -97,7 +97,7 @@ struct Render {
             R.slice(index,face.R.ref::size).copy(face.R);
             index += face.B.ref::size;
         }
-        assert_(index == size);
+        assert_(index == sampleCount);
 
         log("Rendered in", time);
 
