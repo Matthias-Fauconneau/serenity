@@ -10,13 +10,8 @@ struct Render {
         assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
-#if 1
         const size_t N = 33;
         const uint2 size = 1024;
-#else
-        const size_t N = 129;
-        const uint2 size = 128;
-#endif
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
         size_t byteSize = 4*N*N*size.y*size.x*sizeof(half);
@@ -26,8 +21,8 @@ struct Render {
         mref<half> field = mcast<half>(map);
         profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
 
-        buffer<Scene::Renderer<Scene::CheckerboardShader, 3>> renderers (threadCount());
-        for(auto& renderer: renderers) new (&renderer) Scene::Renderer<Scene::CheckerboardShader, 4>(scene);
+        buffer<Scene::Renderer<Scene::RaycastShader, 3>> renderers (threadCount());
+        for(auto& renderer: renderers) new (&renderer) Scene::Renderer<Scene::RaycastShader, 4>(scene);
 
         // Fits scene
         vec3 min = inff, max = -inff;
@@ -52,7 +47,9 @@ struct Render {
             ImageH G (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
             ImageH R (unsafeRef(field.slice(((3ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
 
-            scene.render(renderers[threadID], M, (float[]){1,1,1}, Z, B, G, R);
+            auto& renderer = renderers[threadID];
+            renderer.shader.viewpoint = scene.viewpoint + vec3(s*2-1,t*2-1,0)/scale;
+            scene.render(renderer, M, (float[]){1,1,1}, Z, B, G, R);
 
             ImageH Z01 (Z.size);
             for(size_t i: range(Z.ref::size)) Z01[i] = (Z[i]+1)/2;

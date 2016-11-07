@@ -38,7 +38,7 @@ struct LightFieldViewApp : LightField {
     Scene::Renderer<Scene::CheckerboardShader, 3> UVRenderer {scene};
     Scene::Renderer<Scene::RaycastShader, 3> BGRRenderer {scene};
 
-    bool displayField = false; // or rasterize geometry
+    bool displayField = true; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
     bool displayCoverage = false; // or raycast shader (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
@@ -233,12 +233,14 @@ struct LightFieldViewApp : LightField {
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
                 const float A = - scale*(0+(far-near)/(2*far));
                 const float B = - scale*(1-(far+near)/(2*far));
+                const half* fieldZ = this->fieldZ.data;
                 const half* fieldB = this->fieldB.data;
                 const half* fieldG = this->fieldG.data;
                 const half* fieldR = this->fieldR.data;
                 const int size1 = this->size1;
                 const int size2 = this->size2;
                 const int size3 = this->size3;
+                //const v4sf zTolerance = float4(1); FIXME
                 assert_(imageSize.x%2==0); // Gather 32bit / half
                 const v2si sample2D = {    0,           size1/2};
                 const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
@@ -270,8 +272,15 @@ struct LightFieldViewApp : LightField {
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+#if 1
                             const v4sf w01uv =   __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
-                                               * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+#else
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
+                            const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
+                                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) // uUuU
+                                                   , abs(Z - float4(z)) < zTolerance); // Discards far samples (tradeoff between edge and anisotropic accuracy)
+#endif
                             float sum = ::sum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
@@ -305,12 +314,9 @@ struct LightFieldViewApp : LightField {
                                         * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
                                         * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
                         S = bgr3f(dot(w01, B), dot(w01, G), dot(w01, R));
-
-                        // DEBUG
-                        const v16sf Z = toFloat((v16hf)gather((float*)(fieldR+base), sample4D));
-                        S = bgr3f((dot(w01, Z)+1)/2);
                     }
-                    target[targetIndex] = byte4(byte3(float(0xFF)*S), 0xFF);
+                    extern uint8 sRGB_forward[0x1000];
+                    target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
                 }
             });
         } else {
