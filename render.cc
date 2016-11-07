@@ -8,7 +8,11 @@ struct Render {
         Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
         const Folder& folder = Folder(basename(arguments()[0]), "/var/tmp/"_, true);
         assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
+        for(string file: folder.list(Files)) remove(file, folder);
+
 #if 1 // Surface parametrized render
+        const float cellCount = 32;
+
         // Fits scene
         vec3 min = inff, max = -inff;
         for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
@@ -21,15 +25,16 @@ struct Render {
         Time time {true};
         log("Surface parametrized render");
         time.start();
-        const float cellCount = 1;
         parallel_chunk(0, scene.faces.size, [&scene, scale, near, far, cellCount](uint unused id, uint start, uint sizeI) {
             for(const uint faceIndex: range(start, start+sizeI)) {
                 Scene::Face& face = scene.faces[faceIndex];
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
-                const vec3 O = (a+b+c+d)/4.f;
+                const vec3 faceCenter = (a+b+c+d)/4.f;
                 const vec3 N = cross(c-a, b-a);
                 // Viewpoint st with maximum projection
-                vec2 st = clamp(vec2(-1), scale*(O.xy()-scene.viewpoint.xy()) + (scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
+                vec2 st = clamp(vec2(-1),
+                                scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
+                                vec2(1));
                 if(!N.z) {
                     if(!N.x) st.x = 0;
                     if(!N.y) st.y = 0;
@@ -59,19 +64,28 @@ struct Render {
                 face.G = Image8(U, V);
                 face.R = Image8(U, V);
 
-                //const vec3 ab = b-a;
-                //const vec3 ad = d-a;
-                //const vec3 badc = a-b+c-d;
+                const vec3 ab = b-a;
+                const vec3 ad = d-a;
+                const vec3 badc = a-b+c-d;
 
                 // Shades surface
                 for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
-                    //const float v = (float(svIndex)+1.f/2)/float(V);
-                    //const float u = (float(suIndex)+1.f/2)/float(U);
-                    //const vec3 P = a + ad*v + (ab + badc*v) * u;
-                    face.B[svIndex*U+suIndex] = 0xFF*face.color.b;
-                    face.G[svIndex*U+suIndex] = 0xFF*face.color.g;
-                    face.R[svIndex*U+suIndex] = 0xFF*face.color.r;
-                    // TODO: mirror shader
+                    const float v = (float(svIndex)+1.f/2)/float(V);
+                    const float u = (float(suIndex)+1.f/2)/float(U);
+                    const vec3 P = a + ad*v + (ab + badc*v) * u;
+                    bgr3f color;
+                    if(!face.reflect) color=face.color;
+                    else {
+                        const vec3 viewpoint = scene.viewpoint;
+                        const vec3 D = normalize(P-viewpoint);
+                        const vec3 R = D - 2*dot(N, D)*N;
+                        bgr3f reflected = Scene::raycast(scene.faces, P, normalize(R));
+                        color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
+                    }
+                    const size_t index = svIndex*U+suIndex;
+                    face.B[index] = 0xFF*color.b;
+                    face.G[index] = 0xFF*color.g;
+                    face.R[index] = 0xFF*color.r;
                     // TODO: View dependent representation
                 }
             }
@@ -102,9 +116,6 @@ struct Render {
         log("Rendered in", time);
 
 #else // Dual plane render
-
-        for(string file: folder.list(Files)) remove(file, folder);
-
         const size_t N = 33;
         const uint2 size = 1024;
 

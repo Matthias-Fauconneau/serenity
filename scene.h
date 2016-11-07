@@ -122,9 +122,6 @@ struct Scene {
             const vec3 R = D - 2*dot(face.N, D)*face.N;
             bgr3f color = Scene::raycast(faces, O, normalize(R));
             return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
-            /*const float X = R.x, Y = R.y, Z = R.z;
-            const float r = (X+1)/2, g = (Y+1)/2, b = (Z+1)/2;
-            return Vec<float, 3>{{r, g, b}};*/
         }
     };
 

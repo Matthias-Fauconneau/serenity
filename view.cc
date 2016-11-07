@@ -260,14 +260,14 @@ struct LightFieldViewApp : LightField {
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
                 const float A = - scale*(0+(far-near)/(2*far));
                 const float B = - scale*(1-(far+near)/(2*far));
-                const half* fieldZ = this->fieldZ.data;
+                //const half* fieldZ = this->fieldZ.data;
+                //const v4sf zTolerance = float4(1); FIXME
                 const half* fieldB = this->fieldB.data;
                 const half* fieldG = this->fieldG.data;
                 const half* fieldR = this->fieldR.data;
                 const int size1 = this->size1;
                 const int size2 = this->size2;
                 const int size3 = this->size3;
-                //const v4sf zTolerance = float4(1); FIXME
                 assert_(imageSize.x%2==0); // Gather 32bit / half
                 const v2si sample2D = {    0,           size1/2};
                 const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
@@ -348,10 +348,10 @@ struct LightFieldViewApp : LightField {
             });
         } else {
             ImageH B (target.size), G (target.size), R (target.size);
-            if(displaySurfaceParametrized)
-                scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            else if(displayParametrization)
+            if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            else if(displaySurfaceParametrized)
+                scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;
                 scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
