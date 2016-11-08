@@ -123,10 +123,10 @@ struct Render {
                         if(!face.attributes.reflect) color = face.attributes.color;
                         else {
                             const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
-                            const vec3 D = normalize(P-viewpoint);
-                            const vec3 R = D - 2*dot(N, D)*N;
+                            const vec3 D = (P-viewpoint);
+                            const vec3 R = (D - 2*dot(N, D)*N);
                             innerTSC.start();
-                            bgr3f reflected = scene.raycast(P, normalize(R));
+                            bgr3f reflected = scene.raycast(P, R);
                             innerTSC.stop();
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }

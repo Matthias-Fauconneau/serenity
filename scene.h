@@ -40,7 +40,8 @@ inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
-static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, float& t, float& u, float& v) { // "Efficient Ray-Quadrilateral Intersection Test"
+// "Efficient Ray-Quadrilateral Intersection Test"
+static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, float& t /*, float a11, float b11, float& u, float& v*/) {
     const vec3 e03 = v01 - v00;
     const vec3 e01 = v10 - v00;
     const vec3 P = cross(d, e03);
@@ -71,22 +72,65 @@ static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, fl
     if(t < 0) return false;
     t /= det;
 
-    // Barycentric coordinates of V11 (FIXME: precompute)
-    const vec3 e02 = v11-v00;
-    const vec3 N = cross(e01, e03);
-    float a11, b11;
-    /**/ if(abs(N.x) > abs(N.y) && abs(N.x) > abs(N.z)) { // X
-        a11 = (e02.y*e03.z-e02.z*e03.y)/N.x;
-        b11 = (e01.y*e02.z-e01.z*e02.y)/N.x;
+#if 0
+    /**/ if(abs(a11-1) < 0) {
+        u = a / det;
+        if(abs(b11-1) < 0) v = b / det;
+        else v = b / (det*(u*(b11-1)+1));
     }
-    else if(abs(N.y) > abs(N.x) && abs(N.y) > abs(N.z)) { // Y
-        a11 = (e02.z*e03.x-e02.x*e03.z)/N.y;
-        b11 = (e01.z*e02.x-e01.x*e02.z)/N.y;
+    else if(abs(b11-1) < 0) {
+        v = b / det;
+        u = a / (det*(v*(a11-1)+1));
+    } else {
+        const float A = -(b11-1);
+        const float B = a*(b11-1) - b*(a11-1) - 1;
+        const float C = a;
+        const float delta = B*B - 4*A*C;
+        const float Q = (-1.f/2)*(B+(B>0?1:-1)*sqrt(delta));
+        u = Q/A;
+        if(u < 0 || u > 1) u = C/Q;
+        v = b / (det*u*(b11-1)+1);
     }
-    else /*if(abs(N.z) > abs(N.x) && abs(N.z) > abs(N.y))*/ { // Z
-        a11 = (e02.x*e03.y-e02.y*e03.x)/N.z;
-        b11 = (e01.x*e02.y-e01.y*e02.x)/N.z;
+#endif
+    return true;
+}
+
+#if 1
+static bool intersect(v8sf x00, v8sf y00, v8sf z00,
+                      v8sf x10, v8sf y10, v8sf z10,
+                      v8sf x11, v8sf y11, v8sf z1,
+                      v8sf x01, v8sf y01, v8sf z01,
+                      v8sf a11, v8sf b11,
+                      vec3 O, vec3 d, v8sf& t/*, v8sf& u, v8sf& v*/) { // "Efficient Ray-Quadrilateral Intersection Test"
+    const vec3 e03 = v01 - v00;
+    const vec3 e01 = v10 - v00;
+    const vec3 P = cross(d, e03);
+    float det = dot(e01, P);
+    if(det < 0) return false;
+    const vec3 T0 = O - v00;
+    float a = dot(T0, P);
+    if(a < 0 || a > det) return false;
+    const vec3 Q0 = cross(T0, e01);
+    float b = dot(d, Q0);
+    if(b < 0 || b > det) return false; // FIXME: assert v11 within parallelogram and reorder otherwise
+    // in parallelogram
+    if(a + b > det) { // not in T
+        const vec3 e23 = v01 - v11;
+        const vec3 e21 = v10 - v11;
+        const vec3 P1 = cross(d, e21);
+        const float det1 = dot(e23, P1);
+        if(det1 < 0) return false;
+        const vec3 T1 = O - v11;
+        const float a1 = dot(T1, P1);
+        if(a1 < 0) return false;
+        const vec3 Q1 = cross(T1, e23);
+        const float b1 = dot(d, Q1);
+        if(b1 < 0) return false;
     }
+
+    t = dot(e03, Q0);
+    if(t < 0) return false;
+    t /= det;
 
     /**/ if(abs(a11-1) < 0) {
         u = a / det;
@@ -108,6 +152,7 @@ static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, fl
     }
     return true;
 }
+#endif
 
 struct Scene {
     vec3 viewpoint;
@@ -118,7 +163,7 @@ struct Scene {
             const half* BGR; uint2 size; // Display (TextureShader)
         } attributes;
     };
-    buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
+    buffer<float> X[4], Y[4], Z[4], a11, b11; // Quadrilaterals vertices world space positions XYZ coordinates
     buffer<Face> faces;
 
     vec3 min, max;
@@ -137,19 +182,20 @@ struct Scene {
         far = scale*(-viewpoint.z+max.z);
     }
 
-    bgr3f raycast(vec3 O, vec3 d) const {
+    inline bgr3f raycast(vec3 O, vec3 d) const {
         float nearestZ = inff; bgr3f color (0, 0, 0);
         for(size_t i: range(faces.size)) {
             const vec3 A (X[0][i], Y[0][i], Z[0][i]);
             const vec3 B (X[1][i], Y[1][i], Z[1][i]);
             const vec3 C (X[2][i], Y[2][i], Z[2][i]);
             const vec3 D (X[3][i], Y[3][i], Z[3][i]);
-            float t, u, v;
-            if(!::intersect(A, B, C, D, O, d, t, u, v)) continue;
+            //const float a11 = this->a11[i], b11 = this->b11[i];
+            float t;//, u, v;
+            if(!::intersect(A, B, C, D, O, d, t/*a11, b11, u, v*/)) continue;
             float z = t*d.z;
             if(z > nearestZ) continue;
             nearestZ = z;
-            color = faces[i].attributes.color; //face.reflect==0 ?  face.color : 0; // FIXME: single bounce
+            color = faces[i].attributes.color;
         }
         return color;
     }

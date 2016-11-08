@@ -72,7 +72,7 @@ Scene parseScene(ref<byte> file) {
     } else {
         const vec3 viewpoint = parse<vec3>(s);
         s.skip('\n');
-        array<float> X[4], Y[4], Z[4];
+        array<float> X[4] = {}, Y[4] = {}, Z[4] = {};
         array<Scene::Face> faces;
         while(s) {
             if(s.match('\n')) continue;
@@ -95,8 +95,38 @@ Scene parseScene(ref<byte> file) {
                 Z[i].append(polygon[i].z);
             }
         }
-        log(viewpoint, faces.size);
+
         Scene scene;
+
+        // Precomputes barycentric coordinates of V11
+        scene.a11 = buffer<float>(faces.size);
+        scene.b11 = buffer<float>(faces.size);
+        for(size_t i: range(faces.size)) {
+            const vec3 v00 (X[0][i], Y[0][i], Z[0][i]);
+            const vec3 v10 (X[1][i], Y[1][i], Z[1][i]);
+            const vec3 v11 (X[2][i], Y[2][i], Z[2][i]);
+            const vec3 v01 (X[3][i], Y[3][i], Z[3][i]);
+            const vec3 e01 = v10 - v00;
+            const vec3 e03 = v01 - v00;
+            const vec3 N = cross(e01, e03);
+            const vec3 e02 = v11 - v00;
+            float a11, b11;
+            /**/ if(abs(N.x) > abs(N.y) && abs(N.x) > abs(N.z)) { // X
+                a11 = (e02.y*e03.z-e02.z*e03.y)/N.x;
+                b11 = (e01.y*e02.z-e01.z*e02.y)/N.x;
+            }
+            else if(abs(N.y) > abs(N.x) && abs(N.y) > abs(N.z)) { // Y
+                a11 = (e02.z*e03.x-e02.x*e03.z)/N.y;
+                b11 = (e01.z*e02.x-e01.x*e02.z)/N.y;
+            }
+            else /*if(abs(N.z) > abs(N.x) && abs(N.z) > abs(N.y))*/ { // Z
+                a11 = (e02.x*e03.y-e02.y*e03.x)/N.z;
+                b11 = (e01.x*e02.y-e01.y*e02.x)/N.z;
+            }
+            scene.a11[i] = a11;
+            scene.b11[i] = b11;
+        }
+
         scene.viewpoint = viewpoint;
         for(size_t i: range(4)) {
             scene.X[i] = ::move(X[i]);
@@ -104,7 +134,9 @@ Scene parseScene(ref<byte> file) {
             scene.Z[i] = ::move(Z[i]);
         }
         scene.faces = ::move(faces);
+
         scene.fit();
+
         return scene;
     }
 }
