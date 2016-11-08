@@ -11,7 +11,7 @@ struct Render {
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 1 // Surface parametrized render
-        const float cellCount = 256;
+        const float detailCellCount = 256;
         const uint sSize = 16, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         const uint stSize = tSize*sSize;
 
@@ -44,16 +44,19 @@ struct Render {
             const vec2 uvD = (M*D).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+
+            Scene::Face& face = scene.faces[i];
+            const float cellCount = face.attributes.reflect ? detailCellCount : 1;
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
+
             // Allocates (s,t) (u,v) images
-            Scene::Face& face = scene.faces[i];
             face.attributes.BGR = (half*)sampleCount;
             sampleCount += 3*tSize*sSize*V*U;
         }
 
-        assert_(uint(cellCount) == cellCount);
-        File file(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
+        assert_(uint(detailCellCount) == detailCellCount);
+        File file(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
         size_t byteSize = sampleCount*sizeof(half);
         log(strx(uint2(sSize, tSize)), "=", sampleCount, "samples (per component)", "=", byteSize/1024/1024.f, "M");
         assert_(byteSize <= 16ull*1024*1024*1024, byteSize/(1024*1024*1024.f));
@@ -64,7 +67,10 @@ struct Render {
         Time time {true};
         log("Surface parametrized render");
         time.start();
-        parallel_chunk(0, scene.faces.size, [&scene, cellCount, &folder, BGR](uint unused id, uint start, uint sizeI) {
+        uint64 totalTime[threadCount()], innerTime[threadCount()];
+        parallel_chunk(0, scene.faces.size, [&scene, detailCellCount, &folder, BGR, &totalTime, &innerTime](uint unused id, uint start, uint sizeI) {
+            tsc totalTSC, innerTSC;
+            totalTSC.start();
             for(const size_t i: range(start, start+sizeI)) {
                 const vec3 A (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
                 const vec3 B (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
@@ -91,11 +97,13 @@ struct Render {
                 const vec2 uvD = (M*D).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+
+                Scene::Face& face = scene.faces[i];
+                const float cellCount = face.attributes.reflect ? detailCellCount : 1;
                 const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);
 
                 // Allocates (s,t) (u,v) images
-                Scene::Face& face = scene.faces[i];
                 half* const faceBGR = BGR.begin()+ (size_t)face.attributes.BGR; // base + index
 
                 const vec3 ab = B-A;
@@ -117,7 +125,9 @@ struct Render {
                             const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = normalize(P-viewpoint);
                             const vec3 R = D - 2*dot(N, D)*N;
+                            innerTSC.start();
                             bgr3f reflected = scene.raycast(P, normalize(R));
+                            innerTSC.stop();
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }
                         const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
@@ -140,8 +150,10 @@ struct Render {
                 writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
 #endif
             }
+            totalTime[id] = totalTSC;
+            innerTime[id] = innerTSC;
         });
-        log("Rendered in", time);
+        log("Rendered in", time, strD(sum(ref<uint64>(innerTime, threadCount())),sum(ref<uint64>(totalTime, threadCount()))));
 
 #else // Dual plane render
         const size_t N = 33;

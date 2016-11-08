@@ -158,7 +158,7 @@ struct LightFieldViewApp : LightField {
             }
         });
 #elif 1
-        float cellCount = 0;
+        float detailCellCount = 0;
         for(string name: folder.list(Files)) {
             TextData s (name);
             const uint cellCount_ = s.integer(false);
@@ -167,7 +167,7 @@ struct LightFieldViewApp : LightField {
             if(!s.match('x')) continue;
             const int tSize_ = s.integer(false);
             if(s) continue;
-            cellCount = cellCount_;
+            detailCellCount = cellCount_;
             sSize = sSize_;
             tSize = tSize_;
             break;
@@ -175,8 +175,8 @@ struct LightFieldViewApp : LightField {
         TexRenderer.shader.sSize = sSize;
         TexRenderer.shader.tSize = tSize;
         //TexRenderer.shader.stSize = tSize*sSize;
-        assert_(cellCount && sSize && tSize);
-        surfaceMap = Map(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
+        assert_(detailCellCount && sSize && tSize);
+        surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
         //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
         const ref<half> BGR = cast<half>(surfaceMap);
         assert_(BGR.size%(3*tSize*sSize) == 0);
@@ -206,11 +206,13 @@ struct LightFieldViewApp : LightField {
             const vec2 uvD = (M*D).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+
+            Scene::Face& face = scene.faces[i];
+            const float cellCount = face.attributes.reflect ? detailCellCount : 1;
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
 
             // Scales uv for texture sampling (unnormalized)
-            Scene::Face& face = scene.faces[i];
             for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
             for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
 
