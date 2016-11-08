@@ -210,7 +210,7 @@ struct LightFieldViewApp : LightField {
             const vec2 uvD = (M*d).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-            const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
+            const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
             for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
@@ -378,7 +378,6 @@ struct LightFieldViewApp : LightField {
                 TexRenderer.shader.t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
                 TexRenderer.shader.sIndex = TexRenderer.shader.s;
                 TexRenderer.shader.tIndex = TexRenderer.shader.t;
-                assert_(TexRenderer.shader.sIndex < sSize && TexRenderer.shader.tIndex < tSize, s, t, S, T, TexRenderer.shader.sIndex, TexRenderer.shader.tIndex, sSize, tSize);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             } else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;

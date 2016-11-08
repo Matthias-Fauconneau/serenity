@@ -150,8 +150,8 @@ struct Scene {
             // FIXME: face attribute (+base)
             const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                  size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-            float u = clamp(0.f, varying[0], (float)face.stride-1-0x1p-18f);
-            float v = clamp(0.f, varying[1], (float)face.height-1-0x1p-18f);
+            float u = clamp(0.f, varying[0], face.stride-1-0x1p-16f);
+            float v = clamp(0.f, varying[1], face.height-1-0x1p-16f);
             const int vIndex = v, uIndex = u; // Floor
             const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
             const size_t size4 = tSize*size3;

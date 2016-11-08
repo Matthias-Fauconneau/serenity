@@ -11,8 +11,8 @@ struct Render {
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 1 // Surface parametrized render
-        const float cellCount = 16; //128;
-        const uint sSize = 2/*32*/, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
+        const float cellCount = 256;
+        const uint sSize = 64, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         const uint stSize = tSize*sSize;
 
         // Fits scene
@@ -47,7 +47,7 @@ struct Render {
             const vec2 uvD = (M*d).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-            const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
+            const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
             //for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
@@ -96,7 +96,7 @@ struct Render {
                 const vec2 uvD = (M*d).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-                const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
+                const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);
                 // Scales uv for texture sampling (unnormalized)
                 for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
@@ -132,7 +132,7 @@ struct Render {
                         faceBGR[2*size+index] = color.r;
                     }
                 }
-#if 1 // DEBUG
+#if 0 // DEBUG
                 Image bgr (sSize*U, tSize*V);
                 extern uint8 sRGB_forward[0x1000];
                 for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
