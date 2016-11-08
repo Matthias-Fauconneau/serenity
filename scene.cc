@@ -83,7 +83,8 @@ Scene parseScene(ref<byte> file) {
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == 1; //faces.size%2==0;
             const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
+            //faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
+            faces.append({{polygon[0], polygon[1], polygon[2], polygon[3]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
         }
         log(viewpoint, faces.size);
         return {viewpoint, ::move(faces)};

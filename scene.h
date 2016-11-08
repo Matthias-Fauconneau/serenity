@@ -20,20 +20,20 @@ inline mat4 shearedPerspective(const float s, const float t, const float near, c
 
 #include "raster.h"
 
-static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { //from "Fast, Minimum Storage Ray/Triangle Intersection"
-    vec3 edge1 = B - A;
-    vec3 edge2 = C - A;
-    vec3 pvec = cross(d, edge2);
-    float det = dot(edge1, pvec);
+inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { // "Fast, Minimum Storage Ray/Triangle Intersection"
+    vec3 e2 = C - A;
+    vec3 e1 = B - A;
+    vec3 P = cross(d, e2);
+    float det = dot(e1, P);
     if(det < 0) return false;
-    vec3 tvec = O - A;
-    u = dot(tvec, pvec);
+    vec3 T = O - A;
+    u = dot(T, P);
     if(u < 0 || u > det) return false;
-    vec3 qvec = cross(tvec, edge1);
-    v = dot(d, qvec);
+    vec3 Q = cross(T, e1);
+    v = dot(d, Q);
     if(v < 0 || u + v > det) return false;
-    t = dot(edge2, qvec);
-    if(!(t > 0)) return false;
+    t = dot(e2, Q);
+    if(t < 0) return false;
     //assert_(t >= 0, t);
     t /= det;
     u /= det;
@@ -41,9 +41,78 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, float& t, float& u, float& v) { // "Efficient Ray-Quadrilateral Intersection Test"
+    const vec3 e03 = v01 - v00;
+    const vec3 e01 = v10 - v00;
+    const vec3 P = cross(d, e03);
+    float det = dot(e01, P);
+    if(det < 0) return false;
+    const vec3 T0 = O - v00;
+    float a = dot(T0, P);
+    if(a < 0 || a > det) return false;
+    const vec3 Q0 = cross(T0, e01);
+    float b = dot(d, Q0);
+    if(b < 0 || b > det) return false; // FIXME: assert v11 within parallelogram and reorder otherwise
+    // in parallelogram
+    if(a + b > det) { // not in T
+        const vec3 e23 = v01 - v11;
+        const vec3 e21 = v10 - v11;
+        const vec3 P1 = cross(d, e21);
+        const float det1 = dot(e23, P1);
+        if(det1 < 0) return false;
+        const vec3 T1 = O - v11;
+        const float a1 = dot(T1, P1);
+        if(a1 < 0) return false;
+        const vec3 Q1 = cross(T1, e23);
+        const float b1 = dot(d, Q1);
+        if(b1 < 0) return false;
+    }
+
+    t = dot(e03, Q0);
+    if(t < 0) return false;
+    t /= det;
+
+    // Barycentric coordinates of V11 (FIXME: precompute)
+    const vec3 e02 = v11-v00;
+    const vec3 N = cross(e01, e03);
+    float a11, b11;
+    /**/ if(abs(N.x) > abs(N.y) && abs(N.x) > abs(N.z)) { // X
+        a11 = (e02.y*e03.z-e02.z*e03.y)/N.x;
+        b11 = (e01.y*e02.z-e01.z*e02.y)/N.x;
+    }
+    else if(abs(N.y) > abs(N.x) && abs(N.y) > abs(N.z)) { // Y
+        a11 = (e02.z*e03.x-e02.x*e03.z)/N.y;
+        b11 = (e01.z*e02.x-e01.x*e02.z)/N.y;
+    }
+    else /*if(abs(N.z) > abs(N.x) && abs(N.z) > abs(N.y))*/ { // Z
+        a11 = (e02.x*e03.y-e02.y*e03.x)/N.z;
+        b11 = (e01.x*e02.y-e01.y*e02.x)/N.z;
+    }
+
+    /**/ if(abs(a11-1) < 0) {
+        u = a / det;
+        if(abs(b11-1) < 0) v = b / det;
+        else v = b / (det*(u*(b11-1)+1));
+    }
+    else if(abs(b11-1) < 0) {
+        v = b / det;
+        u = a / (det*(v*(a11-1)+1));
+    } else {
+        const float A = -(b11-1);
+        const float B = a*(b11-1) - b*(a11-1) - 1;
+        const float C = a;
+        const float delta = B*B - 4*A*C;
+        const float Q = (-1.f/2)*(B+(B>0?1:-1)*sqrt(delta));
+        u = Q/A;
+        if(u < 0 || u > 1) u = C/Q;
+        v = b / (det*u*(b11-1)+1);
+    }
+    return true;
+}
+
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<half> BGR; bgr3f color; float reflect; };
+    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<half>  BGR; bgr3f color; float reflect; };
     buffer<Face> faces;
 
     static bgr3f raycast(ref<Face> faces, vec3 O, vec3 d) {
@@ -51,8 +120,8 @@ struct Scene {
         for(const Face& face: faces) {
             const vec3 A = face.position[0], B = face.position[1], C = face.position[2], D = face.position[3];
             float t, u, v;
-            if(!::intersect(A, C, B, O, d, t, u, v) && !::intersect(A, D, C, O, d, t, u, v)) continue; // FIXME: quads
-            float z = -t*d.z; // FIXME
+            if(!::intersect(A, B, C, D, O, d, t, u, v)) continue;
+            float z = t*d.z;
             if(z > nearestZ) continue;
             nearestZ = z;
             color = face.color; //face.reflect==0 ?  face.color : 0; // FIXME: single bounce
@@ -161,7 +230,7 @@ struct Scene {
         M = NDC * M;
         for(const Face& face: faces) {
             const vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
-            if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z <= 0) continue; // Backward face culling
+            if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z >= 0) continue; // Backward face culling
             //const vec3 A = face.position[0]-viewpoint, B = face.position[1]-viewpoint, C = face.position[2]-viewpoint, D = face.position[3]-viewpoint;
             const vec3 A = face.position[0], B = face.position[1], C = face.position[2], D = face.position[3];
             const vec3 N = normalize(cross(B-A,C-A)); // FIXME: store

@@ -11,8 +11,8 @@ struct Render {
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 1 // Surface parametrized render
-        const float cellCount = 32;
-        const uint sSize = 2, tSize = 2; // Number of view-dependent samples along (s,t) dimensions
+        const float cellCount = 128;
+        const uint sSize = 32, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         const uint stSize = tSize*sSize;
 
         // Fits scene
@@ -24,10 +24,55 @@ struct Render {
         const float far = scale*(-scene.viewpoint.z+max.z);
 
         // Fits face UV to maximum projected sample rate
+        size_t sampleCount = 0;
+        for(Scene::Face& face: scene.faces) {
+            const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
+            const vec3 faceCenter = (a+b+c+d)/4.f;
+            const vec3 N = normalize(cross(c-a, b-a));
+            // Viewpoint st with maximum projection
+            vec2 st = clamp(vec2(-1),
+                            scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
+                            vec2(1));
+            if(!N.z) {
+                if(!N.x) st.x = 0;
+                if(!N.y) st.y = 0;
+            }
+            // Projects vertices along st view rays on uv plane (perspective)
+            mat4 M = shearedPerspective(st[0], st[1], near, far);
+            M.scale(scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
+            const vec2 uvA = (M*a).xy();
+            const vec2 uvB = (M*b).xy();
+            const vec2 uvC = (M*c).xy();
+            const vec2 uvD = (M*d).xy();
+            const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
+            const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+            const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+            assert_(U && V);
+            // Scales uv for texture sampling (unnormalized)
+            for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
+            for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
+            // Allocates (s,t) (u,v) images
+            face.BGR.size = 3*tSize*sSize*V*U;
+            face.BGR.data = (half*)sampleCount;
+            //face.stride = U;
+            //face.height = V;
+            sampleCount += face.BGR.ref::size;
+        }
+
+        assert_(uint(cellCount) == cellCount);
+        File file(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
+        size_t byteSize = sampleCount*sizeof(half);
+        log(strx(uint2(sSize, tSize)), "=", sampleCount, "samples (per component)", "=", byteSize/1024/1024.f, "M");
+        assert_(byteSize <= 12ull*1024*1024*1024);
+        file.resize(byteSize);
+        Map map (file, Map::Prot(Map::Read|Map::Write));
+        mref<half> BGR = mcast<half>(map);
+
         Time time {true};
         log("Surface parametrized render");
         time.start();
-        parallel_chunk(0, scene.faces.size, [&scene, scale, near, far, cellCount, &folder](uint unused id, uint start, uint sizeI) {
+        parallel_chunk(0, scene.faces.size, [&scene, scale, near, far, cellCount, &folder, BGR](uint unused id, uint start, uint sizeI) {
             for(const uint faceIndex: range(start, start+sizeI)) {
                 Scene::Face& face = scene.faces[faceIndex];
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
@@ -42,11 +87,6 @@ struct Render {
                     if(!N.y) st.y = 0;
                 }
                 // Projects vertices along st view rays on uv plane (perspective)
-                // FIXME
-                /*const vec2 uvA = st + scale*(a.z-scene.viewpoint.z)/near * (scale*(a.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvB = st + scale*(b.z-scene.viewpoint.z)/near * (scale*(b.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvC = st + scale*(c.z-scene.viewpoint.z)/near * (scale*(c.xy()-scene.viewpoint.xy())-st);
-                      const vec2 uvD = st + scale*(d.z-scene.viewpoint.z)/near * (scale*(d.xy()-scene.viewpoint.xy())-st);*/
                 mat4 M = shearedPerspective(st[0], st[1], near, far);
                 M.scale(scale); // Fits scene within -1, 1
                 M.translate(-scene.viewpoint);
@@ -62,7 +102,7 @@ struct Render {
                 for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
                 for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
                 // Allocates (s,t) (u,v) images
-                face.BGR = buffer<half>(3*tSize*sSize*V*U);
+                half* const faceBGR = BGR.begin()+ (size_t)face.BGR.data; // base + index
 
                 const vec3 ab = b-a;
                 const vec3 ad = d-a;
@@ -87,9 +127,9 @@ struct Render {
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }
                         const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
-                        face.BGR[0*size+index] = color.b;
-                        face.BGR[1*size+index] = color.g;
-                        face.BGR[2*size+index] = color.r;
+                        faceBGR[0*size+index] = color.b;
+                        faceBGR[1*size+index] = color.g;
+                        faceBGR[2*size+index] = color.r;
                     }
                 }
 #if 0 // DEBUG
@@ -99,32 +139,14 @@ struct Render {
                     const size_t uvIndex = svIndex*U+suIndex;
                     const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
                     bgr(s*U+suIndex, t*V+svIndex) = byte4(
-                            sRGB_forward[uint(face.BGR[0*size+index]*0xFFF)],
-                            sRGB_forward[uint(face.BGR[1*size+index]*0xFFF)],
-                            sRGB_forward[uint(face.BGR[2*size+index]*0xFFF)], 0xFF);
+                            sRGB_forward[uint(faceBGR[0*size+index]*0xFFF)],
+                            sRGB_forward[uint(faceBGR[1*size+index]*0xFFF)],
+                            sRGB_forward[uint(faceBGR[2*size+index]*0xFFF)], 0xFF);
                 }
                 writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
 #endif
             }
         });
-        size_t sampleCount = 0;
-        for(const Scene::Face& face: scene.faces) sampleCount += face.BGR.ref::size;
-
-        assert_(uint(cellCount) == cellCount);
-        File file(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
-        size_t byteSize = sampleCount*sizeof(half);
-        log(strx(uint2(sSize, tSize)), "=", sampleCount, "samples (per component)", "=", byteSize/1024/1024.f, "M");
-        assert_(byteSize <= 12ull*1024*1024*1024);
-        file.resize(byteSize);
-        Map map (file, Map::Prot(Map::Read|Map::Write));
-        mref<half> BGR = mcast<half>(map);
-        size_t faceBase = 0;
-        for(const Scene::Face& face: scene.faces) { // FIXME: direct no copy storage
-            for(size_t i: range(face.BGR.size)) BGR[faceBase+i] = face.BGR[i];
-            faceBase += face.BGR.size;
-        }
-        assert_(faceBase == sampleCount);
-
         log("Rendered in", time);
 
 #else // Dual plane render

@@ -165,7 +165,7 @@ struct LightFieldViewApp : LightField {
                 }
             }
         });
-#else
+#elif 1
         float cellCount = 0;
         for(string name: folder.list(Files)) {
             TextData s (name);
@@ -258,8 +258,8 @@ struct LightFieldViewApp : LightField {
             ImageH Z (target.size);
             if(depthCorrect) scene.render(Zrenderer, M, {}, Z);
 
-            parallel_chunk(target.size.y*target.size.x, [this, &target, near, far, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
-                const int targetStride = target.size.x;
+            parallel_chunk(target.size.y, [this, &target, near, far, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
+                const int targetSizeX = target.size.x;
                 const uint sIndex = st[0], tIndex = st[1];
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
@@ -278,8 +278,8 @@ struct LightFieldViewApp : LightField {
                 const v2si sample2D = {    0,           size1/2};
                 const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                      size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-                for(size_t targetIndex: range(start, start+sizeI)) {
-                    int targetX = targetIndex%targetStride, targetY = targetIndex/targetStride;
+                for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(0, targetSizeX)) {
+                    size_t targetIndex = targetY*targetSizeX+targetX;
                     const vec2 uv = scaleTargetUV * vec2(targetX, targetY);
                     bgr3f S = 0;
                     if(depthCorrect) {
@@ -353,22 +353,39 @@ struct LightFieldViewApp : LightField {
                 }
             });
         } else {
+#if 0 // Raycast (FIXME: sheared)
+            vec3 O = scene.viewpoint + vec3(s,t,0)/scale;
+            parallel_chunk(target.size.y, [this, &target, near, scale, O](uint, size_t start, size_t sizeI) {
+                const int targetSizeX = target.size.x;
+                for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
+                    size_t targetIndex = targetY*targetSizeX+targetX;
+                    const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
+                    const vec3 d = normalize(vec3(uv, near));
+                    //log(O, uv, near, near/scale, d);
+                    bgr3f S = Scene::raycast(scene.faces, O, d);
+                    extern uint8 sRGB_forward[0x1000];
+                    target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
+                }
+            });
+#else
             ImageH B (target.size), G (target.size), R (target.size);
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized) {
+                assert_(sSize && tSize);
                 const float S = (s+1)/2, T = (t+1)/2;
                 TexRenderer.shader.s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
                 TexRenderer.shader.t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
                 TexRenderer.shader.sIndex = TexRenderer.shader.s;
                 TexRenderer.shader.tIndex = TexRenderer.shader.t;
-                assert_(TexRenderer.shader.sIndex < sSize && TexRenderer.shader.tIndex < tSize);
+                assert_(TexRenderer.shader.sIndex < sSize && TexRenderer.shader.tIndex < tSize, s, t, S, T, TexRenderer.shader.sIndex, TexRenderer.shader.tIndex, sSize, tSize);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             } else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;
                 scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             }
             convert(target, B, G, R);
+#endif
         }
         return target;
     }

@@ -247,6 +247,7 @@ template<class Shader> struct RenderPass {
 
     /// Submits triangles for binning, actual rendering is deferred until render
     /// \note Device coordinates are not normalized, positions should be in [0..4·Width],[0..4·Height]
+    /// \note Accepts CW winding in the left-handed coordinates system (Z-) i.e CCW winding in original right-handed system
     void submit(vec4 A, vec4 B, vec4 C, const vec3 vertexAttributes[V], FaceAttributes faceAttributes) {
         if(faceCount>=faceCapacity) { error("Face overflow"_); return; }
         Face& face = faces[faceCount];
@@ -262,27 +263,25 @@ template<class Shader> struct RenderPass {
         if(E[1].x>0/*dy<0*/ || (E[1].x==0/*dy=0*/ && E[1].y<0/*dx<0*/)) E[1].z++;
         if(E[2].x>0/*dy<0*/ || (E[2].x==0/*dy=0*/ && E[2].y<0/*dx<0*/)) E[2].z++;
 
-        // FIXME: This is CCW winding but in the left-handed coordinates system (Z-) i.e CW winding in original right-handed system
-
         for(int e: range(3)) {
             const vec2& edge = face.edges[e] = E[e].xy();
             { // Reject masks
-                float step0 = (edge.x>0?edge.x:0) + (edge.y>0?edge.y:0);
+                const float step0 = (edge.x<0?edge.x:0) + (edge.y<0?edge.y:0);
                 // Initial reject corner distance
                 face.binReject[e] = E[e].z + 64.f*step0;
                 // 4×4 reject corner steps
-                int rejectIndex = (edge.x>0)*2 + (edge.y>0);
-                v16sf step = v16sf(edge.x) * X[rejectIndex] + v16sf(edge.y) * Y[rejectIndex];
+                const int rejectIndex = (edge.x<0)*2 + (edge.y<0);
+                const v16sf step = v16sf(edge.x) * X[rejectIndex] + v16sf(edge.y) * Y[rejectIndex];
                 face.blockRejectStep[e] = v16sf(16)*step;
                 face.pixelRejectStep[e] = v16sf(4)*step;
                 face.sampleStep[e] = -step + v16sf(step0/2); // To center (reversed to allow direct comparison)
             }
             { // Accept masks
-                float step0 = (edge.x<=0?edge.x:0) + (edge.y<=0?edge.y:0);
+                const float step0 = (edge.x>=0?edge.x:0) + (edge.y>=0?edge.y:0);
                 // Accept corner distance
                 face.binAccept[e] = E[e].z + 64.f*step0;
                 // 4×4 accept corner steps
-                int acceptIndex = (edge.x<=0)*2 + (edge.y<=0);
+                const int acceptIndex = (edge.x>=0)*2 + (edge.y>=0);
                 v16sf step = v16sf(edge.x) * X[acceptIndex] + v16sf(edge.y) * Y[acceptIndex];
                 face.blockAcceptStep[e] = v16sf(16)*step;
                 face.pixelAcceptStep[e] = v16sf(-4)*step; // Reversed to allow direct comparison
@@ -296,9 +295,9 @@ template<class Shader> struct RenderPass {
             const vec2 binXY = 64.f*vec2(binX, binY);
 
             // Trivial reject
-            if( face.binReject[0] + dot(face.edges[0], binXY) <= 0 ||
-                face.binReject[1] + dot(face.edges[1], binXY) <= 0 ||
-                face.binReject[2] + dot(face.edges[2], binXY) <= 0) continue;
+            if( face.binReject[0] + dot(face.edges[0], binXY) >= 0 ||
+                face.binReject[1] + dot(face.edges[1], binXY) >= 0 ||
+                face.binReject[2] + dot(face.edges[2], binXY) >= 0) continue;
 
             Bin& bin = bins[binY*width+binX];
             if(bin.faceCount>=sizeof(bin.faces)/sizeof(uint16)) { error("Index overflow"); return; }
@@ -331,7 +330,7 @@ template<class Shader> struct RenderPass {
                 }
 
                 // Full bin accept
-                if( binAccept[0] > 0 && binAccept[1] > 0 && binAccept[2] > 0 ) {
+                if( binAccept[0] < 0 && binAccept[1] < 0 && binAccept[2] < 0 ) {
                     v16sf blockX = v16sf(binXY.x)+v16sf(16)*X[0];
                     v16sf blockY = v16sf(binXY.y)+v16sf(16)*Y[0];
                     for(;blockCount<16;blockCount++)
@@ -344,16 +343,16 @@ template<class Shader> struct RenderPass {
                         float blockReject[3]; for(int e: range(3)) blockReject[e] = binReject[e] + face.blockRejectStep[e][blockI];
 
                         // Trivial reject
-                        if((blockReject[0] <= 0) || (blockReject[1] <= 0) || (blockReject[2] <= 0) ) continue;
+                        if((blockReject[0] >= 0) || (blockReject[1] >= 0) || (blockReject[2] >= 0) ) continue;
 
                         const vec2 blockXY (blockX[blockI], blockY[blockI]);
 
                         float blockAccept[3]; for(int e: range(3)) blockAccept[e] = binAccept[e] + face.blockAcceptStep[e][blockI];
                         // Full block accept
                         if(
-                                blockAccept[0] > 0 &&
-                                blockAccept[1] > 0 &&
-                                blockAccept[2] > 0 ) {
+                                blockAccept[0] < 0 &&
+                                blockAccept[1] < 0 &&
+                                blockAccept[2] < 0 ) {
                             blocks[blockCount++] = DrawBlock{blockXY, blockI, 0xFFFF};
                             continue;
                         }
@@ -361,7 +360,7 @@ template<class Shader> struct RenderPass {
                         // 4×4 pixel accept mask
                         uint16 pixelAcceptMask=0xFFFF; // partial block of full pixels
                         for(int e: range(3)) {
-                            pixelAcceptMask &= mask(blockAccept[e] > face.pixelAcceptStep[e]);
+                            pixelAcceptMask &= mask(blockAccept[e] < face.pixelAcceptStep[e]);
                         }
 
                         if(pixelAcceptMask)
@@ -373,7 +372,7 @@ template<class Shader> struct RenderPass {
                         v16sf pixelReject[3]; // Used to reject samples
                         for(int e: range(3)) {
                             pixelReject[e] = v16sf(blockReject[e]) + face.pixelRejectStep[e];
-                            pixelRejectMask |= mask(pixelReject[e] <= 0);
+                            pixelRejectMask |= mask(pixelReject[e] >= 0.f);
                         }
 
                         // Processes partial pixels
@@ -387,9 +386,9 @@ template<class Shader> struct RenderPass {
 
                             // 4×4 samples mask
                             v16si sampleMask =
-                                    (v16sf(pixelReject[0][pixelI]) > face.sampleStep[0]) &
-                                    (v16sf(pixelReject[1][pixelI]) > face.sampleStep[1]) &
-                                    (v16sf(pixelReject[2][pixelI]) > face.sampleStep[2]);
+                                    (v16sf(pixelReject[0][pixelI]) < face.sampleStep[0]) &
+                                    (v16sf(pixelReject[1][pixelI]) < face.sampleStep[1]) &
+                                    (v16sf(pixelReject[2][pixelI]) < face.sampleStep[2]);
                             const uint16 pixelPtr = blockI*(4*4)+pixelI;
                             pixels[pixelCount++] = DrawPixel{sampleMask, vec2(pixelX[pixelI], pixelY[pixelI]), pixelPtr};
                         }
