@@ -168,3 +168,4 @@ inline float dot(v8sf a, v8sf b) {
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
 
 inline String str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
+inline String str(const v16si v) { return "v16si("_+str(ref<int>((int*)&v,16))+")"_; }

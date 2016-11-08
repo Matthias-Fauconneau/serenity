@@ -390,7 +390,9 @@ template<class Shader> struct RenderPass {
                                     (v16sf(pixelReject[1][pixelI]) < face.sampleStep[1]) &
                                     (v16sf(pixelReject[2][pixelI]) < face.sampleStep[2]);
                             const uint16 pixelPtr = blockI*(4*4)+pixelI;
-                            pixels[pixelCount++] = DrawPixel{sampleMask, vec2(pixelX[pixelI], pixelY[pixelI]), pixelPtr};
+                            //assert_(::mask(sampleMask));
+                            if(::mask(sampleMask)) // FIXME
+                                pixels[pixelCount++] = DrawPixel{sampleMask, vec2(pixelX[pixelI], pixelY[pixelI]), pixelPtr};
                         }
                     }
                 }
@@ -412,7 +414,8 @@ template<class Shader> struct RenderPass {
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
-                    Vec<v16sf, C> src = shader.template shade<C>(face.faceAttributes, z, centroid);
+                    for(int i: range(V)) for(int k: range(16)) assert_(!isNaN(centroid[i][k])); // DEBUG
+                    Vec<v16sf, C> src = shader.template shade<C>(face.faceAttributes, z, centroid, mask);
                     for(uint c: range(C)) store(tile.pixels[c][blockIndex], src._[c], mask);
 
                     for(uint pixelI: range(4*4)) {
@@ -429,13 +432,15 @@ template<class Shader> struct RenderPass {
                             // Performs Z-Test
                             v16sf& sampleZ = tile.sampleZ[pixelPtr];
                             const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f);
+                            const mask16 mask = ::mask(visibleMask);
+                            if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
                             // Stores accepted pixels in Z buffer
                             store(sampleZ, z, visibleMask);
 
                             // Counts visible samples
                             float centroid[V];
-                            float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
+                            const float visibleSampleCount = __builtin_popcount(mask);
 
                             // Computes vertex attributes at all samples
                             for(int i: range(V)) {
@@ -447,6 +452,7 @@ template<class Shader> struct RenderPass {
                             }
                             const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
 
+                            for(int i: range(V)) assert_(!isNaN(centroid[i])); // DEBUG
                             Vec<float, C> src = shader.template shade<C>(face.faceAttributes, centroidZ, centroid);
                             for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                         }
@@ -470,19 +476,21 @@ template<class Shader> struct RenderPass {
 
                     // Convert single sample pixel to multisampled pixel
                     if(!(tile.multisample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
-                        // Set multisampled pixel flag
-                        tile.multisample[pixelPtr/16] |= (1<<(pixelPtr%16));
-
                         // Performs Z-Test
                         const float pixelZ = ((float*)tile.pixelZ)[pixelPtr];
                         const v16si visibleMask = (z <= pixelZ) & (z >= /*-1*/__1f) & draw.mask;
+                        const mask16 mask = ::mask(visibleMask);
+                        if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
+
+                        // Set multisampled pixel flag
+                        tile.multisample[pixelPtr/16] |= (1<<(pixelPtr%16));
 
                         // Blends accepted pixels in multisampled Z buffer
                         //for(int i: range(16)) assert_(blend(v16sf(pixelZ), z, visibleMask)[i] >= -2, "B", z[i], i, pixelZ, z[i], visibleMask[i], draw.mask[i]);
                         tile.sampleZ[pixelPtr] = blend(v16sf(pixelZ), z, visibleMask);
 
                         // Counts visible samples
-                        float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
+                        const float visibleSampleCount = __builtin_popcount(mask);
 
                         // Computes vertex attributes at all samples
                         float centroid[V];
@@ -491,18 +499,21 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
                         const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
+                        //for(int i: range(V)) assert_(!isNaN(centroid[i]), face.varyings[i], w, sampleX, sampleY, visibleMask); // DEBUG
                         Vec<float, C> src = shader.template shade<C>(face.faceAttributes, centroidZ, centroid);
                         for(uint c: range(C)) tile.samples[c][pixelPtr] = blend(v16sf(((float*)tile.pixels[c])[pixelPtr]), v16sf(src._[c]), visibleMask);
                     } else {
                         // Performs Z-Test
                         v16sf& sampleZ = tile.sampleZ[pixelPtr];
                         const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f) & draw.mask;
+                        const mask16 mask = ::mask(visibleMask);
+                        if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
                         // Stores accepted pixels in Z buffer
                         store(sampleZ, z, visibleMask);
 
                         // Counts visible samples
-                        float visibleSampleCount = __builtin_popcount(::mask(visibleMask));
+                        const float visibleSampleCount = __builtin_popcount(mask);
 
                         // Computes vertex attributes at all samples
                         float centroid[V];
@@ -511,6 +522,7 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
                         const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
+                        //for(int i: range(V)) assert_(!isNaN(centroid[i])); // DEBUG
                         Vec<float, C> src = shader.template shade<C>(face.faceAttributes, centroidZ, centroid);
                         for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                     }

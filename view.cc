@@ -213,15 +213,16 @@ struct LightFieldViewApp : LightField {
             const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
-            for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
-            for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
+            for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
+            for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
 
             // No copy (surface samples needs to stay memory mapped)
-            face.BGR = unsafeRef(BGR.slice(index,3*tSize*sSize*V*U));
+            face.BGR = unsafeRef(BGR.slice(index, 3*tSize*sSize*V*U));
             face.stride = U;
             face.height = V;
+            log(U, V);
 
-            index += face.BGR.ref::size;
+            index += face.BGR.size;
         }
         assert_(index == BGR.size);
 #endif

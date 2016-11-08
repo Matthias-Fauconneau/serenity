@@ -112,7 +112,7 @@ static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, fl
 
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<half>  BGR; bgr3f color; float reflect; };
+    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<half> BGR; bgr3f color; float reflect; };
     buffer<Face> faces;
 
     static bgr3f raycast(ref<Face> faces, vec3 O, vec3 d) {
@@ -140,21 +140,28 @@ struct Scene {
         float s = 0, t = 0; // 0 .. (s,t)Size
         uint sIndex = 0, tIndex = 0; // floor (s, t)
 
-        template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
+        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
+        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
+
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
-            if(isNaN(varying[0]) || isNaN(varying[1])) return Vec<float, 3>{{1,1,1}};
+            //if(isNaN(varying[0]) || isNaN(varying[1])) return Vec<float, 3>{{1,1,1}};
+            assert_(!(isNaN(varying[0]) || isNaN(varying[1])), varying[0], varying[1]);
             const int size1 = face.stride;
             const int size2 = face.height*size1;
             const int size3 = sSize      *size2;
             // FIXME: face attribute (+base)
             const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                  size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-            const float u = clamp(0.f, varying[0], (float)face.stride-1-0x1p-18f);
-            const float v = clamp(0.f, varying[1], (float)face.height-1-0x1p-18f);
+            float u = clamp(0.f, varying[0], (float)face.stride-1-0x1p-18f);
+            float v = clamp(0.f, varying[1], (float)face.height-1-0x1p-18f);
             const int vIndex = v, uIndex = u; // Floor
+            u = uIndex; v = vIndex;
             const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
+            return Vec<float, 3>{{float(int(u)%2), float(int(v)%2), 1}};
+            //return Vec<float, 3>{{face.BGR[base]
             const size_t size4 = tSize*size3;
+            assert_(base < size4);
             const v16sf B = toFloat((v16hf)gather((float*)(face.BGR+0*size4+base), sample4D));
             const v16sf G = toFloat((v16hf)gather((float*)(face.BGR+1*size4+base), sample4D));
             const v16sf R = toFloat((v16hf)gather((float*)(face.BGR+2*size4+base), sample4D));
@@ -178,7 +185,9 @@ struct Scene {
         static constexpr int V = 2;
         static constexpr bool blend = false; // Disables unnecessary blending
 
-        template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
+        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
+        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
+
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         template<Type T> inline Vec<T, 3> shade3(FaceAttributes, T, T varying[V]) const {
             const T u = varying[0], v = varying[1];
@@ -199,7 +208,9 @@ struct Scene {
         const ref<Face> faces;
         RaycastShader(const Scene& scene) : viewpoint(scene.viewpoint), faces(scene.faces) {}
 
-        template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
+        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
+        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
+
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
             if(!face.reflect) return Vec<float, 3>{{face.color.b, face.color.g, face.color.r}};
@@ -251,17 +262,18 @@ struct Scene {
 };
 
 // Explicit full function template specialization
-template <> inline Vec<float, 0> Scene::CheckerboardShader::shade<0, float>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::CheckerboardShader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::CheckerboardShader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3<float>(face, z, varying); }
-template <> inline Vec<v16sf, 3> Scene::CheckerboardShader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade3<v16sf>(face, z, varying); }
+template <> inline Vec<float, 0> Scene::CheckerboardShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
+template <> inline Vec<v16sf, 0> Scene::CheckerboardShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
+template <> inline Vec<float, 3> Scene::CheckerboardShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3<float>(face, z, varying); }
+template <> inline Vec<v16sf, 3> Scene::CheckerboardShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade3<v16sf>(face, z, varying); }
 
-template <> inline Vec<float, 0> Scene::TextureShader::shade<0, float>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::TextureShader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::TextureShader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
-template <> inline Vec<v16sf, 3> Scene::TextureShader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const {
+template <> inline Vec<float, 0> Scene::TextureShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
+template <> inline Vec<v16sf, 0> Scene::TextureShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
+template <> inline Vec<float, 3> Scene::TextureShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
+template <> inline Vec<v16sf, 3> Scene::TextureShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
     Vec<v16sf, 3> Y;
     for(uint i: range(16)) {
+        if(!mask[i]) continue;
         float x[V];
         for(uint v: range(V)) x[v] = varying[v][i];
         Vec<float, 3> y = shade3(face, z[i], x);
@@ -270,13 +282,14 @@ template <> inline Vec<v16sf, 3> Scene::TextureShader::shade<3, v16sf>(FaceAttri
     return Y;
 }
 
-template <> inline Vec<float, 0> Scene::RaycastShader::shade<0, float>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::RaycastShader::shade<0, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::RaycastShader::shade<3, float>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
+template <> inline Vec<float, 0> Scene::RaycastShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
+template <> inline Vec<v16sf, 0> Scene::RaycastShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
+template <> inline Vec<float, 3> Scene::RaycastShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
 // FIXME: duplicate definition with TextureShader
-template <> inline Vec<v16sf, 3> Scene::RaycastShader::shade<3, v16sf>(FaceAttributes face, v16sf z, v16sf varying[V]) const {
+template <> inline Vec<v16sf, 3> Scene::RaycastShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
     Vec<v16sf, 3> Y;
     for(uint i: range(16)) {
+        if(!mask[i]) continue;
         float x[V];
         for(uint v: range(V)) x[v] = varying[v][i];
         Vec<float, 3> y = shade3(face, z[i], x);

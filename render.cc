@@ -11,8 +11,8 @@ struct Render {
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 1 // Surface parametrized render
-        const float cellCount = 128;
-        const uint sSize = 32, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
+        const float cellCount = 16; //128;
+        const uint sSize = 1/*32*/, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         const uint stSize = tSize*sSize;
 
         // Fits scene
@@ -50,8 +50,8 @@ struct Render {
             const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
-            for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
-            for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
+            //for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
+            //for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
             // Allocates (s,t) (u,v) images
             face.BGR.size = 3*tSize*sSize*V*U;
             face.BGR.data = (half*)sampleCount;
@@ -126,13 +126,14 @@ struct Render {
                             bgr3f reflected = Scene::raycast(scene.faces, P, normalize(R));
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }
+                        color = float((suIndex+svIndex)%2)*face.color; // DEBUG
                         const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
                         faceBGR[0*size+index] = color.b;
                         faceBGR[1*size+index] = color.g;
                         faceBGR[2*size+index] = color.r;
                     }
                 }
-#if 0 // DEBUG
+#if 1 // DEBUG
                 Image bgr (sSize*U, tSize*V);
                 extern uint8 sRGB_forward[0x1000];
                 for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
