@@ -196,10 +196,9 @@ template<class Shader> struct RenderPass {
     // Shading parameters
     typedef typename Shader::FaceAttributes FaceAttributes;
     static constexpr int V = Shader::V;
-    //static constexpr bool blend = Shader::blend;
     const Shader& shader;
-     // implements Vec<float, C> Shader::operator()(FaceAttributes, float[V] varyings);
-     // implements Vec<v16sf, C> Shader::operator()(FaceAttributes, vec16f[V] varyings);
+     // implements Vec<float, C> Shader::operator()(FaceAttributes, float z, float[V] varyings);
+     // implements Vec<v16sf, C> Shader::operator()(FaceAttributes, v16sf z, v16sf[V] varyings, v16si mask);
 
     // Geometry to rasterize
     struct Face { //~1K/face (streamed)

@@ -62,25 +62,17 @@ struct LightFieldViewApp : LightField {
     unique<Window> window = nullptr;
 
     LightFieldViewApp() : LightField(Folder(basename(arguments()[0])+(arguments().contains("coverage")?"/coverage"_:""_),"/var/tmp"_,true)) {
-        // Fits scene
-        vec3 min = inff, max = -inff;
-        for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
-        const float scale = 2./::max(max.x-min.x, max.y-min.y);
-        const float near = scale*(-scene.viewpoint.z+min.z);
-        const float far = scale*(-scene.viewpoint.z+max.z);
-
         mat4 NDC;
         NDC.scale(vec3(vec2(imageSize-uint2(1))/2.f, 1)); // 0, 2 -> pixel size (resolved)
         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
 
-        mat4 M0 = shearedPerspective(-1, -1, near, far);
-        M0.scale(scale); // Fits scene within -1, 1
+        mat4 M0 = shearedPerspective(-1, -1, scene.near, scene.far);
+        M0.scale(scene.scale); // Fits scene within -1, 1
         M0.translate(-scene.viewpoint);
         M0 = NDC * M0;
 
-        mat4 M1 = shearedPerspective(1, 1, near, far);
-        M1.scale(scale); // Fits scene within -1, 1
+        mat4 M1 = shearedPerspective(1, 1, scene.near, scene.far);
+        M1.scale(scene.scale); // Fits scene within -1, 1
         M1.translate(-scene.viewpoint);
         M1 = NDC * M1;
 
@@ -190,38 +182,44 @@ struct LightFieldViewApp : LightField {
         assert_(BGR.size%(3*tSize*sSize) == 0);
 
         size_t index = 0;
-        for(Scene::Face& face: scene.faces) {
-            const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
-            const vec3 O = (a+b+c+d)/4.f;
-            const vec3 N = cross(c-a, b-a);
+        for(size_t i : range(scene.faces.size)) {
+            const vec3 A (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
+            const vec3 B (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
+            const vec3 C (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
+            const vec3 D (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
+
+            const vec3 O = (A+B+C+D)/4.f;
+            const vec3 N = cross(C-A, B-A);
             // Viewpoint st with maximum projection
-            vec2 st = clamp(vec2(-1), scale*(O.xy()-scene.viewpoint.xy()) + (scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
+            vec2 st = clamp(vec2(-1), scene.scale*(O.xy()-scene.viewpoint.xy()) + (scene.scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
             if(!N.z) {
                 if(!N.x) st.x = 0;
                 if(!N.y) st.y = 0;
             }
             // Projects vertices along st view rays on uv plane (perspective)
-            mat4 M = shearedPerspective(st[0], st[1], near, far);
-            M.scale(scale); // Fits scene within -1, 1
+            mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
+            M.scale(scene.scale); // Fits scene within -1, 1
             M.translate(-scene.viewpoint);
-            const vec2 uvA = (M*a).xy();
-            const vec2 uvB = (M*b).xy();
-            const vec2 uvC = (M*c).xy();
-            const vec2 uvD = (M*d).xy();
+            const vec2 uvA = (M*A).xy();
+            const vec2 uvB = (M*B).xy();
+            const vec2 uvC = (M*C).xy();
+            const vec2 uvD = (M*D).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
+
             // Scales uv for texture sampling (unnormalized)
+            Scene::Face& face = scene.faces[i];
             for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
             for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
 
             // No copy (surface samples needs to stay memory mapped)
-            face.BGR = unsafeRef(BGR.slice(index, 3*tSize*sSize*V*U));
-            face.stride = U;
-            face.height = V;
+            face.attributes.BGR = BGR.data+index;
+            face.attributes.size.x = U;
+            face.attributes.size.y = V;
 
-            index += face.BGR.size;
+            index += 3*tSize*sSize*V*U;
         }
         assert_(index == BGR.size);
 #endif
@@ -236,18 +234,10 @@ struct LightFieldViewApp : LightField {
     Image render(uint2 targetSize) {
         Image target (targetSize);
 
-        // Fits scene
-        vec3 min = inff, max = -inff;
-        for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
-        const float scale = 2./::max(max.x-min.x, max.y-min.y);
-        const float near = scale*(-scene.viewpoint.z+min.z);
-        const float far = scale*(-scene.viewpoint.z+max.z);
-
         // Sheared perspective (rectification)
         const float s = view.viewYawPitch.x/(PI/3), t = view.viewYawPitch.y/(PI/3);
-        mat4 M = shearedPerspective(s, t, near, far);
-        M.scale(scale); // Fits scene within -1, 1
+        mat4 M = shearedPerspective(s, t, scene.near, scene.far);
+        M.scale(scene.scale); // Fits scene within -1, 1
         M.translate(-scene.viewpoint);
         const vec2 st = vec2((s+1)/2, (t+1)/2) * vec2(imageCount-uint2(2));
         const vec2 scaleTargetUV = vec2(imageSize-uint2(1)) / vec2(target.size-uint2(1));
@@ -258,14 +248,14 @@ struct LightFieldViewApp : LightField {
             ImageH Z (target.size);
             if(depthCorrect) scene.render(Zrenderer, M, {}, Z);
 
-            parallel_chunk(target.size.y, [this, &target, near, far, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
+            parallel_chunk(target.size.y, [this, &target, scaleTargetUV, st, &Z](uint, size_t start, size_t sizeI) {
                 const int targetSizeX = target.size.x;
                 const uint sIndex = st[0], tIndex = st[1];
                 const uint2 imageCount = this->imageCount;
                 const uint2 imageSize = this->imageSize;
                 const float scale = (float)(imageSize.x-1)/(imageCount.x-1); // st -> uv
-                const float A = - scale*(0+(far-near)/(2*far));
-                const float B = - scale*(1-(far+near)/(2*far));
+                const float A = - scale*(0+(scene.far-scene.near)/(2*scene.far));
+                const float B = - scale*(1-(scene.far+scene.near)/(2*scene.far));
                 //const half* fieldZ = this->fieldZ.data;
                 //const v4sf zTolerance = float4(1); FIXME
                 const half* fieldB = this->fieldB.data;
@@ -380,7 +370,7 @@ struct LightFieldViewApp : LightField {
                 TexRenderer.shader.tIndex = TexRenderer.shader.t;
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             } else {
-                BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;
+                BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scene.scale;
                 scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             }
             convert(target, B, G, R);

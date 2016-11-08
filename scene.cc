@@ -19,6 +19,7 @@ Scene parseScene(ref<byte> file) {
     TextData s (file);
     while(s.match('#')) s.until('\n');
     if(s.match("ply\n")) {
+#if 0
         s.skip("format ascii 1.0\n");
         s.skip("comment "); s.until('\n');
         s.skip("element vertex ");
@@ -65,9 +66,13 @@ Scene parseScene(ref<byte> file) {
             //faces.append({{vertices[face[3]], vertices[face[2]], vertices[face[1]], vertices[face[0]]},{0,1,1,0},{0,0,1,1},Image8()});
         }
         return {viewpoint, ::move(faces)};
+#else
+        error("Unsupported");
+#endif
     } else {
         const vec3 viewpoint = parse<vec3>(s);
         s.skip('\n');
+        array<float> X[4], Y[4], Z[4];
         array<Scene::Face> faces;
         while(s) {
             if(s.match('\n')) continue;
@@ -79,14 +84,27 @@ Scene parseScene(ref<byte> file) {
                 s.skip('\n');
             }
             assert_(polygon.size == 4);
-            const vec3 A = polygon[3], B = polygon[2], C = polygon[1];//, D = polygon[0];
+            const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
             const vec3 N = normalize(cross(B-A, C-A));
-            float reflect = N.z == 1; //faces.size%2==0;
+            float reflect = N.z == -1;
             const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            //faces.append({{polygon[3], polygon[2], polygon[1], polygon[0]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
-            faces.append({{polygon[0], polygon[1], polygon[2], polygon[3]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
+            faces.append({{0,1,1,0},{0,0,1,1},{reflect,color,N,0,0}});
+            for(size_t i: range(4)) {
+                X[i].append(polygon[i].x);
+                Y[i].append(polygon[i].y);
+                Z[i].append(polygon[i].z);
+            }
         }
         log(viewpoint, faces.size);
-        return {viewpoint, ::move(faces)};
+        Scene scene;
+        scene.viewpoint = viewpoint;
+        for(size_t i: range(4)) {
+            scene.X[i] = ::move(X[i]);
+            scene.Y[i] = ::move(Y[i]);
+            scene.Z[i] = ::move(Z[i]);
+        }
+        scene.faces = ::move(faces);
+        scene.fit();
+        return scene;
     }
 }
