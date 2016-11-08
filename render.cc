@@ -12,6 +12,8 @@ struct Render {
 
 #if 1 // Surface parametrized render
         const float cellCount = 32;
+        const uint sSize = 2, tSize = 2; // Number of view-dependent samples along (s,t) dimensions
+        const uint stSize = tSize*sSize;
 
         // Fits scene
         vec3 min = inff, max = -inff;
@@ -25,12 +27,12 @@ struct Render {
         Time time {true};
         log("Surface parametrized render");
         time.start();
-        parallel_chunk(0, scene.faces.size, [&scene, scale, near, far, cellCount](uint unused id, uint start, uint sizeI) {
+        parallel_chunk(0, scene.faces.size, [&scene, scale, near, far, cellCount, &folder](uint unused id, uint start, uint sizeI) {
             for(const uint faceIndex: range(start, start+sizeI)) {
                 Scene::Face& face = scene.faces[faceIndex];
                 const vec3 a = face.position[0], b = face.position[1], c = face.position[2], d = face.position[3];
                 const vec3 faceCenter = (a+b+c+d)/4.f;
-                const vec3 N = cross(c-a, b-a);
+                const vec3 N = normalize(cross(c-a, b-a));
                 // Viewpoint st with maximum projection
                 vec2 st = clamp(vec2(-1),
                                 scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
@@ -59,57 +61,62 @@ struct Render {
                 // Scales uv for texture sampling (unnormalized)
                 for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
                 for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
-                // Allocates image (FIXME)
-                face.B = Image8(U, V);
-                face.G = Image8(U, V);
-                face.R = Image8(U, V);
+                // Allocates (s,t) (u,v) images
+                face.BGR = buffer<uint8>(3*tSize*sSize*V*U);
 
                 const vec3 ab = b-a;
                 const vec3 ad = d-a;
                 const vec3 badc = a-b+c-d;
 
                 // Shades surface
+                const size_t faceSampleCount = U*V;
+                const size_t size = stSize*faceSampleCount;
                 for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = a + ad*v + (ab + badc*v) * u;
-                    bgr3f color;
-                    if(!face.reflect) color=face.color;
-                    else {
-                        const vec3 viewpoint = scene.viewpoint;
-                        const vec3 D = normalize(P-viewpoint);
-                        const vec3 R = D - 2*dot(N, D)*N;
-                        bgr3f reflected = Scene::raycast(scene.faces, P, normalize(R));
-                        color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
+                    const size_t uvIndex = svIndex*U+suIndex;
+                    for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                        bgr3f color;
+                        if(!face.reflect) color = face.color;
+                        else {
+                            const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scale;
+                            const vec3 D = normalize(P-viewpoint);
+                            const vec3 R = D - 2*dot(N, D)*N;
+                            bgr3f reflected = Scene::raycast(scene.faces, P, normalize(R));
+                            color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
+                        }
+                        const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
+                        face.BGR[0*size+index] = 0xFF*color.b;
+                        face.BGR[1*size+index] = 0xFF*color.g;
+                        face.BGR[2*size+index] = 0xFF*color.r;
                     }
-                    const size_t index = svIndex*U+suIndex;
-                    face.B[index] = 0xFF*color.b;
-                    face.G[index] = 0xFF*color.g;
-                    face.R[index] = 0xFF*color.r;
-                    // TODO: View dependent representation
                 }
+                // DEBUG
+                Image bgr (sSize*U, tSize*V);
+                for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+                    const size_t uvIndex = svIndex*U+suIndex;
+                    const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
+                    bgr(s*U+suIndex, t*V+svIndex) = byte4(face.BGR[0*size+index], face.BGR[1*size+index], face.BGR[2*size+index], 0xFF);
+                }
+                writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
             }
         });
         size_t sampleCount = 0;
-        for(const Scene::Face& face: scene.faces) sampleCount += face.B.ref::size;
-        log(sampleCount, "samples (per component)");
+        for(const Scene::Face& face: scene.faces) sampleCount += face.BGR.ref::size;
 
         assert_(uint(cellCount) == cellCount);
-        File file(str(uint(cellCount)), folder, Flags(ReadWrite|Create));
-        size_t byteSize = 3*sampleCount;
+        File file(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
+        size_t byteSize = sampleCount;
+        log(strx(uint2(sSize, tSize)), "=", sampleCount, "samples (per component)", "=", byteSize/1024/1024.f, "M");
         assert_(byteSize <= 12ull*1024*1024*1024);
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<uint8> BGR = mcast<uint8>(map);
-        mref<uint8> B = BGR.slice(0*sampleCount, sampleCount);
-        mref<uint8> G = BGR.slice(1*sampleCount, sampleCount);
-        mref<uint8> R = BGR.slice(2*sampleCount, sampleCount);
         size_t index = 0;
         for(const Scene::Face& face: scene.faces) { // FIXME: direct no copy storage
-            B.slice(index,face.B.ref::size).copy(face.B);
-            G.slice(index,face.G.ref::size).copy(face.G);
-            R.slice(index,face.R.ref::size).copy(face.R);
-            index += face.B.ref::size;
+            BGR.slice(index, face.BGR.ref::size).copy(face.BGR);
+            index += face.BGR.ref::size;
         }
         assert_(index == sampleCount);
 

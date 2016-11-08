@@ -43,7 +43,7 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
 
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[4]; float u[4], v[4]; Image8 B, G, R; bgr3f color; float reflect; };
+    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<uint8> BGR; bgr3f color; float reflect; };
     buffer<Face> faces;
 
     static bgr3f raycast(ref<Face> faces, vec3 O, vec3 d) {
@@ -64,9 +64,10 @@ struct Scene {
         TextureShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* B; const uint8* G; const uint8* R; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
+        uint stSize, stIndex;
 
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
@@ -76,10 +77,11 @@ struct Scene {
             uIndex = clamp(0, uIndex, (int)face.stride-1);
             vIndex = clamp(0, vIndex, (int)face.height-1);
             assert_(vIndex >= 0 && uIndex >= 0 && uint(uIndex)<face.stride && uint(vIndex)<face.height, u, v, face.stride, face.height, uIndex, vIndex, face.stride, face.height);
-            size_t index = vIndex*face.stride+uIndex;
-            const float b = (float)face.B[index]/float(0xFF); // Nearest // FIXME: bilinear
-            const float g = (float)face.G[index]/float(0xFF); // Nearest // FIXME: bilinear
-            const float r = (float)face.R[index]/float(0xFF); // Nearest // FIXME: bilinear
+            const size_t size = stSize*face.height*face.stride;
+            const size_t index = stIndex*face.height*face.stride+vIndex*face.stride+uIndex;
+            const float b = (float)face.BGR[0*size+index]/float(0xFF); // Nearest // FIXME: bilinear
+            const float g = (float)face.BGR[1*size+index]/float(0xFF); // Nearest // FIXME: bilinear
+            const float r = (float)face.BGR[2*size+index]/float(0xFF); // Nearest // FIXME: bilinear
             return Vec<float, 3>{{b, g, r}};
         }
     };
@@ -88,7 +90,7 @@ struct Scene {
         CheckerboardShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* B; const uint8* G; const uint8* R; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2;
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -106,7 +108,7 @@ struct Scene {
 
     struct RaycastShader {
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* B; const uint8* G; const uint8* R; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 5;
         static constexpr bool blend = false; // Disables unnecessary blending
         vec3 viewpoint; // scene.viewpoint + st / scale
@@ -152,12 +154,12 @@ struct Scene {
                                                  vec3(face.v[0],face.v[1],face.v[2]),
                                                  vec3(A.x,B.x,C.x),
                                                  vec3(A.y,B.y,C.y),
-                                                 vec3(A.z,B.z,C.z)}, {face.B.stride, face.B.data, face.G.data, face.R.data, face.B.size.y, N, face.color, face.reflect});
+                                                 vec3(A.z,B.z,C.z)}, {face.stride, face.BGR.data, face.height, N, face.color, face.reflect});
             renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
                                                  vec3(face.v[0],face.v[2],face.v[3]),
                                                  vec3(A.x,C.x,D.x),
                                                  vec3(A.y,C.y,D.y),
-                                                 vec3(A.z,C.z,D.z)}, {face.B.stride, face.B.data, face.G.data, face.R.data, face.B.size.y, N, face.color, face.reflect});
+                                                 vec3(A.z,C.z,D.z)}, {face.stride, face.BGR.data, face.height, N, face.color, face.reflect});
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(Z, targets);

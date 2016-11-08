@@ -33,6 +33,7 @@ struct ViewControl : virtual Widget {
 
 struct LightFieldViewApp : LightField {
     Map surfaceMap; // Needs to stay memory mapped for face B,G,R references
+    uint sSize = 0, tSize = 0;
 
     Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
     Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
@@ -165,23 +166,26 @@ struct LightFieldViewApp : LightField {
             }
         });
 #else
-
         float cellCount = 0;
         for(string name: folder.list(Files)) {
             TextData s (name);
             const uint cellCount_ = s.integer(false);
+            if(!s.match('x')) continue;
+            const int sSize_ = s.integer(false);
+            if(!s.match('x')) continue;
+            const int tSize_ = s.integer(false);
             if(s) continue;
             cellCount = cellCount_;
+            sSize = sSize_;
+            tSize = tSize_;
             break;
         }
-        assert_(cellCount);
-        surfaceMap = Map(str(uint(cellCount)), folder);
-        assert_(surfaceMap.size%3 == 0);
-        size_t sampleCount = surfaceMap.size / 3; // per component
-        ref<uint8> BGR = cast<uint8>(surfaceMap);
-        ref<uint8> B = BGR.slice(0*sampleCount, sampleCount);
-        ref<uint8> G = BGR.slice(1*sampleCount, sampleCount);
-        ref<uint8> R = BGR.slice(2*sampleCount, sampleCount);
+        TexRenderer.shader.stSize = tSize*sSize;
+        assert_(cellCount && sSize && tSize);
+        surfaceMap = Map(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
+        assert_(surfaceMap.size%(3*tSize*sSize) == 0);
+        //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
+        const ref<uint8> BGR = cast<uint8>(surfaceMap);
 
         size_t index = 0;
         for(Scene::Face& face: scene.faces) {
@@ -211,13 +215,13 @@ struct LightFieldViewApp : LightField {
             for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
 
             // No copy (surface samples needs to stay memory mapped)
-            face.B = Image8(unsafeRef(B.slice(index,V*U)), uint2(U, V));
-            face.G = Image8(unsafeRef(G.slice(index,V*U)), uint2(U, V));
-            face.R = Image8(unsafeRef(R.slice(index,V*U)), uint2(U, V));
+            face.BGR = unsafeRef(BGR.slice(index,3*tSize*sSize*V*U));
+            face.stride = U;
+            face.height = V;
 
-            index += face.B.ref::size;
+            index += face.BGR.ref::size;
         }
-        assert_(index == sampleCount);
+        assert_(index == surfaceMap.size);
 #endif
         log(time);
 
@@ -350,9 +354,13 @@ struct LightFieldViewApp : LightField {
             ImageH B (target.size), G (target.size), R (target.size);
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            else if(displaySurfaceParametrized)
+            else if(displaySurfaceParametrized) {
+                const uint sIndex = ((s+1)/2)*(sSize-1);
+                const uint tIndex = ((t+1)/2)*(tSize-1);
+                assert_(sIndex < sSize && tIndex < tSize);
+                TexRenderer.shader.stIndex = tIndex*sSize+sIndex;
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            else {
+            } else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;
                 scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             }
