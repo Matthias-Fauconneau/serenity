@@ -210,7 +210,7 @@ struct LightFieldViewApp : LightField {
             const vec2 uvD = (M*d).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-            const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+            const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
             for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
@@ -220,7 +220,6 @@ struct LightFieldViewApp : LightField {
             face.BGR = unsafeRef(BGR.slice(index, 3*tSize*sSize*V*U));
             face.stride = U;
             face.height = V;
-            log(U, V);
 
             index += face.BGR.size;
         }
@@ -373,7 +372,7 @@ struct LightFieldViewApp : LightField {
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized) {
-                assert_(sSize && tSize);
+                assert_(sSize>1 && tSize>1);
                 const float S = (s+1)/2, T = (t+1)/2;
                 TexRenderer.shader.s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
                 TexRenderer.shader.t = ::min(T * (tSize-1), tSize-1-0x1p-18f);

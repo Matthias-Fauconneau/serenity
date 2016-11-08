@@ -34,7 +34,6 @@ inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     if(v < 0 || u + v > det) return false;
     t = dot(e2, Q);
     if(t < 0) return false;
-    //assert_(t >= 0, t);
     t /= det;
     u /= det;
     v /= det;
@@ -145,8 +144,6 @@ struct Scene {
 
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
-            //if(isNaN(varying[0]) || isNaN(varying[1])) return Vec<float, 3>{{1,1,1}};
-            assert_(!(isNaN(varying[0]) || isNaN(varying[1])), varying[0], varying[1]);
             const int size1 = face.stride;
             const int size2 = face.height*size1;
             const int size3 = sSize      *size2;
@@ -156,12 +153,8 @@ struct Scene {
             float u = clamp(0.f, varying[0], (float)face.stride-1-0x1p-18f);
             float v = clamp(0.f, varying[1], (float)face.height-1-0x1p-18f);
             const int vIndex = v, uIndex = u; // Floor
-            u = uIndex; v = vIndex;
             const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
-            return Vec<float, 3>{{float(int(u)%2), float(int(v)%2), 1}};
-            //return Vec<float, 3>{{face.BGR[base]
             const size_t size4 = tSize*size3;
-            assert_(base < size4);
             const v16sf B = toFloat((v16hf)gather((float*)(face.BGR+0*size4+base), sample4D));
             const v16sf G = toFloat((v16hf)gather((float*)(face.BGR+1*size4+base), sample4D));
             const v16sf R = toFloat((v16hf)gather((float*)(face.BGR+2*size4+base), sample4D));
@@ -242,7 +235,6 @@ struct Scene {
         for(const Face& face: faces) {
             const vec4 a = M*vec4(face.position[0],1), b = M*vec4(face.position[1],1), c = M*vec4(face.position[2],1), d = M*vec4(face.position[3],1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z >= 0) continue; // Backward face culling
-            //const vec3 A = face.position[0]-viewpoint, B = face.position[1]-viewpoint, C = face.position[2]-viewpoint, D = face.position[3]-viewpoint;
             const vec3 A = face.position[0], B = face.position[1], C = face.position[2], D = face.position[3];
             const vec3 N = normalize(cross(B-A,C-A)); // FIXME: store
             renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),

@@ -12,7 +12,7 @@ struct Render {
 
 #if 1 // Surface parametrized render
         const float cellCount = 16; //128;
-        const uint sSize = 1/*32*/, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
+        const uint sSize = 2/*32*/, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         const uint stSize = tSize*sSize;
 
         // Fits scene
@@ -47,7 +47,7 @@ struct Render {
             const vec2 uvD = (M*d).xy();
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-            const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+            const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
             assert_(U && V);
             // Scales uv for texture sampling (unnormalized)
             //for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
@@ -96,7 +96,7 @@ struct Render {
                 const vec2 uvD = (M*d).xy();
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-                const uint U = ceil(maxU*cellCount), V = ceil(maxV*cellCount);
+                const uint U = align(2, ceil(maxU*cellCount)), V = ceil(maxV*cellCount); // Aligns U to 2 for correct 32bit gather indexing
                 assert_(U && V);
                 // Scales uv for texture sampling (unnormalized)
                 for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
@@ -126,7 +126,6 @@ struct Render {
                             bgr3f reflected = Scene::raycast(scene.faces, P, normalize(R));
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }
-                        color = float((suIndex+svIndex)%2)*face.color; // DEBUG
                         const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
                         faceBGR[0*size+index] = color.b;
                         faceBGR[1*size+index] = color.g;
