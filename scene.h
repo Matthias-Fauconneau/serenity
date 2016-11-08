@@ -43,7 +43,7 @@ static bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
 
 struct Scene {
     const vec3 viewpoint;
-    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<uint8> BGR; bgr3f color; float reflect; };
+    struct Face { vec3 position[4]; float u[4], v[4]; uint stride, height; buffer<half> BGR; bgr3f color; float reflect; };
     buffer<Face> faces;
 
     static bgr3f raycast(ref<Face> faces, vec3 O, vec3 d) {
@@ -64,25 +64,40 @@ struct Scene {
         TextureShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const half* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2; //sizeof(Face::attributes)/sizeof(Face::attributes[0]); // U,V
         static constexpr bool blend = false; // Disables unnecessary blending
-        uint stSize, stIndex;
+        uint sSize = 0, tSize = 0;//, stSize = 0;
+        float s = 0, t = 0; // 0 .. (s,t)Size
+        uint sIndex = 0, tIndex = 0; // floor (s, t)
 
         template<int C, Type T> inline Vec<T, C> shade(FaceAttributes, T, T[V]) const;
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
-            const float u = varying[0], v = varying[1];
-            int vIndex = v+1./2, uIndex = u+1./2; // Round
-            uIndex = clamp(0, uIndex, (int)face.stride-1);
-            vIndex = clamp(0, vIndex, (int)face.height-1);
-            assert_(vIndex >= 0 && uIndex >= 0 && uint(uIndex)<face.stride && uint(vIndex)<face.height, u, v, face.stride, face.height, uIndex, vIndex, face.stride, face.height);
-            const size_t size = stSize*face.height*face.stride;
-            const size_t index = stIndex*face.height*face.stride+vIndex*face.stride+uIndex;
-            const float b = (float)face.BGR[0*size+index]/float(0xFF); // Nearest // FIXME: bilinear
-            const float g = (float)face.BGR[1*size+index]/float(0xFF); // Nearest // FIXME: bilinear
-            const float r = (float)face.BGR[2*size+index]/float(0xFF); // Nearest // FIXME: bilinear
-            return Vec<float, 3>{{b, g, r}};
+            if(isNaN(varying[0]) || isNaN(varying[1])) return Vec<float, 3>{{1,1,1}};
+            const int size1 = face.stride;
+            const int size2 = face.height*size1;
+            const int size3 = sSize      *size2;
+            // FIXME: face attribute (+base)
+            const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
+                                 size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+            const float u = clamp(0.f, varying[0], (float)face.stride-1-0x1p-18f);
+            const float v = clamp(0.f, varying[1], (float)face.height-1-0x1p-18f);
+            const int vIndex = v, uIndex = u; // Floor
+            const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
+            const size_t size4 = tSize*size3;
+            const v16sf B = toFloat((v16hf)gather((float*)(face.BGR+0*size4+base), sample4D));
+            const v16sf G = toFloat((v16hf)gather((float*)(face.BGR+1*size4+base), sample4D));
+            const v16sf R = toFloat((v16hf)gather((float*)(face.BGR+2*size4+base), sample4D));
+            const v4sf x = {t, s, v, u}; // tsvu
+            const v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);
+            static const v8sf _00001111f = {0,0,0,0,1,1,1,1};
+            const v8sf w_1mw = abs(X - floor(X) - _00001111f); // fract(x), 1-fract(x)
+            const v16sf w01 = shuffle(w_1mw, w_1mw, 4,4,4,4,4,4,4,4, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
+                            * shuffle(w_1mw, w_1mw, 5,5,5,5,1,1,1,1, 5,5,5,5,1,1,1,1)  // ssssSSSSssssSSSS
+                            * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
+                            * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
+            return Vec<float, 3>{{dot(w01, B), dot(w01, G), dot(w01, R)}};
         }
     };
 
@@ -90,7 +105,7 @@ struct Scene {
         CheckerboardShader(const Scene&) {}
 
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const half* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 2;
         static constexpr bool blend = false; // Disables unnecessary blending
 
@@ -108,7 +123,7 @@ struct Scene {
 
     struct RaycastShader {
         // Shader specification (used by rasterizer)
-        struct FaceAttributes { uint stride; const uint8* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
+        struct FaceAttributes { uint stride; const half* BGR; uint height; /*Clamp*/ vec3 N; bgr3f color; float reflect; };
         static constexpr int V = 5;
         static constexpr bool blend = false; // Disables unnecessary blending
         vec3 viewpoint; // scene.viewpoint + st / scale

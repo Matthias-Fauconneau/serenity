@@ -180,12 +180,14 @@ struct LightFieldViewApp : LightField {
             tSize = tSize_;
             break;
         }
-        TexRenderer.shader.stSize = tSize*sSize;
+        TexRenderer.shader.sSize = sSize;
+        TexRenderer.shader.tSize = tSize;
+        //TexRenderer.shader.stSize = tSize*sSize;
         assert_(cellCount && sSize && tSize);
         surfaceMap = Map(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
-        assert_(surfaceMap.size%(3*tSize*sSize) == 0);
         //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
-        const ref<uint8> BGR = cast<uint8>(surfaceMap);
+        const ref<half> BGR = cast<half>(surfaceMap);
+        assert_(BGR.size%(3*tSize*sSize) == 0);
 
         size_t index = 0;
         for(Scene::Face& face: scene.faces) {
@@ -221,7 +223,7 @@ struct LightFieldViewApp : LightField {
 
             index += face.BGR.ref::size;
         }
-        assert_(index == surfaceMap.size);
+        assert_(index == BGR.size);
 #endif
         log(time);
 
@@ -355,10 +357,12 @@ struct LightFieldViewApp : LightField {
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized) {
-                const uint sIndex = ((s+1)/2)*(sSize-1);
-                const uint tIndex = ((t+1)/2)*(tSize-1);
-                assert_(sIndex < sSize && tIndex < tSize);
-                TexRenderer.shader.stIndex = tIndex*sSize+sIndex;
+                const float S = (s+1)/2, T = (t+1)/2;
+                TexRenderer.shader.s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
+                TexRenderer.shader.t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
+                TexRenderer.shader.sIndex = TexRenderer.shader.s;
+                TexRenderer.shader.tIndex = TexRenderer.shader.t;
+                assert_(TexRenderer.shader.sIndex < sSize && TexRenderer.shader.tIndex < tSize);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             } else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scale;

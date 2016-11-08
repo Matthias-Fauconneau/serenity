@@ -62,7 +62,7 @@ struct Render {
                 for(float& u: face.u) { u *= U; assert_(isNumber(u)); }
                 for(float& v: face.v) { v *= V; assert_(isNumber(v)); }
                 // Allocates (s,t) (u,v) images
-                face.BGR = buffer<uint8>(3*tSize*sSize*V*U);
+                face.BGR = buffer<half>(3*tSize*sSize*V*U);
 
                 const vec3 ab = b-a;
                 const vec3 ad = d-a;
@@ -87,19 +87,24 @@ struct Render {
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                         }
                         const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
-                        face.BGR[0*size+index] = 0xFF*color.b;
-                        face.BGR[1*size+index] = 0xFF*color.g;
-                        face.BGR[2*size+index] = 0xFF*color.r;
+                        face.BGR[0*size+index] = color.b;
+                        face.BGR[1*size+index] = color.g;
+                        face.BGR[2*size+index] = color.r;
                     }
                 }
-                // DEBUG
+#if 0 // DEBUG
                 Image bgr (sSize*U, tSize*V);
+                extern uint8 sRGB_forward[0x1000];
                 for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
                     const size_t uvIndex = svIndex*U+suIndex;
                     const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
-                    bgr(s*U+suIndex, t*V+svIndex) = byte4(face.BGR[0*size+index], face.BGR[1*size+index], face.BGR[2*size+index], 0xFF);
+                    bgr(s*U+suIndex, t*V+svIndex) = byte4(
+                            sRGB_forward[uint(face.BGR[0*size+index]*0xFFF)],
+                            sRGB_forward[uint(face.BGR[1*size+index]*0xFFF)],
+                            sRGB_forward[uint(face.BGR[2*size+index]*0xFFF)], 0xFF);
                 }
                 writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
+#endif
             }
         });
         size_t sampleCount = 0;
@@ -107,18 +112,18 @@ struct Render {
 
         assert_(uint(cellCount) == cellCount);
         File file(str(uint(cellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
-        size_t byteSize = sampleCount;
+        size_t byteSize = sampleCount*sizeof(half);
         log(strx(uint2(sSize, tSize)), "=", sampleCount, "samples (per component)", "=", byteSize/1024/1024.f, "M");
         assert_(byteSize <= 12ull*1024*1024*1024);
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
-        mref<uint8> BGR = mcast<uint8>(map);
-        size_t index = 0;
+        mref<half> BGR = mcast<half>(map);
+        size_t faceBase = 0;
         for(const Scene::Face& face: scene.faces) { // FIXME: direct no copy storage
-            BGR.slice(index, face.BGR.ref::size).copy(face.BGR);
-            index += face.BGR.ref::size;
+            for(size_t i: range(face.BGR.size)) BGR[faceBase+i] = face.BGR[i];
+            faceBase += face.BGR.size;
         }
-        assert_(index == sampleCount);
+        assert_(faceBase == sampleCount);
 
         log("Rendered in", time);
 
