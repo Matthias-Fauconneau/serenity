@@ -49,7 +49,8 @@ struct v16sf {
     explicit operator v16si() const;
 };
 
-static v4sf unused _0f {0,0,0,0};
+//static v4sf unused _0f {0,0,0,0};
+static v8sf unused _0f {0,0,0,0,0,0,0};
 static v16sf unused __1f = v16sf(-1);
 static v16sf unused _1f = v16sf(1);
 
@@ -117,7 +118,8 @@ static const unused v8si selectMask {1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1
 inline v8si mask(const uint8 mask) { return (intX(mask) & selectMask) != _0i; }
 
 
-inline mask16 mask(v16si m) { return __builtin_ia32_movmskps256(m.r1)|(__builtin_ia32_movmskps256(m.r2)<<8); }
+inline mask8 mask(v8si m) { return __builtin_ia32_movmskps256(m); }
+inline mask16 mask(v16si m) { return mask(m.r1)|(mask(m.r2)<<8); }
 inline v16si mask(const mask16 m) { return v16si(mask(mask8(m)), mask(mask8(m>>8))); }
 
 inline v4sf and(v4sf a, v4si b) { return (v4sf)((v4si)a & b); }
@@ -125,7 +127,8 @@ inline v8sf and(v8sf a, v8si b) { return (v8sf)((v8si)a & b); }
 inline v16si operator &(v16si a, v16si b) { return v16si(a.r1 & b.r1, a.r2 & b.r2); }
 inline v16sf operator &(v16sf a, v16si b) { return v16sf(and(a.r1, b.r1), and(a.r2,b.r2)); }
 
-inline v16sf blend(v16sf A, v16sf B, v16si mask) { return v16sf(__builtin_ia32_blendvps256(A.r1, B.r1, mask.r1),__builtin_ia32_blendvps256(A.r2, B.r2, mask.r2)); }
+inline v8sf blend(v8sf A, v8sf B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
+inline v16sf blend(v16sf A, v16sf B, v16si mask) { return v16sf(blend(A.r1, B.r1, mask.r1), blend(A.r2, B.r2, mask.r2)); }
 
 inline void store(v16sf& P, v16sf A, v16si M) {
     __builtin_ia32_maskstoreps256(&P.r1, M.r1, A.r1);
