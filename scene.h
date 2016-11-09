@@ -31,38 +31,6 @@ inline v8sf dot(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, cons
 }
 
 // "Efficient Ray-Quadrilateral Intersection Test"
-static inline float intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d) {
-    const vec3 e03 = v01 - v00;
-    const vec3 e01 = v10 - v00;
-    const vec3 P = cross(d, e03);
-    float det = dot(e01, P);
-    if(det <= 0) return inff;
-    const vec3 T0 = O - v00;
-    float a = dot(T0, P);
-    if(a < 0 || a > det) return inff;
-    const vec3 Q0 = cross(T0, e01);
-    float b = dot(d, Q0);
-    if(b < 0 || b > det) return inff; // FIXME: assert v11 within parallelogram and reorder otherwise
-    // in parallelogram
-    if(a + b > det) { // not in T
-        const vec3 e23 = v01 - v11;
-        const vec3 e21 = v10 - v11;
-        const vec3 P1 = cross(d, e21);
-        const float det1 = dot(e23, P1);
-        if(det1 < 0) return inff;
-        const vec3 T1 = O - v11;
-        const float a1 = dot(T1, P1);
-        if(a1 < 0) return inff;
-        const vec3 Q1 = cross(T1, e23);
-        const float b1 = dot(d, Q1);
-        if(b1 < 0) return inff;
-    }
-
-    const float t = dot(e03, Q0);
-    return t > 0 ? t / det : inff;
-}
-
-// "Efficient Ray-Quadrilateral Intersection Test"
 static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
                              const v8sf x10, const v8sf y10, const v8sf z10,
                              const v8sf x11, const v8sf y11, const v8sf z11,
@@ -96,11 +64,9 @@ static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
     const v8sf e23x = x01 - x11;
     const v8sf e23y = y01 - y11;
     const v8sf e23z = z01 - z11;
-    //const v8sf det1 = dot(e23x, e23y, e23z, P1x, P1y, P1z); // FIXME
     v8sf Q1x, Q1y, Q1z; cross(T1x, T1y, T1z, e23x, e23y, e23z, Q1x, Q1y, Q1z);
     const v8sf b1 = dot(Dx, Dy, Dz, Q1x, Q1y, Q1z);
 
-    //return blend(float8(inff), t, det0 >= _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t >= _0f && a0 <= det0 && b0 <= det0 && det1 >= _0f && a1 <= det1 && b1 <= det1);
     return blend(float8(inff), t, det0 > _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t > _0f);
 }
 
@@ -146,26 +112,6 @@ struct Scene {
     inline bgr3f raycast(vec3 O, vec3 d) const {
         float value = inff; size_t index = invalid;
         assert_(align(8, faces.size)==faces.capacity);
-#if 0
-        for(size_t i=0; i<faces.size; i++) {
-            const float Ax = X[0][i];
-            const float Ay = Y[0][i];
-            const float Az = Z[0][i];
-            const float Bx = X[1][i];
-            const float By = Y[1][i];
-            const float Bz = Z[1][i];
-            const float Cx = X[2][i];
-            const float Cy = Y[2][i];
-            const float Cz = Z[2][i];
-            const float Dx = X[3][i];
-            const float Dy = Y[3][i];
-            const float Dz = Z[3][i];
-            const float t = ::intersect(vec3(Ax,Ay,Az),vec3(Bx,By,Bz),vec3(Cx,Cy,Cz),vec3(Dx,Dy,Dz), O, d);
-            if(t >= value) continue;
-            value = t;
-            index = i;
-        }
-#else
         const v8sf Ox = float8(O.x);
         const v8sf Oy = float8(O.y);
         const v8sf Oz = float8(O.z);
@@ -192,7 +138,6 @@ struct Scene {
             value = hmin0;
             index = i + ::indexOfEqual(t, hmin);
         }
-#endif
         return index==invalid ? bgr3f(0) : faces[index].attributes.color;
     }
 

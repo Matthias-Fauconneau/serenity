@@ -71,11 +71,11 @@ struct Render {
         parallel_chunk(0, scene.faces.size, [&scene, detailCellCount, &folder, BGR, &totalTime, &innerTime](uint unused id, uint start, uint sizeI) {
             tsc totalTSC, innerTSC;
             totalTSC.start();
-            for(const size_t i: range(start, start+sizeI)) {
-                const vec3 A (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
-                const vec3 B (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
-                const vec3 C (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
-                const vec3 D (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
+            for(const size_t faceIndex: range(start, start+sizeI)) {
+                const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
+                const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
+                const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
+                const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
 
                 const vec3 faceCenter = (A+B+C+D)/4.f;
                 const vec3 N = normalize(cross(C-A, B-A));
@@ -98,7 +98,7 @@ struct Render {
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
-                Scene::Face& face = scene.faces[i];
+                Scene::Face& face = scene.faces[faceIndex];
                 const float cellCount = face.attributes.reflect ? detailCellCount : 1;
                 const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);

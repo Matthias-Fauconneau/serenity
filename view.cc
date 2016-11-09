@@ -345,7 +345,7 @@ struct LightFieldViewApp : LightField {
                 }
             });
         } else {
-#if 1 // Raycast (FIXME: sheared)
+#if 0 // Raycast (FIXME: sheared)
             vec3 O = scene.viewpoint + vec3(s,t,0)/scene.scale;
             parallel_chunk(target.size.y, [this, &target, O](uint, size_t start, size_t sizeI) {
                 const int targetSizeX = target.size.x;
