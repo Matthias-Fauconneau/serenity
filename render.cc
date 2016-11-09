@@ -13,6 +13,7 @@ struct Render {
 #if 1 // Surface parametrized render
         const float detailCellCount = 256;
         const uint sSize = 16, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
+        assert_(sSize%8 == 0); // FIXME: 2x4 for better coherent ray early cull
         const uint stSize = tSize*sSize;
 
 
@@ -118,10 +119,18 @@ struct Render {
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = A + ad*v + (ab + badc*v) * u;
                     const size_t uvIndex = svIndex*U+suIndex;
-                    for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                        bgr3f color;
-                        if(!face.attributes.reflect) color = face.attributes.color;
-                        else {
+                    if(!face.attributes.reflect) {
+                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                            const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
+                            faceBGR[0*size+base] = face.attributes.color.b;
+                            faceBGR[1*size+base] = face.attributes.color.g;
+                            faceBGR[2*size+base] = face.attributes.color.r;
+                        }
+                    } else {
+                        innerTSC.start();
+#if 0
+                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                            bgr3f color;
                             const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = (P-viewpoint);
                             const vec3 R = (D - 2*dot(N, D)*N);
@@ -129,14 +138,43 @@ struct Render {
                             bgr3f reflected = scene.raycast(P, R);
                             innerTSC.stop();
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
+                            const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
+                            faceBGR[0*size+index] = color.b;
+                            faceBGR[1*size+index] = color.g;
+                            faceBGR[2*size+index] = color.r;
                         }
-                        const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
-                        faceBGR[0*size+index] = color.b;
-                        faceBGR[1*size+index] = color.g;
-                        faceBGR[2*size+index] = color.r;
+#else
+                        const float iScale = 1./scene.scale;
+                        const float Dz = P.z-scene.viewpoint.z;
+                        for(uint t: range(tSize)) {
+                            const float Dy = P.y - (scene.viewpoint.y + iScale * (t/((tSize-1)/2.f)-1)); // FIXME: Dy = at+b
+                            const float NzDzNyDy = N.z*Dz + N.y*Dy;
+                            static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
+                            for(uint s=0; s<sSize; s += 8) {
+                                const v8sf Dx = float8(P.x)-float8(scene.viewpoint.x) + float8(iScale) * (toFloat(s+seqI)/float8((sSize-1)/2.f)-_1f);
+                                const v8sf dotND = float8(NzDzNyDy) + float8(N.x)*Dx;
+                                const v8sf Rx = Dx - 2*dotND*float8(N.x);
+                                const v8sf Ry = Dy - 2*dotND*float8(N.y);
+                                const v8sf Rz = Dz - 2*dotND*float8(N.z);
+                                // FIXME: R = Ls (factorized linear application)
+                                v8si index = scene.raycast(float8(P.x),float8(P.y),float8(P.z), Rx,Ry,Rz);
+                                // FIXME: gather SoA face.color
+                                const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
+                                for(int k: range(8)) {
+                                    const bgr3f reflected = index[k] == -1 ? bgr3f(0) : scene.faces[index[k]].attributes.color;
+                                    const bgr3f color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
+                                    // FIXME: uv st (store compact s without scatter, same locality as gather is over stuv (4D bilinear interpolation))
+                                    faceBGR[0*size+base+k*faceSampleCount] = color.b;
+                                    faceBGR[1*size+base+k*faceSampleCount] = color.g;
+                                    faceBGR[2*size+base+k*faceSampleCount] = color.r;
+                                }
+                            }
+                        }
+                        innerTSC.stop();
+#endif
                     }
                 }
-#if 0 // DEBUG
+#if 1 // DEBUG
                 Image bgr (sSize*U, tSize*V);
                 extern uint8 sRGB_forward[0x1000];
                 for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {

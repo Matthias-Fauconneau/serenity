@@ -109,6 +109,7 @@ struct Scene {
         far = scale*(-viewpoint.z+max.z);
     }
 
+#if 0
     inline bgr3f raycast(vec3 O, vec3 d) const {
         float value = inff; size_t index = invalid;
         assert_(align(8, faces.size)==faces.capacity);
@@ -131,7 +132,7 @@ struct Scene {
             const v8sf Dx = *(v8sf*)(X[3].data+i);
             const v8sf Dy = *(v8sf*)(Y[3].data+i);
             const v8sf Dz = *(v8sf*)(Z[3].data+i);
-            const v8sf t = ::intersect(Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, Ox, Oy, Oz, dx, dy, dz);
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Dx,Dy,Dz, Ox,Oy,Oz, dx,dy,dz);
             v8sf hmin = ::hmin(t);
             const float hmin0 = hmin[0];
             if(hmin0 >= value) continue;
@@ -140,6 +141,31 @@ struct Scene {
         }
         return index==invalid ? bgr3f(0) : faces[index].attributes.color;
     }
+#else
+    inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
+        v8sf value = float8(inff); v8si index = intX(-1);
+        static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
+        for(size_t i=0; i<faces.size; i+=8) {
+            const float Ax = X[0][i];
+            const float Ay = Y[0][i];
+            const float Az = Z[0][i];
+            const float Bx = X[1][i];
+            const float By = Y[1][i];
+            const float Bz = Z[1][i];
+            const float Cx = X[2][i];
+            const float Cy = Y[2][i];
+            const float Cz = Z[2][i];
+            const float Dx = X[3][i];
+            const float Dy = Y[3][i];
+            const float Dz = Z[3][i];
+            const v8sf t = ::intersect(float8(Ax),float8(Ay),float8(Az), float8(Bx),float8(By),float8(Bz), float8(Cx),float8(Cy),float8(Cz), float8(Dx),float8(Dy),float8(Dz),
+                                        Ox,Oy,Oz, dx,dy,dz);
+            index = blend(index, i+seqI, t < value);
+            value = ::min(value, t);
+        }
+        return index;
+    }
+#endif
 
     struct TextureShader {
         static constexpr int V = 2;
@@ -215,12 +241,12 @@ struct Scene {
         template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
 
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
-        inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
+        inline Vec<float, 3> shade3(FaceAttributes face, float, float unused varying[V]) const {
             if(!face.reflect) return Vec<float, 3>{{face.color.b, face.color.g, face.color.r}};
-            const vec3 O = vec3(varying[2], varying[3], varying[4]);
-            const vec3 D = normalize(O-viewpoint);
-            const vec3 R = D - 2*dot(face.N, D)*face.N;
-            bgr3f color = scene.raycast(O, normalize(R));
+            //const vec3 O = vec3(varying[2], varying[3], varying[4]);
+            //const vec3 D = normalize(O-viewpoint);
+            //const vec3 R = D - 2*dot(face.N, D)*face.N;
+            bgr3f color = 0; //scene.raycast(O, normalize(R)); FIXME
             return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
         }
     };

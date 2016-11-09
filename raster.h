@@ -59,7 +59,7 @@ template<int C> struct RenderTarget {
 template<int C> void RenderTarget<C>::resolve(const ImageH& Z, const ImageH targets[C]) {
     if(Z) {
         const uint stride = Z.stride;
-        const v16si pixelSeq = (4*4)*seqI;
+        static constexpr v16si pixelSeq {v8si{(4*4)*0,(4*4)*1,(4*4)*2,(4*4)*3,(4*4)*4,(4*4)*5,(4*4)*6,(4*4)*7},v8si{(4*4)*8,(4*4)*9,(4*4)*10,(4*4)*11,(4*4)*12,(4*4)*13,(4*4)*14,(4*4)*15}};
         for(uint tileY: range(height)) for(uint tileX: range(width)) {
             Tile<C>& tile = tiles[tileY*width+tileX];
             uint const targetTilePtr = tileY*16*stride + tileX*16;
@@ -111,7 +111,7 @@ template<int C> void RenderTarget<C>::resolve(const ImageH& Z, const ImageH targ
         }
     } else { // Specific path without Z
         const uint stride = targets[0].stride;
-        const v16si pixelSeq = (4*4)*seqI;
+        static constexpr v16si pixelSeq {v8si{(4*4)*0,(4*4)*1,(4*4)*2,(4*4)*3,(4*4)*4,(4*4)*5,(4*4)*6,(4*4)*7},v8si{(4*4)*8,(4*4)*9,(4*4)*10,(4*4)*11,(4*4)*12,(4*4)*13,(4*4)*14,(4*4)*15}};
         for(uint tileY: range(height)) for(uint tileX: range(width)) {
             Tile<C>& tile = tiles[tileY*width+tileX];
             uint const targetTilePtr = tileY*16*stride + tileX*16;
