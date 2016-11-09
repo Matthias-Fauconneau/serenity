@@ -70,10 +70,21 @@ Scene parseScene(ref<byte> file) {
         error("Unsupported");
 #endif
     } else {
-        const vec3 viewpoint = parse<vec3>(s);
+        Scene scene;
+
+        scene.viewpoint = parse<vec3>(s);
         s.skip('\n');
-        array<float> X[4] = {}, Y[4] = {}, Z[4] = {};
-        array<Scene::Face> faces;
+
+        const size_t faceCount = parse<uint>(s);
+        s.skip('\n');
+
+        scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
+        for(size_t i: range(4)) {
+            scene.X[i] = buffer<float>(align(8,faceCount), 0);
+            scene.Y[i] = buffer<float>(align(8,faceCount), 0);
+            scene.Z[i] = buffer<float>(align(8,faceCount), 0);
+        }
+
         while(s) {
             if(s.match('\n')) continue;
             if(s.match('#')) { s.until('\n'); continue; }
@@ -88,16 +99,15 @@ Scene parseScene(ref<byte> file) {
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == -1;
             const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            faces.append({{0,1,1,0},{0,0,1,1},{reflect,color,N,0,0}});
+            scene.faces.append({{0,1,1,0},{0,0,1,1},{reflect,color,N,0,0}});
             for(size_t i: range(4)) {
-                X[i].append(polygon[i].x);
-                Y[i].append(polygon[i].y);
-                Z[i].append(polygon[i].z);
+                scene.X[i].append(polygon[i].x);
+                scene.Y[i].append(polygon[i].y);
+                scene.Z[i].append(polygon[i].z);
             }
         }
-
-        Scene scene;
-
+        assert_(scene.faces.size == faceCount);
+#if 0
         // Precomputes barycentric coordinates of V11
         scene.a11 = buffer<float>(faces.size);
         scene.b11 = buffer<float>(faces.size);
@@ -126,15 +136,7 @@ Scene parseScene(ref<byte> file) {
             scene.a11[i] = a11;
             scene.b11[i] = b11;
         }
-
-        scene.viewpoint = viewpoint;
-        for(size_t i: range(4)) {
-            scene.X[i] = ::move(X[i]);
-            scene.Y[i] = ::move(Y[i]);
-            scene.Z[i] = ::move(Z[i]);
-        }
-        scene.faces = ::move(faces);
-
+#endif
         scene.fit();
 
         return scene;

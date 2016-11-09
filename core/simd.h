@@ -7,20 +7,16 @@
 typedef uint8 mask8;
 typedef uint16 mask16;
 
-typedef long long b64;
-typedef b64 v4x64 __attribute((vector_size(32)));
+typedef int v2si __attribute((ext_vector_type(2)));
+typedef int v4si __attribute((ext_vector_type(4)));
+typedef int v8si __attribute((ext_vector_type(8)));
 
-typedef int v2si __attribute((vector_size(8)));
-typedef int v4si __attribute((vector_size(16)));
-typedef int v8si __attribute((vector_size(32)));
+typedef float v2sf __attribute((ext_vector_type(2)));
+typedef float v4sf __attribute((ext_vector_type(4)));
+typedef float v8sf __attribute((ext_vector_type(8)));
 
-typedef float v2sf __attribute((vector_size(8)));
-typedef float v4sf __attribute((vector_size(16)));
-typedef float v8sf __attribute((vector_size(32)));
-
-typedef half v4hf __attribute((vector_size(8)));
-typedef half v8hf __attribute((vector_size(16)));
-typedef half v16hf __attribute((vector_size(32)));
+typedef half v4hf __attribute((ext_vector_type(4)));
+typedef half v16hf __attribute((ext_vector_type(16)));
 
 inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 static v8si unused _0i = intX(0);
@@ -49,7 +45,7 @@ struct v16sf {
     explicit operator v16si() const;
 };
 
-//static v4sf unused _0f {0,0,0,0};
+static v4sf unused _0f4 {0,0,0,0};
 static v8sf unused _0f {0,0,0,0,0,0,0};
 static v16sf unused __1f = v16sf(-1);
 static v16sf unused _1f = v16sf(1);
@@ -160,15 +156,15 @@ inline v16sf toFloat(const v16hf v) {
 static const unused v16si seqI (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 
 inline float dot(v4sf a, v4sf b) { return __builtin_ia32_dpps(a, b, 0xFF)[0]; }
-//inline v4sf low(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 0); }
-//inline v4sf high(v8sf a) { return __builtin_ia32_vextractf128_ps256(a, 1); }
-inline v4sf low(v8sf a) { return __builtin_shufflevector(a,a, 0,1,2,3); }
-inline v4sf high(v8sf a) { return __builtin_shufflevector(a,a, 4,5,6,7); }
+inline v4sf low(v8sf a) { return __builtin_shufflevector(a,a, 0,1,2,3); } // vextractf128 0
+inline v4sf high(v8sf a) { return __builtin_shufflevector(a,a, 4,5,6,7); } // vextractf128 1
 inline float dot(v8sf a, v8sf b) {
     v8sf dot4 = __builtin_ia32_dpps256(a, b, 0xFF);
     return (low(dot4)+high(dot4))[0];
 }
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
 
-inline String str(const v16sf v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
-inline String str(const v16si v) { return "v16si("_+str(ref<int>((int*)&v,16))+")"_; }
+template<> inline String str(const v8sf& v) { return "v8sf("_+str(ref<float>((float*)&v,8))+")"_; }
+template<> inline String str(const v8si& v) { return "v8si("_+str(ref<int>((int*)&v,8))+")"_; }
+template<> inline String str(const v16sf& v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }
+template<> inline String str(const v16si& v) { return "v16si("_+str(ref<int>((int*)&v,16))+")"_; }

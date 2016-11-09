@@ -20,173 +20,89 @@ inline mat4 shearedPerspective(const float s, const float t, const float near, c
 
 #include "raster.h"
 
-inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { // "Fast, Minimum Storage Ray/Triangle Intersection"
-    vec3 e2 = C - A;
-    vec3 e1 = B - A;
-    vec3 P = cross(d, e2);
-    float det = dot(e1, P);
-    if(det < 0) return false;
-    vec3 T = O - A;
-    u = dot(T, P);
-    if(u < 0 || u > det) return false;
-    vec3 Q = cross(T, e1);
-    v = dot(d, Q);
-    if(v < 0 || u + v > det) return false;
-    t = dot(e2, Q);
-    if(t < 0) return false;
-    t /= det;
-    u /= det;
-    v /= det;
-    return true;
+inline void cross(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, const v8sf By, const v8sf Bz, v8sf& X, v8sf& Y, v8sf& Z) {
+    X = Ay*Bz - By*Az;
+    Y = Az*Bx - Bz*Ax;
+    Z = Ax*By - Bx*Ay;
 }
 
-#if 0
+inline v8sf dot(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, const v8sf By, const v8sf Bz) {
+    return Ax*Bx + Ay*By + Az*Bz;
+}
+
 // "Efficient Ray-Quadrilateral Intersection Test"
-static bool intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d, float& t /*, float a11, float b11, float& u, float& v*/) {
+static inline float intersect(vec3 v00, vec3 v10, vec3 v11, vec3 v01, vec3 O, vec3 d) {
     const vec3 e03 = v01 - v00;
     const vec3 e01 = v10 - v00;
     const vec3 P = cross(d, e03);
     float det = dot(e01, P);
-    if(det < 0) return false;
+    if(det <= 0) return inff;
     const vec3 T0 = O - v00;
     float a = dot(T0, P);
-    if(a < 0 || a > det) return false;
+    if(a < 0 || a > det) return inff;
     const vec3 Q0 = cross(T0, e01);
     float b = dot(d, Q0);
-    if(b < 0 || b > det) return false; // FIXME: assert v11 within parallelogram and reorder otherwise
+    if(b < 0 || b > det) return inff; // FIXME: assert v11 within parallelogram and reorder otherwise
     // in parallelogram
     if(a + b > det) { // not in T
         const vec3 e23 = v01 - v11;
         const vec3 e21 = v10 - v11;
         const vec3 P1 = cross(d, e21);
         const float det1 = dot(e23, P1);
-        if(det1 < 0) return false;
+        if(det1 < 0) return inff;
         const vec3 T1 = O - v11;
         const float a1 = dot(T1, P1);
-        if(a1 < 0) return false;
+        if(a1 < 0) return inff;
         const vec3 Q1 = cross(T1, e23);
         const float b1 = dot(d, Q1);
-        if(b1 < 0) return false;
+        if(b1 < 0) return inff;
     }
 
-    t = dot(e03, Q0);
-    if(t < 0) return false;
-    t /= det;
-
-#if 0
-    /**/ if(abs(a11-1) < 0) {
-        u = a / det;
-        if(abs(b11-1) < 0) v = b / det;
-        else v = b / (det*(u*(b11-1)+1));
-    }
-    else if(abs(b11-1) < 0) {
-        v = b / det;
-        u = a / (det*(v*(a11-1)+1));
-    } else {
-        const float A = -(b11-1);
-        const float B = a*(b11-1) - b*(a11-1) - 1;
-        const float C = a;
-        const float delta = B*B - 4*A*C;
-        const float Q = (-1.f/2)*(B+(B>0?1:-1)*sqrt(delta));
-        u = Q/A;
-        if(u < 0 || u > 1) u = C/Q;
-        v = b / (det*u*(b11-1)+1);
-    }
-#endif
-    return true;
-}
-#else
-
-inline void cross(v8sf Ax, v8sf Ay, v8sf Az, v8sf Bx, v8sf By, v8sf Bz, v8sf& X, v8sf& Y, v8sf& Z) {
-    X = Ay*Bz - By*Az;
-    Y = Az*Bx - Bz*Ax;
-    Z = Ax*By - Bx*Ay;
-}
-
-inline v8sf dot(v8sf Ax, v8sf Ay, v8sf Az, v8sf Bx, v8sf By, v8sf Bz) {
-    return Ax*Bx + Ay*By + Az*Bz;
+    const float t = dot(e03, Q0);
+    return t > 0 ? t / det : inff;
 }
 
 // "Efficient Ray-Quadrilateral Intersection Test"
-static inline v8sf intersect(v8sf x00, v8sf y00, v8sf z00,
-                      v8sf x10, v8sf y10, v8sf z10,
-                      v8sf x11, v8sf y11, v8sf z11,
-                      v8sf x01, v8sf y01, v8sf z01,
-                      vec3 O, vec3 d /*v8sf a11, v8sf b11, v8sf& u, v8sf& v*/) {
+static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
+                             const v8sf x10, const v8sf y10, const v8sf z10,
+                             const v8sf x11, const v8sf y11, const v8sf z11,
+                             const v8sf x01, const v8sf y01, const v8sf z01,
+                             const v8sf  Ox, const v8sf  Oy, const v8sf  Oz,
+                             const v8sf  Dx, const v8sf  Dy, const v8sf  Dz) {
     const v8sf e03x = x01 - x00;
     const v8sf e03y = y01 - y00;
     const v8sf e03z = z01 - z00;
+    v8sf P0x, P0y, P0z; cross(Dx, Dy, Dz, e03x, e03y, e03z, P0x, P0y, P0z);
+    const v8sf T0x = Ox - x00;
+    const v8sf T0y = Oy - y00;
+    const v8sf T0z = Oz - z00;
+    const v8sf a0 = dot(T0x, T0y, T0z, P0x, P0y, P0z);
     const v8sf e01x = x10 - x00;
     const v8sf e01y = y10 - y00;
     const v8sf e01z = z10 - z00;
-    const v8sf Dx = float8(d.x);
-    const v8sf Dy = float8(d.y);
-    const v8sf Dz = float8(d.z);
-    v8sf P0x, P0y, P0z; cross(Dx, Dy, Dz, e03x, e03y, e03z, P0x, P0y, P0z); // cross(d, e03)
     const v8sf det0 = dot(e01x, e01y, e01z, P0x, P0y, P0z);
-    const v8sf T0x = float8(O.x) - x00;
-    const v8sf T0y = float8(O.y) - y00;
-    const v8sf T0z = float8(O.z) - z00;
-    const v8sf a0 = dot(T0x, T0y, T0z, P0x, P0y, P0z);
-
     v8sf Q0x, Q0y, Q0z; cross(T0x, T0y, T0z, e01x, e01y, e01z, Q0x, Q0y, Q0z);
     const v8sf b0 = dot(Dx, Dy, Dz, Q0x, Q0y, Q0z);
+    const v8sf t = dot(e03x, e03y, e03z, Q0x, Q0y, Q0z) / det0;
 
-    const v8sf e23x = x01 - x11;
-    const v8sf e23y = y01 - y11;
-    const v8sf e23z = z01 - z11;
     const v8sf e21x = x10 - x11;
     const v8sf e21y = y10 - y11;
     const v8sf e21z = z10 - z11;
-    v8sf P1x, P1y, P1z; cross(Dx, Dy, Dz, e21x, e21y, e21z, P1x, P1y, P1z); // cross(d, e21)
-    //const v8sf det1 = dot(e23x, e23y, e23z, P1x, P1y, P1z);
-    const v8sf T1x = float8(O.x) - x11;
-    const v8sf T1y = float8(O.y) - y11;
-    const v8sf T1z = float8(O.z) - z11;
+    v8sf P1x, P1y, P1z; cross(Dx, Dy, Dz, e21x, e21y, e21z, P1x, P1y, P1z);
+    const v8sf T1x = Ox - x11;
+    const v8sf T1y = Oy - y11;
+    const v8sf T1z = Oz - z11;
     const v8sf a1 = dot(T1x, T1y, T1z, P1x, P1y, P1z);
-
-    v8sf Q1x, Q1y, Q1z; cross(T1x, T0y, T0z, e23x, e23y, e23z, Q1x, Q1y, Q1z);
+    const v8sf e23x = x01 - x11;
+    const v8sf e23y = y01 - y11;
+    const v8sf e23z = z01 - z11;
+    //const v8sf det1 = dot(e23x, e23y, e23z, P1x, P1y, P1z); // FIXME
+    v8sf Q1x, Q1y, Q1z; cross(T1x, T1y, T1z, e23x, e23y, e23z, Q1x, Q1y, Q1z);
     const v8sf b1 = dot(Dx, Dy, Dz, Q1x, Q1y, Q1z);
 
-    const v8sf t = dot(e03x, e03y, e03z, Q0x, Q0y, Q0z) / det0;
-    return blend(float8(inff), t, det0 >= _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t >= _0f);
-    /* a0 <= det0 && b0 < det0 && det1 >= 0*/
-
-#if 0
-    /**/ if(abs(a11-1) < 0) {
-        u = a / det;
-        if(abs(b11-1) < 0) v = b / det;
-        else v = b / (det*(u*(b11-1)+1));
-    }
-    else if(abs(b11-1) < 0) {
-        v = b / det;
-        u = a / (det*(v*(a11-1)+1));
-    } else {
-        const float A = -(b11-1);
-        const float B = a*(b11-1) - b*(a11-1) - 1;
-        const float C = a;
-        const float delta = B*B - 4*A*C;
-        const float Q = (-1.f/2)*(B+(B>0?1:-1)*sqrt(delta));
-        u = Q/A;
-        if(u < 0 || u > 1) u = C/Q;
-        v = b / (det*u*(b11-1)+1);
-    }
-    return true;
-#endif
+    //return blend(float8(inff), t, det0 >= _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t >= _0f && a0 <= det0 && b0 <= det0 && det1 >= _0f && a1 <= det1 && b1 <= det1);
+    return blend(float8(inff), t, det0 > _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t > _0f);
 }
-#endif
-
-#if 0
-inline uint argmax(const v8sf x, v8sf& max) {
-    /*v8sf max0 = __builtin_ia32_maxps256(x, __builtin_shufflevector(v,v, 1,0, 3,2, 5,4, 7,6)); // FIXME: alignr 4
-    v8sf max1 = __builtin_ia32_maxps256(max0, __builtin_shufflevector(v,v, 2,3,0,1, 6,7,4,5)); // FIXME: alignr 8
-    v8sf max = __builtin_ia32_maxps256(max1, __builtin_shufflevector(v,v, 0,1,2,3, 4,5,6,7)); // FIXME: permute2x128 1*/
-    const v8sf max0 = __builtin_ia32_maxps256(x, _mm256_alignr_epi8(x, x, 4));
-    const v8sf max1 = __builtin_ia32_maxps256(max0, _mm256_alignr_epi8(max0, max0, 8));
-    max = __builtin_ia32_maxps256(max1, _mm256_permute2x128_si256(max1, max1, 0x01));
-    return __builtin_ctz(::mask(x == max)) >> 2;
-}
-#endif
 
 inline v8sf hmin(const v8sf x) {
     const v8sf v0 = __builtin_ia32_minps256(x, _mm256_alignr_epi8(x, x, 4));
@@ -195,7 +111,7 @@ inline v8sf hmin(const v8sf x) {
 }
 
 inline uint indexOfEqual(const v8sf x, const v8sf y) {
-    return __builtin_ctz(::mask(x == y)) >> 2;
+    return __builtin_ctz(::mask(x == y));
 }
 
 struct Scene {
@@ -207,7 +123,8 @@ struct Scene {
             const half* BGR; uint2 size; // Display (TextureShader)
         } attributes;
     };
-    buffer<float> X[4], Y[4], Z[4], a11, b11; // Quadrilaterals vertices world space positions XYZ coordinates
+    buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
+    buffer<float> a11, b11;
     buffer<Face> faces;
 
     vec3 min, max;
@@ -228,7 +145,34 @@ struct Scene {
 
     inline bgr3f raycast(vec3 O, vec3 d) const {
         float value = inff; size_t index = invalid;
-        for(size_t i: range(faces.size/8)) { // FIXME: Align
+        assert_(align(8, faces.size)==faces.capacity);
+#if 0
+        for(size_t i=0; i<faces.size; i++) {
+            const float Ax = X[0][i];
+            const float Ay = Y[0][i];
+            const float Az = Z[0][i];
+            const float Bx = X[1][i];
+            const float By = Y[1][i];
+            const float Bz = Z[1][i];
+            const float Cx = X[2][i];
+            const float Cy = Y[2][i];
+            const float Cz = Z[2][i];
+            const float Dx = X[3][i];
+            const float Dy = Y[3][i];
+            const float Dz = Z[3][i];
+            const float t = ::intersect(vec3(Ax,Ay,Az),vec3(Bx,By,Bz),vec3(Cx,Cy,Cz),vec3(Dx,Dy,Dz), O, d);
+            if(t >= value) continue;
+            value = t;
+            index = i;
+        }
+#else
+        const v8sf Ox = float8(O.x);
+        const v8sf Oy = float8(O.y);
+        const v8sf Oz = float8(O.z);
+        const v8sf dx = float8(d.x);
+        const v8sf dy = float8(d.y);
+        const v8sf dz = float8(d.z);
+        for(size_t i=0; i<faces.size; i+=8) {
             const v8sf Ax = *(v8sf*)(X[0].data+i);
             const v8sf Ay = *(v8sf*)(Y[0].data+i);
             const v8sf Az = *(v8sf*)(Z[0].data+i);
@@ -241,14 +185,15 @@ struct Scene {
             const v8sf Dx = *(v8sf*)(X[3].data+i);
             const v8sf Dy = *(v8sf*)(Y[3].data+i);
             const v8sf Dz = *(v8sf*)(Z[3].data+i);
-            const v8sf t = ::intersect(Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, O, d/*a11, b11, u, v*/);
+            const v8sf t = ::intersect(Ax, Ay, Az, Bx, By, Bz, Cx, Cy, Cz, Dx, Dy, Dz, Ox, Oy, Oz, dx, dy, dz);
             v8sf hmin = ::hmin(t);
             const float hmin0 = hmin[0];
-            if(hmin0 > value) continue;
+            if(hmin0 >= value) continue;
             value = hmin0;
             index = i + ::indexOfEqual(t, hmin);
         }
-        return index==invalid ? 0 : faces[index].attributes.color;
+#endif
+        return index==invalid ? bgr3f(0) : faces[index].attributes.color;
     }
 
     struct TextureShader {

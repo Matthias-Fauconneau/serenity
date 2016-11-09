@@ -32,6 +32,7 @@ generic struct buffer : mref<T> {
   assert(capacity>=size);
   if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
    error("Out of memory", size, capacity, sizeof(T));
+  assert_(size_t(data)%32==0);
  }
  /*explicit*/ buffer(size_t size) : buffer(size, size) {}
 

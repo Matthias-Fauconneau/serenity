@@ -284,7 +284,7 @@ struct LightFieldViewApp : LightField {
                         v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
 
-                        v4sf B = _0f, G = _0f, R = _0f;
+                        v4sf B = _0f4, G = _0f4, R = _0f4;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
                             if(sIndex+ds > imageCount.x-1) { w01st[dt*2+ds] = 0; continue; } // s == sSize-1
                             if(tIndex+dt > imageCount.y-1) { w01st[dt*2+ds] = 0; continue; } // t == tSize-1
@@ -345,16 +345,15 @@ struct LightFieldViewApp : LightField {
                 }
             });
         } else {
-#if 0 // Raycast (FIXME: sheared)
-            vec3 O = scene.viewpoint + vec3(s,t,0)/scale;
-            parallel_chunk(target.size.y, [this, &target, near, scale, O](uint, size_t start, size_t sizeI) {
+#if 1 // Raycast (FIXME: sheared)
+            vec3 O = scene.viewpoint + vec3(s,t,0)/scene.scale;
+            parallel_chunk(target.size.y, [this, &target, O](uint, size_t start, size_t sizeI) {
                 const int targetSizeX = target.size.x;
                 for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
                     size_t targetIndex = targetY*targetSizeX+targetX;
                     const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
-                    const vec3 d = normalize(vec3(uv, near));
-                    //log(O, uv, near, near/scale, d);
-                    bgr3f S = Scene::raycast(scene.faces, O, d);
+                    const vec3 d = normalize(vec3(uv, scene.near));
+                    bgr3f S = scene.raycast(O, d);
                     extern uint8 sRGB_forward[0x1000];
                     target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
                 }
