@@ -106,7 +106,7 @@ struct Render {
 
                 // Allocates (s,t) (u,v) images
                 half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
-                //const size_t faceSampleCount = U*V;
+                const size_t faceSampleCount = U*V;
                 const size_t size = stSize*V*U;
                 half* const faceB = faceBGR+0*size;
                 half* const faceG = faceBGR+1*size;
@@ -122,10 +122,10 @@ struct Render {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = A + ad*v + (ab + badc*v) * u;
-                    const size_t base0 = (svIndex*U+suIndex)*stSize;
+                    const size_t base0 = svIndex*U+suIndex;
                     if(!face.reflect) {
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                            const size_t base = base0 + sSize * t + s;
+                            const size_t base = base0 + (sSize * t + s) * faceSampleCount;
                             faceBGR[0*size+base] = scene.B[faceIndex];
                             faceBGR[1*size+base] = scene.G[faceIndex];
                             faceBGR[2*size+base] = scene.R[faceIndex];
@@ -140,7 +140,7 @@ struct Render {
                             const vec3 R = (D - 2*dot(N, D)*N);
                             bgr3f reflected = scene.raycast(P, R);
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
-                            const size_t base = base0 + sSize * t + s;
+                            const size_t base = base0 + (sSize * t + s) * faceSampleCount;
                             faceBGR[0*size+base] = color.b;
                             faceBGR[1*size+base] = color.g;
                             faceBGR[2*size+base] = color.r;
@@ -172,20 +172,23 @@ struct Render {
                             const v8sf Rx0 = Rx00 + Rx0t*float(t);
                             const v8sf Ry0 = Ry00 + Ry0t*float(t);
                             const v8sf Rz0 = Rz00 + Rz0t*float(t);
-                            const size_t baseT = base0 + sSize * t;
+                            const size_t baseT = base0 + (sSize * t) * faceSampleCount;
                             for(uint s=0; s<sSize; s += 8) {
                                 const v8sf S = float8(float(s))+seqF;
                                 const v8sf Rx = Rx0 + Rxs * S;
                                 const v8sf Ry = Ry0 + Rys * S;
                                 const v8sf Rz = Rz0 + Rzs * S;
-                                v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
-                                v8sf B =           gather(scene.B.data, index);
-                                v8sf G = (1.f/2) * gather(scene.G.data, index);
-                                v8sf R = (1.f/2) * gather(scene.R.data, index);
-                                const size_t base = baseT + s;
-                                *(v8hf*)(faceB+base) = toHalf(B);
-                                *(v8hf*)(faceG+base) = toHalf(G);
-                                *(v8hf*)(faceR+base) = toHalf(R);
+                                const v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
+                                const v8sf B =           gather(scene.B.data, index);
+                                const v8sf G = (1.f/2) * gather(scene.G.data, index);
+                                const v8sf R = (1.f/2) * gather(scene.R.data, index);
+                                const v8hf b = toHalf(B);
+                                const v8hf g = toHalf(G);
+                                const v8hf r = toHalf(R);
+                                const size_t base = baseT + s * faceSampleCount;
+                                for(int k: range(8)) faceB[base + k*faceSampleCount] = b[k];
+                                for(int k: range(8)) faceG[base + k*faceSampleCount] = g[k];
+                                for(int k: range(8)) faceR[base + k*faceSampleCount] = r[k];
                             }
                         }
 #endif

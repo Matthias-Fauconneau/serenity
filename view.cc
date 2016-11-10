@@ -221,7 +221,7 @@ struct LightFieldViewApp : LightField {
             face.size.x = U;
             face.size.y = V;
 
-            index += 3*tSize*sSize*V*U;
+            index += 3*V*U*tSize*sSize;
         }
         assert_(index == BGR.size);
 #endif
