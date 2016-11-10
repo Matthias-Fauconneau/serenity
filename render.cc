@@ -143,15 +143,19 @@ struct Render {
                             faceBGR[2*size+index] = color.r;
                         }
 #else
-                        const float iScale = 1./scene.scale;
+                        static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
                         const float Dz = P.z-scene.viewpoint.z;
+                        const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
+                        const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
+                        const float Dyt = -2/((tSize-1)*scene.scale);
+                        const float Dxs = -2/((sSize-1)*scene.scale);
+                        const float NzDz = N.z*Dz;
                         for(uint t: range(tSize)) {
-                            const float Dy = P.y - (scene.viewpoint.y + iScale * (t/((tSize-1)/2.f)-1)); // FIXME: Dy = at+b
-                            const float NzDzNyDy = N.z*Dz + N.y*Dy;
-                            static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
+                            const float Dy = Dy0 + Dyt * t;
+                            const float NzDzNyDy = NzDz + N.y*Dy;
                             for(uint s=0; s<sSize; s += 8) {
-                                const v8sf Dx = float8(P.x-scene.viewpoint.x) - float8(iScale) * (toFloat(s+seqI)/float8((sSize-1)/2.f)-_1f);
-                                const v8sf dotND = float8(NzDzNyDy) + float8(N.x)*Dx;
+                                const v8sf Dx = Dx0 + Dxs * toFloat(s+seqI);
+                                const v8sf dotND = NzDzNyDy + float8(N.x)*Dx;
                                 const v8sf Rx = Dx - 2*dotND*float8(N.x);
                                 const v8sf Ry = Dy - 2*dotND*float8(N.y);
                                 const v8sf Rz = Dz - 2*dotND*float8(N.z);
