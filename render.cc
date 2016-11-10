@@ -11,8 +11,8 @@ struct Render {
         for(string file: folder.list(Files)) remove(file, folder);
 
 #if 1 // Surface parametrized render
-        const float detailCellCount = 256;
-        const uint sSize = 16, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
+        const float detailCellCount = 512;
+        const uint sSize = 32, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         assert_(sSize%8 == 0); // FIXME: 2x4 for better coherent ray early cull
         const uint stSize = tSize*sSize;
 
@@ -64,61 +64,62 @@ struct Render {
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> BGR = mcast<half>(map);
+        BGR.clear(0); // Explicitly clears to avoid performance skew from clear on page faults
 
-        Time time {true};
-        log("Surface parametrized render");
-        time.start();
         uint64 totalTime[threadCount()], innerTime[threadCount()];
-        parallel_chunk(0, scene.faces.size, [&scene, detailCellCount, &folder, BGR, &totalTime, &innerTime](uint unused id, uint start, uint sizeI) {
-            tsc totalTSC, innerTSC;
-            totalTSC.start();
-            for(const size_t faceIndex: range(start, start+sizeI)) {
-                const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
-                const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
-                const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
-                const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
+        mref<uint64>(totalTime, threadCount()).clear(0);
+        mref<uint64>(innerTime, threadCount()).clear(0);
+        log("Surface parametrized render");
+        Time time {true};
+        for(const size_t faceIndex: range(scene.faces.size)) {
+            const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
+            const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
+            const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
+            const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
 
-                const vec3 faceCenter = (A+B+C+D)/4.f;
-                const vec3 N = normalize(cross(C-A, B-A));
-                // Viewpoint st with maximum projection
-                vec2 st = clamp(vec2(-1),
-                                scene.scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scene.scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
-                                vec2(1));
-                if(!N.z) {
-                    if(!N.x) st.x = 0;
-                    if(!N.y) st.y = 0;
-                }
-                // Projects vertices along st view rays on uv plane (perspective)
-                mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
-                M.scale(scene.scale); // Fits scene within -1, 1
-                M.translate(-scene.viewpoint);
-                const vec2 uvA = (M*A).xy();
-                const vec2 uvB = (M*B).xy();
-                const vec2 uvC = (M*C).xy();
-                const vec2 uvD = (M*D).xy();
-                const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
-                const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+            const vec3 faceCenter = (A+B+C+D)/4.f;
+            const vec3 N = normalize(cross(C-A, B-A));
+            // Viewpoint st with maximum projection
+            vec2 st = clamp(vec2(-1),
+                            scene.scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scene.scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
+                            vec2(1));
+            if(!N.z) {
+                if(!N.x) st.x = 0;
+                if(!N.y) st.y = 0;
+            }
+            // Projects vertices along st view rays on uv plane (perspective)
+            mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
+            M.scale(scene.scale); // Fits scene within -1, 1
+            M.translate(-scene.viewpoint);
+            const vec2 uvA = (M*A).xy();
+            const vec2 uvB = (M*B).xy();
+            const vec2 uvC = (M*C).xy();
+            const vec2 uvD = (M*D).xy();
+            const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
+            const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
-                Scene::Face& face = scene.faces[faceIndex];
-                const float cellCount = face.reflect ? detailCellCount : 1;
-                const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
-                assert_(U && V);
+            Scene::Face& face = scene.faces[faceIndex];
+            const float cellCount = face.reflect ? detailCellCount : 1;
+            const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
+            assert_(U && V);
 
-                // Allocates (s,t) (u,v) images
-                half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
-                const size_t faceSampleCount = U*V;
-                const size_t size = stSize*V*U;
-                half* const faceB = faceBGR+0*size;
-                half* const faceG = faceBGR+1*size;
-                half* const faceR = faceBGR+2*size;
-                //mref<half>(faceBGR, stSize*V*U).clear(0); // Just To Be Sure™
+            // Allocates (s,t) (u,v) images
+            half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
+            const size_t faceSampleCount = V*U;
+            const size_t size = stSize*V*U;
+            half* const faceB = faceBGR+0*size;
+            half* const faceG = faceBGR+1*size;
+            half* const faceR = faceBGR+2*size;
 
-                const vec3 ab = B-A;
-                const vec3 ad = D-A;
-                const vec3 badc = A-B+C-D;
+            const vec3 ab = B-A;
+            const vec3 ad = D-A;
+            const vec3 badc = A-B+C-D;
 
-                // Shades surface
-                for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
+            // Shades surface
+            parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime](uint unused id, uint start, uint sizeI) {
+                tsc totalTSC, innerTSC;
+                totalTSC.start();
+                for(uint svIndex: range(start, start+sizeI)) for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = A + ad*v + (ab + badc*v) * u;
@@ -195,11 +196,14 @@ struct Render {
                         innerTSC.stop();
                     }
                 }
+                totalTime[id] += totalTSC.cycleCount();
+                innerTime[id] += innerTSC.cycleCount();
+            });
 #if 0 // DEBUG
                 Image bgr (sSize*U, tSize*V);
                 extern uint8 sRGB_forward[0x1000];
                 for(uint svIndex: range(V)) for(uint suIndex: range(U)) for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                    const size_t index = (svIndex*U+suIndex)*stSize + sSize * t + s;
+                    const size_t index = (sSize * t + s)*faceSampleCount + (svIndex*U+suIndex);
                     assert_(faceBGR[0*size+index] >= 0 && faceBGR[0*size+index] <= 1, faceBGR[0*size+index]);
                     assert_(faceBGR[1*size+index] >= 0 && faceBGR[1*size+index] <= 1);
                     assert_(faceBGR[2*size+index] >= 0 && faceBGR[2*size+index] <= 1);
@@ -210,11 +214,9 @@ struct Render {
                 }
                 writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
 #endif
-            }
-            totalTime[id] = totalTSC;
-            innerTime[id] = innerTSC;
-        });
-        log("Rendered in", time, strD(sum(ref<uint64>(innerTime, threadCount())),sum(ref<uint64>(totalTime, threadCount()))));
+        }
+        log("Rendered in", time, str((float)time.nanoseconds()/sampleCount, 1u),
+            strD(sum(ref<uint64>(innerTime, threadCount())),sum(ref<uint64>(totalTime, threadCount()))));
 
 #else // Dual plane render
         const size_t N = 33;
