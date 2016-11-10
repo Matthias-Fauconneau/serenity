@@ -84,13 +84,12 @@ struct Scene {
     vec3 viewpoint;
     struct Face {
         float u[4], v[4]; // Vertex attributes
-        struct Attributes { // Face attributes
-            float reflect; bgr3f color; vec3 N; // Render (RaycastShader)
-            const half* BGR; uint2 size; // Display (TextureShader)
-        } attributes;
+        float reflect; vec3 N; // Render (RaycastShader)
+        const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
     buffer<float> a11, b11;
+    buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
 
     vec3 min, max;
@@ -139,7 +138,7 @@ struct Scene {
             value = hmin0;
             index = i + ::indexOfEqual(t, hmin);
         }
-        return index==invalid ? bgr3f(0) : faces[index].attributes.color;
+        return index==invalid ? bgr3f(0) : bgr3f{B[index],G[index],R[index]};
     }
 #endif
 #if 1
@@ -169,19 +168,21 @@ struct Scene {
 
     struct TextureShader {
         static constexpr int V = 2;
-        typedef Scene::Face::Attributes FaceAttributes;
+        typedef uint FaceAttributes;
 
+        ref<Scene::Face> faces;
         uint sSize = 0, tSize = 0;
         float s = 0, t = 0; // 0 .. (s,t)Size
         uint sIndex = 0, tIndex = 0; // floor (s, t)
 
-        TextureShader(const Scene&) {}
+        TextureShader(const Scene& scene) : faces(scene.faces) {}
 
         template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
         template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
 
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
-        inline Vec<float, 3> shade3(FaceAttributes face, float, float varying[V]) const {
+        inline Vec<float, 3> shade3(FaceAttributes index, float, float varying[V]) const {
+            const Scene::Face& face = faces[index];
             const int size1 = face.size.x;
             const int size2 = face.size.y*size1;
             const int size3 = sSize      *size2;
@@ -209,7 +210,7 @@ struct Scene {
     };
 
     struct CheckerboardShader {
-        typedef Scene::Face::Attributes FaceAttributes;
+        typedef uint FaceAttributes;
         static constexpr int V = 2;
 
         CheckerboardShader(const Scene&) {}
@@ -229,7 +230,7 @@ struct Scene {
     };
 
     struct RaycastShader {
-        typedef Scene::Face::Attributes FaceAttributes;
+        typedef uint FaceAttributes;
         static constexpr int V = 5;
 
         const Scene& scene;
@@ -242,7 +243,7 @@ struct Scene {
 
         template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
         inline Vec<float, 3> shade3(FaceAttributes face, float, float unused varying[V]) const {
-            if(!face.reflect) return Vec<float, 3>{{face.color.b, face.color.g, face.color.r}};
+            if(!scene.faces[face].reflect) return Vec<float, 3>{{scene.B[face],scene.G[face],scene.R[face]}};
             //const vec3 O = vec3(varying[2], varying[3], varying[4]);
             //const vec3 D = normalize(O-viewpoint);
             //const vec3 R = D - 2*dot(face.N, D)*face.N;
@@ -268,26 +269,26 @@ struct Scene {
         NDC.scale(vec3(vec2(size*4u)/2.f, 1)); // 0, 2 -> subsample size // *4u // MSAA->4x
         NDC.translate(vec3(vec2(1), 0.f)); // -1, 1 -> 0, 2
         M = NDC * M;
-        for(size_t i: range(faces.size)) {
-            const vec3 A (X[0][i], Y[0][i], Z[0][i]);
-            const vec3 B (X[1][i], Y[1][i], Z[1][i]);
-            const vec3 C (X[2][i], Y[2][i], Z[2][i]);
-            const vec3 D (X[3][i], Y[3][i], Z[3][i]);
+        for(size_t faceIndex : range(faces.size)) {
+            const vec3 A (X[0][faceIndex], Y[0][faceIndex], Z[0][faceIndex]);
+            const vec3 B (X[1][faceIndex], Y[1][faceIndex], Z[1][faceIndex]);
+            const vec3 C (X[2][faceIndex], Y[2][faceIndex], Z[2][faceIndex]);
+            const vec3 D (X[3][faceIndex], Y[3][faceIndex], Z[3][faceIndex]);
 
             const vec4 a = M*vec4(A,1), b = M*vec4(B,1), c = M*vec4(C,1), d = M*vec4(D,1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z >= 0) continue; // Backward face culling
 
-            const Face& face = faces[i];
+            const Face& face = faces[faceIndex];
             renderer.pass.submit(a,b,c, (vec3[]){vec3(face.u[0],face.u[1],face.u[2]),
                                                  vec3(face.v[0],face.v[1],face.v[2]),
                                                  vec3(A.x,B.x,C.x),
                                                  vec3(A.y,B.y,C.y),
-                                                 vec3(A.z,B.z,C.z)}, face.attributes);
+                                                 vec3(A.z,B.z,C.z)}, faceIndex);
             renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
                                                  vec3(face.v[0],face.v[2],face.v[3]),
                                                  vec3(A.x,C.x,D.x),
                                                  vec3(A.y,C.y,D.y),
-                                                 vec3(A.z,C.z,D.z)}, face.attributes);
+                                                 vec3(A.z,C.z,D.z)}, faceIndex);
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(depth, targets);

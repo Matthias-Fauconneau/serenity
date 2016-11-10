@@ -47,12 +47,12 @@ struct Render {
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
             Scene::Face& face = scene.faces[i];
-            const float cellCount = face.attributes.reflect ? detailCellCount : 1;
+            const float cellCount = face.reflect ? detailCellCount : 1;
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
 
             // Allocates (s,t) (u,v) images
-            face.attributes.BGR = (half*)sampleCount;
+            face.BGR = (half*)sampleCount;
             sampleCount += 3*tSize*sSize*V*U;
         }
 
@@ -100,12 +100,12 @@ struct Render {
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
                 Scene::Face& face = scene.faces[faceIndex];
-                const float cellCount = face.attributes.reflect ? detailCellCount : 1;
+                const float cellCount = face.reflect ? detailCellCount : 1;
                 const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);
 
                 // Allocates (s,t) (u,v) images
-                half* const faceBGR = BGR.begin()+ (size_t)face.attributes.BGR; // base + index
+                half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
                 const size_t faceSampleCount = U*V;
                 const size_t size = stSize*faceSampleCount;
                 mref<half>(faceBGR, stSize*faceSampleCount).clear(0); // Just To Be Sure™
@@ -120,12 +120,12 @@ struct Render {
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = A + ad*v + (ab + badc*v) * u;
                     const size_t uvIndex = svIndex*U+suIndex;
-                    if(!face.attributes.reflect) {
+                    if(!face.reflect) {
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
-                            faceBGR[0*size+base] = face.attributes.color.b;
-                            faceBGR[1*size+base] = face.attributes.color.g;
-                            faceBGR[2*size+base] = face.attributes.color.r;
+                            faceBGR[0*size+base] = scene.B[faceIndex];
+                            faceBGR[1*size+base] = scene.G[faceIndex];
+                            faceBGR[2*size+base] = scene.R[faceIndex];
                         }
                     } else {
                         innerTSC.start();
@@ -143,7 +143,7 @@ struct Render {
                             faceBGR[2*size+index] = color.r;
                         }
 #else
-                        static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
+                        static constexpr v8sf seqF = v8sf{0,1,2,3,4,5,6,7};
                         const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
                         const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
                         const float Dz = P.z-scene.viewpoint.z;
@@ -159,24 +159,27 @@ struct Render {
                         const float Ry0t = (N.y*N.y+1)*Dyt;
                         const float Rz00 = a0*N.z + (N.z*N.y+1)*Dy0 + RzDx*Dx0;
                         const float Rz0t = (N.z*N.y+1)*Dyt;
-                        const float Rxs = RxDx * Dxs;
-                        const float Rys = RyDx * Dxs;
-                        const float Rzs = RzDx * Dxs;
+                        const v8sf Px = P.x;
+                        const v8sf Py = P.y;
+                        const v8sf Pz = P.z;
+                        const v8sf Rxs = RxDx * Dxs;
+                        const v8sf Rys = RyDx * Dxs;
+                        const v8sf Rzs = RzDx * Dxs;
                         for(uint t: range(tSize)) {
-                            const float Rx0 = Rx00 + Rx0t*t;
-                            const float Ry0 = Ry00 + Ry0t*t;
-                            const float Rz0 = Rz00 + Rz0t*t;
+                            const v8sf Rx0 = Rx00 + Rx0t*float(t);
+                            const v8sf Ry0 = Ry00 + Ry0t*float(t);
+                            const v8sf Rz0 = Rz00 + Rz0t*float(t);
                             for(uint s=0; s<sSize; s += 8) {
-                                const v8sf S = toFloat(s+seqI);
+                                const v8sf S = float8(float(s))+seqF;
                                 const v8sf Rx = Rx0 + Rxs * S;
                                 const v8sf Ry = Ry0 + Rys * S;
                                 const v8sf Rz = Rz0 + Rzs * S;
-                                v8si index = scene.raycast(float8(P.x),float8(P.y),float8(P.z), Rx,Ry,Rz);
-                                // FIXME: gather SoA face.color
+                                v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
+                                // FIXME: gather BGR
                                 const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
                                 for(int k: range(8)) {
                                     //assert_(index[k] == -1 || index[k] < scene.faces.size, index[k]);
-                                    const bgr3f reflected = index[k] == -1 ? bgr3f(0) : scene.faces[index[k]].attributes.color;
+                                    const bgr3f reflected = index[k] == -1 ? bgr3f(0) : bgr3f{scene.B[index[k]], scene.G[index[k]], scene.R[index[k]]};
                                     const bgr3f color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                                     // FIXME: uv st (store compact s without scatter, same locality as gather is over stuv (4D bilinear interpolation))
                                     faceBGR[0*size+base+k*faceSampleCount] = color.b;

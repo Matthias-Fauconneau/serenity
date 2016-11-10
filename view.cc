@@ -208,7 +208,7 @@ struct LightFieldViewApp : LightField {
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
             Scene::Face& face = scene.faces[i];
-            const float cellCount = face.attributes.reflect ? detailCellCount : 1;
+            const float cellCount = face.reflect ? detailCellCount : 1;
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
             assert_(U && V);
 
@@ -217,9 +217,9 @@ struct LightFieldViewApp : LightField {
             for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
 
             // No copy (surface samples needs to stay memory mapped)
-            face.attributes.BGR = BGR.data+index;
-            face.attributes.size.x = U;
-            face.attributes.size.y = V;
+            face.BGR = BGR.data+index;
+            face.size.x = U;
+            face.size.y = V;
 
             index += 3*tSize*sSize*V*U;
         }
@@ -354,7 +354,7 @@ struct LightFieldViewApp : LightField {
                     const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
                     const vec3 d = normalize(vec3(uv, scene.near));
                     v8si index = scene.raycast(float8(O.x), float8(O.y), float8(O.z), float8(d.x), float8(d.y), float8(d.z));
-                    bgr3f S = scene.faces[index[0]].attributes.color;
+                    bgr3f S = scene.faces[index[0]].color;
                     extern uint8 sRGB_forward[0x1000];
                     target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
                 }

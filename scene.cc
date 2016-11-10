@@ -79,6 +79,9 @@ Scene parseScene(ref<byte> file) {
         s.skip('\n');
 
         scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
+        scene.B = buffer<float>(align(8,faceCount), 0);
+        scene.G = buffer<float>(align(8,faceCount), 0);
+        scene.R = buffer<float>(align(8,faceCount), 0);
         for(size_t i: range(4)) {
             scene.X[i] = buffer<float>(align(8,faceCount), 0);
             scene.Y[i] = buffer<float>(align(8,faceCount), 0);
@@ -98,8 +101,11 @@ Scene parseScene(ref<byte> file) {
             const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == -1;
-            const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},{reflect,color,N,0,0}});
+            const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+            scene.faces.append({{0,1,1,0},{0,0,1,1},reflect,N,0,0});
+            scene.B.append(color.b);
+            scene.G.append(color.g);
+            scene.R.append(color.r);
             for(size_t i: range(4)) {
                 scene.X[i].append(polygon[i].x);
                 scene.Y[i].append(polygon[i].y);
