@@ -168,6 +168,7 @@ inline float dot(v8sf a, v8sf b) {
 }
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
 
+template<> inline String str(const half& v) { return str(float(v)); }
 template<> inline String str(const v8sf& v) { return "v8sf("_+str(ref<float>((float*)&v,8))+")"_; }
 template<> inline String str(const v8si& v) { return "v8si("_+str(ref<int>((int*)&v,8))+")"_; }
 template<> inline String str(const v16sf& v) { return "v16sf("_+str(ref<float>((float*)&v,16))+")"_; }

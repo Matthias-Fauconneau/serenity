@@ -353,7 +353,8 @@ struct LightFieldViewApp : LightField {
                     size_t targetIndex = targetY*targetSizeX+targetX;
                     const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
                     const vec3 d = normalize(vec3(uv, scene.near));
-                    bgr3f S = scene.raycast(O, d);
+                    v8si index = scene.raycast(float8(O.x), float8(O.y), float8(O.z), float8(d.x), float8(d.y), float8(d.z));
+                    bgr3f S = scene.faces[index[0]].attributes.color;
                     extern uint8 sRGB_forward[0x1000];
                     target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
                 }

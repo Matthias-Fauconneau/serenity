@@ -109,7 +109,7 @@ struct Scene {
         far = scale*(-viewpoint.z+max.z);
     }
 
-#if 0
+#if 1
     inline bgr3f raycast(vec3 O, vec3 d) const {
         float value = inff; size_t index = invalid;
         assert_(align(8, faces.size)==faces.capacity);
@@ -141,11 +141,11 @@ struct Scene {
         }
         return index==invalid ? bgr3f(0) : faces[index].attributes.color;
     }
-#else
+#endif
+#if 1
     inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
         v8sf value = float8(inff); v8si index = intX(-1);
-        static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
-        for(size_t i=0; i<faces.size; i+=8) {
+        for(size_t i: range(faces.size)) {
             const float Ax = X[0][i];
             const float Ay = Y[0][i];
             const float Az = Z[0][i];
@@ -160,7 +160,7 @@ struct Scene {
             const float Dz = Z[3][i];
             const v8sf t = ::intersect(float8(Ax),float8(Ay),float8(Az), float8(Bx),float8(By),float8(Bz), float8(Cx),float8(Cy),float8(Cz), float8(Dx),float8(Dy),float8(Dz),
                                         Ox,Oy,Oz, dx,dy,dz);
-            index = blend(index, i+seqI, t < value);
+            index = blend(index, i, t < value);
             value = ::min(value, t);
         }
         return index;

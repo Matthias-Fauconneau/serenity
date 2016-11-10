@@ -106,14 +106,15 @@ struct Render {
 
                 // Allocates (s,t) (u,v) images
                 half* const faceBGR = BGR.begin()+ (size_t)face.attributes.BGR; // base + index
+                const size_t faceSampleCount = U*V;
+                const size_t size = stSize*faceSampleCount;
+                mref<half>(faceBGR, stSize*faceSampleCount).clear(0); // Just To Be Sure™
 
                 const vec3 ab = B-A;
                 const vec3 ad = D-A;
                 const vec3 badc = A-B+C-D;
 
                 // Shades surface
-                const size_t faceSampleCount = U*V;
-                const size_t size = stSize*faceSampleCount;
                 for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
@@ -134,9 +135,7 @@ struct Render {
                             const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = (P-viewpoint);
                             const vec3 R = (D - 2*dot(N, D)*N);
-                            innerTSC.start();
                             bgr3f reflected = scene.raycast(P, R);
-                            innerTSC.stop();
                             color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                             const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
                             faceBGR[0*size+index] = color.b;
@@ -151,7 +150,7 @@ struct Render {
                             const float NzDzNyDy = N.z*Dz + N.y*Dy;
                             static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
                             for(uint s=0; s<sSize; s += 8) {
-                                const v8sf Dx = float8(P.x)-float8(scene.viewpoint.x) + float8(iScale) * (toFloat(s+seqI)/float8((sSize-1)/2.f)-_1f);
+                                const v8sf Dx = float8(P.x-scene.viewpoint.x) - float8(iScale) * (toFloat(s+seqI)/float8((sSize-1)/2.f)-_1f);
                                 const v8sf dotND = float8(NzDzNyDy) + float8(N.x)*Dx;
                                 const v8sf Rx = Dx - 2*dotND*float8(N.x);
                                 const v8sf Ry = Dy - 2*dotND*float8(N.y);
@@ -161,6 +160,7 @@ struct Render {
                                 // FIXME: gather SoA face.color
                                 const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
                                 for(int k: range(8)) {
+                                    //assert_(index[k] == -1 || index[k] < scene.faces.size, index[k]);
                                     const bgr3f reflected = index[k] == -1 ? bgr3f(0) : scene.faces[index[k]].attributes.color;
                                     const bgr3f color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
                                     // FIXME: uv st (store compact s without scatter, same locality as gather is over stuv (4D bilinear interpolation))
@@ -170,8 +170,8 @@ struct Render {
                                 }
                             }
                         }
-                        innerTSC.stop();
 #endif
+                        innerTSC.stop();
                     }
                 }
 #if 1 // DEBUG
@@ -180,6 +180,9 @@ struct Render {
                 for(uint t: range(tSize)) for(uint s: range(sSize)) for(uint svIndex: range(V)) for(uint suIndex: range(U)) {
                     const size_t uvIndex = svIndex*U+suIndex;
                     const size_t index = (t*sSize+s)*faceSampleCount+uvIndex;
+                    assert_(faceBGR[0*size+index] >= 0 && faceBGR[0*size+index] <= 1, faceBGR[0*size+index]);
+                    assert_(faceBGR[1*size+index] >= 0 && faceBGR[1*size+index] <= 1);
+                    assert_(faceBGR[2*size+index] >= 0 && faceBGR[2*size+index] <= 1);
                     bgr(s*U+suIndex, t*V+svIndex) = byte4(
                             sRGB_forward[uint(faceBGR[0*size+index]*0xFFF)],
                             sRGB_forward[uint(faceBGR[1*size+index]*0xFFF)],
