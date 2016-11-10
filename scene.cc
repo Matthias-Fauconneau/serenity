@@ -79,9 +79,13 @@ Scene parseScene(ref<byte> file) {
         s.skip('\n');
 
         scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
-        scene.B = buffer<float>(align(8,faceCount), 0);
-        scene.G = buffer<float>(align(8,faceCount), 0);
-        scene.R = buffer<float>(align(8,faceCount), 0);
+        scene.B = buffer<float>(align(8,faceCount+1), 0);
+        scene.G = buffer<float>(align(8,faceCount+1), 0);
+        scene.R = buffer<float>(align(8,faceCount+1), 0);
+        // index=faceCount flags miss (raycast hits no face) (i.e background "face" color)
+        scene.B[faceCount] = 0;
+        scene.G[faceCount] = 0;
+        scene.R[faceCount] = 0;
         for(size_t i: range(4)) {
             scene.X[i] = buffer<float>(align(8,faceCount), 0);
             scene.Y[i] = buffer<float>(align(8,faceCount), 0);

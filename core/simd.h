@@ -16,6 +16,7 @@ typedef float v4sf __attribute((ext_vector_type(4)));
 typedef float v8sf __attribute((ext_vector_type(8)));
 
 typedef half v4hf __attribute((ext_vector_type(4)));
+typedef half v8hf __attribute((ext_vector_type(8)));
 typedef half v16hf __attribute((ext_vector_type(16)));
 
 inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
@@ -146,12 +147,9 @@ const v8si notSignBit8 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFF
 inline v8sf abs(v8sf a) { return (v8sf)(notSignBit8 & (v8si)a); }
 
 inline v8sf toFloat(const v8si v) { return __builtin_ia32_cvtdq2ps256(v); }
+inline v8hf toHalf(const v8sf v) { return __builtin_ia32_vcvtps2ph256(v, 0); }
 
-inline v16hf toHalf(const v16sf v) {
-    v4sf a = __builtin_ia32_vcvtps2ph256(v.r1, 0);
-    v4sf b = __builtin_ia32_vcvtps2ph256(v.r2, 0);
-    return __builtin_shufflevector(a, b, 0, 1, 2, 3, 4, 5, 6, 7);
-}
+inline v16hf toHalf(const v16sf v) { return __builtin_shufflevector(toHalf(v.r1), toHalf(v.r2), 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15); }
 
 inline v4sf toFloat(const v4hf v) { return {(float)v[0], (float)v[1], (float)v[2], (float)v[3]}; }
 inline v16sf toFloat(const v16hf v) {

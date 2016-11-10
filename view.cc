@@ -36,10 +36,10 @@ struct LightFieldViewApp : LightField {
     uint sSize = 0, tSize = 0;
 
     Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
-    Scene::Renderer<Scene::TextureShader, 0> Zrenderer {scene};
-    Scene::Renderer<Scene::TextureShader, 3> TexRenderer {scene};
-    Scene::Renderer<Scene::CheckerboardShader, 3> UVRenderer {scene};
-    Scene::Renderer<Scene::RaycastShader, 3> BGRRenderer {scene};
+    Scene::Renderer<Scene::NoShader> Zrenderer {};
+    Scene::Renderer<Scene::TextureShader> TexRenderer {scene};
+    Scene::Renderer<Scene::CheckerboardShader> UVRenderer {};
+    Scene::Renderer<Scene::RaycastShader> BGRRenderer {scene};
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field

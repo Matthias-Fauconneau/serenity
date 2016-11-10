@@ -143,7 +143,7 @@ struct Scene {
 #endif
 #if 1
     inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
-        v8sf value = float8(inff); v8si index = intX(-1);
+        v8sf value = float8(inff); v8si index = intX(faces.size);
         for(size_t i: range(faces.size)) {
             const float Ax = X[0][i];
             const float Ay = Y[0][i];
@@ -166,9 +166,51 @@ struct Scene {
     }
 #endif
 
-    struct TextureShader {
+    struct NoShader {
+        static constexpr int C = 0;
+        static constexpr int V = 0;
+        typedef uint FaceAttributes;
+        inline Vec<float, 0> shade(FaceAttributes, float, float[V]) const { return {}; }
+        inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const { return {}; }
+    };
+
+    struct CheckerboardShader {
+        static constexpr int C = 3;
         static constexpr int V = 2;
         typedef uint FaceAttributes;
+
+        inline Vec<float, 3> shade(FaceAttributes, float, float varying[2]) const { return shade(varying); }
+        inline Vec<v16sf, 3> shade(FaceAttributes, v16sf, v16sf varying[2], v16si) const { return shade(varying); }
+
+        template<Type T> inline Vec<T, 3> shade(T varying[2]) const {
+            const T u = varying[0], v = varying[1];
+            static T cellCount = T(1); //static T cellCount = T(16);
+            const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
+            const T m = T(1./2)*n; // Half integer
+            const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
+            return Vec<T, 3>{{mod, mod, mod}};
+        }
+    };
+
+    template<int C_, int V_, Type D> struct Shader {
+        static constexpr int C = C_;
+        static constexpr int V = V_;
+        typedef uint FaceAttributes;
+
+        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
+            Vec<v16sf, C> Y;
+            for(uint i: range(16)) {
+                if(!mask[i]) continue;
+                float x[V];
+                for(uint v: range(V)) x[v] = varying[v][i];
+                Vec<float, C> y = ((D*)this)->shade(face, z[i], x);
+                for(uint c: range(C)) Y._[c][i] = y._[c];
+            }
+            return Y;
+        }
+    };
+
+    struct TextureShader : Shader<3, 2, TextureShader> {
 
         ref<Scene::Face> faces;
         uint sSize = 0, tSize = 0;
@@ -177,11 +219,8 @@ struct Scene {
 
         TextureShader(const Scene& scene) : faces(scene.faces) {}
 
-        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
-        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
-
-        template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
-        inline Vec<float, 3> shade3(FaceAttributes index, float, float varying[V]) const {
+        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
+        inline Vec<float, 3> shade(FaceAttributes index, float, float varying[V]) const {
             const Scene::Face& face = faces[index];
             const int size1 = face.size.x;
             const int size2 = face.size.y*size1;
@@ -209,27 +248,7 @@ struct Scene {
         }
     };
 
-    struct CheckerboardShader {
-        typedef uint FaceAttributes;
-        static constexpr int V = 2;
-
-        CheckerboardShader(const Scene&) {}
-
-        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
-        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
-
-        template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
-        template<Type T> inline Vec<T, 3> shade3(FaceAttributes, T, T varying[V]) const {
-            const T u = varying[0], v = varying[1];
-            static T cellCount = T(1); //static T cellCount = T(16);
-            const T n = floor(cellCount*u)+floor(cellCount*v); // Integer
-            const T m = T(1./2)*n; // Half integer
-            const T mod = T(2)*(m-floor(m)); // 0 or 1, 2*fract(n/2) = n%2
-            return Vec<T, 3>{{mod, mod, mod}};
-        }
-    };
-
-    struct RaycastShader {
+    struct RaycastShader : Shader<3, 2, RaycastShader> {
         typedef uint FaceAttributes;
         static constexpr int V = 5;
 
@@ -238,11 +257,8 @@ struct Scene {
 
         RaycastShader(const Scene& scene) : scene(scene) {}
 
-        template<int C> inline Vec<float, C> shade(FaceAttributes, float, float[V]) const;
-        template<int C> inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const;
-
-        template<Type T> inline Vec<T, 0> shade0(FaceAttributes, T, T[V]) const { return {}; }
-        inline Vec<float, 3> shade3(FaceAttributes face, float, float unused varying[V]) const {
+        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
+        inline Vec<float, 3> shade(FaceAttributes face, float, float unused varying[V]) const {
             if(!scene.faces[face].reflect) return Vec<float, 3>{{scene.B[face],scene.G[face],scene.R[face]}};
             //const vec3 O = vec3(varying[2], varying[3], varying[4]);
             //const vec3 D = normalize(O-viewpoint);
@@ -252,15 +268,15 @@ struct Scene {
         }
     };
 
-    template<Type Shader, int C> struct Renderer {
+    template<Type Shader> struct Renderer {
         Shader shader; // Instance holds any uniforms (currently none)
         RenderPass<Shader> pass; // Face bins
-        RenderTarget<C> target; // Sample tiles
-        Renderer(const Scene& scene) : shader(scene), pass(shader) {}
+        RenderTarget<Shader::C> target; // Sample tiles
+        Renderer(Shader&& shader_={}) : shader(::move(shader_)), pass(shader) {}
     };
 
     template<Type Shader, Type... Args>
-    void render(Renderer<Shader, sizeof...(Args)>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& depth, const Args&... targets_) {
+    void render(Renderer<Shader>& renderer, mat4 M, float clear[/*sizeof...(Args)*/], const ImageH& depth, const Args&... targets_) {
         const ImageH targets[sizeof...(Args)] { unsafeShare(targets_)... }; // Zero-length arrays are not permitted in C++
         uint2 size = (sizeof...(Args) ? targets[0] : depth).size;
         renderer.target.setup(int2(size), 1, clear); // Needs to be setup before pass
@@ -294,43 +310,6 @@ struct Scene {
         renderer.target.resolve(depth, targets);
     }
 };
-
-// Explicit full function template specialization
-template <> inline Vec<float, 0> Scene::CheckerboardShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::CheckerboardShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::CheckerboardShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3<float>(face, z, varying); }
-template <> inline Vec<v16sf, 3> Scene::CheckerboardShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade3<v16sf>(face, z, varying); }
-
-template <> inline Vec<float, 0> Scene::TextureShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::TextureShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::TextureShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
-template <> inline Vec<v16sf, 3> Scene::TextureShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
-    Vec<v16sf, 3> Y;
-    for(uint i: range(16)) {
-        if(!mask[i]) continue;
-        float x[V];
-        for(uint v: range(V)) x[v] = varying[v][i];
-        Vec<float, 3> y = shade3(face, z[i], x);
-        for(uint c: range(3)) Y._[c][i] = y._[c];
-    }
-    return Y;
-}
-
-template <> inline Vec<float, 0> Scene::RaycastShader::shade<0>(FaceAttributes face, float z, float varying[V]) const { return shade0<float>(face, z, varying); }
-template <> inline Vec<v16sf, 0> Scene::RaycastShader::shade<0>(FaceAttributes face, v16sf z, v16sf varying[V], v16si) const { return shade0<v16sf>(face, z, varying); }
-template <> inline Vec<float, 3> Scene::RaycastShader::shade<3>(FaceAttributes face, float z, float varying[V]) const { return shade3(face, z, varying); }
-// FIXME: duplicate definition with TextureShader
-template <> inline Vec<v16sf, 3> Scene::RaycastShader::shade<3>(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
-    Vec<v16sf, 3> Y;
-    for(uint i: range(16)) {
-        if(!mask[i]) continue;
-        float x[V];
-        for(uint v: range(V)) x[v] = varying[v][i];
-        Vec<float, 3> y = shade3(face, z[i], x);
-        for(uint c: range(3)) Y._[c][i] = y._[c];
-    }
-    return Y;
-}
 
 Scene parseScene(ref<byte> scene);
 
