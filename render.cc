@@ -144,22 +144,33 @@ struct Render {
                         }
 #else
                         static constexpr v8si seqI = v8si{0,1,2,3,4,5,6,7};
-                        const float Dz = P.z-scene.viewpoint.z;
-                        const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
                         const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
-                        const float Dyt = -2/((tSize-1)*scene.scale);
+                        const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
+                        const float Dz = P.z-scene.viewpoint.z;
                         const float Dxs = -2/((sSize-1)*scene.scale);
-                        const float NzDz = N.z*Dz;
+                        const float Dyt = -2/((tSize-1)*scene.scale);
+                        const float RxDx = 1 - 2*N.x*N.x;
+                        const float RyDx =   - 2*N.x*N.y;
+                        const float RzDx =   - 2*N.x*N.z;
+                        const float a0 = -2*N.z*Dz;
+                        const float Rx00 = a0*N.x + (N.x*N.y+0)*Dy0 + RxDx*Dx0;
+                        const float Rx0t = (N.x*N.y+0)*Dyt;
+                        const float Ry00 = a0*N.y + (N.y*N.y+1)*Dy0 + RyDx*Dx0;
+                        const float Ry0t = (N.y*N.y+1)*Dyt;
+                        const float Rz00 = a0*N.z + (N.z*N.y+1)*Dy0 + RzDx*Dx0;
+                        const float Rz0t = (N.z*N.y+1)*Dyt;
+                        const float Rxs = RxDx * Dxs;
+                        const float Rys = RyDx * Dxs;
+                        const float Rzs = RzDx * Dxs;
                         for(uint t: range(tSize)) {
-                            const float Dy = Dy0 + Dyt * t;
-                            const float NzDzNyDy = NzDz + N.y*Dy;
+                            const float Rx0 = Rx00 + Rx0t*t;
+                            const float Ry0 = Ry00 + Ry0t*t;
+                            const float Rz0 = Rz00 + Rz0t*t;
                             for(uint s=0; s<sSize; s += 8) {
-                                const v8sf Dx = Dx0 + Dxs * toFloat(s+seqI);
-                                const v8sf dotND = NzDzNyDy + float8(N.x)*Dx;
-                                const v8sf Rx = Dx - 2*dotND*float8(N.x);
-                                const v8sf Ry = Dy - 2*dotND*float8(N.y);
-                                const v8sf Rz = Dz - 2*dotND*float8(N.z);
-                                // FIXME: R = Ls (factorized linear application)
+                                const v8sf S = toFloat(s+seqI);
+                                const v8sf Rx = Rx0 + Rxs * S;
+                                const v8sf Ry = Ry0 + Rys * S;
+                                const v8sf Rz = Rz0 + Rzs * S;
                                 v8si index = scene.raycast(float8(P.x),float8(P.y),float8(P.z), Rx,Ry,Rz);
                                 // FIXME: gather SoA face.color
                                 const size_t base = uvIndex+(t*sSize+s)*faceSampleCount;
