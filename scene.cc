@@ -23,7 +23,9 @@ Scene parseScene(ref<byte> file) {
         mat4 transform = mat4().rotateX(PI/2);
         s.until('\n');
         array<vec3> vertices;
+        array<vec3> normals;
         array<uint4> indices;
+        array<uint4> normalIndices;
         array<string> faceObjectName;
         string objectName;
         while(s) {
@@ -31,18 +33,23 @@ Scene parseScene(ref<byte> file) {
                 vertices.append( transform * parse<vec3>(s) );
                 s.skip('\n');
             }
+            else if(s.match("vn ")) {
+                normals.append( transform.normalMatrix() * parse<vec3>(s) );
+                s.skip('\n');
+            }
             else if(s.match("f ")) {
-                array<int> a;
+                array<int> v, vn;
                 for(;;) {
-                 a.append(s.integer()-1);
+                 v.append(s.integer()-1);
                  s.skip("//");
-                 s.integer();
+                 vn.append(s.integer()-1);
                  if(s.match('\n')) break;
                  s.skip(' ');
                 }
                 //assert_(a.size == 4, a.size);
-                if(a.size == 4) {
-                    indices.append(uint4(a[0], a[1], a[2], a[3]));
+                if(v.size == 4) {
+                    indices.append(uint4(v[0], v[1], v[2], v[3]));
+                    normalIndices.append(uint4(vn[0], vn[1], vn[2], vn[3]));
                     faceObjectName.append(objectName); // FIXME
                 }
             }
@@ -76,9 +83,10 @@ Scene parseScene(ref<byte> file) {
                 scene.Y[vertexIndex].append(vertices[faceIndices[vertexIndex]].y);
                 scene.Z[vertexIndex].append(vertices[faceIndices[vertexIndex]].z);
             }
-            const vec3 A = vertices[faceIndices[0]], B = vertices[faceIndices[1]], C = vertices[faceIndices[2]];
-            const vec3 N = normalize(cross(B-A, C-A));
-            Scene::Face face {{0,1,1,0},{0,0,1,1},0,0,N,0,0};
+            //const vec3 A = vertices[faceIndices[0]], B = vertices[faceIndices[1]], C = vertices[faceIndices[2]];
+            //const vec3 N = normalize(cross(B-A, C-A)); Scene::Face face {{0,1,1,0},{0,0,1,1},0,0,N,0,0};
+            Scene::Face face {{0,1,1,0},{0,0,1,1},{normals[normalIndices[faceIndex][0]],normals[normalIndices[faceIndex][1]],
+                                                   normals[normalIndices[faceIndex][2]],normals[normalIndices[faceIndex][3]]},0,0,0,0};
             if(faceObjectName[faceIndex] == "Cylinder") face.refract = 1;
             scene.faces.append(face);
             bgr3f color = 1;
@@ -88,6 +96,7 @@ Scene parseScene(ref<byte> file) {
             scene.R.append(color.r);
         }
     } else {
+#if 0
         scene.viewpoint = parse<vec3>(s);
         s.skip('\n');
 
@@ -133,6 +142,10 @@ Scene parseScene(ref<byte> file) {
             }
         }
         assert_(scene.faces.size == faceCount);
+#else
+        error("Unsupported");
+#endif
+    }
 #if 0
         // Precomputes barycentric coordinates of V11
         scene.a11 = buffer<float>(faces.size);
@@ -163,7 +176,6 @@ Scene parseScene(ref<byte> file) {
             scene.b11[i] = b11;
         }
 #endif
-    }
     scene.fit();
     return scene;
 }

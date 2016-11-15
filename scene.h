@@ -84,7 +84,8 @@ struct Scene {
     vec3 viewpoint;
     struct Face {
         float u[4], v[4]; // Vertex attributes
-        float reflect, refract; vec3 N; // Render (RaycastShader)
+        vec3 N[4]; // Vertex attributes
+        float reflect, refract; //vec3 N; // Render (RaycastShader)
         const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
@@ -292,7 +293,7 @@ struct Scene {
         }
     };
 
-    struct RaycastShader : Shader<3, 5, RaycastShader> {
+    struct RaycastShader : Shader<3, 8, RaycastShader> {
         typedef uint FaceAttributes;
 
         const Scene& scene;
@@ -323,15 +324,16 @@ struct Scene {
                 const vec3 O = vec3(varying[2], varying[3], varying[4]);
                 const vec3 D = normalize(O-viewpoint);
                 const float n1 = 1, n2 = 1.3;
-                const vec3 R = normalize(refract(n1/n2, normalize(face.N), D));
+                const vec3 N = normalize(vec3(varying[5], varying[6], varying[7])); //face.N
+                //const bgr3f color = (backO-scene.min)/(scene.max-scene.min);
+                //const bgr3f color = (vec3(1)+N)/2.f;
+                //return Vec<float, 3>{{color.b, color.g, color.r}};
+                const vec3 R = normalize(refract(n1/n2, N, D));
                 float backT;
                 size_t back = scene.raycast_reverseWinding(O, R, &backT);
                 if(back == scene.faces.size) return {}; // FIXME
                 const vec3 backO = O+backT*R;
-                //const bgr3f color = (backO-scene.min)/(scene.max-scene.min);
-                //const bgr3f color = (vec3(1)+normalize(face.N))/2.f;
-                //return Vec<float, 3>{{color.b, color.g, color.r}};
-                const vec3 backR = refract(n2/n1, normalize(-scene.faces[back].N), R);
+                const vec3 backR = refract(n2/n1, -scene.faces[back].N[0]/*FIXME: lerp*/, R);
                 size_t index = scene.raycast(backO, backR);
                 return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
             }
@@ -373,12 +375,20 @@ struct Scene {
                                                  vec3(face.v[0],face.v[1],face.v[2]),
                                                  vec3(A.x,B.x,C.x),
                                                  vec3(A.y,B.y,C.y),
-                                                 vec3(A.z,B.z,C.z)}, faceIndex);
+                                                 vec3(A.z,B.z,C.z),
+                                                 vec3(faces[faceIndex].N[0].x, faces[faceIndex].N[1].x, faces[faceIndex].N[2].x),
+                                                 vec3(faces[faceIndex].N[0].y, faces[faceIndex].N[1].y, faces[faceIndex].N[2].y),
+                                                 vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[1].z, faces[faceIndex].N[2].z)
+                                 }, faceIndex);
             renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
                                                  vec3(face.v[0],face.v[2],face.v[3]),
                                                  vec3(A.x,C.x,D.x),
                                                  vec3(A.y,C.y,D.y),
-                                                 vec3(A.z,C.z,D.z)}, faceIndex);
+                                                 vec3(A.z,C.z,D.z),
+                                                 vec3(faces[faceIndex].N[0].x, faces[faceIndex].N[2].x, faces[faceIndex].N[3].x),
+                                                 vec3(faces[faceIndex].N[0].y, faces[faceIndex].N[2].y, faces[faceIndex].N[3].y),
+                                                 vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[2].z, faces[faceIndex].N[3].z)
+                                 }, faceIndex);
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(depth, targets);
