@@ -30,6 +30,26 @@ inline v8sf dot(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, cons
     return Ax*Bx + Ay*By + Az*Bz;
 }
 
+inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { // "Fast, Minimum Storage Ray/Triangle Intersection"
+    vec3 e2 = C - A;
+    vec3 e1 = B - A;
+    vec3 P = cross(d, e2);
+    float det = dot(e1, P);
+    //if(det < 0) return false;
+    vec3 T = O - A;
+    u = dot(T, P);
+    if(u < 0 || u > det) return false;
+    vec3 Q = cross(T, e1);
+    v = dot(d, Q);
+    if(v < 0 || u + v > det) return false;
+    t = dot(e2, Q);
+    //if(t < 0) return false;
+    t /= det;
+    u /= det;
+    v /= det;
+    return true;
+}
+
 // "Efficient Ray-Quadrilateral Intersection Test"
 static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
                              const v8sf x10, const v8sf y10, const v8sf z10,
@@ -319,25 +339,38 @@ struct Scene {
              return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
             }
 #endif
-#if 1
             else if(face.refract) {
                 const vec3 O = vec3(varying[2], varying[3], varying[4]);
-                const vec3 D = normalize(O-viewpoint);
                 const float n1 = 1, n2 = 1.3;
                 const vec3 N = normalize(vec3(varying[5], varying[6], varying[7])); //face.N
                 //const bgr3f color = (backO-scene.min)/(scene.max-scene.min);
                 //const bgr3f color = (vec3(1)+N)/2.f;
                 //return Vec<float, 3>{{color.b, color.g, color.r}};
-                const vec3 R = normalize(refract(n1/n2, N, D));
+                const vec3 R = refract(n1/n2, N, normalize(O-viewpoint));
                 float backT;
-                size_t back = scene.raycast_reverseWinding(O, R, &backT);
+                const size_t back = scene.raycast_reverseWinding(O, R, &backT);
                 if(back == scene.faces.size) return {}; // FIXME
                 const vec3 backO = O+backT*R;
-                const vec3 backR = refract(n2/n1, -scene.faces[back].N[0]/*FIXME: lerp*/, R);
+                float t,u,v;
+                const vec3 A = scene.faces[back].N[0];
+                const vec3 B = scene.faces[back].N[1];
+                const vec3 C = scene.faces[back].N[2];
+                const vec3 D = scene.faces[back].N[3];
+                vec3 backN;
+                if(intersect(vec3(scene.X[0][back],scene.Y[0][back],scene.Z[0][back]),
+                              vec3(scene.X[1][back],scene.Y[1][back],scene.Z[1][back]),
+                              vec3(scene.X[2][back],scene.Y[2][back],scene.Z[2][back]), O, -R, t, u, v)) {
+                    backN = (1-u-v) * A + u * B + v * C;
+                } else {
+                    intersect(vec3(scene.X[0][back],scene.Y[0][back],scene.Z[0][back]),
+                              vec3(scene.X[2][back],scene.Y[2][back],scene.Z[2][back]),
+                              vec3(scene.X[3][back],scene.Y[3][back],scene.Z[3][back]), O, -R, t, u, v);
+                    backN = (1-u-v) * A + u * C + v * D;
+                }
+                const vec3 backR = refract(n2/n1, -backN, R);
                 size_t index = scene.raycast(backO, backR);
                 return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
             }
-#endif
             else {
                 return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
             }

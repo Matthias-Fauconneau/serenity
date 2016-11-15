@@ -148,13 +148,13 @@ Scene parseScene(ref<byte> file) {
     }
 #if 0
         // Precomputes barycentric coordinates of V11
-        scene.a11 = buffer<float>(faces.size);
-        scene.b11 = buffer<float>(faces.size);
-        for(size_t i: range(faces.size)) {
-            const vec3 v00 (X[0][i], Y[0][i], Z[0][i]);
-            const vec3 v10 (X[1][i], Y[1][i], Z[1][i]);
-            const vec3 v11 (X[2][i], Y[2][i], Z[2][i]);
-            const vec3 v01 (X[3][i], Y[3][i], Z[3][i]);
+        scene.a11 = buffer<float>(scene.faces.size);
+        scene.b11 = buffer<float>(scene.faces.size);
+        for(size_t i: range(scene.faces.size)) {
+            const vec3 v00 (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
+            const vec3 v10 (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
+            const vec3 v11 (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
+            const vec3 v01 (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
             const vec3 e01 = v10 - v00;
             const vec3 e03 = v01 - v00;
             const vec3 N = cross(e01, e03);
