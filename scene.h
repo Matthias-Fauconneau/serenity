@@ -84,11 +84,11 @@ struct Scene {
     vec3 viewpoint;
     struct Face {
         float u[4], v[4]; // Vertex attributes
-        float reflect; vec3 N; // Render (RaycastShader)
+        float reflect, refract; vec3 N; // Render (RaycastShader)
         const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
-    buffer<float> a11, b11;
+    //buffer<float> a11, b11;
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
 
@@ -108,10 +108,9 @@ struct Scene {
         far = scale*(-viewpoint.z+max.z);
     }
 
-#if 1
-    inline bgr3f raycast(vec3 O, vec3 d) const {
-        float value = inff; size_t index = invalid;
-        assert_(align(8, faces.size)==faces.capacity);
+    inline size_t raycast(vec3 O, vec3 d) const {
+        assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
+        float value = inff; size_t index = faces.size;
         const v8sf Ox = float8(O.x);
         const v8sf Oy = float8(O.y);
         const v8sf Oz = float8(O.z);
@@ -138,9 +137,40 @@ struct Scene {
             value = hmin0;
             index = i + ::indexOfEqual(t, hmin);
         }
-        return index==invalid ? bgr3f(0) : bgr3f{B[index],G[index],R[index]};
+        return index;
     }
-#endif
+    inline size_t raycast_reverseWinding(vec3 O, vec3 d, float* T=0) const {
+        assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
+        float value = inff; size_t index = faces.size;
+        const v8sf Ox = float8(O.x);
+        const v8sf Oy = float8(O.y);
+        const v8sf Oz = float8(O.z);
+        const v8sf dx = float8(d.x);
+        const v8sf dy = float8(d.y);
+        const v8sf dz = float8(d.z);
+        for(size_t i=0; i<faces.size; i+=8) {
+            const v8sf Ax = *(v8sf*)(X[3].data+i);
+            const v8sf Ay = *(v8sf*)(Y[3].data+i);
+            const v8sf Az = *(v8sf*)(Z[3].data+i);
+            const v8sf Bx = *(v8sf*)(X[2].data+i);
+            const v8sf By = *(v8sf*)(Y[2].data+i);
+            const v8sf Bz = *(v8sf*)(Z[2].data+i);
+            const v8sf Cx = *(v8sf*)(X[1].data+i);
+            const v8sf Cy = *(v8sf*)(Y[1].data+i);
+            const v8sf Cz = *(v8sf*)(Z[1].data+i);
+            const v8sf Dx = *(v8sf*)(X[0].data+i);
+            const v8sf Dy = *(v8sf*)(Y[0].data+i);
+            const v8sf Dz = *(v8sf*)(Z[0].data+i);
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Dx,Dy,Dz, Ox,Oy,Oz, dx,dy,dz);
+            v8sf hmin = ::hmin(t);
+            const float hmin0 = hmin[0];
+            if(hmin0 >= value) continue;
+            value = hmin0;
+            index = i + ::indexOfEqual(t, hmin);
+        }
+        if(T) *T=value;
+        return index;
+    }
 #if 1
     inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
         v8sf value = float8(inff); v8si index = intX(faces.size);
@@ -262,23 +292,53 @@ struct Scene {
         }
     };
 
-    struct RaycastShader : Shader<3, 2, RaycastShader> {
+    struct RaycastShader : Shader<3, 5, RaycastShader> {
         typedef uint FaceAttributes;
-        static constexpr int V = 5;
 
         const Scene& scene;
         vec3 viewpoint; // scene.viewpoint + (s, t)
 
         RaycastShader(const Scene& scene) : scene(scene) {}
 
+        vec3 refract(const float r, const vec3 N, const vec3 D) const {
+            const float c = -dot(N, D);
+            return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
+        }
+
         inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
-        inline Vec<float, 3> shade(FaceAttributes face, float, float unused varying[V]) const {
-            if(!scene.faces[face].reflect) return Vec<float, 3>{{scene.B[face],scene.G[face],scene.R[face]}};
-            //const vec3 O = vec3(varying[2], varying[3], varying[4]);
-            //const vec3 D = normalize(O-viewpoint);
-            //const vec3 R = D - 2*dot(face.N, D)*face.N;
-            bgr3f color = 0; //scene.raycast(O, normalize(R)); FIXME
-            return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
+        inline Vec<float, 3> shade(FaceAttributes index, float, float unused varying[V]) const {
+            const Scene::Face& face = scene.faces[index];
+            if(0) {}
+#if 0
+            else if(face.reflect) {
+             const vec3 O = vec3(varying[2], varying[3], varying[4]);
+             const vec3 D = normalize(O-viewpoint);
+             const vec3 R = D - 2*dot(face.N, D)*face.N;
+             bgr3f color = scene.raycast(O, normalize(R));
+             return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
+            }
+#endif
+#if 1
+            else if(face.refract) {
+                const vec3 O = vec3(varying[2], varying[3], varying[4]);
+                const vec3 D = normalize(O-viewpoint);
+                const float n1 = 1, n2 = 1.3;
+                const vec3 R = normalize(refract(n1/n2, normalize(face.N), D));
+                float backT;
+                size_t back = scene.raycast_reverseWinding(O, R, &backT);
+                if(back == scene.faces.size) return {}; // FIXME
+                const vec3 backO = O+backT*R;
+                //const bgr3f color = (backO-scene.min)/(scene.max-scene.min);
+                //const bgr3f color = (vec3(1)+normalize(face.N))/2.f;
+                //return Vec<float, 3>{{color.b, color.g, color.r}};
+                const vec3 backR = refract(n2/n1, normalize(-scene.faces[back].N), R);
+                size_t index = scene.raycast(backO, backR);
+                return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
+            }
+#endif
+            else {
+                return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
+            }
         }
     };
 
@@ -338,6 +398,6 @@ inline string basename(string x) {
 
 inline String sceneFile(string name) {
     if(existsFile(name+".scene")) return name+".scene";
-    if(existsFile(name+".ply")) return name+".ply";
+    if(existsFile(name+".obj")) return name+".obj";
     error("No such file", name);
 }

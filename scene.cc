@@ -18,60 +18,76 @@ template<> inline vec3 parse<vec3>(TextData& s) { return parseVec<vec3>(s); }
 Scene parseScene(ref<byte> file) {
     TextData s (file);
     while(s.match('#')) s.until('\n');
-    if(s.match("ply\n")) {
-#if 0
-        s.skip("format ascii 1.0\n");
-        s.skip("comment "); s.until('\n');
-        s.skip("element vertex ");
-        const uint vertexCount = s.integer();
-        s.skip('\n');
-        while(s.match("property")) s.until("\n");
-        s.skip("element face ");
-        const uint faceCount = s.integer();
-        s.skip('\n');
-        while(s.match("property")) s.until("\n");
-        s.skip("end_header\n");
-        buffer<vec3> vertices (vertexCount);
-        for(size_t i : range(vertexCount)) {
-            vertices[i] = parse<vec3>(s);
-            s.until('\n');
-        }
-
-        vec3 min = inff, max = -inff;
-        for(vec3 p: vertices) { min = ::min(min, p); max = ::max(max, p); }
-        log(min, max);
-
-        buffer<uint4> indices (faceCount);
-        for(size_t i : range(faceCount)) {
-            uint length = s.integer();
-            if(length==3) {
-                indices[i] = uint4(parse<uint3>(s), 0);
-                indices[i][3] = indices[i][2]; // FIXME
-            } else {
-                assert_(length == 4, length);
-                indices[i] = parse<uint4>(s);
+    Scene scene;
+    if(s.match("mtllib")) {
+        mat4 transform = mat4().rotateX(PI/2);
+        s.until('\n');
+        array<vec3> vertices;
+        array<uint4> indices;
+        array<string> faceObjectName;
+        string objectName;
+        while(s) {
+            /**/ if(s.match("v ")) {
+                vertices.append( transform * parse<vec3>(s) );
+                s.skip('\n');
             }
-            s.until('\n');
+            else if(s.match("f ")) {
+                array<int> a;
+                for(;;) {
+                 a.append(s.integer()-1);
+                 s.skip("//");
+                 s.integer();
+                 if(s.match('\n')) break;
+                 s.skip(' ');
+                }
+                //assert_(a.size == 4, a.size);
+                if(a.size == 4) {
+                    indices.append(uint4(a[0], a[1], a[2], a[3]));
+                    faceObjectName.append(objectName); // FIXME
+                }
+            }
+            else if(s.match("o ")) objectName = s.until("\n");
+            else if(s.match("vn ")) s.until("\n");
+            else if(s.match("usemtl ")) s.until("\n");
+            else if(s.match("s ")) s.until("\n");
+            else error(s);
         }
 
-        const vec3 viewpoint (0,0,-64);
-        buffer<Scene::Face> faces (faceCount, 0);
-        for(uint4 face: indices) {
-            float reflect = faces.size%2==0;
-            log(faces.size);
-            const vec3 A = vertices[face[0]], B = vertices[face[1]], C = vertices[face[2]];//, D = vertices[face[3]];
+        scene.viewpoint = vec3(0,0,-4);
+        const size_t faceCount = indices.size;
+        scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
+        scene.B = buffer<float>(align(8,faceCount+1), 0);
+        scene.G = buffer<float>(align(8,faceCount+1), 0);
+        scene.R = buffer<float>(align(8,faceCount+1), 0);
+        // index=faceCount flags miss (raycast hits no face) (i.e background "face" color)
+        scene.B[faceCount] = 0;
+        scene.G[faceCount] = 0;
+        scene.R[faceCount] = 0;
+        for(size_t i: range(4)) {
+            scene.X[i] = buffer<float>(align(8,faceCount), 0);
+            scene.Y[i] = buffer<float>(align(8,faceCount), 0);
+            scene.Z[i] = buffer<float>(align(8,faceCount), 0);
+        }
+        //for(uint4 face: indices) {
+        for(size_t faceIndex: range(indices.size)) {
+            const uint4& faceIndices = indices[faceIndex];
+            for(size_t vertexIndex: range(4)) {
+                scene.X[vertexIndex].append(vertices[faceIndices[vertexIndex]].x);
+                scene.Y[vertexIndex].append(vertices[faceIndices[vertexIndex]].y);
+                scene.Z[vertexIndex].append(vertices[faceIndices[vertexIndex]].z);
+            }
+            const vec3 A = vertices[faceIndices[0]], B = vertices[faceIndices[1]], C = vertices[faceIndices[2]];
             const vec3 N = normalize(cross(B-A, C-A));
-            const vec3 color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            faces.append({{vertices[face[0]], vertices[face[1]], vertices[face[2]], vertices[face[3]]},{0,1,1,0},{0,0,1,1},0,0,buffer<half>(),color,reflect});
-            //faces.append({{vertices[face[3]], vertices[face[2]], vertices[face[1]], vertices[face[0]]},{0,1,1,0},{0,0,1,1},Image8()});
+            Scene::Face face {{0,1,1,0},{0,0,1,1},0,0,N,0,0};
+            if(faceObjectName[faceIndex] == "Cylinder") face.refract = 1;
+            scene.faces.append(face);
+            bgr3f color = 1;
+            if(faceObjectName[faceIndex] == "Cube") color = bgr3f(faceIndex&0b100,faceIndex&0b010,faceIndex&0b001);
+            scene.B.append(color.b);
+            scene.G.append(color.g);
+            scene.R.append(color.r);
         }
-        return {viewpoint, ::move(faces)};
-#else
-        error("Unsupported");
-#endif
     } else {
-        Scene scene;
-
         scene.viewpoint = parse<vec3>(s);
         s.skip('\n');
 
@@ -106,7 +122,7 @@ Scene parseScene(ref<byte> file) {
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},reflect,N,0,0});
+            scene.faces.append({{0,1,1,0},{0,0,1,1},reflect,0,N,0,0});
             scene.B.append(color.b);
             scene.G.append(color.g);
             scene.R.append(color.r);
@@ -147,8 +163,7 @@ Scene parseScene(ref<byte> file) {
             scene.b11[i] = b11;
         }
 #endif
-        scene.fit();
-
-        return scene;
     }
+    scene.fit();
+    return scene;
 }

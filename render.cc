@@ -185,7 +185,6 @@ struct Render {
             const uint size4 = stSize*VU;
             const half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             Image bgr (sSize*U, tSize*V);
-            bgr.clear(0); // FIXME
             extern uint8 sRGB_forward[0x1000];
             for(uint svIndex: range(V)) for(uint suIndex: range(U)) for(uint t: range(tSize)) for(uint s: range(sSize)) {
                 const uint index = (sSize * t + s)*VU + (svIndex*U+suIndex);

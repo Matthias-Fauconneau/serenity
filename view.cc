@@ -173,55 +173,57 @@ struct LightFieldViewApp : LightField {
             break;
         }
         //TexRenderer.shader.stSize = tSize*sSize;
-        assert_(detailCellCount && sSize && tSize);
-        surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
-        //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
-        const ref<half> BGR = cast<half>(surfaceMap);
-        //assert_(BGR.size%(3*tSize*sSize) == 0);
+        //assert_(detailCellCount && sSize && tSize);
+        if(detailCellCount && sSize && tSize) {
+            surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
+            //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
+            const ref<half> BGR = cast<half>(surfaceMap);
+            //assert_(BGR.size%(3*tSize*sSize) == 0);
 
-        size_t index = 0;
-        for(size_t i : range(scene.faces.size)) {
-            const vec3 A (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
-            const vec3 B (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
-            const vec3 C (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
-            const vec3 D (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
+            size_t index = 0;
+            for(size_t i : range(scene.faces.size)) {
+                const vec3 A (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
+                const vec3 B (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
+                const vec3 C (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
+                const vec3 D (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
 
-            const vec3 O = (A+B+C+D)/4.f;
-            const vec3 N = cross(C-A, B-A);
-            // Viewpoint st with maximum projection
-            vec2 st = clamp(vec2(-1), scene.scale*(O.xy()-scene.viewpoint.xy()) + (scene.scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
-            if(!N.z) {
-                if(!N.x) st.x = 0;
-                if(!N.y) st.y = 0;
+                const vec3 O = (A+B+C+D)/4.f;
+                const vec3 N = cross(C-A, B-A);
+                // Viewpoint st with maximum projection
+                vec2 st = clamp(vec2(-1), scene.scale*(O.xy()-scene.viewpoint.xy()) + (scene.scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
+                if(!N.z) {
+                    if(!N.x) st.x = 0;
+                    if(!N.y) st.y = 0;
+                }
+                // Projects vertices along st view rays on uv plane (perspective)
+                mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
+                M.scale(scene.scale); // Fits scene within -1, 1
+                M.translate(-scene.viewpoint);
+                const vec2 uvA = (M*A).xy();
+                const vec2 uvB = (M*B).xy();
+                const vec2 uvC = (M*C).xy();
+                const vec2 uvD = (M*D).xy();
+                const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
+                const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
+
+                Scene::Face& face = scene.faces[i];
+                const float cellCount = face.reflect ? detailCellCount : 1;
+                const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
+                assert_(U && V);
+
+                // Scales uv for texture sampling (unnormalized)
+                for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
+                for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
+
+                // No copy (surface samples needs to stay memory mapped)
+                face.BGR = BGR.data+index;
+                face.size.x = U;
+                face.size.y = V;
+
+                index += 3*V*U*tSize*sSize;
             }
-            // Projects vertices along st view rays on uv plane (perspective)
-            mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
-            M.scale(scene.scale); // Fits scene within -1, 1
-            M.translate(-scene.viewpoint);
-            const vec2 uvA = (M*A).xy();
-            const vec2 uvB = (M*B).xy();
-            const vec2 uvC = (M*C).xy();
-            const vec2 uvD = (M*D).xy();
-            const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
-            const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
-
-            Scene::Face& face = scene.faces[i];
-            const float cellCount = face.reflect ? detailCellCount : 1;
-            const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
-            assert_(U && V);
-
-            // Scales uv for texture sampling (unnormalized)
-            for(float& u: face.u) { u *= U-1; assert_(isNumber(u)); }
-            for(float& v: face.v) { v *= V-1; assert_(isNumber(v)); }
-
-            // No copy (surface samples needs to stay memory mapped)
-            face.BGR = BGR.data+index;
-            face.size.x = U;
-            face.size.y = V;
-
-            index += 3*V*U*tSize*sSize;
+            //assert_(index == BGR.size);
         }
-        //assert_(index == BGR.size);
 #endif
         log(time);
 
@@ -360,7 +362,7 @@ struct LightFieldViewApp : LightField {
             ImageH B (target.size), G (target.size), R (target.size);
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            else if(displaySurfaceParametrized) {
+            else if(displaySurfaceParametrized && sSize>1 && tSize>1) {
                 assert_(sSize>1 && tSize>1);
                 TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
