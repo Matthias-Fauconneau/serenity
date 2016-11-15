@@ -211,39 +211,53 @@ struct Scene {
     };
 
     struct TextureShader : Shader<3, 2, TextureShader> {
+        struct Face {
+            const half* BGR[3];
+            v8si sample4D;
+            v4sf Wts;
+        };
 
-        ref<Scene::Face> faces;
-        uint sSize = 0, tSize = 0;
-        float s = 0, t = 0; // 0 .. (s,t)Size
-        uint sIndex = 0, tIndex = 0; // floor (s, t)
+        buffer<Face> faces;
 
-        TextureShader(const Scene& scene) : faces(scene.faces) {}
+        TextureShader(const Scene& scene) : faces(scene.faces.size) {}
+
+        void setFaceAttributes(const ref<Scene::Face>& faces, const uint sSize, const uint tSize, const float S, const float T) {
+            assert_(faces.size == this->faces.size);
+            const float s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
+            const float t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
+            const size_t sIndex = s;
+            const size_t tIndex = t;
+            for(size_t faceIndex: range(faces.size)) {
+                const Scene::Face& face = faces[faceIndex];
+                Face& attributes = this->faces[faceIndex];
+                const int    size1 = face.size.x*1    ;
+                const int    size2 = face.size.y*size1;
+                const int    size3 = sSize      *size2;
+                const size_t size4 = tSize      *size3;
+                attributes.BGR[0] = face.BGR + 0*size4 + tIndex*size3 + sIndex*size2;
+                attributes.BGR[1] = face.BGR + 1*size4 + tIndex*size3 + sIndex*size2;
+                attributes.BGR[2] = face.BGR + 2*size4 + tIndex*size3 + sIndex*size2;
+                attributes.sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
+                                     size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                attributes.Wts = {(1-fract(t))*(1-fract(s)), (1-fract(t))*fract(s), fract(t)*(1-fract(s)), fract(t)*fract(s)};
+            }
+        }
 
         inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
         inline Vec<float, 3> shade(FaceAttributes index, float, float varying[V]) const {
-            const Scene::Face& face = faces[index];
-            const int size1 = face.size.x;
-            const int size2 = face.size.y*size1;
-            const int size3 = sSize      *size2;
-            // FIXME: face attribute (+base)
-            const v8si sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
-                                 size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-            float u = clamp(0.f, varying[0], face.size.x-1-0x1p-16f);
-            float v = clamp(0.f, varying[1], face.size.y-1-0x1p-16f);
+            const float u = varying[0], v = varying[1];
             const int vIndex = v, uIndex = u; // Floor
-            const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
-            const size_t size4 = tSize*size3;
-            const v16sf B = toFloat((v16hf)gather((float*)(face.BGR+0*size4+base), sample4D));
-            const v16sf G = toFloat((v16hf)gather((float*)(face.BGR+1*size4+base), sample4D));
-            const v16sf R = toFloat((v16hf)gather((float*)(face.BGR+2*size4+base), sample4D));
-            const v4sf x = {t, s, v, u}; // tsvu
-            const v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);
-            static const v8sf _00001111f = {0,0,0,0,1,1,1,1};
-            const v8sf w_1mw = abs(X - floor(X) - _00001111f); // fract(x), 1-fract(x)
-            const v16sf w01 = shuffle(w_1mw, w_1mw, 4,4,4,4,4,4,4,4, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
-                            * shuffle(w_1mw, w_1mw, 5,5,5,5,1,1,1,1, 5,5,5,5,1,1,1,1)  // ssssSSSSssssSSSS
-                            * shuffle(w_1mw, w_1mw, 6,6,2,2,6,6,2,2, 6,6,2,2,6,6,2,2)  // vvVVvvVVvvVVvvVV
-                            * shuffle(w_1mw, w_1mw, 7,3,7,3,7,3,7,3, 7,3,7,3,7,3,7,3); // uUuUuUuUuUuUuUuU
+            const Face& face = faces[index];
+            const size_t base = 2*face.sample4D[1]*vIndex + uIndex;
+            const v16sf B = toFloat((v16hf)gather((float*)(face.BGR[0]+base), face.sample4D));
+            const v16sf G = toFloat((v16hf)gather((float*)(face.BGR[1]+base), face.sample4D));
+            const v16sf R = toFloat((v16hf)gather((float*)(face.BGR[2]+base), face.sample4D));
+            const v4sf Wts = face.Wts;
+            const v4sf vuvu = {v, u, v, u};
+            const v4sf w_1mw = abs(vuvu - floor(vuvu) - _1100f); // 1-fract(x), fract(x)
+            const v16sf w01 = shuffle(  Wts,   Wts, 0,0,0,0,1,1,1,1, 2,2,2,2,3,3,3,3)  // 0000111122223333
+                            * shuffle(w_1mw, w_1mw, 0,0,2,2,0,0,2,2, 0,0,2,2,0,0,2,2)  // vvVVvvVVvvVVvvVV
+                            * shuffle(w_1mw, w_1mw, 1,3,1,3,1,3,1,3, 1,3,1,3,1,3,1,3); // uUuUuUuUuUuUuUuU
             return Vec<float, 3>{{dot(w01, B), dot(w01, G), dot(w01, R)}};
         }
     };

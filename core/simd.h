@@ -27,7 +27,9 @@ inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
 inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 inline v8sf float8(v4sf a, v4sf b) { return __builtin_shufflevector(a, b, 0,1,2,3,4,5,6,7); }
 
-static const v4sf _0011f = {0,0,1,1};
+//static constexpr v4sf _0011f = {0,0,1,1};
+static constexpr v4sf _1100f = {1,1,0,0};
+static constexpr v8sf _00001111f = {0,0,0,0,1,1,1,1};
 
 static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }

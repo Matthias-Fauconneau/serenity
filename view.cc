@@ -172,14 +172,12 @@ struct LightFieldViewApp : LightField {
             tSize = tSize_;
             break;
         }
-        TexRenderer.shader.sSize = sSize;
-        TexRenderer.shader.tSize = tSize;
         //TexRenderer.shader.stSize = tSize*sSize;
         assert_(detailCellCount && sSize && tSize);
         surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
         //const size_t sampleCount = surfaceMap.size / (3*tSize*sSize); // per component
         const ref<half> BGR = cast<half>(surfaceMap);
-        assert_(BGR.size%(3*tSize*sSize) == 0);
+        //assert_(BGR.size%(3*tSize*sSize) == 0);
 
         size_t index = 0;
         for(size_t i : range(scene.faces.size)) {
@@ -223,7 +221,7 @@ struct LightFieldViewApp : LightField {
 
             index += 3*V*U*tSize*sSize;
         }
-        assert_(index == BGR.size);
+        //assert_(index == BGR.size);
 #endif
         log(time);
 
@@ -280,9 +278,9 @@ struct LightFieldViewApp : LightField {
                         const float d = A*z + B;
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                        const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                        v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
-                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
+                        const v4sf w_1mw = abs(X - floor(X) - _1100f); // fract(x), 1-fract(x)
+                        v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 0,0,2,2) // ttTT
+                                   * __builtin_shufflevector(w_1mw, w_1mw, 1,3,1,3); // sSsS
 
                         v4sf B = _0f4, G = _0f4, R = _0f4;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
@@ -296,10 +294,10 @@ struct LightFieldViewApp : LightField {
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                            const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                            const v4sf w_1mw = abs(X - floor(X) - _1100f); // fract(x), 1-fract(x)
 #if 1
-                            const v4sf w01uv =   __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
-                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+                            const v4sf w01uv =   __builtin_shufflevector(w_1mw, w_1mw, 0,0,2,2)  // vvVV
+                                    * __builtin_shufflevector(w_1mw, w_1mw, 1,3,1,3); // uUuU
 #else
                             const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ+base), sample2D));
                             const v4sf w01uv = and(__builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
@@ -332,7 +330,6 @@ struct LightFieldViewApp : LightField {
 
                         const v4sf x = {st[1], st[0], uv[1], uv[0]}; // tsvu
                         const v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);
-                        static const v8sf _00001111f = {0,0,0,0,1,1,1,1};
                         const v8sf w_1mw = abs(X - floor(X) - _00001111f); // fract(x), 1-fract(x)
                         const v16sf w01 = shuffle(w_1mw, w_1mw, 4,4,4,4,4,4,4,4, 0,0,0,0,0,0,0,0)  // ttttttttTTTTTTTT
                                         * shuffle(w_1mw, w_1mw, 5,5,5,5,1,1,1,1, 5,5,5,5,1,1,1,1)  // ssssSSSSssssSSSS
@@ -365,11 +362,7 @@ struct LightFieldViewApp : LightField {
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized) {
                 assert_(sSize>1 && tSize>1);
-                const float S = (s+1)/2, T = (t+1)/2;
-                TexRenderer.shader.s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
-                TexRenderer.shader.t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
-                TexRenderer.shader.sIndex = TexRenderer.shader.s;
-                TexRenderer.shader.tIndex = TexRenderer.shader.t;
+                TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             } else {
                 BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scene.scale;
