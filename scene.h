@@ -341,11 +341,8 @@ struct Scene {
 #endif
             else if(face.refract) {
                 const vec3 O = vec3(varying[2], varying[3], varying[4]);
-                const float n1 = 1, n2 = 1.3;
-                const vec3 N = normalize(vec3(varying[5], varying[6], varying[7])); //face.N
-                //const bgr3f color = (backO-scene.min)/(scene.max-scene.min);
-                //const bgr3f color = (vec3(1)+N)/2.f;
-                //return Vec<float, 3>{{color.b, color.g, color.r}};
+                const float n1 = 1, n2 = 1; //1.3
+                const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
                 const vec3 R = refract(n1/n2, N, normalize(O-viewpoint));
                 float backT;
                 const size_t back = scene.raycast_reverseWinding(O, R, &backT);
@@ -369,7 +366,13 @@ struct Scene {
                 }
                 const vec3 backR = refract(n2/n1, -backN, R);
                 size_t index = scene.raycast(backO, backR);
-                return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
+                float d = length(backO-O);
+                bgr3f frontColor (scene.B[index],scene.G[index],scene.R[index]);
+                bgr3f backColor (scene.B[back],scene.G[back],scene.R[back]);
+                const float l = 1;
+                float a = __builtin_exp(-d/l);
+                bgr3f color = (1-a)*backColor + a*frontColor;
+                return Vec<float, 3>{{color.b, color.g, color.r}};
             }
             else {
                 return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
