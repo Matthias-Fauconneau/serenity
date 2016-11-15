@@ -27,7 +27,7 @@ struct Render {
 
             const vec3 faceCenter = (A+B+C+D)/4.f;
             const vec3 N = normalize(cross(C-A, B-A));
-            // Viewpoint st with maximum projection
+            // Viewpoint st with maximum projection area
             vec2 st = clamp(vec2(-1),
                             scene.scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scene.scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
                             vec2(1));
