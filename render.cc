@@ -10,12 +10,9 @@ struct Render {
         assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
-#if 1 // Surface parametrized render
         const float detailCellCount = 512;
         const uint sSize = 32, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         assert_(sSize%8 == 0); // FIXME: 2x4 for better coherent ray early cull
-        const uint stSize = tSize*sSize;
-
 
         // Fits face UV to maximum projected sample rate
         size_t sampleCount = 0;
@@ -81,7 +78,7 @@ struct Render {
             const uint U = face.size.x, V = face.size.y;
             half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             const size_t VU = V*U;
-            const size_t size4 = stSize*V*U;
+            const size_t size4 = tSize*sSize*V*U;
             half* const faceB = faceBGR+0*size4;
             half* const faceG = faceBGR+1*size4;
             half* const faceR = faceBGR+2*size4;
@@ -108,20 +105,6 @@ struct Render {
                         }
                     } else {
                         innerTSC.start();
-#if 0
-                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                            bgr3f color;
-                            const vec3 viewpoint = scene.viewpoint + vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
-                            const vec3 D = (P-viewpoint);
-                            const vec3 R = (D - 2*dot(N, D)*N);
-                            bgr3f reflected = scene.raycast(P, R);
-                            color = bgr3f(reflected.b, reflected.g/2, reflected.r/2);
-                            const size_t base = base0 + (sSize * t + s) * VU;
-                            faceBGR[0*size4+base] = color.b;
-                            faceBGR[1*size4+base] = color.g;
-                            faceBGR[2*size4+base] = color.r;
-                        }
-#else
                         static constexpr v8sf seqF = v8sf{0,1,2,3,4,5,6,7};
                         const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
                         const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
@@ -167,7 +150,6 @@ struct Render {
                                 for(uint k: range(8)) faceR[base + k*VU] = r[k];
                             }
                         }
-#endif
                         innerTSC.stop();
                     }
                 }
@@ -182,7 +164,7 @@ struct Render {
             const Scene::Face& face = scene.faces[faceIndex];
             const uint U = face.size.x, V = face.size.y;
             const uint VU = V*U;
-            const uint size4 = stSize*VU;
+            const uint size4 = tSize*sSize*VU;
             const half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             Image bgr (sSize*U, tSize*V);
             extern uint8 sRGB_forward[0x1000];
@@ -195,55 +177,6 @@ struct Render {
             }
             writeFile(str(faceIndex)+".png", encodePNG(bgr), folder);
         }
-#endif
-#else // Dual plane render
-        const size_t N = 33;
-        const uint2 size = 1024;
-
-        File file(str(N)+'x'+str(N)+'x'+strx(size), folder, Flags(ReadWrite|Create));
-        size_t byteSize = 4*N*N*size.y*size.x*sizeof(half);
-        assert_(byteSize <= 16ull*1024*1024*1024);
-        file.resize(byteSize);
-        Map map (file, Map::Prot(Map::Read|Map::Write));
-        mref<half> field = mcast<half>(map);
-        profile( field.clear() ); // Explicitly clears to avoid performance skew from clear on page faults
-
-        buffer<Scene::Renderer<Scene::RaycastShader, 3>> renderers (threadCount());
-        for(auto& renderer: renderers) new (&renderer) Scene::Renderer<Scene::RaycastShader, 4>(scene);
-
-        // Fits scene
-        vec3 min = inff, max = -inff;
-        for(const Scene::Face& f: scene.faces) for(vec3 p: f.position) { min = ::min(min, p); max = ::max(max, p); }
-        max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
-        const float scale = 2./::max(max.x-min.x, max.y-min.y);
-        const float near = scale*(-scene.viewpoint.z+min.z);
-        const float far = scale*(-scene.viewpoint.z+max.z);
-
-        Time time (true);
-        parallel_for(0, N*N, [near, far, scale, &scene, field, size, &renderers, &folder](uint threadID, size_t stIndex) {
-            int sIndex = stIndex%N, tIndex = stIndex/N;
-
-            // Sheared perspective (rectification)
-            const float s = sIndex/float(N-1), t = tIndex/float(N-1);
-            mat4 M = shearedPerspective(s*2-1, t*2-1, near, far);
-            M.scale(scale); // Fits scene within -1, 1
-            M.translate(-scene.viewpoint);
-
-            ImageH Z (unsafeRef(field.slice(((0ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH B (unsafeRef(field.slice(((1ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH G (unsafeRef(field.slice(((2ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-            ImageH R (unsafeRef(field.slice(((3ull*N+tIndex)*N+sIndex)*size.y*size.x, size.y*size.x)), size);
-
-            auto& renderer = renderers[threadID];
-            renderer.shader.viewpoint = scene.viewpoint + vec3(s*2-1,t*2-1,0)/scale;
-            scene.render(renderer, M, (float[]){1,1,1}, Z, B, G, R);
-
-            ImageH Z01 (Z.size);
-            for(size_t i: range(Z.ref::size)) Z01[i] = (Z[i]+1)/2;
-            if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".Z.png", encodePNG(convert(Z01, Z01, Z01)), folder, true);
-            if(sIndex%16==0 && tIndex%16==0) writeFile(str(sIndex)+'_'+str(tIndex)+".BGR.png", encodePNG(convert(B, G, R)), folder, true);
-        });
-        log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
 #endif
     }
 } render;

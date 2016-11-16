@@ -22,8 +22,6 @@ render.cc
 raster.h
 raster.cc
 scene.h
-analyze.cc
-field.h
 view.cc
 box.h
 scene.cc

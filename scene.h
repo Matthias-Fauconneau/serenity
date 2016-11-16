@@ -290,6 +290,9 @@ struct Scene {
                 attributes.BGR[2] = face.BGR + 2*size4 + tIndex*size3 + sIndex*size2;
                 attributes.sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                      size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                if(sSize == 1 || tSize ==1) // Prevents OOB
+                    attributes.sample4D = {    0,           size1/2,         0,       size1/2,
+                                               0,           size1/2,         0,       size1/2};
                 attributes.Wts = {(1-fract(t))*(1-fract(s)), (1-fract(t))*fract(s), fract(t)*(1-fract(s)), fract(t)*fract(s)};
             }
         }

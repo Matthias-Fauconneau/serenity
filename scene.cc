@@ -96,7 +96,6 @@ Scene parseScene(ref<byte> file) {
             scene.R.append(color.r);
         }
     } else {
-#if 0
         scene.viewpoint = parse<vec3>(s);
         s.skip('\n');
 
@@ -131,7 +130,7 @@ Scene parseScene(ref<byte> file) {
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},reflect,0,N,0,0});
+            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,/*N,*/0,0});
             scene.B.append(color.b);
             scene.G.append(color.g);
             scene.R.append(color.r);
@@ -142,9 +141,6 @@ Scene parseScene(ref<byte> file) {
             }
         }
         assert_(scene.faces.size == faceCount);
-#else
-        error("Unsupported");
-#endif
     }
 #if 0
         // Precomputes barycentric coordinates of V11
