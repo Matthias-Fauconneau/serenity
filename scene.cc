@@ -50,23 +50,29 @@ inline Variant parseJSON(TextData& s) {
 
 const mat4 transform(const Dict& object) {
     const Dict& t = object.at("transform");
-    ref<Variant> position = t.at("position");
-    transform.translate(position);
-    ref<Variant> rotation = t.at("rotation");
-    ref<Variant> scale = t.at("scale");
     mat4 transform;
-    transform.scale(vec3((float)scale[0], (float)scale[1], (float)scale[2]));
-    transform.rotateX(rotation[0]*PI/180);
-    transform.rotateY(rotation[0]*PI/180);
-    transform.rotateZ(rotation[0]*PI/180);
-    return transform
+    if(t.contains("position")) {
+        ref<Variant> position = t.at("position");
+        transform.translate(vec3((float)position[0],(float)position[1],(float)position[2]));
+    }
+    if(t.contains("scale")) {
+        ref<Variant> scale = t.at("scale");
+        transform.scale(vec3((float)scale[0], (float)scale[1], (float)scale[2]));
+    }
+    if(t.contains("rotation")) {
+        ref<Variant> rotation = t.at("rotation");
+        transform.rotateX(rotation[0]*PI/180);
+        transform.rotateY(rotation[1]*PI/180);
+        transform.rotateZ(rotation[2]*PI/180);
+    }
+    return transform;
 }
 
 Scene parseScene(ref<byte> file) {
     TextData s (file);
     Variant root = parseJSON(s);
 
-    mat4 camera = transform( root.dict.at("camera") ).inverse();
+    mat4 camera;// = transform( root.dict.at("camera") ).inverse();
 
     Scene scene;
     array<float> X[4], Y[4], Z[4];
@@ -74,31 +80,41 @@ Scene parseScene(ref<byte> file) {
     array<Scene::Face> faces;
 
     for(const Dict& primitive: root.dict.at("primitives"_).list) {
-
-        if((string)primitive.at("type")=="quad"_) {
-            ref<vec3> polygon {transform*vec3(0,0,0),transform*vec3(1,0,0),transform*vec3(1,1,0),transform*vec3(0,1,0)};
-            assert_(polygon.size == 4);
-            const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
-            const vec3 N = normalize(cross(B-A, C-A));
+        mat4 transform = camera * ::transform(primitive);
+        auto quad = [&](vec3 v00, vec3 v10, vec3 v11, vec3 v01) {
+            vec3 quad[4] {transform*v00,transform*v10,transform*v11,transform*v01};
+            const vec3 N = normalize(transform.normalMatrix() * vec3(0,0,1));
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
             const float gloss = 1./8;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,gloss,0,0});
-            scene.B.append(color.b);
-            scene.G.append(color.g);
-            scene.R.append(color.r);
+            faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,gloss,0,0});
+            B.append(color.b);
+            G.append(color.g);
+            R.append(color.r);
             for(size_t i: range(4)) {
-                scene.X[i].append(polygon[i].x);
-                scene.Y[i].append(polygon[i].y);
-                scene.Z[i].append(polygon[i].z);
+                X[i].append(quad[i].x);
+                Y[i].append(quad[i].y);
+                Z[i].append(quad[i].z);
             }
+        };
+
+        if((string)primitive.at("type")=="quad"_) {
+            quad(vec3(0,0,0),vec3(1,0,0),vec3(1,1,0),vec3(0,1,0));
         }
-        else error(primitive);
+        else if((string)primitive.at("type")=="cube"_) {
+            quad(vec3(0,0,0),vec3(1,0,0),vec3(1,1,0),vec3(0,1,0));
+            quad(vec3(0,0,1),vec3(1,0,1),vec3(1,1,1),vec3(0,1,1));
+            quad(vec3(0,0,0),vec3(0,1,0),vec3(0,1,1),vec3(0,0,1));
+            quad(vec3(1,0,0),vec3(1,1,0),vec3(1,1,1),vec3(1,0,1));
+            quad(vec3(0,0,0),vec3(0,1,0),vec3(0,1,1),vec3(0,0,1));
+            quad(vec3(0,1,0),vec3(1,1,0),vec3(1,1,1),vec3(1,0,1));
+        }
+        else error("Unknown primitive", primitive);
     }
 
-    scene.B = buffer<float>(align(8,faces.size+1), 0);
-    scene.G = buffer<float>(align(8,faces.size+1), 0);
-    scene.R = buffer<float>(align(8,faces.size+1), 0);
+    scene.B = buffer<float>(align(8,faces.size+1), faces.size);
+    scene.G = buffer<float>(align(8,faces.size+1), faces.size);
+    scene.R = buffer<float>(align(8,faces.size+1), faces.size);
     scene.B.slice(0, B.size).copy(B);
     scene.G.slice(0, G.size).copy(G);
     scene.R.slice(0, R.size).copy(R);
@@ -106,16 +122,18 @@ Scene parseScene(ref<byte> file) {
     scene.G[faces.size] = 0;
     scene.R[faces.size] = 0;
     for(size_t i: range(4)) {
-        scene.X[i] = buffer<float>(align(8,faces.size), 0);
+        scene.X[i] = buffer<float>(align(8,faces.size), X[i].size);
         scene.X[i].slice(0, X[i].size).copy(X[i]);
-        scene.Y[i] = buffer<float>(align(8,faces.size), 0);
+        scene.Y[i] = buffer<float>(align(8,faces.size), Y[i].size);
         scene.Y[i].slice(0, Y[i].size).copy(Y[i]);
-        scene.Z[i] = buffer<float>(align(8,faces.size), 0);
+        scene.Z[i] = buffer<float>(align(8,faces.size), Z[i].size);
         scene.Z[i].slice(0, Z[i].size).copy(Z[i]);
+        //log(X[i], Y[i], Z[i]);
     }
-    scene.faces = buffer<Scene::Face>(align(8,faces.size), 0);
+    scene.faces = buffer<Scene::Face>(align(8,faces.size), faces.size);
     scene.faces.slice(0, faces.size).copy(faces);
     scene.fit();
+    log(scene.min, scene.max);
 
     return scene;
 }
@@ -262,6 +280,13 @@ Scene parseScene(ref<byte> file) {
                 scene.X[i].append(polygon[i].x-viewpoint.x);
                 scene.Y[i].append(polygon[i].y-viewpoint.y);
                 scene.Z[i].append(polygon[i].z-viewpoint.z);
+            }
+            if(N.y == 1) {
+                for(size_t i: range(4)) {
+                    scene.light.X[i].append(polygon[i].x-viewpoint.x);
+                    scene.light.Y[i].append(polygon[i].y-viewpoint.y);
+                    scene.light.Z[i].append(polygon[i].z-viewpoint.z);
+                }
             }
         }
         assert_(scene.faces.size == faceCount);

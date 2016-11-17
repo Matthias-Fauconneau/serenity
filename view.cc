@@ -228,7 +228,7 @@ struct ViewApp {
                     //break;
                 }
 #endif
-        } else error(sSize, tSize);
+        } //else error(sSize, tSize);
         if(window) window->setTitle(strx(uint2(sSize,tSize)));
     }
     Image render(uint2 targetSize) {
@@ -284,6 +284,9 @@ struct ViewApp {
                 uint B = uint(sumB[i]/count*0xFFF);
                 uint G = uint(sumG[i]/count*0xFFF);
                 uint R = uint(sumR[i]/count*0xFFF);
+                B = clamp(0u, B, 0xFFFu);
+                G = clamp(0u, G, 0xFFFu);
+                R = clamp(0u, R, 0xFFFu);
                 assert_(B >= 0 && B <= 0xFFF, B);
                 assert_(G >= 0 && G <= 0xFFF, G);
                 assert_(R >= 0 && R <= 0xFFF, R);

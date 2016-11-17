@@ -141,6 +141,10 @@ struct Scene {
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
 
+    struct {
+        buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
+    } light;
+
     vec3 min, max;
     float scale, near, far;
 
@@ -360,6 +364,12 @@ struct Scene {
         inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
         inline Vec<float, 3> shade(FaceAttributes index, float, float unused varying[V]) const {
             const Scene::Face& face = scene.faces[index];
+
+            // Light
+            vec3 L = vec3((scene.light.X[0]+scene.light.X[1]+scene.light.X[2]+scene.light.X[3])/4,
+                          (scene.light.Y[0]+scene.light.Y[1]+scene.light.Y[2]+scene.light.Y[3])/4,
+                          (scene.light.Z[0]+scene.light.Z[1]+scene.light.Z[2]+scene.light.Z[3])/4);
+
             if(0) {}
             else if(face.reflect) {
              const vec3 O = vec3(varying[2], varying[3], varying[4]);
