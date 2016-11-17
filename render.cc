@@ -145,35 +145,42 @@ struct Render {
                         for(uint t: range(tSize)) {
                             const size_t baseT = base0 + (sSize * t) * VU;
                             for(uint s=0; s<sSize; s += 8) {
-                                v8sf Rx, Ry, Rz;
-                                for(int k: range(8)) {
-                                    const vec3 viewpoint = scene.viewpoint + vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
-                                    const vec3 D = (P-viewpoint);
-                                    //const vec3 R = D - 2*dot(N, D)*N;
-                                    // Marsaglia
-                                    static Random random;
-                                    float t0, t1, sq;
-                                    do {
-                                        t0 = random()*2-1;
-                                        t1 = random()*2-1;
-                                        sq = t0*t0 + t1*t1;
-                                    } while(sq >= 1);
-                                    float r = sqrt(1-sq);
-                                    vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
-                                    if(dot(U,N) < 0) U = -U; // On hemisphere
-                                    const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
-                                    Rx[k] = R.x;
-                                    Ry[k] = R.y;
-                                    Rz[k] = R.z;
-                                }
+                                v8sf sumB = 0, sumG = 0, sumR = 0;
+                                const uint sampleCount = 2;
+                                for(uint unused sampleIndex: range(sampleCount)) {
+                                    v8sf Rx, Ry, Rz;
+                                    for(int k: range(8)) {
+                                        const vec3 viewpoint = scene.viewpoint + vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
+                                        const vec3 D = (P-viewpoint);
+                                        //const vec3 R = D - 2*dot(N, D)*N;
+                                        // Marsaglia
+                                        static Random random;
+                                        float t0, t1, sq;
+                                        do {
+                                            t0 = random()*2-1;
+                                            t1 = random()*2-1;
+                                            sq = t0*t0 + t1*t1;
+                                        } while(sq >= 1);
+                                        float r = sqrt(1-sq);
+                                        vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
+                                        if(dot(U,N) < 0) U = -U; // On hemisphere
+                                        const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
+                                        Rx[k] = R.x;
+                                        Ry[k] = R.y;
+                                        Rz[k] = R.z;
+                                    }
 #endif
-                                const v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
-                                const v8sf B =           gather(scene.B.data, index);
-                                const v8sf G = (1.f/2) * gather(scene.G.data, index);
-                                const v8sf R = (1.f/2) * gather(scene.R.data, index);
-                                const v8hf b = toHalf(B);
-                                const v8hf g = toHalf(G);
-                                const v8hf r = toHalf(R);
+                                    const v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
+                                    const v8sf B =           gather(scene.B.data, index);
+                                    const v8sf G = (1.f/2) * gather(scene.G.data, index);
+                                    const v8sf R = (1.f/2) * gather(scene.R.data, index);
+                                    sumB += B;
+                                    sumG += G;
+                                    sumR += R;
+                                }
+                                const v8hf b = toHalf(sumB/sampleCount);
+                                const v8hf g = toHalf(sumG/sampleCount);
+                                const v8hf r = toHalf(sumR/sampleCount);
                                 const size_t base = baseT + s * VU;
                                 for(uint k: range(8)) faceB[base + k*VU] = b[k];
                                 for(uint k: range(8)) faceG[base + k*VU] = g[k];
