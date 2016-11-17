@@ -105,6 +105,10 @@ struct Render {
                         }
                     } else {
                         innerTSC.start();
+                        const v8sf Px = P.x;
+                        const v8sf Py = P.y;
+                        const v8sf Pz = P.z;
+#if 0
                         static constexpr v8sf seqF = v8sf{0,1,2,3,4,5,6,7};
                         const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
                         const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
@@ -115,15 +119,14 @@ struct Render {
                         const float RyDx =   - 2*N.x*N.y;
                         const float RzDx =   - 2*N.x*N.z;
                         const float a0 = -2*N.z*Dz;
+
                         const float Rx00 = a0*N.x + (N.x*N.y+0)*Dy0 + RxDx*Dx0;
                         const float Rx0t = (N.x*N.y+0)*Dyt;
                         const float Ry00 = a0*N.y + (N.y*N.y+1)*Dy0 + RyDx*Dx0;
                         const float Ry0t = (N.y*N.y+1)*Dyt;
                         const float Rz00 = a0*N.z + (N.z*N.y+1)*Dy0 + RzDx*Dx0;
                         const float Rz0t = (N.z*N.y+1)*Dyt;
-                        const v8sf Px = P.x;
-                        const v8sf Py = P.y;
-                        const v8sf Pz = P.z;
+
                         const v8sf Rxs = RxDx * Dxs;
                         const v8sf Rys = RyDx * Dxs;
                         const v8sf Rzs = RzDx * Dxs;
@@ -133,10 +136,25 @@ struct Render {
                             const v8sf Rz0 = Rz00 + Rz0t*float(t);
                             const size_t baseT = base0 + (sSize * t) * VU;
                             for(uint s=0; s<sSize; s += 8) {
+
                                 const v8sf S = float8(float(s))+seqF;
                                 const v8sf Rx = Rx0 + Rxs * S;
                                 const v8sf Ry = Ry0 + Rys * S;
                                 const v8sf Rz = Rz0 + Rzs * S;
+#else
+                        for(uint t: range(tSize)) {
+                            const size_t baseT = base0 + (sSize * t) * VU;
+                            for(uint s=0; s<sSize; s += 8) {
+                                v8sf Rx, Ry, Rz;
+                                for(int k: range(8)) {
+                                    const vec3 viewpoint = scene.viewpoint + vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
+                                    const vec3 D = (P-viewpoint);
+                                    const vec3 R = D - 2*dot(N, D)*N;
+                                    Rx[k] = R.x;
+                                    Ry[k] = R.y;
+                                    Rz[k] = R.z;
+                                }
+#endif
                                 const v8si index = scene.raycast(Px,Py,Pz, Rx,Ry,Rz);
                                 const v8sf B =           gather(scene.B.data, index);
                                 const v8sf G = (1.f/2) * gather(scene.G.data, index);

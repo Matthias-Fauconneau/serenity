@@ -100,12 +100,17 @@ inline uint indexOfEqual(const v8sf x, const v8sf y) {
     return __builtin_ctz(::mask(x == y));
 }
 
+#include "time.h"
+
 struct Scene {
     vec3 viewpoint;
     struct Face {
-        float u[4], v[4]; // Vertex attributes
-        vec3 N[4]; // Vertex attributes
-        float reflect, refract; //vec3 N; // Render (RaycastShader)
+        // Vertex attributes (FIXME: triangle)
+        float u[4];
+        float v[4];
+        vec3 N[4];
+        // Face attributes
+        float reflect, refract, gloss; // Render (RaycastShader)
         const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
@@ -333,15 +338,26 @@ struct Scene {
         inline Vec<float, 3> shade(FaceAttributes index, float, float unused varying[V]) const {
             const Scene::Face& face = scene.faces[index];
             if(0) {}
-#if 0
             else if(face.reflect) {
              const vec3 O = vec3(varying[2], varying[3], varying[4]);
              const vec3 D = normalize(O-viewpoint);
-             const vec3 R = D - 2*dot(face.N, D)*face.N;
-             bgr3f color = scene.raycast(O, normalize(R));
-             return Vec<float, 3>{{color.b, color.g/2, color.r/2}};
+             const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
+             // Marsaglia
+             static Random random;
+             float t0, t1, sq;
+             do {
+                 t0 = random()*2-1;
+                 t1 = random()*2-1;
+                 sq = t0*t0 + t1*t1;
+             } while(sq >= 1);
+             float r = sqrt(1-sq);
+             vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
+             if(dot(U,N) < 0) U = -U; // On hemisphere
+             const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
+             const size_t reflect = scene.raycast(O, normalize(R));
+             bgr3f reflectColor (scene.B[reflect],scene.G[reflect],scene.R[reflect]);
+             return Vec<float, 3>{{reflectColor.b, reflectColor.g/2, reflectColor.r/2}};
             }
-#endif
             else if(face.refract) {
                 const vec3 O = vec3(varying[2], varying[3], varying[4]);
                 const float n1 = 1, n2 = 1; //1.3

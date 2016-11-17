@@ -20,7 +20,6 @@ ui/text.cc
 test.cc
 render.cc
 raster.h
-raster.cc
 scene.h
 view.cc
 box.h

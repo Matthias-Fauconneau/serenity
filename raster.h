@@ -148,9 +148,6 @@ template<int C> void RenderTarget<C>::resolve(const ImageH& Z, const ImageH targ
     }
 }
 
-void convert(const Image& target, const ImageH& B, const ImageH& G, const ImageH& R);
-inline Image convert(const ImageH& B, const ImageH& G, const ImageH& R) { Image target(B.size); convert(target, B, G, R); return target; }
-
 // 4×4 xy steps constant mask for the 4 possible reject corner
 static const v16sf X[4] = {
     {0,1,2,3,

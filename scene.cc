@@ -86,7 +86,7 @@ Scene parseScene(ref<byte> file) {
             //const vec3 A = vertices[faceIndices[0]], B = vertices[faceIndices[1]], C = vertices[faceIndices[2]];
             //const vec3 N = normalize(cross(B-A, C-A)); Scene::Face face {{0,1,1,0},{0,0,1,1},0,0,N,0,0};
             Scene::Face face {{0,1,1,0},{0,0,1,1},{normals[normalIndices[faceIndex][0]],normals[normalIndices[faceIndex][1]],
-                                                   normals[normalIndices[faceIndex][2]],normals[normalIndices[faceIndex][3]]},0,0,0,0};
+                                                   normals[normalIndices[faceIndex][2]],normals[normalIndices[faceIndex][3]]},0,0,1,0,0};
             if(faceObjectName[faceIndex] == "Cylinder") face.refract = 1;
             scene.faces.append(face);
             bgr3f color = 1;
@@ -130,7 +130,8 @@ Scene parseScene(ref<byte> file) {
             const vec3 N = normalize(cross(B-A, C-A));
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,/*N,*/0,0});
+            const float gloss = 1./8;
+            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,gloss,0,0});
             scene.B.append(color.b);
             scene.G.append(color.g);
             scene.R.append(color.r);
