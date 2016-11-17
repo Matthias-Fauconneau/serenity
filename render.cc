@@ -25,9 +25,7 @@ struct Render {
             const vec3 faceCenter = (A+B+C+D)/4.f;
             const vec3 N = normalize(cross(C-A, B-A));
             // Viewpoint st with maximum projection area
-            vec2 st = clamp(vec2(-1),
-                            scene.scale*(faceCenter.xy()-scene.viewpoint.xy()) + (scene.scale*(faceCenter.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(),
-                            vec2(1));
+            vec2 st = clamp(vec2(-1), scene.scale*faceCenter.xy() + (scene.scale*faceCenter.z/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
             if(!N.z) {
                 if(!N.x) st.x = 0;
                 if(!N.y) st.y = 0;
@@ -35,7 +33,6 @@ struct Render {
             // Projects vertices along st view rays on uv plane (perspective)
             mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
             M.scale(scene.scale); // Fits scene within -1, 1
-            M.translate(-scene.viewpoint);
             const vec2 uvA = (M*A).xy();
             const vec2 uvB = (M*B).xy();
             const vec2 uvC = (M*C).xy();
@@ -110,9 +107,9 @@ struct Render {
                         const v8sf Pz = P.z;
 #if 0
                         static constexpr v8sf seqF = v8sf{0,1,2,3,4,5,6,7};
-                        const float Dx0 = P.x-scene.viewpoint.x+1./scene.scale;
-                        const float Dy0 = P.y-scene.viewpoint.y+1./scene.scale;
-                        const float Dz = P.z-scene.viewpoint.z;
+                        const float Dx0 = P.x+1./scene.scale;
+                        const float Dy0 = P.y+1./scene.scale;
+                        const float Dz = P.z;
                         const float Dxs = -2/((sSize-1)*scene.scale);
                         const float Dyt = -2/((tSize-1)*scene.scale);
                         const float RxDx = 1 - 2*N.x*N.x;
@@ -150,7 +147,7 @@ struct Render {
                                 for(uint unused sampleIndex: range(sampleCount)) {
                                     v8sf Rx, Ry, Rz;
                                     for(int k: range(8)) {
-                                        const vec3 viewpoint = scene.viewpoint + vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
+                                        const vec3 viewpoint = vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                                         const vec3 D = (P-viewpoint);
                                         //const vec3 R = D - 2*dot(N, D)*N;
                                         // Marsaglia

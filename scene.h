@@ -128,7 +128,6 @@ inline uint indexOfEqual(const v8sf x, const v8sf y) {
 #include "time.h"
 
 struct Scene {
-    vec3 viewpoint;
     struct Face {
         // Vertex attributes (FIXME: triangle)
         float u[4];
@@ -154,8 +153,8 @@ struct Scene {
         }
         max.z += 0x1p-8; // Prevents back and far plane from Z-fighting
         scale = 2./::max(max.x-min.x, max.y-min.y);
-        near = scale*(-viewpoint.z+min.z);
-        far = scale*(-viewpoint.z+max.z);
+        near = scale*min.z;
+        far = scale*max.z;
     }
 
     inline size_t raycast(vec3 O, vec3 d) const {

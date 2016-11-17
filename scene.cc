@@ -66,6 +66,8 @@ Scene parseScene(ref<byte> file) {
     TextData s (file);
     Variant root = parseJSON(s);
 
+    mat4 camera = transform( root.dict.at("camera") ).inverse();
+
     Scene scene;
     array<float> X[4], Y[4], Z[4];
     array<float> B, G, R;
@@ -115,8 +117,6 @@ Scene parseScene(ref<byte> file) {
     scene.faces.slice(0, faces.size).copy(faces);
     scene.fit();
 
-    scene.viewpoint = transform( root.dict.at("camera") ).inverse() * vec3(0,0,0);
-
     return scene;
 }
 
@@ -140,6 +140,7 @@ Scene parseScene(ref<byte> file) {
     TextData s (file);
     while(s.match('#')) s.until('\n');
     Scene scene;
+#if 0
     if(s.match("mtllib")) {
         mat4 transform = mat4().rotateX(PI/2);
         s.until('\n');
@@ -181,7 +182,6 @@ Scene parseScene(ref<byte> file) {
             else error(s);
         }
 
-        scene.viewpoint = vec3(0,0,-4);
         const size_t faceCount = indices.size;
         scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
         scene.B = buffer<float>(align(8,faceCount+1), 0);
@@ -216,8 +216,10 @@ Scene parseScene(ref<byte> file) {
             scene.G.append(color.g);
             scene.R.append(color.r);
         }
-    } else {
-        scene.viewpoint = parse<vec3>(s);
+    } else
+#endif
+    {
+        vec3 viewpoint = parse<vec3>(s);
         s.skip('\n');
 
         const size_t faceCount = parse<uint>(s);
@@ -257,9 +259,9 @@ Scene parseScene(ref<byte> file) {
             scene.G.append(color.g);
             scene.R.append(color.r);
             for(size_t i: range(4)) {
-                scene.X[i].append(polygon[i].x);
-                scene.Y[i].append(polygon[i].y);
-                scene.Z[i].append(polygon[i].z);
+                scene.X[i].append(polygon[i].x-viewpoint.x);
+                scene.Y[i].append(polygon[i].y-viewpoint.y);
+                scene.Z[i].append(polygon[i].z-viewpoint.z);
             }
         }
         assert_(scene.faces.size == faceCount);

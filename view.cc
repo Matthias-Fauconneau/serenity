@@ -93,12 +93,10 @@ struct ViewApp {
 
         mat4 M0 = shearedPerspective(-1, -1, scene.near, scene.far);
         M0.scale(scene.scale); // Fits scene within -1, 1
-        M0.translate(-scene.viewpoint);
         M0 = NDC * M0;
 
         mat4 M1 = shearedPerspective(1, 1, scene.near, scene.far);
         M1.scale(scene.scale); // Fits scene within -1, 1
-        M1.translate(-scene.viewpoint);
         M1 = NDC * M1;
 
         // Fits face UV to maximum projected sample rate
@@ -141,7 +139,7 @@ struct ViewApp {
                 const vec3 O = (A+B+C+D)/4.f;
                 const vec3 N = cross(C-A, B-A);
                 // Viewpoint st with maximum projection
-                vec2 st = clamp(vec2(-1), scene.scale*(O.xy()-scene.viewpoint.xy()) + (scene.scale*(O.z-scene.viewpoint.z)/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
+                vec2 st = clamp(vec2(-1), scene.scale*O.xy() + (scene.scale*O.z/(N.z==0?0/*-0 negates infinities*/:-N.z))*N.xy(), vec2(1));
                 if(!N.z) {
                     if(!N.x) st.x = 0;
                     if(!N.y) st.y = 0;
@@ -149,7 +147,6 @@ struct ViewApp {
                 // Projects vertices along st view rays on uv plane (perspective)
                 mat4 M = shearedPerspective(st[0], st[1], scene.near, scene.far);
                 M.scale(scene.scale); // Fits scene within -1, 1
-                M.translate(-scene.viewpoint);
                 const vec2 uvA = (M*A).xy();
                 const vec2 uvB = (M*B).xy();
                 const vec2 uvC = (M*C).xy();
@@ -241,7 +238,6 @@ struct ViewApp {
         const float s = view.viewYawPitch.x/(PI/3), t = view.viewYawPitch.y/(PI/3);
         mat4 M = shearedPerspective(s, t, scene.near, scene.far);
         M.scale(scene.scale); // Fits scene within -1, 1
-        M.translate(-scene.viewpoint);
 
 #if 0 // Raycast (FIXME: sheared)
         vec3 O = scene.viewpoint + vec3(s,t,0)/scene.scale;
@@ -265,7 +261,7 @@ struct ViewApp {
             TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
             scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
         } else {
-            BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scene.scale;
+            BGRRenderer.shader.viewpoint = vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             if(sumB.size != target.size) sumB = ImageH(target.size);
             if(sumG.size != target.size) sumG = ImageH(target.size);
