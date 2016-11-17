@@ -52,7 +52,7 @@ void Data::skip(const uint8 key) {
  if(!match(key)) error("Expected '"+hex(key)+"', got '"+hex(peek())+'\'');
 }
 void Data::skip(const char key) {
- if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', data, peek(min(data.size-index,16ul)));
+ if(!match(key)) error("Expected '"+escape(key)+"', got '"+peek()+'\'', peek(min(data.size-index,16ul)));
 }
 
 void Data::skip(const ref<uint8> key) {
@@ -68,10 +68,10 @@ ref<byte> BinaryData::whileNot(uint8 key) {
  return slice(start, index-start);
 }
 
-/*TextData::Text(ref<byte> data) : Data(data) {
+TextData::TextData(ref<byte> data) : Data(data) {
  if(data && uint8(data[0]) >= 0x80 && !match("\xEF\xBB\xBF"))
   error("Expected Unicode BOM, got", peek(3), hex(peek(3)));
-}*/
+}
 
 void TextData::advance(size_t step) {
  assert(index+step<=data.size, index, data.size);

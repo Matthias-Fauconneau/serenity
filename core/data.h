@@ -147,12 +147,12 @@ struct TextData : Data {
  int lineIndex = 1, columnIndex = 1;
 
  using Data::Data;
- /*/// Creates a TextData interface to a \a ref
+ /// Creates a TextData interface to a \a ref
  /// \note Matches any heading Unicode BOM
  explicit TextData(ref<byte> data);
  /// Creates a Data interface to a \a buffer
  /// \note Matches any heading Unicode BOM
- Data(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}*/
+ //TextData(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}
 
  void advance(size_t step) override;
 

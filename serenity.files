@@ -12,6 +12,11 @@ core/simd.h
 core/parallel.h
 core/parallel.cc
 core/function.h
+core/thread.cc
+core/data.h
+core/data.cc
+core/map.h
+io/variant.h
 
 ui/gl.h
 ui/text.h

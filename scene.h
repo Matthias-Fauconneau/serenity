@@ -50,6 +50,31 @@ inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     return true;
 }
 
+// "Fast, Minimum Storage Ray/Triangle Intersection"
+static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
+                             const v8sf xB, const v8sf yB, const v8sf zB,
+                             const v8sf xC, const v8sf yC, const v8sf zC,
+                             const v8sf  Ox, const v8sf  Oy, const v8sf Oz,
+                             const v8sf  Dx, const v8sf  Dy, const v8sf Dz,
+                             v8sf& det, v8sf& u, v8sf& v) {
+    const v8sf eACx = xC - xA;
+    const v8sf eACy = yC - yA;
+    const v8sf eACz = zC - zA;
+    v8sf Px, Py, Pz; cross(Dx, Dy, Dz, eACx, eACy, eACz, Px, Py, Pz);
+    const v8sf Tx = Ox - xA;
+    const v8sf Ty = Oy - yA;
+    const v8sf Tz = Oz - zA;
+    u = dot(Tx, Ty, Tz, Px, Py, Pz);
+    const v8sf eABx = xB - xA;
+    const v8sf eABy = yB - yA;
+    const v8sf eABz = zB - zA;
+    det = dot(eABx, eABy, eABz, Px, Py, Pz);
+    v8sf Qx, Qy, Qz; cross(Tx, Ty, Tz, eABx, eABy, eABz, Qx, Qy, Qz);
+    v = dot(Dx, Dy, Dz, Qx, Qy, Qz);
+    const v8sf t = dot(eACx, eACy, eACz, Qx, Qy, Qz) / det;
+    return blend(float8(inff), t, det > _0f && u >= _0f && v >= _0f && u + v <= det && t > _0f);
+}
+
 // "Efficient Ray-Quadrilateral Intersection Test"
 static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
                              const v8sf x10, const v8sf y10, const v8sf z10,
@@ -114,7 +139,6 @@ struct Scene {
         const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
-    //buffer<float> a11, b11;
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
 
@@ -462,6 +486,7 @@ inline string basename(string x) {
 #include "file.h"
 
 inline String sceneFile(string name) {
+    if(existsFile(name)) return name+"/scene.json";
     if(existsFile(name+".scene")) return name+".scene";
     if(existsFile(name+".obj")) return name+".obj";
     error("No such file", name);

@@ -1,5 +1,126 @@
 #include "scene.h"
 #include "data.h"
+#include "variant.h"
+
+#if 0
+inline Variant parseJSON(TextData& s) {
+    s.whileAny(" \t\n\r"_);
+    if(s.match("true")) return true;
+    else if(s.match("false")) return false;
+    else if(s.match('"')) {
+        return copyRef(s.until('"'));
+    }
+    else if(s.match('{')) {
+        Dict dict;
+        s.whileAny(" \t\n\r"_);
+        if(!s.match('}')) for(;;) {
+            s.skip('"');
+            string key = s.until('"');
+            assert_(key && !dict.contains(key));
+            s.whileAny(" \t\n\r"_);
+            s.skip(':');
+            Variant value = parseJSON(s);
+            dict.insertSorted(copyRef(key), ::move(value));
+            s.whileAny(" \t\n\r"_);
+            if(s.match(',')) { s.whileAny(" \t\n\r"_); continue; }
+            if(s.match('}')) break;
+            error("Expected , or }"_);
+        }
+        return dict;
+    }
+    else if(s.match('[')) {
+        array<Variant> list;
+        s.whileAny(" \t\n\r"_);
+        if(!s.match(']')) for(;;) {
+            Variant value = parseJSON(s);
+            list.append( ::move(value) );
+            s.whileAny(" \t\n\r"_);
+            if(s.match(',')) continue;
+            if(s.match(']')) break;
+            error("Expected , or ]"_);
+        }
+        return list;
+    }
+    else {
+        string d = s.whileDecimal();
+        if(d) return parseDecimal(d);
+        else error("Unexpected"_, s.peek(16));
+    }
+}
+
+const mat4 transform(const Dict& object) {
+    const Dict& t = object.at("transform");
+    ref<Variant> position = t.at("position");
+    transform.translate(position);
+    ref<Variant> rotation = t.at("rotation");
+    ref<Variant> scale = t.at("scale");
+    mat4 transform;
+    transform.scale(vec3((float)scale[0], (float)scale[1], (float)scale[2]));
+    transform.rotateX(rotation[0]*PI/180);
+    transform.rotateY(rotation[0]*PI/180);
+    transform.rotateZ(rotation[0]*PI/180);
+    return transform
+}
+
+Scene parseScene(ref<byte> file) {
+    TextData s (file);
+    Variant root = parseJSON(s);
+
+    Scene scene;
+    array<float> X[4], Y[4], Z[4];
+    array<float> B, G, R;
+    array<Scene::Face> faces;
+
+    for(const Dict& primitive: root.dict.at("primitives"_).list) {
+
+        if((string)primitive.at("type")=="quad"_) {
+            ref<vec3> polygon {transform*vec3(0,0,0),transform*vec3(1,0,0),transform*vec3(1,1,0),transform*vec3(0,1,0)};
+            assert_(polygon.size == 4);
+            const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
+            const vec3 N = normalize(cross(B-A, C-A));
+            float reflect = N.z == -1;
+            const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+            const float gloss = 1./8;
+            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,gloss,0,0});
+            scene.B.append(color.b);
+            scene.G.append(color.g);
+            scene.R.append(color.r);
+            for(size_t i: range(4)) {
+                scene.X[i].append(polygon[i].x);
+                scene.Y[i].append(polygon[i].y);
+                scene.Z[i].append(polygon[i].z);
+            }
+        }
+        else error(primitive);
+    }
+
+    scene.B = buffer<float>(align(8,faces.size+1), 0);
+    scene.G = buffer<float>(align(8,faces.size+1), 0);
+    scene.R = buffer<float>(align(8,faces.size+1), 0);
+    scene.B.slice(0, B.size).copy(B);
+    scene.G.slice(0, G.size).copy(G);
+    scene.R.slice(0, R.size).copy(R);
+    scene.B[faces.size] = 0;
+    scene.G[faces.size] = 0;
+    scene.R[faces.size] = 0;
+    for(size_t i: range(4)) {
+        scene.X[i] = buffer<float>(align(8,faces.size), 0);
+        scene.X[i].slice(0, X[i].size).copy(X[i]);
+        scene.Y[i] = buffer<float>(align(8,faces.size), 0);
+        scene.Y[i].slice(0, Y[i].size).copy(Y[i]);
+        scene.Z[i] = buffer<float>(align(8,faces.size), 0);
+        scene.Z[i].slice(0, Z[i].size).copy(Z[i]);
+    }
+    scene.faces = buffer<Scene::Face>(align(8,faces.size), 0);
+    scene.faces.slice(0, faces.size).copy(faces);
+    scene.fit();
+
+    scene.viewpoint = transform( root.dict.at("camera") ).inverse() * vec3(0,0,0);
+
+    return scene;
+}
+
+#else
 
 //include "parse.h"
 // Enforces exact match for overload resolution
@@ -143,36 +264,7 @@ Scene parseScene(ref<byte> file) {
         }
         assert_(scene.faces.size == faceCount);
     }
-#if 0
-        // Precomputes barycentric coordinates of V11
-        scene.a11 = buffer<float>(scene.faces.size);
-        scene.b11 = buffer<float>(scene.faces.size);
-        for(size_t i: range(scene.faces.size)) {
-            const vec3 v00 (scene.X[0][i], scene.Y[0][i], scene.Z[0][i]);
-            const vec3 v10 (scene.X[1][i], scene.Y[1][i], scene.Z[1][i]);
-            const vec3 v11 (scene.X[2][i], scene.Y[2][i], scene.Z[2][i]);
-            const vec3 v01 (scene.X[3][i], scene.Y[3][i], scene.Z[3][i]);
-            const vec3 e01 = v10 - v00;
-            const vec3 e03 = v01 - v00;
-            const vec3 N = cross(e01, e03);
-            const vec3 e02 = v11 - v00;
-            float a11, b11;
-            /**/ if(abs(N.x) > abs(N.y) && abs(N.x) > abs(N.z)) { // X
-                a11 = (e02.y*e03.z-e02.z*e03.y)/N.x;
-                b11 = (e01.y*e02.z-e01.z*e02.y)/N.x;
-            }
-            else if(abs(N.y) > abs(N.x) && abs(N.y) > abs(N.z)) { // Y
-                a11 = (e02.z*e03.x-e02.x*e03.z)/N.y;
-                b11 = (e01.z*e02.x-e01.x*e02.z)/N.y;
-            }
-            else /*if(abs(N.z) > abs(N.x) && abs(N.z) > abs(N.y))*/ { // Z
-                a11 = (e02.x*e03.y-e02.y*e03.x)/N.z;
-                b11 = (e01.x*e02.y-e01.y*e02.x)/N.z;
-            }
-            scene.a11[i] = a11;
-            scene.b11[i] = b11;
-        }
-#endif
     scene.fit();
     return scene;
 }
+#endif
