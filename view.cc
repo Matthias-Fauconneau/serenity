@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;
@@ -235,14 +235,6 @@ struct ViewApp {
         if(window) window->setTitle(strx(uint2(sSize,tSize)));
     }
     Image render(uint2 targetSize) {
-        if(view.viewYawPitch != viewYawPitch) { // Resets accumulation
-            count = 0;
-            sumB.clear(0);
-            sumG.clear(0);
-            sumR.clear(0);
-            viewYawPitch = view.viewYawPitch;
-        }
-
         Image target (targetSize);
 
         // Sheared perspective (rectification)
@@ -275,27 +267,46 @@ struct ViewApp {
         } else {
             BGRRenderer.shader.viewpoint = scene.viewpoint + vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            if(sumB.size != target.size) sumB = ImageH(target.size);
+            if(sumG.size != target.size) sumG = ImageH(target.size);
+            if(sumR.size != target.size) sumR = ImageH(target.size);
+            if(view.viewYawPitch != viewYawPitch) { // Resets accumulation
+                viewYawPitch = view.viewYawPitch;
+                for(size_t i: range(B.ref::size)) sumB[i] = B[i];
+                for(size_t i: range(G.ref::size)) sumG[i] = G[i];
+                for(size_t i: range(R.ref::size)) sumR[i] = R[i];
+                count = 1;
+            } else {
+                for(size_t i: range(B.ref::size)) sumB[i] += B[i];
+                for(size_t i: range(G.ref::size)) sumG[i] += G[i];
+                for(size_t i: range(R.ref::size)) sumR[i] += R[i];
+                count++;
+            }
+            assert_(target.size == B.size);
+            extern uint8 sRGB_forward[0x1000];
+            for(size_t i: range(target.ref::size)) {
+                uint B = uint(sumB[i]/count*0xFFF);
+                uint G = uint(sumG[i]/count*0xFFF);
+                uint R = uint(sumR[i]/count*0xFFF);
+                assert_(B >= 0 && B <= 0xFFF, B);
+                assert_(G >= 0 && G <= 0xFFF, G);
+                assert_(R >= 0 && R <= 0xFFF, R);
+                target[i] = byte4(sRGB_forward[B], sRGB_forward[G], sRGB_forward[R], 0xFF);
+            }
+            window->render(); // Accumulates
         }
-        if(sumB.size != target.size) sumB = ImageH(target.size);
-        if(sumG.size != target.size) sumG = ImageH(target.size);
-        if(sumR.size != target.size) sumR = ImageH(target.size);
-        for(size_t i: range(B.ref::size)) sumB[i] += B[i];
-        for(size_t i: range(G.ref::size)) sumG[i] += G[i];
-        for(size_t i: range(R.ref::size)) sumR[i] += R[i];
-        count++;
         assert_(target.size == B.size);
         extern uint8 sRGB_forward[0x1000];
         for(size_t i: range(target.ref::size)) {
-            uint B = uint(sumB[i]/count*0xFFF);
-            uint G = uint(sumG[i]/count*0xFFF);
-            uint R = uint(sumR[i]/count*0xFFF);
-            assert_(B >= 0 && B <= 0xFFF, B);
-            assert_(G >= 0 && G <= 0xFFF, G);
-            assert_(R >= 0 && R <= 0xFFF, R);
-            target[i] = byte4(sRGB_forward[B], sRGB_forward[G], sRGB_forward[R], 0xFF);
+            uint b = uint(B[i]*0xFFF);
+            uint g = uint(G[i]*0xFFF);
+            uint r = uint(R[i]*0xFFF);
+            assert_(b >= 0 && b <= 0xFFF, b);
+            assert_(g >= 0 && g <= 0xFFF, g);
+            assert_(r >= 0 && r <= 0xFFF, r);
+            target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
         }
 #endif
-        window->render(); // Accumulates
         return target;
     }
 } view;

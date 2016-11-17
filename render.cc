@@ -149,7 +149,19 @@ struct Render {
                                 for(int k: range(8)) {
                                     const vec3 viewpoint = scene.viewpoint + vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                                     const vec3 D = (P-viewpoint);
-                                    const vec3 R = D - 2*dot(N, D)*N;
+                                    //const vec3 R = D - 2*dot(N, D)*N;
+                                    // Marsaglia
+                                    static Random random;
+                                    float t0, t1, sq;
+                                    do {
+                                        t0 = random()*2-1;
+                                        t1 = random()*2-1;
+                                        sq = t0*t0 + t1*t1;
+                                    } while(sq >= 1);
+                                    float r = sqrt(1-sq);
+                                    vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
+                                    if(dot(U,N) < 0) U = -U; // On hemisphere
+                                    const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
                                     Rx[k] = R.x;
                                     Ry[k] = R.y;
                                     Rz[k] = R.z;
