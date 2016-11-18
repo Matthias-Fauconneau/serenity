@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;
@@ -155,7 +155,7 @@ struct ViewApp {
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
                 Scene::Face& face = scene.faces[faceIndex];
-                const float cellCount = face.reflect ? detailCellCount : 1;
+                const float cellCount = detailCellCount; //face.reflect ? detailCellCount : 1;
                 const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);
 
@@ -282,7 +282,6 @@ struct ViewApp {
                     sumG = ImageH(target.size);
                     sumR = ImageH(target.size);
                 }
-                log("Reset");
                 viewYawPitch = view.viewYawPitch;
                 for(size_t i: range(B.ref::size)) sumB[i] = B[i];
                 for(size_t i: range(G.ref::size)) sumG[i] = G[i];
@@ -293,7 +292,6 @@ struct ViewApp {
                 for(size_t i: range(G.ref::size)) sumG[i] += G[i];
                 for(size_t i: range(R.ref::size)) sumR[i] += R[i];
                 count++;
-                log(count);
             }
             assert_(target.size == B.size);
             extern uint8 sRGB_forward[0x1000];
