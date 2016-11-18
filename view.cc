@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;
@@ -180,8 +180,6 @@ struct ViewApp {
             }
 
             if(scale>1 && (sSize==sMaxSize||tSize==tMaxSize)) {
-                Time time{true};
-                log(strx(uint2(sSize,tSize)), "->", strx(uint2(sSize,tSize)/scale));
                 File file(str(uint(detailCellCount))+'x'+strx(uint2(sSize,tSize)/scale), folder, Flags(ReadWrite|Create));
                 assert_(index%sq(scale)==0);
                 size_t byteSize = (index/sq(scale)+lastU/scale)*sizeof(half);
@@ -210,9 +208,7 @@ struct ViewApp {
                     }
                     sourceIndex += 3*V*U*tSize*sSize;
                 }
-                log(time);
                 load(scale); // Loads new file
-                log(time);
             }
 #if 0 // DEBUG
             log("DEBUG");
@@ -246,21 +242,6 @@ struct ViewApp {
         mat4 M = shearedPerspective(s, t, scene.near, scene.far);
         M.scale(scene.scale); // Fits scene within -1, 1
 
-#if 0 // Raycast (FIXME: sheared)
-        vec3 O = scene.viewpoint + vec3(s,t,0)/scene.scale;
-        parallel_chunk(target.size.y, [this, &target, O](uint, size_t start, size_t sizeI) {
-            const int targetSizeX = target.size.x;
-            for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
-                size_t targetIndex = targetY*targetSizeX+targetX;
-                const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
-                const vec3 d = normalize(vec3(uv, scene.near));
-                v8si index = scene.raycast(float8(O.x), float8(O.y), float8(O.z), float8(d.x), float8(d.y), float8(d.z));
-                bgr3f S = scene.faces[index[0]].color;
-                extern uint8 sRGB_forward[0x1000];
-                target[targetIndex] = byte4(sRGB_forward[uint(S.b*0xFFF)], sRGB_forward[uint(S.g*0xFFF)], sRGB_forward[uint(S.r*0xFFF)], 0xFF);
-            }
-        });
-#else
         ImageH B (target.size), G (target.size), R (target.size);
         if(displayParametrization || (displaySurfaceParametrized && sSize && tSize)) {
             if(displayParametrization)
@@ -284,25 +265,35 @@ struct ViewApp {
                 target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
             }
         } else {
+            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size) { // Resets accumulation
+                sumB = ImageH(target.size);
+                sumG = ImageH(target.size);
+                sumR = ImageH(target.size);
+                count = 1;
+            } else count++;
+#if 1 // Raycast (FIXME: sheared)
+        const vec3 O = vec3(s,t,0)/scene.scale;
+        Random randoms[threadCount()];
+        for(Random& random: mref<Random>(randoms,threadCount())) { random.seed(); }
+        parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
+            const int targetSizeX = target.size.x;
+            for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
+                size_t targetIndex = targetY*targetSizeX+targetX;
+                const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
+                const vec3 d = normalize(vec3(uv, scene.near));
+                bgr3f color = scene.raycast_shade(O, d, randoms[id], 0);
+                sumB[targetIndex] += color.b;
+                sumG[targetIndex] += color.g;
+                sumR[targetIndex] += color.r;
+            }
+        });
+#else
             BGRRenderer.shader.viewpoint = vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size) { // Resets accumulation
-                if(sumB.size != target.size) {
-                    sumB = ImageH(target.size);
-                    sumG = ImageH(target.size);
-                    sumR = ImageH(target.size);
-                }
-                viewYawPitch = view.viewYawPitch;
-                for(size_t i: range(B.ref::size)) sumB[i] = B[i];
-                for(size_t i: range(G.ref::size)) sumG[i] = G[i];
-                for(size_t i: range(R.ref::size)) sumR[i] = R[i];
-                count = 1;
-            } else {
-                for(size_t i: range(B.ref::size)) sumB[i] += B[i];
-                for(size_t i: range(G.ref::size)) sumG[i] += G[i];
-                for(size_t i: range(R.ref::size)) sumR[i] += R[i];
-                count++;
-            }
+            for(size_t i: range(B.ref::size)) sumB[i] += B[i];
+            for(size_t i: range(G.ref::size)) sumG[i] += G[i];
+            for(size_t i: range(R.ref::size)) sumR[i] += R[i];
+#endif
             assert_(target.size == B.size);
             extern uint8 sRGB_forward[0x1000];
             for(size_t i: range(target.ref::size)) {
@@ -319,7 +310,6 @@ struct ViewApp {
             }
             window->render(); // Accumulates
         }
-#endif
         return target;
     }
 } view;

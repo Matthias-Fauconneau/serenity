@@ -13,6 +13,7 @@ Finally, after all passes have been rendered, the tiles are resolved and copied 
 #include "matrix.h"
 #include "simd.h"
 #include "image.h"
+#include "parallel.h"
 
 #define PROFILE 0
 #if PROFILE
@@ -311,7 +312,7 @@ template<class Shader> struct RenderPass {
     }
 
     /// Renders one tile
-    template<int C> void render(Tile<C>& tile, const Bin& bin, const vec2 binXY) {
+    template<int C> void render(const uint id, Tile<C>& tile, const Bin& bin, const vec2 binXY) {
         // Loops on all faces in the bin
         for(uint16 faceIndex: ref<uint16>(bin.faces, bin.faceCount)) {
             struct DrawBlock { vec2 pos; uint blockIndex; mask16 mask; } blocks[4*4]; uint blockCount=0;
@@ -446,7 +447,7 @@ template<class Shader> struct RenderPass {
                             }
                             const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
 
-                            Vec<float, C> src = shader.template shade(0, face.faceAttributes, centroidZ, centroid);
+                            Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                             for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                         }
                     }
@@ -491,7 +492,7 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
                         const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
-                        Vec<float, C> src = shader.template shade(0, face.faceAttributes, centroidZ, centroid);
+                        Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                         for(uint c: range(C)) tile.samples[c][pixelPtr] = blend(v16sf(((float*)tile.pixels[c])[pixelPtr]), v16sf(src._[c]), visibleMask);
                     } else {
                         // Performs Z-Test
@@ -513,7 +514,7 @@ template<class Shader> struct RenderPass {
                             centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
                         const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
-                        Vec<float, C> src = shader.template shade(0, face.faceAttributes, centroidZ, centroid);
+                        Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                         for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                     }
                 }
@@ -527,8 +528,9 @@ template<class Shader> struct RenderPass {
     template<int C> void render(RenderTarget<C>& target) {
         assert_(width == target.width && height == target.height);
         if(!bins || !faces) return;
-        for(uint binIndex: range(width*height)) {
-            if(!bins[binIndex].faceCount) continue;
+        //for(uint binIndex: range(width*height)) {
+        parallel_for(0, width*height, [this, &target](const uint id, uint binIndex) {
+            if(!bins[binIndex].faceCount) return;
 
             Tile<C>& tile = target.tiles[binIndex];
             if(tile.needClear) {
@@ -539,7 +541,7 @@ template<class Shader> struct RenderPass {
             }
 
             const vec2 binXY = 64.f*vec2(binIndex%target.width,binIndex/target.width);
-            render(tile, bins[binIndex], binXY);
-        }
+            render(id, tile, bins[binIndex], binXY);
+        });
     }
 };

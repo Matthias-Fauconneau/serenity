@@ -10,7 +10,7 @@ struct Render {
         assert_(Folder(".",folder).name() == "/var/tmp/"+basename(arguments()[0]), folder.name());
         for(string file: folder.list(Files)) remove(file, folder);
 
-        const float detailCellCount = 64;
+        const float detailCellCount = 32;
         const uint sSize = 8, tSize = sSize; // Number of view-dependent samples along (s,t) dimensions
         assert_(sSize%8 == 0); // FIXME: 2x4 for better coherent ray early cull
 
@@ -108,7 +108,7 @@ struct Render {
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = normalize(P-viewpoint);
-                            const uint sampleCount = 64;
+                            const uint sampleCount = 256;
                             bgr3f color = 0;
                             for(uint unused sampleIndex: range(sampleCount)) {
                                 color += scene.shade(faceIndex*2+0, P, D, N, randoms[id], 0);
@@ -119,7 +119,7 @@ struct Render {
                             faceBGR[2*size4+base] = color.r/sampleCount;
                         }
                     } else {
-                        const uint sampleCount = 4096;
+                        const uint sampleCount = 1024;
                         bgr3f color = 0;
                         const vec3 D = normalize(P);
                         for(uint unused sampleIndex: range(sampleCount)) {
