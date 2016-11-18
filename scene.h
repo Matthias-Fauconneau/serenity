@@ -290,6 +290,7 @@ struct Scene {
     inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const;
 
     bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 N, Random& random, const uint bounce) const {
+        if(bounce > 0) return 0;
         const Scene::Face& face = faces[faceIndex];
         if(face.reflect) {
             // Marsaglia
@@ -505,7 +506,6 @@ struct Scene {
             const vec3 A (X[0][faceIndex], Y[0][faceIndex], Z[0][faceIndex]);
             const vec3 B (X[1][faceIndex], Y[1][faceIndex], Z[1][faceIndex]);
             const vec3 C (X[2][faceIndex], Y[2][faceIndex], Z[2][faceIndex]);
-            const vec3 D (X[3][faceIndex], Y[3][faceIndex], Z[3][faceIndex]);
 
             const vec4 a = M*vec4(A,1), b = M*vec4(B,1), c = M*vec4(C,1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z >= 0) continue; // Backward face culling

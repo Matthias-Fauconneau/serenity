@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;
@@ -130,11 +130,11 @@ struct ViewApp {
             const ref<half> BGR = cast<half>(surfaceMap);
 
             size_t index = 0; size_t lastU = 0;
-            for(size_t faceIndex: range(scene.faces.size)) {
-                const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
-                const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
-                const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
-                const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
+            for(const size_t faceIndex: range(scene.faces.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
+                const vec3 A (scene.X[0][2*faceIndex+0], scene.Y[0][2*faceIndex+0], scene.Z[0][2*faceIndex+0]);
+                const vec3 B (scene.X[1][2*faceIndex+0], scene.Y[1][2*faceIndex+0], scene.Z[1][2*faceIndex+0]);
+                const vec3 C (scene.X[2][2*faceIndex+0], scene.Y[2][2*faceIndex+0], scene.Z[2][2*faceIndex+0]);
+                const vec3 D (scene.X[2][2*faceIndex+1], scene.Y[2][2*faceIndex+1], scene.Z[2][2*faceIndex+1]);
 
                 const vec3 O = (A+B+C+D)/4.f;
                 const vec3 N = cross(C-A, B-A);
@@ -154,7 +154,7 @@ struct ViewApp {
                 const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
                 const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
-                Scene::Face& face = scene.faces[faceIndex];
+                Scene::Face& face = scene.faces[2*faceIndex+0];
                 const float cellCount = detailCellCount; //face.reflect ? detailCellCount : 1;
                 const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
                 assert_(U && V);
@@ -162,14 +162,21 @@ struct ViewApp {
                 // Scales uv for texture sampling (unnormalized)
                 for(float& u: face.u) { u = u ? U-1 : 0; assert_(isNumber(u)); }
                 for(float& v: face.v) { v = v ? V-1 : 0; assert_(isNumber(v)); }
+                for(float& u: scene.faces[2*faceIndex+1].u) { u = u ? U-1 : 0; assert_(isNumber(u)); }
+                for(float& v: scene.faces[2*faceIndex+1].v) { v = v ? V-1 : 0; assert_(isNumber(v)); }
 
                 // No copy (surface samples needs to stay memory mapped)
                 face.BGR = BGR.data+index;
                 face.size.x = U;
                 face.size.y = V;
 
+                // Triangle ACD
+                scene.faces[2*faceIndex+1].BGR = BGR.data+index;
+                scene.faces[2*faceIndex+1].size.x = U;
+                scene.faces[2*faceIndex+1].size.y = V;
+
                 index += 3*V*U*tSize*sSize;
-                if(faceIndex == scene.faces.size-1) lastU = U; // Prevents OOB on interpolation
+                if(faceIndex+1 == scene.faces.size-1) lastU = U; // Prevents OOB on interpolation
             }
 
             if(scale>1 && (sSize==sMaxSize||tSize==tMaxSize)) {
@@ -183,8 +190,8 @@ struct ViewApp {
                 const mref<half> target = mcast<half>(subsampleMap);
 
                 size_t sourceIndex = 0;
-                for(size_t i : range(scene.faces.size)) {
-                    Scene::Face& face = scene.faces[i];
+                for(size_t faceIndex : range(scene.faces.size/2)) {
+                    Scene::Face& face = scene.faces[faceIndex*2];
                     const uint U = face.size.x, V = face.size.y;
                     const half* const faceSource = face.BGR;
                     half* const faceTarget = target.begin()+sourceIndex/sq(scale);
@@ -209,8 +216,8 @@ struct ViewApp {
             }
 #if 0 // DEBUG
             log("DEBUG");
-                for(const size_t faceIndex: range(scene.faces.size)) {
-                    const Scene::Face& face = scene.faces[faceIndex];
+                for(const size_t faceIndex: range(scene.faces.size/2)) {
+                    const Scene::Face& face = scene.faces[faceIndex*2];
                     const uint U = face.size.x, V = face.size.y;
                     const uint VU = V*U;
                     const uint size4 = tSize*sSize*VU;
@@ -268,6 +275,9 @@ struct ViewApp {
                 uint b = uint(B[i]*0xFFF);
                 uint g = uint(G[i]*0xFFF);
                 uint r = uint(R[i]*0xFFF);
+                b = clamp(0u, b, 0xFFFu);
+                g = clamp(0u, g, 0xFFFu);
+                r = clamp(0u, r, 0xFFFu);
                 assert_(b >= 0 && b <= 0xFFF, b);
                 assert_(g >= 0 && g <= 0xFFF, g);
                 assert_(r >= 0 && r <= 0xFFF, r);

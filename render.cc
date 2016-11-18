@@ -67,7 +67,7 @@ struct Render {
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) { random.seed(); }
         Time time {true};
-        for(const size_t faceIndex: range(scene.faces.size)) {
+        for(const size_t faceIndex: range(scene.faces.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
             const vec3 A (scene.X[0][2*faceIndex+0], scene.Y[0][2*faceIndex+0], scene.Z[0][2*faceIndex+0]);
             const vec3 B (scene.X[1][2*faceIndex+0], scene.Y[1][2*faceIndex+0], scene.Z[1][2*faceIndex+0]);
             const vec3 C (scene.X[2][2*faceIndex+0], scene.Y[2][2*faceIndex+0], scene.Z[2][2*faceIndex+0]);
@@ -76,7 +76,7 @@ struct Render {
             const vec3 nB = scene.faces[2*faceIndex+0].N[1];
             const vec3 nC = scene.faces[2*faceIndex+0].N[2];
             const vec3 nD = scene.faces[2*faceIndex+1].N[2];
-            const Scene::Face& face = scene.faces[faceIndex];
+            const Scene::Face& face = scene.faces[2*faceIndex+0];
             const uint U = face.size.x, V = face.size.y;
             half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             const size_t VU = V*U;
@@ -104,19 +104,33 @@ struct Render {
                     const vec3 N = nA + Nad*v + (Nab + Nbadc*v) * u;
                     const size_t base0 = svIndex*U+suIndex;
 #if 1
-                    for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                        const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
-                        const vec3 D = normalize(P-viewpoint);
-                        const uint sampleCount = 64;
-                        bgr3f color = 0;
-                        for(uint unused sampleIndex: range(sampleCount)) {
-                            color += scene.shade(faceIndex, P, D, N, randoms[id], 0);
+                    if(scene.faces[faceIndex*2].reflect) {
+                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                            const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
+                            const vec3 D = normalize(P-viewpoint);
+                            const uint sampleCount = 64;
+                            bgr3f color = 0;
+                            for(uint unused sampleIndex: range(sampleCount)) {
+                                color += scene.shade(faceIndex*2+0, P, D, N, randoms[id], 0);
+                            }
+                            const size_t base = base0 + (sSize * t + s) * VU;
+                            faceBGR[0*size4+base] = color.b/sampleCount;
+                            faceBGR[1*size4+base] = color.g/sampleCount;
+                            faceBGR[2*size4+base] = color.r/sampleCount;
                         }
-
-                        const size_t base = base0 + (sSize * t + s) * VU;
-                        faceBGR[0*size4+base] = color.b/sampleCount;
-                        faceBGR[1*size4+base] = color.g/sampleCount;
-                        faceBGR[2*size4+base] = color.r/sampleCount;
+                    } else {
+                        const uint sampleCount = 4096;
+                        bgr3f color = 0;
+                        const vec3 D = normalize(P);
+                        for(uint unused sampleIndex: range(sampleCount)) {
+                            color += scene.shade(faceIndex*2+0, P, D, N, randoms[id], 0);
+                        }
+                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                            const size_t base = base0 + (sSize * t + s) * VU;
+                            faceBGR[0*size4+base] = color.b/sampleCount;
+                            faceBGR[1*size4+base] = color.g/sampleCount;
+                            faceBGR[2*size4+base] = color.r/sampleCount;
+                        }
                     }
 #else // TODO: SIMD shader
                     if(!face.reflect) {
@@ -249,9 +263,9 @@ struct Render {
         }
         //assert_(sum(ref<uint64>(innerTime, threadCount()))*100 >= 99*sum(ref<uint64>(totalTime, threadCount())));
         log(sampleCount/(1024*1024*1024.f), "G samples in", time, "=", str((float)time.nanoseconds()/sampleCount, 1u), "ns/sample");
-#if 0 // DEBUG
-        for(const size_t faceIndex: range(scene.faces.size)) {
-            const Scene::Face& face = scene.faces[faceIndex];
+#if 1 // DEBUG
+        for(const size_t faceIndex: range(scene.faces.size/2)) {
+            const Scene::Face& face = scene.faces[faceIndex*2+0];
             const uint U = face.size.x, V = face.size.y;
             const uint VU = V*U;
             const uint size4 = tSize*sSize*VU;
