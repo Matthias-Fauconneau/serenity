@@ -27,7 +27,6 @@ render.cc
 raster.h
 scene.h
 view.cc
-box.h
 scene.cc
 test.cc
 filesync.cc

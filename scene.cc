@@ -240,21 +240,21 @@ Scene parseScene(ref<byte> file) {
         vec3 viewpoint = parse<vec3>(s);
         s.skip('\n');
 
-        const size_t faceCount = parse<uint>(s);
+        const size_t quadCount = parse<uint>(s);
         s.skip('\n');
 
-        scene.faces = buffer<Scene::Face>(align(8,faceCount), 0);
-        scene.B = buffer<float>(align(8,faceCount+1), 0);
-        scene.G = buffer<float>(align(8,faceCount+1), 0);
-        scene.R = buffer<float>(align(8,faceCount+1), 0);
+        scene.faces = buffer<Scene::Face>(align(8,2*quadCount), 0);
+        scene.B = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.G = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.R = buffer<float>(align(8,2*quadCount+1), 0);
         // index=faceCount flags miss (raycast hits no face) (i.e background "face" color)
-        scene.B[faceCount] = 0;
-        scene.G[faceCount] = 0;
-        scene.R[faceCount] = 0;
-        for(size_t i: range(4)) {
-            scene.X[i] = buffer<float>(align(8,faceCount), 0);
-            scene.Y[i] = buffer<float>(align(8,faceCount), 0);
-            scene.Z[i] = buffer<float>(align(8,faceCount), 0);
+        scene.B[2*quadCount] = 0;
+        scene.G[2*quadCount] = 0;
+        scene.R[2*quadCount] = 0;
+        for(size_t i: range(3)) {
+            scene.X[i] = buffer<float>(align(8,2*quadCount), 0);
+            scene.Y[i] = buffer<float>(align(8,2*quadCount), 0);
+            scene.Z[i] = buffer<float>(align(8,2*quadCount), 0);
         }
 
         while(s) {
@@ -272,18 +272,30 @@ Scene parseScene(ref<byte> file) {
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
             const float gloss = 1./8;
-            scene.faces.append({{0,1,1,0},{0,0,1,1},{N,N,N,N},reflect,0,gloss,0,0});
+            // Triangle ABC
+            scene.faces.append({{0,1,1},{0,0,1},{N,N,N},reflect,0,gloss,0,0});
             scene.B.append(color.b);
             scene.G.append(color.g);
             scene.R.append(color.r);
-            for(size_t i: range(4)) {
+            for(size_t i: range(3)) {
                 scene.X[i].append(polygon[i].x-viewpoint.x);
                 scene.Y[i].append(polygon[i].y-viewpoint.y);
                 scene.Z[i].append(polygon[i].z-viewpoint.z);
             }
             if(N.y == 1) scene.lights.append(scene.faces.size-1);
+            // Triangle ACD
+            scene.faces.append({{0,1,0},{0,1,1},{N,N,N},reflect,0,gloss,0,0});
+            scene.B.append(color.b);
+            scene.G.append(color.g);
+            scene.R.append(color.r);
+            for(size_t i: range(3)) {
+                scene.X[i].append(polygon[i?1+i:0].x-viewpoint.x);
+                scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
+                scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
+            }
+            if(N.y == 1) scene.lights.append(scene.faces.size-1);
         }
-        assert_(scene.faces.size == faceCount);
+        assert_(scene.faces.size == 2*quadCount);
     }
     scene.fit();
     return scene;

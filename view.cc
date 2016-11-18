@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;

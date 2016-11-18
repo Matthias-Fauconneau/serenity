@@ -16,11 +16,11 @@ struct Render {
 
         // Fits face UV to maximum projected sample rate
         size_t sampleCount = 0;
-        for(size_t faceIndex : range(scene.faces.size)) {
-            const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
-            const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
-            const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
-            const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
+        for(size_t faceIndex : range(scene.faces.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
+            const vec3 A (scene.X[0][2*faceIndex+0], scene.Y[0][2*faceIndex+0], scene.Z[0][2*faceIndex+0]);
+            const vec3 B (scene.X[1][2*faceIndex+0], scene.Y[1][2*faceIndex+0], scene.Z[1][2*faceIndex+0]);
+            const vec3 C (scene.X[2][2*faceIndex+0], scene.Y[2][2*faceIndex+0], scene.Z[2][2*faceIndex+0]);
+            const vec3 D (scene.X[2][2*faceIndex+1], scene.Y[2][2*faceIndex+1], scene.Z[2][2*faceIndex+1]);
 
             const vec3 faceCenter = (A+B+C+D)/4.f;
             const vec3 N = normalize(cross(C-A, B-A));
@@ -40,16 +40,16 @@ struct Render {
             const float maxU = ::max(length(uvB-uvA), length(uvC-uvD)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uvD-uvA), length(uvC-uvB)); // Maximum projected edge length along quad's v axis
 
-            Scene::Face& face = scene.faces[faceIndex];
+            Scene::Face& face = scene.faces[2*faceIndex+0];
             const float cellCount = detailCellCount; //face.reflect ? detailCellCount : 1;
             const uint U = align(2, ceil(maxU*cellCount)), V = align(2, ceil(maxV*cellCount)); // Aligns UV to 2 for correct 32bit gather indexing
-            assert_(U && V);
+            assert_(U && V, A, B, C, D);
 
             // Allocates (s,t) (u,v) images
             face.BGR = (half*)(3*sampleCount);
             face.size = uint2(U, V);
             sampleCount += tSize*sSize*V*U;
-            if(faceIndex == scene.faces.size-1) sampleCount += U; // Prevents OOB on interpolation
+            if(2*faceIndex+1 == scene.faces.size-1) sampleCount += U; // Prevents OOB on interpolation
         }
 
         assert_(uint(detailCellCount) == detailCellCount);
@@ -68,22 +68,22 @@ struct Render {
         for(Random& random: mref<Random>(randoms,threadCount())) { random.seed(); }
         Time time {true};
         for(const size_t faceIndex: range(scene.faces.size)) {
-            const vec3 A (scene.X[0][faceIndex], scene.Y[0][faceIndex], scene.Z[0][faceIndex]);
-            const vec3 B (scene.X[1][faceIndex], scene.Y[1][faceIndex], scene.Z[1][faceIndex]);
-            const vec3 C (scene.X[2][faceIndex], scene.Y[2][faceIndex], scene.Z[2][faceIndex]);
-            const vec3 D (scene.X[3][faceIndex], scene.Y[3][faceIndex], scene.Z[3][faceIndex]);
-            const vec3 nA = scene.faces[faceIndex].N[0];
-            const vec3 nB = scene.faces[faceIndex].N[1];
-            const vec3 nC = scene.faces[faceIndex].N[2];
-            const vec3 nD = scene.faces[faceIndex].N[3];
+            const vec3 A (scene.X[0][2*faceIndex+0], scene.Y[0][2*faceIndex+0], scene.Z[0][2*faceIndex+0]);
+            const vec3 B (scene.X[1][2*faceIndex+0], scene.Y[1][2*faceIndex+0], scene.Z[1][2*faceIndex+0]);
+            const vec3 C (scene.X[2][2*faceIndex+0], scene.Y[2][2*faceIndex+0], scene.Z[2][2*faceIndex+0]);
+            const vec3 D (scene.X[2][2*faceIndex+1], scene.Y[2][2*faceIndex+1], scene.Z[2][2*faceIndex+1]);
+            const vec3 nA = scene.faces[2*faceIndex+0].N[0];
+            const vec3 nB = scene.faces[2*faceIndex+0].N[1];
+            const vec3 nC = scene.faces[2*faceIndex+0].N[2];
+            const vec3 nD = scene.faces[2*faceIndex+1].N[2];
             const Scene::Face& face = scene.faces[faceIndex];
             const uint U = face.size.x, V = face.size.y;
             half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             const size_t VU = V*U;
             const size_t size4 = tSize*sSize*V*U;
-            half* const faceB = faceBGR+0*size4;
+            /*half* const faceB = faceBGR+0*size4;
             half* const faceG = faceBGR+1*size4;
-            half* const faceR = faceBGR+2*size4;
+            half* const faceR = faceBGR+2*size4;*/
 
             const vec3 ab = B-A;
             const vec3 ad = D-A;
@@ -94,16 +94,31 @@ struct Render {
             const vec3 Nbadc = nA-nB+nC-nD;
 
             // Shades surface
-            parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime, &randoms](uint id, uint start, uint sizeI) {
-                Random& random = randoms[id];
-                tsc totalTSC, innerTSC;
-                totalTSC.start();
+            parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime, &randoms](const uint id, const uint start, const uint sizeI) {
+                //tsc totalTSC, innerTSC;
+                //totalTSC.start();
                 for(uint svIndex: range(start, start+sizeI)) for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
-                    const vec3 O = A + ad*v + (ab + badc*v) * u;
+                    const vec3 P = A + ad*v + (ab + badc*v) * u;
                     const vec3 N = nA + Nad*v + (Nab + Nbadc*v) * u;
                     const size_t base0 = svIndex*U+suIndex;
+#if 1
+                    for(uint t: range(tSize)) for(uint s: range(sSize)) {
+                        const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
+                        const vec3 D = normalize(P-viewpoint);
+                        const uint sampleCount = 64;
+                        bgr3f color = 0;
+                        for(uint unused sampleIndex: range(sampleCount)) {
+                            color += scene.shade(faceIndex, P, D, N, randoms[id], 0);
+                        }
+
+                        const size_t base = base0 + (sSize * t + s) * VU;
+                        faceBGR[0*size4+base] = color.b/sampleCount;
+                        faceBGR[1*size4+base] = color.g/sampleCount;
+                        faceBGR[2*size4+base] = color.r/sampleCount;
+                    }
+#else // TODO: SIMD shader
                     if(!face.reflect) {
                         // Shader view-independent evaluation
                         const uint sampleCount = 4096;
@@ -137,7 +152,7 @@ struct Render {
                             faceBGR[2*size4+base] = color.r/sampleCount;
                         }
                     } else {
-                        innerTSC.start();
+                        //innerTSC.start();
                         const v8sf Ox = O.x;
                         const v8sf Oy = O.y;
                         const v8sf Oz = O.z;
@@ -226,9 +241,10 @@ struct Render {
                         }
                         innerTSC.stop();
                     }
+#endif
                 }
-                totalTime[id] += totalTSC.cycleCount();
-                innerTime[id] += innerTSC.cycleCount();
+                //totalTime[id] += totalTSC.cycleCount();
+                //innerTime[id] += innerTSC.cycleCount();
             });
         }
         //assert_(sum(ref<uint64>(innerTime, threadCount()))*100 >= 99*sum(ref<uint64>(totalTime, threadCount())));

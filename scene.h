@@ -1,5 +1,6 @@
 #pragma once
 #include "matrix.h"
+#include "parallel.h"
 
 inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
     const float left = (-1-s), right = (1-s);
@@ -30,6 +31,7 @@ inline v8sf dot(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, cons
     return Ax*Bx + Ay*By + Az*Bz;
 }
 
+#if 0
 inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { // "Fast, Minimum Storage Ray/Triangle Intersection"
     vec3 e2 = C - A;
     vec3 e1 = B - A;
@@ -49,6 +51,7 @@ inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u
     v /= det;
     return true;
 }
+#endif
 
 // "Fast, Minimum Storage Ray/Triangle Intersection"
 static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
@@ -75,6 +78,7 @@ static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
     return blend(float8(inff), t, det > _0f && u >= _0f && v >= _0f && u + v <= det && t > _0f);
 }
 
+#if 0
 // "Efficient Ray-Quadrilateral Intersection Test"
 static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
                              const v8sf x10, const v8sf y10, const v8sf z10,
@@ -114,6 +118,7 @@ static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
 
     return blend(float8(inff), t, det0 > _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t > _0f);
 }
+#endif
 
 inline v8sf hmin(const v8sf x) {
     const v8sf v0 = __builtin_ia32_minps256(x, _mm256_alignr_epi8(x, x, 4));
@@ -130,14 +135,14 @@ inline uint indexOfEqual(const v8sf x, const v8sf y) {
 struct Scene {
     struct Face {
         // Vertex attributes (FIXME: triangle)
-        float u[4];
-        float v[4];
-        vec3 N[4];
+        float u[3];
+        float v[3];
+        vec3 N[3];
         // Face attributes
         float reflect, refract, gloss; // Render (RaycastShader)
         const half* BGR; uint2 size; // Display (TextureShader)
     };
-    buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
+    buffer<float> X[3], Y[3], Z[3]; // Quadrilaterals vertices world space positions XYZ coordinates
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
     array<uint> lights; // Face index of lights
@@ -148,7 +153,7 @@ struct Scene {
     void fit() {
         // Fits scene
         min = inff, max = -inff;
-        for(size_t i: range(4)) {
+        for(size_t i: range(3)) {
             min = ::min(min, vec3(::min(X[i]), ::min(Y[i]), ::min(Z[i])));
             max = ::max(max, vec3(::max(X[i]), ::max(Y[i]), ::max(Z[i])));
         }
@@ -157,7 +162,7 @@ struct Scene {
         near = scale*min.z;
         far = scale*max.z;
     }
-
+#if 1
     inline size_t raycast(vec3 O, vec3 d) const {
         assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
         float value = inff; size_t index = faces.size;
@@ -177,10 +182,8 @@ struct Scene {
             const v8sf Cx = *(v8sf*)(X[2].data+i);
             const v8sf Cy = *(v8sf*)(Y[2].data+i);
             const v8sf Cz = *(v8sf*)(Z[2].data+i);
-            const v8sf Dx = *(v8sf*)(X[3].data+i);
-            const v8sf Dy = *(v8sf*)(Y[3].data+i);
-            const v8sf Dz = *(v8sf*)(Z[3].data+i);
-            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Dx,Dy,Dz, Ox,Oy,Oz, dx,dy,dz);
+            v8sf unused det, U, V;
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Ox,Oy,Oz, dx,dy,dz, det,U,V);
             v8sf hmin = ::hmin(t);
             const float hmin0 = hmin[0];
             if(hmin0 >= value) continue;
@@ -189,9 +192,42 @@ struct Scene {
         }
         return index;
     }
-    inline size_t raycast_reverseWinding(vec3 O, vec3 d, float* T=0) const {
+#endif
+    inline size_t raycast(vec3 O, vec3 d, float& minT, float& u, float& v) const {
         assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
-        float value = inff; size_t index = faces.size;
+        minT = inff; size_t index = faces.size;
+        const v8sf Ox = float8(O.x);
+        const v8sf Oy = float8(O.y);
+        const v8sf Oz = float8(O.z);
+        const v8sf dx = float8(d.x);
+        const v8sf dy = float8(d.y);
+        const v8sf dz = float8(d.z);
+        for(size_t i=0; i<faces.size; i+=8) {
+            const v8sf Ax = *(v8sf*)(X[0].data+i);
+            const v8sf Ay = *(v8sf*)(Y[0].data+i);
+            const v8sf Az = *(v8sf*)(Z[0].data+i);
+            const v8sf Bx = *(v8sf*)(X[1].data+i);
+            const v8sf By = *(v8sf*)(Y[1].data+i);
+            const v8sf Bz = *(v8sf*)(Z[1].data+i);
+            const v8sf Cx = *(v8sf*)(X[2].data+i);
+            const v8sf Cy = *(v8sf*)(Y[2].data+i);
+            const v8sf Cz = *(v8sf*)(Z[2].data+i);
+            v8sf det, U, V;
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Ox,Oy,Oz, dx,dy,dz, det, U, V);
+            v8sf hmin = ::hmin(t);
+            const float hmin0 = hmin[0];
+            if(hmin0 >= minT) continue;
+            minT = hmin0;
+            uint k = ::indexOfEqual(t, hmin);
+            index = i + k;
+            u = U[k]/det[k];
+            v = V[k]/det[k];
+        }
+        return index;
+    }
+    inline size_t raycast_reverseWinding(vec3 O, vec3 d, float& minT, float& u, float& v) const {
+        assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
+        minT = inff; size_t index = faces.size;
         const v8sf Ox = float8(O.x);
         const v8sf Oy = float8(O.y);
         const v8sf Oz = float8(O.z);
@@ -208,20 +244,20 @@ struct Scene {
             const v8sf Cx = *(v8sf*)(X[1].data+i);
             const v8sf Cy = *(v8sf*)(Y[1].data+i);
             const v8sf Cz = *(v8sf*)(Z[1].data+i);
-            const v8sf Dx = *(v8sf*)(X[0].data+i);
-            const v8sf Dy = *(v8sf*)(Y[0].data+i);
-            const v8sf Dz = *(v8sf*)(Z[0].data+i);
-            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Dx,Dy,Dz, Ox,Oy,Oz, dx,dy,dz);
+            v8sf det, U, V;
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Ox,Oy,Oz, dx,dy,dz, det, U, V);
             v8sf hmin = ::hmin(t);
             const float hmin0 = hmin[0];
-            if(hmin0 >= value) continue;
-            value = hmin0;
-            index = i + ::indexOfEqual(t, hmin);
+            if(hmin0 >= minT) continue;
+            minT = hmin0;
+            uint k = ::indexOfEqual(t, hmin);
+            index = i + k;
+            u = U[k]/det[k];
+            v = V[k]/det[k];
         }
-        if(T) *T=value;
         return index;
     }
-#if 1
+#if 0
     inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
         v8sf value = float8(inff); v8si index = intX(faces.size);
         for(size_t i: range(faces.size)) {
@@ -246,12 +282,94 @@ struct Scene {
     }
 #endif
 
+    static inline vec3 refract(const float r, const vec3 N, const vec3 D) {
+        const float c = -dot(N, D);
+        return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
+    }
+
+    inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const;
+
+    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 N, Random& random, const uint bounce) const {
+        const Scene::Face& face = faces[faceIndex];
+        if(face.reflect) {
+            // Marsaglia
+            float t0, t1, sq;
+            do {
+                t0 = random()*2-1;
+                t1 = random()*2-1;
+                sq = t0*t0 + t1*t1;
+            } while(sq >= 1);
+            float r = sqrt(1-sq);
+            vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
+            if(dot(U,N) < 0) U = -U; // On hemisphere
+
+            const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
+
+            return bgr3f(1, 1./2, 1./2) * raycast_shade(P, R, random, bounce+1);
+        }
+        else if(face.refract) {
+            const float n1 = 1, n2 = 1; //1.3
+            const vec3 R = normalize(refract(n1/n2, N, D));
+            float backT, backU, backV;
+            const size_t backFaceIndex = raycast_reverseWinding(P, R, backT, backU, backV);
+            if(backFaceIndex == faces.size) return 0; // FIXME
+
+            const vec3 backP = P+backT*R;
+
+            // Volumetric diffuse
+            const float l = 1;
+            float a = __builtin_exp(-backT/l);
+            bgr3f volumeColor (this->B[faceIndex],this->G[faceIndex],this->R[faceIndex]);
+
+            const vec3 backN = (1-backU-backV) * faces[backFaceIndex].N[0] +
+                                        backU * faces[backFaceIndex].N[1] +
+                                        backV * faces[backFaceIndex].N[2];
+            const vec3 backR = refract(n2/n1, -backN, R);
+
+            bgr3f transmitColor = raycast_shade(backP, backR, random, bounce+1);
+
+            return (1-a)*volumeColor + a*transmitColor;
+        }
+        else { // Diffuse
+            for(uint light: lights) if(faceIndex == light) return 1;
+            //size_t light = lights[random%lights.size];
+            bgr3f sum = 0;
+            for(uint light: lights) { // FIXME: uniform sampling
+                const float u = random();
+                const float v = random();
+                vec3 L = normalize(vec3((1-u-v) * X[0][light] +  u * X[1][light] + v * X[2][light],
+                        (1-u-v) * Y[0][light] +  u * Y[1][light] + v * Y[2][light],
+                        (1-u-v) * Z[0][light] +  u * Z[1][light] + v * Z[2][light])-P);
+                vec3 Nl = (1-u-v) * faces[light].N[0] +  u * faces[light].N[1] + v * faces[light].N[2];
+                float dotNlL = dot(Nl, -L);
+                if(dotNlL <= 0) continue; // Backface light cull
+                else {
+                    float dotNL = dot(N, L);
+                    if(dotNL <= 0) continue;
+                    else {
+                        size_t lightRayHitFaceIndex = raycast(P, L);
+                        if(lightRayHitFaceIndex != light) continue;
+                        else sum += dotNlL * dotNL * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
+                    }
+                }
+            }
+            return sum;
+        }
+    }
+
+    inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce) const {
+        const vec3 N = (1-u-v) * faces[faceIndex].N[0] +
+                             u * faces[faceIndex].N[1] +
+                             v * faces[faceIndex].N[2];
+        return shade(faceIndex, P, D, N, random, bounce);
+    }
+
     struct NoShader {
         static constexpr int C = 0;
         static constexpr int V = 0;
         typedef uint FaceAttributes;
-        inline Vec<float, 0> shade(FaceAttributes, float, float[V]) const { return {}; }
-        inline Vec<v16sf, C> shade(FaceAttributes, v16sf, v16sf[V], v16si) const { return {}; }
+        inline Vec<float, 0> shade(const uint, FaceAttributes, float, float[V]) const { return {}; }
+        inline Vec<v16sf, C> shade(const uint, FaceAttributes, v16sf, v16sf[V], v16si) const { return {}; }
     };
 
     struct CheckerboardShader {
@@ -259,8 +377,8 @@ struct Scene {
         static constexpr int V = 2;
         typedef uint FaceAttributes;
 
-        inline Vec<float, 3> shade(FaceAttributes, float, float varying[2]) const { return shade(varying); }
-        inline Vec<v16sf, 3> shade(FaceAttributes, v16sf, v16sf varying[2], v16si) const { return shade(varying); }
+        inline Vec<float, 3> shade(const uint, FaceAttributes, float, float varying[2]) const { return shade(varying); }
+        inline Vec<v16sf, 3> shade(const uint, FaceAttributes, v16sf, v16sf varying[2], v16si) const { return shade(varying); }
 
         template<Type T> inline Vec<T, 3> shade(T varying[2]) const {
             const T u = varying[0], v = varying[1];
@@ -277,13 +395,13 @@ struct Scene {
         static constexpr int V = V_;
         typedef uint FaceAttributes;
 
-        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
+        inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const {
             Vec<v16sf, C> Y;
             for(uint i: range(16)) {
                 if(!mask[i]) continue;
                 float x[V];
                 for(uint v: range(V)) x[v] = varying[v][i];
-                Vec<float, C> y = ((D*)this)->shade(face, z[i], x);
+                Vec<float, C> y = ((D*)this)->shade(id, face, z[i], x);
                 for(uint c: range(C)) Y._[c][i] = y._[c];
             }
             return Y;
@@ -326,8 +444,8 @@ struct Scene {
             }
         }
 
-        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
-        inline Vec<float, 3> shade(FaceAttributes index, float, float varying[V]) const {
+        inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(id, face, z, varying, mask); }
+        inline Vec<float, 3> shade(const uint, FaceAttributes index, float, float varying[V]) const {
             const float u = varying[0], v = varying[1];
             const int vIndex = v, uIndex = u; // Floor
             const Face& face = faces[index];
@@ -349,93 +467,20 @@ struct Scene {
         typedef uint FaceAttributes;
 
         const Scene& scene;
-        vec3 viewpoint; // scene.viewpoint + (s, t)
+        vec3 viewpoint; // (s, t)
+        buffer<Random> randoms;
 
-        RaycastShader(const Scene& scene) : scene(scene) {}
-
-        vec3 refract(const float r, const vec3 N, const vec3 D) const {
-            const float c = -dot(N, D);
-            return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
+        RaycastShader(const Scene& scene) : scene(scene) {
+            randoms = buffer<Random>(threadCount());
+            for(auto& random: randoms) random.seed();
         }
 
-        inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
-        inline Vec<float, 3> shade(FaceAttributes index, float, float unused varying[V]) const {
-            const vec3 O = vec3(varying[2], varying[3], varying[4]);
+        inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(id, face, z, varying, mask); }
+        inline Vec<float, 3> shade(const uint id, FaceAttributes index, float, float unused varying[V]) const {
+            const vec3 P = vec3(varying[2], varying[3], varying[4]);
             const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
-
-            const Scene::Face& face = scene.faces[index];
-            bgr3f final;
-            if(face.reflect) {
-             const vec3 D = normalize(O-viewpoint);
-             // Marsaglia
-             float t0, t1, sq;
-             do {
-                 t0 = random()*2-1;
-                 t1 = random()*2-1;
-                 sq = t0*t0 + t1*t1;
-             } while(sq >= 1);
-             float r = sqrt(1-sq);
-             vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
-             if(dot(U,N) < 0) U = -U; // On hemisphere
-             const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
-             const size_t reflect = scene.raycast(O, normalize(R));
-             bgr3f reflectColor (scene.B[reflect],scene.G[reflect],scene.R[reflect]); // FIXME: shader evaluation (i.e with lighting)
-             final = vec3(reflectColor.b, reflectColor.g/2, reflectColor.r/2);
-            }
-            else if(face.refract) {
-                const vec3 O = vec3(varying[2], varying[3], varying[4]);
-                const float n1 = 1, n2 = 1; //1.3
-                const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
-                const vec3 R = refract(n1/n2, N, normalize(O-viewpoint));
-                float backT;
-                const size_t back = scene.raycast_reverseWinding(O, R, &backT);
-                if(back == scene.faces.size) return {}; // FIXME
-                const vec3 backO = O+backT*R;
-                float t,u,v;
-                const vec3 A = scene.faces[back].N[0];
-                const vec3 B = scene.faces[back].N[1];
-                const vec3 C = scene.faces[back].N[2];
-                const vec3 D = scene.faces[back].N[3];
-                vec3 backN;
-                if(intersect(vec3(scene.X[0][back],scene.Y[0][back],scene.Z[0][back]),
-                              vec3(scene.X[1][back],scene.Y[1][back],scene.Z[1][back]),
-                              vec3(scene.X[2][back],scene.Y[2][back],scene.Z[2][back]), O, -R, t, u, v)) {
-                    backN = (1-u-v) * A + u * B + v * C;
-                } else {
-                    intersect(vec3(scene.X[0][back],scene.Y[0][back],scene.Z[0][back]),
-                              vec3(scene.X[2][back],scene.Y[2][back],scene.Z[2][back]),
-                              vec3(scene.X[3][back],scene.Y[3][back],scene.Z[3][back]), O, -R, t, u, v);
-                    backN = (1-u-v) * A + u * C + v * D;
-                }
-                const vec3 backR = refract(n2/n1, -backN, R);
-                size_t index = scene.raycast(backO, backR);
-                float d = length(backO-O);
-                bgr3f frontColor (scene.B[index],scene.G[index],scene.R[index]);
-                bgr3f backColor (scene.B[back],scene.G[back],scene.R[back]);
-                const float l = 1;
-                float a = __builtin_exp(-d/l);
-                final = (1-a)*backColor + a*frontColor;
-            }
-            else { // Diffuse
-                // Light
-                size_t light = scene.lights[0];
-                if(index == light) return Vec<float, 3>{{1,1,1}};
-                static Random random;
-                const float u = random();
-                const float v = random();
-                vec3 L = normalize(vec3(scene.X[0][light] +  u * (scene.X[1][light]-scene.X[0][light]) + v * (scene.X[3][light]-scene.X[0][light]),
-                              scene.Y[0][light] +  u * (scene.Y[1][light]-scene.Y[0][light]) + v * (scene.Y[3][light]-scene.Y[0][light]),
-                              scene.Z[0][light] +  u * (scene.Z[1][light]-scene.Z[0][light]) + v * (scene.Z[3][light]-scene.Z[0][light]))-O);
-                float dotNL = dot(N, L);
-                if(dotNL <= 0) return Vec<float, 3>{{0,0,0}};
-                size_t lightRayHitFaceIndex = scene.raycast(O, L);
-                if(lightRayHitFaceIndex != light) return Vec<float, 3>{{0,0,0}};
-
-                bgr3f color = vec3(scene.B[index],scene.G[index],scene.R[index]);
-                bgr3f diffuse = dotNL * color;
-                final = diffuse;
-            }
-            return Vec<float, 3>{{final.b, final.g, final.r}};
+            bgr3f color = scene.shade(index, P, normalize(P-viewpoint), N, randoms[id], 0);
+            return Vec<float, 3>{{color.b, color.g, color.r}};
         }
     };
 
@@ -462,7 +507,7 @@ struct Scene {
             const vec3 C (X[2][faceIndex], Y[2][faceIndex], Z[2][faceIndex]);
             const vec3 D (X[3][faceIndex], Y[3][faceIndex], Z[3][faceIndex]);
 
-            const vec4 a = M*vec4(A,1), b = M*vec4(B,1), c = M*vec4(C,1), d = M*vec4(D,1);
+            const vec4 a = M*vec4(A,1), b = M*vec4(B,1), c = M*vec4(C,1);
             if(cross((b/b.w-a/a.w).xyz(),(c/c.w-a/a.w).xyz()).z >= 0) continue; // Backward face culling
 
             const Face& face = faces[faceIndex];
@@ -475,20 +520,17 @@ struct Scene {
                                                  vec3(faces[faceIndex].N[0].y, faces[faceIndex].N[1].y, faces[faceIndex].N[2].y),
                                                  vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[1].z, faces[faceIndex].N[2].z)
                                  }, faceIndex);
-            renderer.pass.submit(a,c,d, (vec3[]){vec3(face.u[0],face.u[2],face.u[3]),
-                                                 vec3(face.v[0],face.v[2],face.v[3]),
-                                                 vec3(A.x,C.x,D.x),
-                                                 vec3(A.y,C.y,D.y),
-                                                 vec3(A.z,C.z,D.z),
-                                                 vec3(faces[faceIndex].N[0].x, faces[faceIndex].N[2].x, faces[faceIndex].N[3].x),
-                                                 vec3(faces[faceIndex].N[0].y, faces[faceIndex].N[2].y, faces[faceIndex].N[3].y),
-                                                 vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[2].z, faces[faceIndex].N[3].z)
-                                 }, faceIndex);
         }
         renderer.pass.render(renderer.target);
         renderer.target.resolve(depth, targets);
     }
 };
+
+inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const {
+    float t, u, v;
+    const size_t faceIndex = raycast(O, D, t, u, v);
+    return shade(faceIndex, O+t*D, D, u, v, random, bounce);
+}
 
 Scene parseScene(ref<byte> scene);
 
