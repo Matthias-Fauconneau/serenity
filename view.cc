@@ -44,7 +44,7 @@ struct ViewApp {
 
     bool displayField = false; // or rasterize geometry
     bool depthCorrect = true; // when displaying field
-    bool displaySurfaceParametrized = true; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
+    bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
     ImageH sumB, sumG, sumR;
@@ -255,18 +255,34 @@ struct ViewApp {
         });
 #else
         ImageH B (target.size), G (target.size), R (target.size);
-        if(displayParametrization)
-            scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-        else if(displaySurfaceParametrized && sSize && tSize) {
-            TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
-            scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+        if(displayParametrization || (displaySurfaceParametrized && sSize && tSize)) {
+            if(displayParametrization)
+                scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            else if(displaySurfaceParametrized && sSize && tSize) {
+                TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
+                scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+            }
+            assert_(target.size == B.size);
+            extern uint8 sRGB_forward[0x1000];
+            for(size_t i: range(target.ref::size)) {
+                uint b = uint(B[i]*0xFFF);
+                uint g = uint(G[i]*0xFFF);
+                uint r = uint(R[i]*0xFFF);
+                assert_(b >= 0 && b <= 0xFFF, b);
+                assert_(g >= 0 && g <= 0xFFF, g);
+                assert_(r >= 0 && r <= 0xFFF, r);
+                target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
+            }
         } else {
             BGRRenderer.shader.viewpoint = vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
-            if(sumB.size != target.size) sumB = ImageH(target.size);
-            if(sumG.size != target.size) sumG = ImageH(target.size);
-            if(sumR.size != target.size) sumR = ImageH(target.size);
-            if(view.viewYawPitch != viewYawPitch) { // Resets accumulation
+            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size) { // Resets accumulation
+                if(sumB.size != target.size) {
+                    sumB = ImageH(target.size);
+                    sumG = ImageH(target.size);
+                    sumR = ImageH(target.size);
+                }
+                log("Reset");
                 viewYawPitch = view.viewYawPitch;
                 for(size_t i: range(B.ref::size)) sumB[i] = B[i];
                 for(size_t i: range(G.ref::size)) sumG[i] = G[i];
@@ -277,6 +293,7 @@ struct ViewApp {
                 for(size_t i: range(G.ref::size)) sumG[i] += G[i];
                 for(size_t i: range(R.ref::size)) sumR[i] += R[i];
                 count++;
+                log(count);
             }
             assert_(target.size == B.size);
             extern uint8 sRGB_forward[0x1000];
@@ -293,17 +310,6 @@ struct ViewApp {
                 target[i] = byte4(sRGB_forward[B], sRGB_forward[G], sRGB_forward[R], 0xFF);
             }
             window->render(); // Accumulates
-        }
-        assert_(target.size == B.size);
-        extern uint8 sRGB_forward[0x1000];
-        for(size_t i: range(target.ref::size)) {
-            uint b = uint(B[i]*0xFFF);
-            uint g = uint(G[i]*0xFFF);
-            uint r = uint(R[i]*0xFFF);
-            assert_(b >= 0 && b <= 0xFFF, b);
-            assert_(g >= 0 && g <= 0xFFF, g);
-            assert_(r >= 0 && r <= 0xFFF, r);
-            target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
         }
 #endif
         return target;

@@ -281,13 +281,7 @@ Scene parseScene(ref<byte> file) {
                 scene.Y[i].append(polygon[i].y-viewpoint.y);
                 scene.Z[i].append(polygon[i].z-viewpoint.z);
             }
-            if(N.y == 1) {
-                for(size_t i: range(4)) {
-                    scene.light.X[i].append(polygon[i].x-viewpoint.x);
-                    scene.light.Y[i].append(polygon[i].y-viewpoint.y);
-                    scene.light.Z[i].append(polygon[i].z-viewpoint.z);
-                }
-            }
+            if(N.y == 1) scene.lights.append(scene.faces.size-1);
         }
         assert_(scene.faces.size == faceCount);
     }

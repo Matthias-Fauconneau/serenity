@@ -140,10 +140,7 @@ struct Scene {
     buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
-
-    struct {
-        buffer<float> X[4], Y[4], Z[4]; // Quadrilaterals vertices world space positions XYZ coordinates
-    } light;
+    array<uint> lights; // Face index of lights
 
     vec3 min, max;
     float scale, near, far;
@@ -363,20 +360,28 @@ struct Scene {
 
         inline Vec<v16sf, C> shade(FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(face, z, varying, mask); }
         inline Vec<float, 3> shade(FaceAttributes index, float, float unused varying[V]) const {
-            const Scene::Face& face = scene.faces[index];
+            const vec3 O = vec3(varying[2], varying[3], varying[4]);
+            const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
 
             // Light
-            vec3 L = vec3((scene.light.X[0]+scene.light.X[1]+scene.light.X[2]+scene.light.X[3])/4,
-                          (scene.light.Y[0]+scene.light.Y[1]+scene.light.Y[2]+scene.light.Y[3])/4,
-                          (scene.light.Z[0]+scene.light.Z[1]+scene.light.Z[2]+scene.light.Z[3])/4);
+            size_t light = scene.lights[0];
+            if(index == light) return Vec<float, 3>{{1,1,1}};
+            static Random random;
+            const float u = random();
+            const float v = random();
+            vec3 L = normalize(vec3(scene.X[0][light] +  u * (scene.X[1][light]-scene.X[0][light]) + v * (scene.X[3][light]-scene.X[0][light]),
+                          scene.Y[0][light] +  u * (scene.Y[1][light]-scene.Y[0][light]) + v * (scene.Y[3][light]-scene.Y[0][light]),
+                          scene.Z[0][light] +  u * (scene.Z[1][light]-scene.Z[0][light]) + v * (scene.Z[3][light]-scene.Z[0][light]))-O);
+            float dotNL = dot(N, L);
+            if(dotNL <= 0) return Vec<float, 3>{{0,0,0}};
+            size_t lightRayHitFaceIndex = scene.raycast(O, L);
+            if(lightRayHitFaceIndex != light) return Vec<float, 3>{{0,0,0}};
 
-            if(0) {}
-            else if(face.reflect) {
-             const vec3 O = vec3(varying[2], varying[3], varying[4]);
+            const Scene::Face& face = scene.faces[index];
+            bgr3f color;
+            if(face.reflect) {
              const vec3 D = normalize(O-viewpoint);
-             const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
              // Marsaglia
-             static Random random;
              float t0, t1, sq;
              do {
                  t0 = random()*2-1;
@@ -389,7 +394,7 @@ struct Scene {
              const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
              const size_t reflect = scene.raycast(O, normalize(R));
              bgr3f reflectColor (scene.B[reflect],scene.G[reflect],scene.R[reflect]);
-             return Vec<float, 3>{{reflectColor.b, reflectColor.g/2, reflectColor.r/2}};
+             color = vec3(reflectColor.b, reflectColor.g/2, reflectColor.r/2);
             }
             else if(face.refract) {
                 const vec3 O = vec3(varying[2], varying[3], varying[4]);
@@ -423,12 +428,13 @@ struct Scene {
                 bgr3f backColor (scene.B[back],scene.G[back],scene.R[back]);
                 const float l = 1;
                 float a = __builtin_exp(-d/l);
-                bgr3f color = (1-a)*backColor + a*frontColor;
-                return Vec<float, 3>{{color.b, color.g, color.r}};
+                color = (1-a)*backColor + a*frontColor;
             }
             else {
-                return Vec<float, 3>{{scene.B[index],scene.G[index],scene.R[index]}};
+                color = vec3(scene.B[index],scene.G[index],scene.R[index]);
             }
+            bgr3f diffuse = dotNL * color;
+            return Vec<float, 3>{{diffuse.b, diffuse.g, diffuse.r}};
         }
     };
 
