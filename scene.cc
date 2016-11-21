@@ -244,13 +244,19 @@ Scene parseScene(ref<byte> file) {
         s.skip('\n');
 
         scene.faces = buffer<Scene::Face>(align(8,2*quadCount), 0);
-        scene.B = buffer<float>(align(8,2*quadCount+1), 0);
-        scene.G = buffer<float>(align(8,2*quadCount+1), 0);
-        scene.R = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.emittanceB = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.emittanceG = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.emittanceR = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.reflectanceB = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.reflectanceG = buffer<float>(align(8,2*quadCount+1), 0);
+        scene.reflectanceR = buffer<float>(align(8,2*quadCount+1), 0);
         // index=faceCount flags miss (raycast hits no face) (i.e background "face" color)
-        scene.B[2*quadCount] = 0;
-        scene.G[2*quadCount] = 0;
-        scene.R[2*quadCount] = 0;
+        scene.emittanceB[2*quadCount] = 0;
+        scene.emittanceG[2*quadCount] = 0;
+        scene.emittanceR[2*quadCount] = 0;
+        scene.reflectanceB[2*quadCount] = 0;
+        scene.reflectanceG[2*quadCount] = 0;
+        scene.reflectanceR[2*quadCount] = 0;
         for(size_t i: range(3)) {
             scene.X[i] = buffer<float>(align(8,2*quadCount), 0);
             scene.Y[i] = buffer<float>(align(8,2*quadCount), 0);
@@ -276,37 +282,51 @@ Scene parseScene(ref<byte> file) {
             const float gloss = 1./8;
             // Triangle ABC
             scene.faces.append({{0,1,1},{0,0,1},{N,N,N},reflect,0,gloss,0,0});
-            scene.B.append(color.b);
-            scene.G.append(color.g);
-            scene.R.append(color.r);
             for(size_t i: range(3)) {
                 scene.X[i].append(polygon[i].x-viewpoint.x);
                 scene.Y[i].append(polygon[i].y-viewpoint.y);
                 scene.Z[i].append(polygon[i].z-viewpoint.z);
             }
             if(N.y == 1) {
-                scene.lights.append(scene.faces.size-1);
-                scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
+                scene.emittanceB.append(1);
+                scene.emittanceG.append(1);
+                scene.emittanceR.append(1);
+                scene.reflectanceB.append(1);
+                scene.reflectanceG.append(1);
+                scene.reflectanceR.append(1);
+            } else {
+                scene.emittanceB.append(0);
+                scene.emittanceG.append(0);
+                scene.emittanceR.append(0);
+                scene.reflectanceB.append(color.b);
+                scene.reflectanceG.append(color.g);
+                scene.reflectanceR.append(color.r);
             }
             // Triangle ACD
             scene.faces.append({{0,1,0},{0,1,1},{N,N,N},reflect,0,gloss,0,0});
-            scene.B.append(color.b);
-            scene.G.append(color.g);
-            scene.R.append(color.r);
             for(size_t i: range(3)) {
                 scene.X[i].append(polygon[i?1+i:0].x-viewpoint.x);
                 scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
                 scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
             }
             if(N.y == 1) {
-                scene.lights.append(scene.faces.size-1);
-                scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
+                scene.emittanceB.append(1);
+                scene.emittanceG.append(1);
+                scene.emittanceR.append(1);
+                scene.reflectanceB.append(1);
+                scene.reflectanceG.append(1);
+                scene.reflectanceR.append(1);
+            } else {
+                scene.emittanceB.append(0);
+                scene.emittanceG.append(0);
+                scene.emittanceR.append(0);
+                scene.reflectanceB.append(color.b);
+                scene.reflectanceG.append(color.g);
+                scene.reflectanceR.append(color.r);
             }
         }
         assert_(scene.faces.size == 2*quadCount);
     }
-    for(float& v: scene.CAF) v /= scene.CAF.last();
-    assert_(scene.CAF.last()==1);
     scene.fit();
     return scene;
 }

@@ -143,10 +143,9 @@ struct Scene {
         const half* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[3], Y[3], Z[3]; // Quadrilaterals vertices world space positions XYZ coordinates
-    buffer<float> B, G, R; // Face color attributes
+    buffer<float> emittanceB, emittanceG, emittanceR; // Face color attributes
+    buffer<float> reflectanceB, reflectanceG, reflectanceR; // 1/PI
     buffer<Face> faces;
-    array<uint> lights; // Face index of lights
-    array<float> CAF; // Cumulative area of lights (sample proportionnal to area)
 
     vec3 min, max;
     float scale, near, far;
@@ -349,7 +348,7 @@ struct Scene {
             // Volumetric diffuse
             const float l = 1;
             float a = __builtin_exp(-backT/l);
-            bgr3f volumeColor (this->B[faceIndex],this->G[faceIndex],this->R[faceIndex]);
+            bgr3f volumeColor (this->emittanceB[faceIndex],this->emittanceG[faceIndex],this->emittanceR[faceIndex]);
 
             const vec3 backN = (1-backU-backV) * faces[backFaceIndex].N[0] +
                                         backU * faces[backFaceIndex].N[1] +
@@ -361,21 +360,18 @@ struct Scene {
             return (1-a)*volumeColor + a*transmitColor;
         }
         else { // Diffuse
-            for(uint light: lights) if(faceIndex == light) return 1; // FIXME
-            float cosθ;
-            const vec3 l = cosine(random, N, cosθ /*PDF*/);
-            const float dotNL = cosθ;
-            const float PDF = cosθ;
-            float t,u,v;
-            size_t lightRayFaceIndex = raycast(P, l, t, u, v);
-            if(lights.contains(lightRayFaceIndex)) {
-                return (1/PDF) * 2 * dotNL * ((PI/PI) * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]));
-            } else { // Indirect lighting
-                if(bounce > 0) return 0;
-                if(lightRayFaceIndex == faces.size) return 0; // No hits
-                const bgr3f incidentPower = shade(lightRayFaceIndex, P+t*l, l, u, v, random, bounce+1);
-                return (1/PDF) * 2 * dotNL * (PI/PI) * incidentPower;
+            bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
+            if(bounce < 2) {
+                float cosθ;
+                const vec3 l = cosine(random, N, cosθ /*PDF*/);
+                const float dotNL = cosθ;
+                const bgr3f BRDF = 2.f * bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]) * dotNL;
+                const float PDF = cosθ;
+                float t,u,v;
+                size_t lightRayFaceIndex = raycast(P, l, t, u, v);
+                out += (1/PDF) * BRDF * shade(lightRayFaceIndex, P+t*l, l, u, v, random, bounce+1);
             }
+            return out;
         }
     }
 
