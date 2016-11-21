@@ -306,6 +306,27 @@ struct Scene {
         const vec3 S = sphere(random);
         return dot(S,N) < 0 ? -S: S;
     }
+    // Cosine distributed points on hemisphere directed towards N
+    vec3 cosine(Random& random, const vec3 N, float& cosθ /*PDF*/) const {
+        const float ξ1 = random();
+        const float ξ2 = random();
+
+        cosθ = sqrt(1-ξ1);
+        const float θ = acos(cosθ);
+        const float φ = 2*PI*ξ2;
+
+        const float xs = sin(θ) * cos(φ);
+        const float ys = cos(θ);
+        const float zs = sin(θ) * sin(φ);
+
+        vec3 h = N;
+        /**/ if(abs(h.x)<=abs(h.y) && abs(h.x)<=abs(h.z)) h.x=1;
+        else if(abs(h.y)<=abs(h.x) && abs(h.y)<=abs(h.z)) h.y=1;
+        else /*                                        */ h.z=1;
+
+        const vec3 x = normalize(cross(h, N));
+        return normalize(xs * x + ys * N + zs * normalize(cross(x, N)));
+    }
 
     bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 N, Random& random, const uint bounce) const {
         const Scene::Face& face = faces[faceIndex];
@@ -341,21 +362,19 @@ struct Scene {
         }
         else { // Diffuse
             for(uint light: lights) if(faceIndex == light) return 1; // FIXME
-            const vec3 S = sphere(random);
-            const float dotNS = dot(N, S);
-            const vec3 l      = dotNS < 0 ? -S : S;
-            const float dotNL = dotNS < 0 ? -dotNS : dotNS;
+            float cosθ;
+            const vec3 l = cosine(random, N, cosθ /*PDF*/);
+            const float dotNL = cosθ;
+            const float PDF = cosθ;
             float t,u,v;
             size_t lightRayFaceIndex = raycast(P, l, t, u, v);
             if(lights.contains(lightRayFaceIndex)) {
-                //if(bounce == 0) return 0; // No direct lighting
-                return 2 * dotNL * ((PI/PI) * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]));
+                return (1/PDF) * 2 * dotNL * ((PI/PI) * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]));
             } else { // Indirect lighting
                 if(bounce > 0) return 0;
                 if(lightRayFaceIndex == faces.size) return 0; // No hits
                 const bgr3f incidentPower = shade(lightRayFaceIndex, P+t*l, l, u, v, random, bounce+1);
-                return 2 * dotNL * (PI/PI) * incidentPower;
-                //return (1/sqL * (1+dotNlL)/2 * (1+dotNL)/2) * incidentPower; // * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]);
+                return (1/PDF) * 2 * dotNL * (PI/PI) * incidentPower;
             }
         }
     }
