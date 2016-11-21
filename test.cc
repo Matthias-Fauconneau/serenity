@@ -10,5 +10,8 @@ int main(int argc, char** argv) {
  action.setObjectName("serenity");
  QObject::connect(&action, &QAction::triggered, [](bool){log("Triggered");});
  KGlobalAccel::self()->setShortcut(&action, QList<QKeySequence>() << Qt::Key_F8, KGlobalAccel::NoAutoloading);
+ KAuth::Action action("org.kde.powerdevil.backlighthelper.setbrightness");
+ action.setHelperId(HELPER_IDorg.kde.powerdevil.backlighthelper);
+ action.addArgument("brightness", value);
  return app.exec();
 }

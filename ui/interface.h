@@ -64,7 +64,6 @@ struct ImageView : Widget {
     String title() override { return copyRef(caption); }
     vec2 sizeHint(vec2) override;
     shared<Graphics> graphics(vec2 size) override;
-
 };
 
 // Control

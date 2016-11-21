@@ -28,7 +28,7 @@ registerApplication(MusicPDFPreview);
 
 struct MusicPDFExport : MusicPDF, Application {
     MusicPDFExport() {
-        writeFile(name+".pdf"_, toPDF(vec2(sheet.pageSize) ?: sheet.pages[0].bounds.max, sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
+        writeFile(name+"_.pdf"_, toPDF(vec2(sheet.pageSize) ?: sheet.pages[0].bounds.max, sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
     }
 };
 registerApplication(MusicPDFExport, export);

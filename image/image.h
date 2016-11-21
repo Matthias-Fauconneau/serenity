@@ -105,9 +105,6 @@ template<Type F, Type... S> void applyXY(const ImageF& target, F function, const
 
 // -- sRGB --
 
-extern uint8 sRGB_forward[0x1000];
-extern float sRGB_reverse[0x100];
-
 /// Converts an sRGB component to linear float
 void linear(mref<float> target, ref<byte4> source, int component);
 inline ImageF linear(ImageF&& target, const Image& source, int component) { linear(target, source, component); return move(target); }

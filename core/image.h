@@ -45,6 +45,3 @@ typedef ImageT<byte4> Image;
 /// 2D array of 32bit floating-point pixels
 typedef ImageT<float> ImageF;
 
-// -- sRGB --
-
-extern uint8 sRGB_forward[0x1000];

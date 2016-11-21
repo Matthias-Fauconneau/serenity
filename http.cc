@@ -187,7 +187,7 @@ HTTP::HTTP(URL&& url, function<void(const URL&, Map&&)> contentAvailable, array<
 
 void HTTP::request() {
  String request = (url.post?"POST"_:"GET"_)+" "_+(startsWith(url.path,"/"_)?""_:"/"_)+url.path+" HTTP/1.1\r\nHost: "_+url.host+"\r\n"
-         "Accept-Encoding: gzip, deflate\r\n"
+         //"Accept-Encoding: gzip, deflate\r\n"
          ;
  if(url.post) {
   headers.append("Content-Type: application/x-www-form-urlencoded"__);

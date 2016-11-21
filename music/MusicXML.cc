@@ -233,8 +233,8 @@ MusicXML::MusicXML(string document, string) {
                         if(accidental) measureAlterations[step] = alteration;
 
                         const Element* notations = e.contains("notations"_) ? &e("notations") : 0;
-                        const Element* articulations = notations && notations->contains("articulations"_) ? &notations->child("articulations"_) : 0;
-                        const Element* ornaments = notations && notations->contains("ornaments"_) ? &notations->child("ornaments"_) : 0;
+                        const Element* articulations = notations && notations->contains("articulations"_) ? notations->child("articulations"_) : 0;
+                        const Element* ornaments = notations && notations->contains("ornaments"_) ? notations->child("ornaments"_) : 0;
                         {
                             Sign sign{Sign::Note, time, {{staff, {{duration, .note={
                                                     .value = value,
@@ -257,7 +257,7 @@ MusicXML::MusicXML(string document, string) {
                                                     .measureIndex = measureIndex
                                                     //.stem = e.contains("stem"_) && e("stem").text() == "up"_,
                                                 }}}}}};
-                            const Element* tremolo = ornaments && ornaments->contains("tremolo"_) ? &ornaments->child("tremolo"_) : 0;
+                            const Element* tremolo = ornaments && ornaments->contains("tremolo"_) ? ornaments->child("tremolo"_) : 0;
                             if(tremolo && parseInteger(tremolo->text()) != 1) { // FIXME: single note tremolo
                              if(parseInteger(tremolo->text()) != 3) log("parseInteger(tremolo->text()) == 3", tremolo->text());
                              assert_(parseInteger(tremolo->text()) == 3, tremolo->text());

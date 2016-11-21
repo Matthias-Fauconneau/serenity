@@ -202,7 +202,8 @@ struct DCC : Link {
 
 struct DCCApp {
  DCCApp() {
-  String query = join(arguments(), " ");
+  buffer<string> args = filter(::arguments(), [](string arg) { return startsWith(arg,"--"); });
+  String query = join(args, " ");
   String url;
   if(true || arguments().size > 1) {
    String config = readFile(".irc");
@@ -215,12 +216,14 @@ struct DCCApp {
        if(p>0) searchURL = searchURL+"&pn="+str(p);
        Map document = getURL(searchURL, {}, 1);
        Element root = parseHTML(document);
+       if(!root.child("//table")) break;
        const Element& table = root("//table");
        for(size_t i=1; i<table.children.size; i++) {
            const Element& row = table(i);
            String file = row(0).text();
            //if(!(find(file, query) || !find(file, replace(query, " ", ".")))) continue;
            if(find(toUpper(file), "NL") || find(toUpper(file), "SUB")) continue;
+           if(find(file,"1080p.HEVC.x265")) continue;
            string irc = row(0)(0)["href"];
            if(!startsWith(irc,"irc")) continue;
            String sizeString = replace(row(6).text(), "&nbsp;", " ");
@@ -238,7 +241,14 @@ struct DCCApp {
            if(link.channels[0]==channels[0]) link.channels.append(channels[1]);
            for(string word: split(query," ")) if(!find(file, word)) goto continue2;
            log(file, size/1e9, link.bot);
-           if(availableCapacity(".") < size) continue;
+           {
+            int64 remainingSize = size;
+            if(existsFile(file)) {
+             remainingSize -= File(file).size();
+             log("Remaining", remainingSize/1e9);
+            }
+            if(availableCapacity(".") < remainingSize) continue;
+           }
            if(bots.contains(link.bot)) {
                log(file, size, age, link.channels, link.bot);
                url = str(link);
@@ -249,11 +259,12 @@ struct DCCApp {
        }
        if(url) break;
    }
-   if(!url) error(search, linkBots);//, table);
+   if(!url) error(search);
   }
   else url = unsafeRef(query);
   log(url);
-  for(int i: range(8)) {
+  if(arguments().contains("--pretend")) return;
+  for(int i: range(9)) {
    DCC dcc(url);
    if(!dcc.fileName || !dcc.fileSize || !dcc.position) return; // Failed
    if(dcc.position == dcc.fileSize) return; // Completed

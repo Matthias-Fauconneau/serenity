@@ -33,7 +33,7 @@ struct SheetContext {
  float shortStemLength = 5*halfLineInterval;
  float margin = halfLineInterval;
  float textSize = 6*halfLineInterval;
- bool tablature = true;
+ static constexpr bool tablature = false;
  float interstaffDistance = 14*lineInterval;
 
  // Tablature
@@ -129,7 +129,7 @@ struct System : SheetContext {
 
  // Metrics
  // Enough space for accidented dichords
- const float space = 2*glyphSize(SMuFL::Accidental::Sharp, &smallFont).x+glyphSize(SMuFL::NoteHead::Black).x;
+ const float space = /*2*glyphSize(SMuFL::Accidental::Sharp, &smallFont).x+*/glyphSize(SMuFL::NoteHead::Black).x+glyphSize(SMuFL::Flag::Above).x;
  const float spaceWidth; // Minimum space width on initial layout pass, then space width for measure justification on final layout pass
 
  // Page context
@@ -164,7 +164,7 @@ struct System : SheetContext {
  uint measureStartTime = 0; // in ticks
  uint shortestInterval = 0; // in ticks
  float X(uint time) {
-  assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
+  //assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
   return measureStartX + (time-measureStartTime)/shortestInterval*spaceWidth;
  }
  size_t justifiedSpace = 0;
@@ -559,7 +559,7 @@ void System::layoutNotes(uint staff) {
  }
 
  // Fingering
- for(const Chord& chord: beam) {
+ if(0) for(const Chord& chord: beam) {
   array<int> fingering;
   for(const Sign& sign: chord) if(sign.note.finger) fingering.append( sign.note.finger );
   if(fingering) {
@@ -667,34 +667,35 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
   // Clears any pending clef changes
   if((sign.type == Sign::Note ||sign.type == Sign::Rest) || sign.type == Sign::KeySignature) {
-   for(size_t index=0; index<pendingClefChange.size;) {
-    // Skips if not needed yet to keep the opportunity to clear right before measure bar
-    if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff) // Same staff
-       || sign.type == Sign::TimeSignature || sign.type == Sign::KeySignature) { // Non staff signs requiring pending clefs to be cleared
-     Sign signClef = pendingClefChange.take(index);
-     Clef clef = signClef.clef;
-     float y = staffY(signClef.staff, clef.clefSign==GClef ? -6 : -2);
-     ClefSign clefSign = clef.clefSign;
-     if(clef.octave==1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8va);
-     else if(clef.octave==-1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8vb);
-     else assert(clef.octave==0, clef, clef.octave);
+      float advance = 0;
+      for(size_t index=0; index<pendingClefChange.size;) {
+          // Skips if not needed yet to keep the opportunity to clear right before measure bar
+          if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff) // Same staff
+                  || sign.type == Sign::TimeSignature || sign.type == Sign::KeySignature) { // Non staff signs requiring pending clefs to be cleared
+              Sign signClef = pendingClefChange.take(index);
+              Clef clef = signClef.clef;
+              float y = staffY(signClef.staff, clef.clefSign==GClef ? -6 : -2);
+              ClefSign clefSign = clef.clefSign;
+              if(clef.octave==1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8va);
+              else if(clef.octave==-1) clefSign = ClefSign(clefSign+SMuFL::Clef::_8vb);
+              else assert(clef.octave==0, clef, clef.octave);
 #if 0
-     float& x = staves[signClef.staff].x; // No need to advance up to time track synchronization point
-     if(sign.type == Sign::Note||sign.type == Sign::Rest) {
-      //x = max(x, min((x + timeTrack.at(sign.time) - glyphSize(clefSign).x)/2 /*Center between last staff sign and next synchronization point*/,
-      //timeTrack.at(sign.time) - glyphSize(clefSign).x));
-      x = max(x, (x + timeTrack.at(sign.time) + spaceWidth /*- glyphSize(clefSign).x*/)/2); /*Center between last staff sign and next synchronization point*/
-     }
-     x += glyph(vec2(x, y), clefSign);
-     timeTrack[sign.time] = max(timeTrack[sign.time], x); // Updates next synchronization point
+              float& x = staves[signClef.staff].x; // No need to advance up to time track synchronization point
+              if(sign.type == Sign::Note||sign.type == Sign::Rest) {
+                  //x = max(x, min((x + timeTrack.at(sign.time) - glyphSize(clefSign).x)/2 /*Center between last staff sign and next synchronization point*/,
+                  //timeTrack.at(sign.time) - glyphSize(clefSign).x));
+                  x = max(x, (x + timeTrack.at(sign.time) + spaceWidth /*- glyphSize(clefSign).x*/)/2); /*Center between last staff sign and next synchronization point*/
+              }
+              x += glyph(vec2(x, y), clefSign);
+              timeTrack[sign.time] = max(timeTrack[sign.time], x); // Updates next synchronization point
 #else
-     assert_(sign.time >= measureStartTime);
-     //log(measureStartX);
-     float advance = glyph(vec2(X(sign.time), y), clefSign);
-     /*if(sign.staff==1)*/ measureStartX += advance; // FIXME
+              assert_(sign.time >= measureStartTime);
+              //log(measureStartX);
+              advance = ::max(advance, glyph(vec2(X(sign.time), y), clefSign)+space/2);
 #endif
-    } else { index++; continue; }
-   }
+          } else { index++; continue; }
+      }
+      measureStartX += advance;
   }
 
   if(sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) { // Staff signs
@@ -749,11 +750,13 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     if(sign.type == Sign::Note) {
      Note& note = sign.note;
 
-     StringFret fingering = nextNote(sign); // Update fingering context (has to be called in temporal note order)
-     note.string = fingering.string;
-     note.fret = fingering.fret;
-     signs[signIndex].note.string = note.string;
-     signs[signIndex].note.fret = note.fret;
+     if(0) {
+         StringFret fingering = nextNote(sign); // Update fingering context (has to be called in temporal note order)
+         note.string = fingering.string;
+         note.fret = fingering.fret;
+         signs[signIndex].note.string = note.string;
+         signs[signIndex].note.fret = note.fret;
+     }
 
      note.clef = staves[staff].clef;
      //for(const auto& sign: staves[staff].chord) if(sign.note.key() == note.key()) goto continue2_;
@@ -911,7 +914,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      for(size_t staff: range(staves.size)) glyph(vec2(x, staffY(staff, -6)), SMuFL::TimeSignature::_0+digit-'0');
      x += glyphAdvance(SMuFL::TimeSignature::_0+digit-'0');
     }
-    maxX = max(maxX, x); //startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
+    maxX = max(maxX, x)+glyphAdvance(SMuFL::TimeSignature::_0); //startX+2*glyphAdvance(SMuFL::TimeSignature::_0);
     measureStartX += maxX - startX;
     //timeTrack.at(sign.time) = maxX;
     //for(Staff& staff: staves) staff.x = maxX;
@@ -963,7 +966,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      // Draws measure bar
      //if(measureBars) log("|", sign.time, x);
      x += dx;
-     x -= spaceWidth/2;
+     //x -= spaceWidth/2;
      if(margin || signIndex < signs.size-1) {
       if(1) { // Grand staff
        //if(measureBars)  log("|", x);

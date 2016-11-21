@@ -28,7 +28,7 @@ generic struct remove_reference<T&&> { typedef T type; };
 generic __attribute((warn_unused_result)) inline constexpr Type remove_reference<T>::type&& move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
-//generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
+generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Forwards references and copyable values
 generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
 /// Forwards moveable values

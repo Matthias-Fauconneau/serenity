@@ -2,7 +2,7 @@
 #include "ui/render.h"
 #include "x.h"
 #include "time.h"
-#include "gl.h"
+//include "gl.h"
 
 #include <sys/shm.h>
 
@@ -28,8 +28,10 @@
 #undef Font
 #undef None
 
+#if CURSOR
 ICON(text);
 Image cursorIcon();
+#endif
 using namespace X11;
 
 static Window* currentWindow = 0; // FIXME
@@ -276,8 +278,12 @@ void XWindow::event() {
  }
 
  if(glContext)
+#if GL
   GLFrameBuffer::bindWindow(0, Window::size, 0/*ClearColor|ClearDepth*/,
                             rgba4f(backgroundColor, 1));
+#else
+  error("GL");
+#endif
  Update update = render(Window::size, target);
  if(update) {
   if(glContext) {
@@ -301,9 +307,13 @@ void XWindow::initializeThreadGLContext() {
 }
 
 Image XWindow::readback() {
+#if GL
  Image target(Window::size);
  glReadPixels(0, 0, target.size.x, target.size.y, GL_BGRA, GL_UNSIGNED_BYTE, (void*)target.data);
  return flip(move(target));
+#else
+ error("GL");
+#endif
 }
 
 void XWindow::setCursor(MouseCursor /*cursor*/) {
@@ -348,65 +358,6 @@ void XWindow::setSelection(string selection, bool clipboard) {
  this->selection[clipboard] = copyRef(selection);
  //send(SetSelectionOwner{.owner=id, .selection=clipboard?Atom("CLIPBOARD"_):1});
 }
-
-#if DRM
-// --- DRM Window
-
-DRMWindow::DRMWindow(Widget* widget, Thread& thread) : Window(widget, thread) {
- if(!display) display = unique<Display>();  // Created by the first instantiation of a window, deleted at exit
- display->windows.append(this);
- size = display->buffers[0].target.size;
- actions[Escape] = []{requestTermination();};
- mapped = true;
- render();
-}
-DRMWindow::~DRMWindow() {
- display->windows.remove(this);
- if(!display->windows) display=null;
-}
-
-// FIXME: Schedules window rendering after all events have been processed
-void DRMWindow::event() {
- if(!updates) return;
- render(display->buffers[1].target);
- display->swapBuffers();
-}
-
-void DRMWindow::mouseEvent(int2 cursor, ::Event event, Button button) {
- if(event==Press) {
-  Widget* previousFocus = focus;
-  if(widget->mouseEvent(vec2(cursor), vec2(size), Press, button, focus) || focus!=previousFocus) render();
-  drag = focus;
- }
- if(event==Release) {
-  drag=0;
-  if(button <= RightButton && widget->mouseEvent(vec2(cursor), vec2(size), Release, button, focus)) render();
- }
- if(event==Motion) {
-  if(drag && button==LeftButton && drag->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
-  else if(widget->mouseEvent(vec2(cursor), vec2(size), Motion, button, focus)) render();
- }
-}
-
-void DRMWindow::keyPress(Key key) {
- if(focus && focus->keyPress(key, NoModifiers)) render();
- else {
-  function<void()>* action = actions.find(key);
-  if(action) (*action)(); // Local window action
- }
-}
-
-function<void()>& DRMWindow::globalAction(Key key) { return actions[key]; }
-void DRMWindow::show() {}
-void DRMWindow::hide() {}
-void DRMWindow::setTitle(const string) {}
-void DRMWindow::setIcon(const Image&) {}
-void DRMWindow::setCursor(MouseCursor) {}
-String DRMWindow::getSelection(bool) { return {}; }
-void DRMWindow::setSelection(string, bool) {}
-
-unique<Display> DRMWindow::display = null;
-#endif
 
 unique<Window> window(Widget* widget, int2 size, Thread& thread, bool useGL, string title) {
  if(environmentVariable("DISPLAY")) {

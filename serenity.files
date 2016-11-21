@@ -13,7 +13,6 @@ core/string.cc
 core/vector.h
 core/matrix.h
 core/image.h
-core/image.cc
 core/simd.h
 core/map.h
 core/file.h
@@ -32,4 +31,9 @@ core/sort.h
 io/dbus.h
 io/dbus.cc
 
-test.cc
+ui/window.cc
+ui/render.cc
+ui/gl.cc
+
+music/MusicXML.cc
+music/music-test.cc
