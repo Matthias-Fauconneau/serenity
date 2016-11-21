@@ -290,22 +290,28 @@ struct Scene {
 
     inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const;
 
+    // Uniformly distributed points on sphere (Marsaglia)
+    vec3 sphere(Random& random) const {
+        float t0, t1, sq;
+        do {
+            t0 = random()*2-1;
+            t1 = random()*2-1;
+            sq = t0*t0 + t1*t1;
+        } while(sq >= 1);
+        const float r = sqrt(1-sq);
+        return vec3(2*t0*r, 2*t1*r, 1-2*sq);
+    }
+    // Uniformly distributed points on hemisphere directed towards N
+    vec3 hemisphere(Random& random, vec3 N) const {
+        const vec3 S = sphere(random);
+        return dot(S,N) < 0 ? -S: S;
+    }
+
     bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 N, Random& random, const uint bounce) const {
         const Scene::Face& face = faces[faceIndex];
         if(face.reflect) {
             if(bounce > 0) return 0;
-            // Marsaglia
-            float t0, t1, sq;
-            do {
-                t0 = random()*2-1;
-                t1 = random()*2-1;
-                sq = t0*t0 + t1*t1;
-            } while(sq >= 1);
-            float r = sqrt(1-sq);
-            vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
-            if(dot(U,N) < 0) U = -U; // On hemisphere
-
-            const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
+            const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * hemisphere(random, N));
 
             return bgr3f(1, 1./2, 1./2) * raycast_shade(P, R, random, bounce+1);
         }
@@ -335,6 +341,23 @@ struct Scene {
         }
         else { // Diffuse
             for(uint light: lights) if(faceIndex == light) return 1; // FIXME
+#if 1
+            const vec3 S = sphere(random);
+            const float dotNS = dot(N, S);
+            const vec3 l      = dotNS < 0 ? -S : S;
+            const float dotNL = dotNS < 0 ? -dotNS : dotNS;
+            float t,u,v;
+            size_t lightFaceIndex = raycast(P, l, t, u, v);
+            if(!lights.contains(lightFaceIndex)) return 0; // FIXME: TODO: indirect lighting
+            const vec3 Nl = normalize((1-u-v) * faces[lightFaceIndex].N[0] + u * faces[lightFaceIndex].N[1] + v * faces[lightFaceIndex].N[2]);
+            float dotNlL = dot(Nl, -l);
+            if(dotNlL <= 0) return 0; // Backface light cull
+            else {
+                const float lightPower = sq(512);
+                float sqL = sq(t);
+                return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
+            }
+#else
             const float a = random(); uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
             const uint lightFaceIndex = lights[lightIndex];
             const float u = random();
@@ -355,11 +378,11 @@ struct Scene {
                     if(lightRayHitFaceIndex != lightFaceIndex) return 0;
                     else {
                         const float lightPower = sq(512);
-                        //return sqrt(sqL)/512;
                         return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
                     }
                 }
             }
+#endif
         }
     }
 

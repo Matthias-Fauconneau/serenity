@@ -47,7 +47,7 @@ struct ViewApp {
     bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
-    ImageH sumB, sumG, sumR;
+    ImageF sumB, sumG, sumR;
     size_t count = 0;
     vec2 viewYawPitch;
 
@@ -266,9 +266,9 @@ struct ViewApp {
             }
         } else {
             if(view.viewYawPitch != viewYawPitch || sumB.size != target.size) { // Resets accumulation
-                sumB = ImageH(target.size);
-                sumG = ImageH(target.size);
-                sumR = ImageH(target.size);
+                sumB = ImageF(target.size);
+                sumG = ImageF(target.size);
+                sumR = ImageF(target.size);
                 count = 1;
             } else count++;
 #if 1 // Raycast (FIXME: sheared)
