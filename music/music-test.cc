@@ -5,7 +5,7 @@
 
 struct MusicTest {
  Map map;
- Image image;
+ Image image, target;
  ImageView view;
  unique<Window> window = nullptr;
  MusicTest() {
@@ -32,7 +32,15 @@ struct MusicTest {
   }
   map = Map(imageFile);
   image = Image(cast<byte4>(unsafeRef(map)), size);
-  view = cropRef(image,0,int2(1366*2,870));
+  target = copy(image);
+  view = cropRef(target,0,int2(1366*2,870));
   window = ::window(&view);
+  for(size_t x: range(image.size.x)) {
+   uint sum = 0;
+   for(size_t y: range(image.size.y)) sum += image(x,y).g;
+   if(sum < 255u*image.size.y*2/3) { // Measure Bar
+    for(size_t y: range(image.size.y)) target(x,y) = 0;
+   }
+  }
  }
 } test;
