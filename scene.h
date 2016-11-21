@@ -341,48 +341,22 @@ struct Scene {
         }
         else { // Diffuse
             for(uint light: lights) if(faceIndex == light) return 1; // FIXME
-#if 1
             const vec3 S = sphere(random);
             const float dotNS = dot(N, S);
             const vec3 l      = dotNS < 0 ? -S : S;
             const float dotNL = dotNS < 0 ? -dotNS : dotNS;
             float t,u,v;
-            size_t lightFaceIndex = raycast(P, l, t, u, v);
-            if(!lights.contains(lightFaceIndex)) return 0; // FIXME: TODO: indirect lighting
-            const vec3 Nl = normalize((1-u-v) * faces[lightFaceIndex].N[0] + u * faces[lightFaceIndex].N[1] + v * faces[lightFaceIndex].N[2]);
-            float dotNlL = dot(Nl, -l);
-            if(dotNlL <= 0) return 0; // Backface light cull
-            else {
-                const float lightPower = sq(512);
-                float sqL = sq(t);
-                return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
+            size_t lightRayFaceIndex = raycast(P, l, t, u, v);
+            if(lights.contains(lightRayFaceIndex)) {
+                //if(bounce == 0) return 0; // No direct lighting
+                return 2 * dotNL * ((PI/PI) * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]));
+            } else { // Indirect lighting
+                if(bounce > 0) return 0;
+                if(lightRayFaceIndex == faces.size) return 0; // No hits
+                const bgr3f incidentPower = shade(lightRayFaceIndex, P+t*l, l, u, v, random, bounce+1);
+                return 2 * dotNL * (PI/PI) * incidentPower;
+                //return (1/sqL * (1+dotNlL)/2 * (1+dotNL)/2) * incidentPower; // * bgr3f(B[faceIndex],G[faceIndex],R[faceIndex]);
             }
-#else
-            const float a = random(); uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
-            const uint lightFaceIndex = lights[lightIndex];
-            const float u = random();
-            const float v = random();
-            vec3 L = vec3((1-u-v) * X[0][lightFaceIndex] +  u * X[1][lightFaceIndex] + v * X[2][lightFaceIndex],
-                          (1-u-v) * Y[0][lightFaceIndex] +  u * Y[1][lightFaceIndex] + v * Y[2][lightFaceIndex],
-                          (1-u-v) * Z[0][lightFaceIndex] +  u * Z[1][lightFaceIndex] + v * Z[2][lightFaceIndex])-P;
-            float sqL = sq(L);
-            vec3 l = rsqrt(sqL) * L;
-            vec3 Nl = normalize((1-u-v) * faces[lightFaceIndex].N[0] +  u * faces[lightFaceIndex].N[1] + v * faces[lightFaceIndex].N[2]);
-            float dotNlL = dot(Nl, -l);
-            if(dotNlL <= 0) return 0; // Backface light cull
-            else {
-                float dotNL = dot(N, l);
-                if(dotNL <= 0) return 0;
-                else {
-                    size_t lightRayHitFaceIndex = raycast(P, l);
-                    if(lightRayHitFaceIndex != lightFaceIndex) return 0;
-                    else {
-                        const float lightPower = sq(512);
-                        return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
-                    }
-                }
-            }
-#endif
         }
     }
 
