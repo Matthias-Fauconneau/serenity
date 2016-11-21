@@ -146,6 +146,7 @@ struct Scene {
     buffer<float> B, G, R; // Face color attributes
     buffer<Face> faces;
     array<uint> lights; // Face index of lights
+    array<float> CAF; // Cumulative area of lights (sample proportionnal to area)
 
     vec3 min, max;
     float scale, near, far;
@@ -334,32 +335,29 @@ struct Scene {
         }
         else { // Diffuse
             for(uint light: lights) if(faceIndex == light) return 1; // FIXME
-            //size_t light = lights[random%lights.size];
-            bgr3f sum = 0;
-            for(uint light: lights) { // FIXME: uniform sampling
-                const float u = random();
-                const float v = random();
-                vec3 L = vec3((1-u-v) * X[0][light] +  u * X[1][light] + v * X[2][light],
-                        (1-u-v) * Y[0][light] +  u * Y[1][light] + v * Y[2][light],
-                        (1-u-v) * Z[0][light] +  u * Z[1][light] + v * Z[2][light])-P;
-                vec3 l = normalize(L);
-                vec3 Nl = (1-u-v) * faces[light].N[0] +  u * faces[light].N[1] + v * faces[light].N[2];
-                float dotNlL = dot(Nl, -l);
-                if(dotNlL <= 0) continue; // Backface light cull
+            const float a = random();
+            uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
+            const float u = random();
+            const float v = random();
+            vec3 L = vec3((1-u-v) * X[0][lightIndex] +  u * X[1][lightIndex] + v * X[2][lightIndex],
+                    (1-u-v) * Y[0][lightIndex] +  u * Y[1][lightIndex] + v * Y[2][lightIndex],
+                    (1-u-v) * Z[0][lightIndex] +  u * Z[1][lightIndex] + v * Z[2][lightIndex])-P;
+            vec3 l = normalize(L);
+            vec3 Nl = (1-u-v) * faces[lightIndex].N[0] +  u * faces[lightIndex].N[1] + v * faces[lightIndex].N[2];
+            float dotNlL = dot(Nl, -l);
+            if(dotNlL <= 0) return 0; // Backface light cull
+            else {
+                float dotNL = dot(N, l);
+                if(dotNL <= 0) return 0;
                 else {
-                    float dotNL = dot(N, l);
-                    if(dotNL <= 0) continue;
+                    size_t lightRayHitFaceIndex = raycast(P, l);
+                    if(lightRayHitFaceIndex != lightIndex) return 0;
                     else {
-                        size_t lightRayHitFaceIndex = raycast(P, l);
-                        if(lightRayHitFaceIndex != light) continue;
-                        else {
-                            const float lightPower = sq(512);
-                            sum += lightPower * dotNlL * dotNL / sq(L) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
-                        }
+                        const float lightPower = sq(512);
+                        return lightPower * dotNlL * dotNL / sq(L) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
                     }
                 }
             }
-            return sum;
         }
     }
 

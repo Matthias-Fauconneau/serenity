@@ -268,7 +268,9 @@ Scene parseScene(ref<byte> file) {
             }
             assert_(polygon.size == 4);
             const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
-            const vec3 N = normalize(cross(B-A, C-A));
+            const vec3 cross = ::cross(B-A, C-A);
+            const float lengthCross = length(cross);
+            const vec3 N = cross/lengthCross;
             float reflect = N.z == -1;
             const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
             const float gloss = 1./8;
@@ -282,7 +284,10 @@ Scene parseScene(ref<byte> file) {
                 scene.Y[i].append(polygon[i].y-viewpoint.y);
                 scene.Z[i].append(polygon[i].z-viewpoint.z);
             }
-            if(N.y == 1) scene.lights.append(scene.faces.size-1);
+            if(N.y == 1) {
+                scene.lights.append(scene.faces.size-1);
+                scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
+            }
             // Triangle ACD
             scene.faces.append({{0,1,0},{0,1,1},{N,N,N},reflect,0,gloss,0,0});
             scene.B.append(color.b);
@@ -293,10 +298,15 @@ Scene parseScene(ref<byte> file) {
                 scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
                 scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
             }
-            if(N.y == 1) scene.lights.append(scene.faces.size-1);
+            if(N.y == 1) {
+                scene.lights.append(scene.faces.size-1);
+                scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
+            }
         }
         assert_(scene.faces.size == 2*quadCount);
     }
+    for(float& v: scene.CAF) v /= scene.CAF.last();
+    assert_(scene.CAF.last()==1);
     scene.fit();
     return scene;
 }
