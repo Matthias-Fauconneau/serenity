@@ -335,15 +335,16 @@ struct Scene {
         }
         else { // Diffuse
             for(uint light: lights) if(faceIndex == light) return 1; // FIXME
-            const float a = random();
-            uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
+            const float a = random(); uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
+            const uint lightFaceIndex = lights[lightIndex];
             const float u = random();
             const float v = random();
-            vec3 L = vec3((1-u-v) * X[0][lightIndex] +  u * X[1][lightIndex] + v * X[2][lightIndex],
-                    (1-u-v) * Y[0][lightIndex] +  u * Y[1][lightIndex] + v * Y[2][lightIndex],
-                    (1-u-v) * Z[0][lightIndex] +  u * Z[1][lightIndex] + v * Z[2][lightIndex])-P;
-            vec3 l = normalize(L);
-            vec3 Nl = (1-u-v) * faces[lightIndex].N[0] +  u * faces[lightIndex].N[1] + v * faces[lightIndex].N[2];
+            vec3 L = vec3((1-u-v) * X[0][lightFaceIndex] +  u * X[1][lightFaceIndex] + v * X[2][lightFaceIndex],
+                          (1-u-v) * Y[0][lightFaceIndex] +  u * Y[1][lightFaceIndex] + v * Y[2][lightFaceIndex],
+                          (1-u-v) * Z[0][lightFaceIndex] +  u * Z[1][lightFaceIndex] + v * Z[2][lightFaceIndex])-P;
+            float sqL = sq(L);
+            vec3 l = rsqrt(sqL) * L;
+            vec3 Nl = normalize((1-u-v) * faces[lightFaceIndex].N[0] +  u * faces[lightFaceIndex].N[1] + v * faces[lightFaceIndex].N[2]);
             float dotNlL = dot(Nl, -l);
             if(dotNlL <= 0) return 0; // Backface light cull
             else {
@@ -351,10 +352,11 @@ struct Scene {
                 if(dotNL <= 0) return 0;
                 else {
                     size_t lightRayHitFaceIndex = raycast(P, l);
-                    if(lightRayHitFaceIndex != lightIndex) return 0;
+                    if(lightRayHitFaceIndex != lightFaceIndex) return 0;
                     else {
                         const float lightPower = sq(512);
-                        return lightPower * dotNlL * dotNL / sq(L) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
+                        //return sqrt(sqL)/512;
+                        return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
                     }
                 }
             }

@@ -15,6 +15,7 @@ inline float floor(float x) { return __builtin_floorf(x); }
 inline float fract(float x) { return x - floor(x); }
 inline float round(float x) { return __builtin_roundf(x); }
 inline float ceil(float x) { return __builtin_ceilf(x); }
+inline float rsqrt(float f) { return 1/__builtin_sqrtf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 
 constexpr float PI = 3.14159265358979323846;
