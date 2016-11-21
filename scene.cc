@@ -273,56 +273,62 @@ Scene parseScene(ref<byte> file) {
                 s.skip('\n');
             }
             assert_(polygon.size == 4);
-            const vec3 A = polygon[0], B = polygon[1], C = polygon[2];
-            const vec3 cross = ::cross(B-A, C-A);
-            const float lengthCross = length(cross);
-            const vec3 N = cross/lengthCross;
-            float reflect = N.z == -1;
-            const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
             const float gloss = 1./8;
-            // Triangle ABC
-            scene.faces.append({{0,1,1},{0,0,1},{N,N,N},reflect,0,gloss,0,0});
-            for(size_t i: range(3)) {
-                scene.X[i].append(polygon[i].x-viewpoint.x);
-                scene.Y[i].append(polygon[i].y-viewpoint.y);
-                scene.Z[i].append(polygon[i].z-viewpoint.z);
+            { // Triangle ABC
+                const vec3 T = normalize(polygon[1]-polygon[0]);
+                const vec3 B = normalize(polygon[2]-polygon[1]);
+                const vec3 N = normalize(cross(T, B));
+                const float reflect = N.z == -1;
+                const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+                scene.faces.append({{0,1,1},{0,0,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
+                for(size_t i: range(3)) {
+                    scene.X[i].append(polygon[i].x-viewpoint.x);
+                    scene.Y[i].append(polygon[i].y-viewpoint.y);
+                    scene.Z[i].append(polygon[i].z-viewpoint.z);
+                }
+                if(N.y == 1) {
+                    scene.emittanceB.append(1);
+                    scene.emittanceG.append(1);
+                    scene.emittanceR.append(1);
+                    scene.reflectanceB.append(1);
+                    scene.reflectanceG.append(1);
+                    scene.reflectanceR.append(1);
+                } else {
+                    scene.emittanceB.append(0);
+                    scene.emittanceG.append(0);
+                    scene.emittanceR.append(0);
+                    scene.reflectanceB.append(color.b);
+                    scene.reflectanceG.append(color.g);
+                    scene.reflectanceR.append(color.r);
+                }
             }
-            if(N.y == 1) {
-                scene.emittanceB.append(1);
-                scene.emittanceG.append(1);
-                scene.emittanceR.append(1);
-                scene.reflectanceB.append(1);
-                scene.reflectanceG.append(1);
-                scene.reflectanceR.append(1);
-            } else {
-                scene.emittanceB.append(0);
-                scene.emittanceG.append(0);
-                scene.emittanceR.append(0);
-                scene.reflectanceB.append(color.b);
-                scene.reflectanceG.append(color.g);
-                scene.reflectanceR.append(color.r);
-            }
-            // Triangle ACD
-            scene.faces.append({{0,1,0},{0,1,1},{N,N,N},reflect,0,gloss,0,0});
-            for(size_t i: range(3)) {
-                scene.X[i].append(polygon[i?1+i:0].x-viewpoint.x);
-                scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
-                scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
-            }
-            if(N.y == 1) {
-                scene.emittanceB.append(1);
-                scene.emittanceG.append(1);
-                scene.emittanceR.append(1);
-                scene.reflectanceB.append(1);
-                scene.reflectanceG.append(1);
-                scene.reflectanceR.append(1);
-            } else {
-                scene.emittanceB.append(0);
-                scene.emittanceG.append(0);
-                scene.emittanceR.append(0);
-                scene.reflectanceB.append(color.b);
-                scene.reflectanceG.append(color.g);
-                scene.reflectanceR.append(color.r);
+            { // Triangle ACD
+                const vec3 T = normalize(polygon[2]-polygon[3]);
+                const vec3 B = normalize(polygon[3]-polygon[0]);
+                const vec3 N = normalize(cross(T, B));
+                const float reflect = N.z == -1;
+                const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+                scene.faces.append({{0,1,0},{0,1,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
+                for(size_t i: range(3)) {
+                    scene.X[i].append(polygon[i?1+i:0].x-viewpoint.x);
+                    scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
+                    scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
+                }
+                if(N.y == 1) {
+                    scene.emittanceB.append(1);
+                    scene.emittanceG.append(1);
+                    scene.emittanceR.append(1);
+                    scene.reflectanceB.append(1);
+                    scene.reflectanceG.append(1);
+                    scene.reflectanceR.append(1);
+                } else {
+                    scene.emittanceB.append(0);
+                    scene.emittanceG.append(0);
+                    scene.emittanceR.append(0);
+                    scene.reflectanceB.append(color.b);
+                    scene.reflectanceG.append(color.g);
+                    scene.reflectanceR.append(color.r);
+                }
             }
         }
         assert_(scene.faces.size == 2*quadCount);

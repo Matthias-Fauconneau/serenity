@@ -134,10 +134,10 @@ inline uint indexOfEqual(const v8sf x, const v8sf y) {
 
 struct Scene {
     struct Face {
-        // Vertex attributes (FIXME: triangle)
+        // Vertex attributes
         float u[3];
         float v[3];
-        vec3 N[3];
+        vec3 T[3], B[3], N[3];
         // Face attributes
         float reflect, refract, gloss; // Render (RaycastShader)
         const half* BGR; uint2 size; // Display (TextureShader)
@@ -305,18 +305,19 @@ struct Scene {
         const vec3 S = sphere(random);
         return dot(S,N) < 0 ? -S: S;
     }
+#if 0
     // Cosine distributed points on hemisphere directed towards N
     vec3 cosine(Random& random, const vec3 N, float& cosθ /*PDF*/) const {
         const float ξ1 = random();
         const float ξ2 = random();
 
         cosθ = sqrt(1-ξ1);
-        const float θ = acos(cosθ);
+        const float sinθ = sqrt(ξ1);
         const float φ = 2*PI*ξ2;
 
-        const float xs = sin(θ) * cos(φ);
-        const float ys = cos(θ);
-        const float zs = sin(θ) * sin(φ);
+        const float xs = sinθ * cos(φ);
+        const float ys = cosθ;
+        const float zs = sinθ * sin(φ);
 
         vec3 h = N;
         /**/ if(abs(h.x)<=abs(h.y) && abs(h.x)<=abs(h.z)) h.x=1;
@@ -326,8 +327,17 @@ struct Scene {
         const vec3 x = normalize(cross(h, N));
         return normalize(xs * x + ys * N + zs * normalize(cross(x, N)));
     }
-
-    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 N, Random& random, const uint bounce) const {
+#else
+    vec3 cosine(Random& random) const {
+        const float ξ1 = random();
+        const float ξ2 = random();
+        const float cosθ = sqrt(1-ξ1);
+        const float sinθ = sqrt(ξ1);
+        const float φ = 2*PI*ξ2;
+        return vec3(sinθ * cos(φ), sinθ * sin(φ), cosθ);
+    }
+#endif
+    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const uint bounce) const {
         const Scene::Face& face = faces[faceIndex];
         if(face.reflect) {
             if(bounce > 0) return 0;
@@ -351,8 +361,8 @@ struct Scene {
             bgr3f volumeColor (this->emittanceB[faceIndex],this->emittanceG[faceIndex],this->emittanceR[faceIndex]);
 
             const vec3 backN = (1-backU-backV) * faces[backFaceIndex].N[0] +
-                                        backU * faces[backFaceIndex].N[1] +
-                                        backV * faces[backFaceIndex].N[2];
+                                         backU * faces[backFaceIndex].N[1] +
+                                         backV * faces[backFaceIndex].N[2];
             const vec3 backR = refract(n2/n1, -backN, R);
 
             bgr3f transmitColor = raycast_shade(backP, backR, random, bounce+1);
@@ -361,25 +371,35 @@ struct Scene {
         }
         else { // Diffuse
             bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
-            if(bounce < 2) {
-                float cosθ;
-                const vec3 l = cosine(random, N, cosθ /*PDF*/);
-                const float dotNL = cosθ;
-                const bgr3f BRDF = 2.f * bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]) * dotNL;
-                const float PDF = cosθ;
+            const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
+            if(bounce < 1) { // Direct or indirect
+                const vec3 l = cosine(random); // Local frame
+                const vec3 L = l.x * T + l.y * B + l.z * N;
                 float t,u,v;
-                size_t lightRayFaceIndex = raycast(P, l, t, u, v);
-                out += (1/PDF) * BRDF * shade(lightRayFaceIndex, P+t*l, l, u, v, random, bounce+1);
+                size_t lightRayFaceIndex = raycast(P, L, t, u, v);
+                out += BRDF * shade(lightRayFaceIndex, P+t*L, L, u, v, random, bounce+1);
+            } else { // Last bounce (only direct lighting)
+                const vec3 l = cosine(random); // Local frame
+                const vec3 L = l.x * T + l.y * B + l.z * N;
+                float t,u,v;
+                size_t lightRayFaceIndex = raycast(P, L, t, u, v);
+                out += BRDF * bgr3f(emittanceB[lightRayFaceIndex], emittanceG[lightRayFaceIndex], emittanceR[lightRayFaceIndex]);
             }
             return out;
         }
     }
 
     inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce) const {
+        const vec3 T = (1-u-v) * faces[faceIndex].T[0] +
+                             u * faces[faceIndex].T[1] +
+                             v * faces[faceIndex].T[2];
+        const vec3 B = (1-u-v) * faces[faceIndex].B[0] +
+                             u * faces[faceIndex].B[1] +
+                             v * faces[faceIndex].B[2];
         const vec3 N = (1-u-v) * faces[faceIndex].N[0] +
                              u * faces[faceIndex].N[1] +
                              v * faces[faceIndex].N[2];
-        return shade(faceIndex, P, D, N, random, bounce);
+        return shade(faceIndex, P, D, T, B, N, random, bounce);
     }
 
     struct NoShader {
@@ -496,8 +516,10 @@ struct Scene {
         inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(id, face, z, varying, mask); }
         inline Vec<float, 3> shade(const uint id, FaceAttributes index, float, float unused varying[V]) const {
             const vec3 P = vec3(varying[2], varying[3], varying[4]);
-            const vec3 N = normalize(vec3(varying[5], varying[6], varying[7]));
-            bgr3f color = scene.shade(index, P, normalize(P-viewpoint), N, randoms[id], 0);
+            const vec3 T = normalize(vec3(varying[5], varying[6], varying[7]));
+            const vec3 B = normalize(vec3(varying[8], varying[9], varying[10]));
+            const vec3 N = normalize(vec3(varying[11], varying[12], varying[13])); // FIXME: cross
+            bgr3f color = scene.shade(index, P, normalize(P-viewpoint), T, B, N, randoms[id], 0);
             return Vec<float, 3>{{color.b, color.g, color.r}};
         }
     };
@@ -533,9 +555,15 @@ struct Scene {
                                                  vec3(A.x,B.x,C.x),
                                                  vec3(A.y,B.y,C.y),
                                                  vec3(A.z,B.z,C.z),
+                                                 vec3(faces[faceIndex].T[0].x, faces[faceIndex].T[1].x, faces[faceIndex].T[2].x),
+                                                 vec3(faces[faceIndex].T[0].y, faces[faceIndex].T[1].y, faces[faceIndex].T[2].y),
+                                                 vec3(faces[faceIndex].T[0].z, faces[faceIndex].T[1].z, faces[faceIndex].T[2].z),
+                                                 vec3(faces[faceIndex].B[0].x, faces[faceIndex].B[1].x, faces[faceIndex].B[2].x),
+                                                 vec3(faces[faceIndex].B[0].y, faces[faceIndex].B[1].y, faces[faceIndex].B[2].y),
+                                                 vec3(faces[faceIndex].B[0].z, faces[faceIndex].B[1].z, faces[faceIndex].B[2].z),
                                                  vec3(faces[faceIndex].N[0].x, faces[faceIndex].N[1].x, faces[faceIndex].N[2].x),
                                                  vec3(faces[faceIndex].N[0].y, faces[faceIndex].N[1].y, faces[faceIndex].N[2].y),
-                                                 vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[1].z, faces[faceIndex].N[2].z)
+                                                 vec3(faces[faceIndex].N[0].z, faces[faceIndex].N[1].z, faces[faceIndex].N[2].z) // FIXME: cross
                                  }, faceIndex);
         }
         renderer.pass.render(renderer.target);
