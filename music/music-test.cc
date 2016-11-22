@@ -1,10 +1,12 @@
 #include "MusicXML.h"
 #include "midi.h"
 #include "audio.h"
+#include "keyboard.h"
 #include "png.h"
 #include "interface.h"
 #include "window.h"
 #include "encoder.h"
+#include "asound.h"
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
@@ -27,12 +29,44 @@ uint audioStart(string audioFileName) {
  }
 }
 
-struct MusicTest {
+struct Music : Widget {
+ // MusicXML
+ buffer<Sign> signs;
+ // PNG
  Map rawImageFileMap;
- Image image, target;
- ImageView view;
+ Image image;
+ array<uint> measureX; // X position in image of start of each measure
+ // MIDI
+ MidiNotes notes;
+ buffer<Sign> midiToSign;
+ array<int64> measureT;
+ // MP3
+ unique<FFmpeg> audioFile = nullptr;
+
+ // View
+ Scroll<ImageView> scroll;
+ Keyboard keyboard; // 1/6 ~ 120
+
+ // Highlighting
+ map<uint, Sign> active; // Maps active keys to notes (indices)
+ uint midiIndex = 0, noteIndex = 0;
+
+ // Preview
  unique<Window> window = nullptr;
- MusicTest() {
+ Thread audioThread;
+ AudioOutput audio = {{this, &Music::read32}, audioThread};
+
+ size_t read32(mref<int2> output) {
+  if(audioFile->channels == audio.channels) return audioFile->read32(mcast<int>(output));
+  else if(audioFile->channels == 1 && audio.channels==2) {
+   int buffer[output.size];
+   audioFile->read32(mref<int>(buffer, output.size));
+   for(size_t i: range(output.size)) output[i] = buffer[i];
+   return output.size;
+  } else error(audioFile->channels);
+ }
+
+ Music() {
   string name = arguments()[0];
   String imageFile; int2 size;
   auto list = currentWorkingDirectory().list(Files);
@@ -57,21 +91,19 @@ struct MusicTest {
   }
   rawImageFileMap = Map(imageFile);
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
-  target = copy(image);
+  //Image target = copy(image);
 
-  array<uint> measureX; // X position in image of start of each measure
   for(uint x: range(image.size.x)) {
    if(measureX && x<=measureX.last()+200) continue; // Minimum interval between measures
    uint sum = 0;
    for(uint y: range(image.size.y)) sum += image(x,y).g;
    if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
-    for(size_t y: range(image.size.y)) target(x,y) = 0;
+    //for(size_t y: range(image.size.y)) target(x,y) = 0;
     measureX.append(x);
    }
   }
-  MusicXML xml = readFile(name+".xml"_);
 
-  const mref<Sign> signs = xml.signs;
+  signs = MusicXML(readFile(name+".xml"_)).signs;
 
   map<uint, array<Sign>> notes;
   for(size_t signIndex: range(signs.size)) {
@@ -86,13 +118,13 @@ struct MusicTest {
   }
 
   String audioFileName = name+".mp3";
-  FFmpeg audioFile = FFmpeg(audioFileName);
+  audioFile = unique<FFmpeg>(audioFileName);
 
-  MidiNotes midi = ::scale(MidiFile(readFile(name+".mid"_)).notes, audioFile.audioFrameRate, audioStart(audioFileName));
-  buffer<MidiNote> midiNotes = filter(midi, [](MidiNote o){return o.velocity==0;});
+  this->notes = ::scale(MidiFile(readFile(name+".mid"_)).notes, audioFile->audioFrameRate, audioStart(audioFileName));
+  buffer<MidiNote> midiNotes = filter(this->notes, [](MidiNote o){return o.velocity==0;});
 
   // Associates MIDI notes with score notes
-  buffer<Sign> midiToSign = buffer<Sign>(midiNotes.size, 0);
+  midiToSign = buffer<Sign>(midiNotes.size, 0);
 
   array<array<uint>> S;
   array<array<uint>> Si; // Maps sorted index to original
@@ -153,7 +185,6 @@ struct MusicTest {
   // Forward scan (chronologic)
   size_t i = 0, j = 0; // Score and MIDI bins indices
   size_t signIndex = 0;
-  array<int64> measureT;
   while(i<m && j<n) {
    /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
     i++;
@@ -188,10 +219,126 @@ struct MusicTest {
   //for(size_t midiNotesIndex: range(midiNotes.size)) {
    //log(strKey(0, midiToSign[midiNotesIndex].note.key()), strKey(0,midiNotes[midiNotesIndex].key));
   //}
-  if(measureT.size != measureX.size) writeFile("output.png", encodePNG(target), currentWorkingDirectory(), true);
+  //if(measureT.size != measureX.size) writeFile("output.png", encodePNG(target), currentWorkingDirectory(), true);
   assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
-  log(measureT);
-  view = cropRef(target,0,int2(1366*2,870));
-  window = ::window(&view);
+  //log(measureT);
+  //view = cropRef(target,0,int2(1366*2,870));
+  scroll.image = unsafeRef(image);
+  scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
+  window = ::window(this);
+
+  audio.start(audioFile->audioFrameRate, 1024, 32, 2);
+  audioThread.spawn();
  }
+
+ bool follow(int64 timeNum, int64 timeDen, vec2 size) {
+  //constexpr int staffCount = 2;
+  bool contentChanged = false;
+  for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= timeNum*(int64)notes.ticksPerSeconds; midiIndex++) {
+   MidiNote note = notes[midiIndex];
+   if(note.velocity) {
+    //assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
+    Sign sign = midiToSign[noteIndex];
+    if(sign.type == Sign::Note) {
+     active.insertMulti(note.key, sign);
+     (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
+     /*if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
+      assert_(sign.note.pageIndex == 0);
+      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:(staffCount==1?blue:green));
+      contentChanged = true;
+     }*/
+    }
+    // Updates next notes
+#if 0
+    size_t firstSignIndex = sign.note.signIndex;
+    assert_(firstSignIndex != invalid);
+    //bool firstNote = true;
+    for(size_t signIndex: range(firstSignIndex, signs.size)) {
+     assert_(signIndex < signs.size, signIndex);
+     const Sign& sign = signs[signIndex];
+     if(sign.type == Sign::Note) {
+      //keyboard.measure.insertMulti(sign.note.key(), sign);
+      //if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
+      //firstNote = false;
+     }
+     if(sign.type == Sign::Measure) break;
+    }
+#endif
+    noteIndex++;
+   }
+   else if(!note.velocity && active.contains(note.key)) {
+    while(active.contains(note.key)) {
+     Sign sign = active.take(note.key);
+     //fret.active.take(note.key);
+     //if(fret.measure.contains(note.key)) fret.measure.remove(note.key);
+     (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
+     /*if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
+      assert_(sign.note.pageIndex == 0);
+      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid)  system.glyphs[index].color = black;
+     }*/
+#if 0
+     // Updates next notes
+     //keyboard.measure.clear();
+     size_t firstSignIndex = sign.note.signIndex+1;
+     assert_(firstSignIndex != invalid);
+     //bool firstNote = true;
+     for(size_t signIndex: range(firstSignIndex, signs.size)) {
+      assert_(signIndex < signs.size, signIndex);
+      const Sign& sign = signs[signIndex];
+      if(sign.type == Sign::Note) {
+       //keyboard.measure.insertMulti(sign.note.key(), sign);
+       //if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
+       //firstNote = false;
+      }
+      if(sign.type == Sign::Measure) break;
+     }
+#endif
+     contentChanged = true;
+    }
+   }
+  }
+
+  int64 t = (int64)timeNum*notes.ticksPerSeconds;
+  float previousOffset = scroll.offset.x;
+  // Cardinal cubic B-Spline
+  for(int index: range(measureT.size-1)) {
+   int64 t1 = (int64)measureT[index]*timeDen;
+   int64 t2 = (int64)measureT[index+1]*timeDen;
+   if(t1 <= t && t < t2) {
+    double f = double(t-t1)/double(t2-t1);
+    double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
+    auto X = [&](int index) { return clamp(0.f, measureX[clamp<int>(0, index, measureX.size-1)] - size.x/2, image.size.x-size.x); };
+    float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+    if(newOffset >= -scroll.offset.x) scroll.offset.x = -newOffset;
+    break;
+   }
+  }
+  if(previousOffset != scroll.offset.x) contentChanged = true;
+  //synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
+#if 0
+  if(video) {
+   while((int64)video.videoTime*timeDen < (int64)timeNum*video.timeDen) {
+    Image image = video.read();
+    if(!image) { if(!preview) log("Missing image"); break; }
+    assert_(image);
+    videoView.image = ::move(image);
+    contentChanged=true;
+    // Only preview may have lower framerate than video
+    assert_((int64)video.videoTime*timeDen >= (int64)timeNum*video.timeDen || preview || video.videoTime == 0 /*First frame might have a negative timecode*/, video.videoTime, video.timeDen, timeNum, timeDen);
+   }
+  }
+#endif
+  return contentChanged;
+ }
+
+ vec2 sizeHint(vec2) override { return vec2(1366, 435); }
+ shared<Graphics> graphics(vec2 size) override {
+  follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
+  window->render();
+  return scroll.ScrollArea::graphics(size);
+ }
+ bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
+return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
+ }
+ bool keyPress(Key key, Modifiers modifiers) override { return scroll.ScrollArea::keyPress(key, modifiers); }
 } test;

@@ -8,28 +8,28 @@
 /// Implements a scrollable area for \a widget
 struct ScrollArea : Widget {
     /// Directions (false: expand, true: scroll)
-	bool horizontal = false, vertical = true;
-	bool scrollbar = true, drag = false;
-	const float scrollBarWidth = 16;
+    bool horizontal = false, vertical = true;
+    bool scrollbar = true, drag = false;
+    const float scrollBarWidth = 16;
     vec2 offset = 0;
     vec2 dragStartCursor = 0;
-	vec2 dragStartOffset = 0;
+    vec2 dragStartOffset = 0;
     vec2 viewSize = 0;
 
     /// Overrides \a widget to return the proxied widget
-	virtual Widget& widget() abstract;
+    virtual Widget& widget() abstract;
 
     vec2 sizeHint(vec2 size) override { return widget().sizeHint(size); }
     shared<Graphics> graphics(vec2 size) override;
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
-	bool keyPress(Key key, Modifiers modifiers) override;
+    bool keyPress(Key key, Modifiers modifiers) override;
 };
 
 /// Makes a widget scrollable by proxying it through \a ScrollArea
 generic struct Scroll : ScrollArea, T {
     using T::T;
     /// Returns a reference to \a T::Widget (for ScrollArea implementation)
-	Widget& widget() override { return (T&)*this; }
+    Widget& widget() override { return (T&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
     Widget& area() { return (ScrollArea&)*this; }
     /// Returns a reference to \a ScrollArea::Widget (e.g to add the area to a layout)
@@ -96,7 +96,7 @@ struct ToggleButton : ImageView {
     ToggleButton(Image&& enable, Image&& disable) : ImageView(unsafeRef(enable)), enableIcon(move(enable)), disableIcon(move(disable)) {}
 
     /// User toggled the button
-	function<void(bool /*state*/)> toggled;
+    function<void(bool /*state*/)> toggled;
 
     /// Current button state
     bool enabled = false;
@@ -108,11 +108,11 @@ struct ToggleButton : ImageView {
 };
 
 struct Index {
-	size_t* pointer;
-	Index(size_t* pointer) : pointer(pointer) {}
-	void operator=(size_t value) { *pointer = value; }
-	operator size_t() const { return *pointer; }
-	operator size_t&() { return *pointer; }
+    size_t* pointer;
+    Index(size_t* pointer) : pointer(pointer) {}
+    void operator=(size_t value) { *pointer = value; }
+    operator size_t() const { return *pointer; }
+    operator size_t&() { return *pointer; }
 };
 inline String str(Index o) { return str(*o.pointer); }
 
@@ -120,18 +120,18 @@ generic buffer<Widget*> toWidgets(mref<T> widgets) { return apply(widgets, [](T&
 
 /// Several widgets in one spot, cycled by user
 struct WidgetCycle : Widget {
-	buffer<Widget*> widgets;
-	size_t index = 0;
+    buffer<Widget*> widgets;
+    size_t index = 0;
 
-	WidgetCycle(ref<Widget*> widgets) : widgets(copyRef(widgets)) {}
+    WidgetCycle(ref<Widget*> widgets) : widgets(copyRef(widgets)) {}
 
-	// Forwards content
-	String title() override { return widgets[index]->title(); }
+    // Forwards content
+    String title() override { return widgets[index]->title(); }
     vec2 sizeHint(vec2 size) override { return widgets[index]->sizeHint(size); }
     shared<Graphics> graphics(vec2 size) override { return widgets[index]->graphics(size); }
 
-	// Forwards events
+    // Forwards events
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
-	// Forwards events and cycle widgets
-	bool keyPress(Key key, Modifiers modifiers) override;
+    // Forwards events and cycle widgets
+    bool keyPress(Key key, Modifiers modifiers) override;
 };

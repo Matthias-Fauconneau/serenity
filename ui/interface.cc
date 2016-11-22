@@ -102,7 +102,7 @@ shared<Graphics> Progress::graphics(vec2 size) {
 vec2 ImageView::sizeHint(vec2 size) {
  if(!image) return 0;
  if(size > vec2(image.size)) return vec2(image.size);
- return size.x*image.size.y < size.y*image.size.x ?
+ return size.x && size.x*image.size.y < size.y*image.size.x ?
     vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
     vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
 }
@@ -110,13 +110,14 @@ vec2 ImageView::sizeHint(vec2 size) {
 shared<Graphics> ImageView::graphics(vec2 size) {
     shared<Graphics> graphics;
     if(image) {
-    /*// Crop
-	int2 offset = max(int2(0),image.size-int2(size))/2;
-	graphics->blits.append(
-		    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
-		    vec2(min(int2(size), image.size)), // or fits
-            cropShare(image, offset, min(int2(size), image.size-offset)) ); // by cropping center*/
-     graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), unsafeRef(image) ); // Resizes
+        graphics->blits.append(vec2(0), vec2(image.size), unsafeRef(image));
+        // Crop
+        /*int2 offset = max(int2(0),image.size-int2(size))/2;
+        graphics->blits.append(
+                    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
+                    vec2(min(int2(size), image.size)), // or fits
+                    cropShare(image, offset, min(int2(size), image.size-offset)) );*/ // by cropping center*/
+        graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), unsafeRef(image) ); // Resizes
     }
     return graphics;
 }

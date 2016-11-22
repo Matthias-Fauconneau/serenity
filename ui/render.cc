@@ -69,7 +69,6 @@ void blit(const Image& target, int2 origin, const Image& source, bgr3f color, fl
  }
 }
 
-
 static void blend(const Image& target, uint x, uint y, bgr3f color, float opacity, bool transpose) {
  if(transpose) swap(x,y);
  if(x>=target.width || y>=target.height) return;
@@ -266,6 +265,18 @@ static void bilinear(const Image& target, const Image& source) {
  }
 }
 
+void blit(const Image& target, int2 origin, int2 size, const Image& source, bgr3f color, float opacity) {
+ //assert_(origin+size <= target.size, origin, size, target.size);
+ int2 min = ::max(int2(0), origin);
+ int2 max = ::min(target.size, origin+size);
+ assert_(color==bgr3f(1) && opacity==1 && !source.alpha && size != source.size && size*2 <= source.size+int2(1), size, source.size); // Bilinear
+ /*for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
+  byte4 s = source(x-origin.x, y-origin.y);
+  target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
+ }*/
+ bilinear(cropRef(target, min, max-min), cropRef(source, ::max(int2(0), -origin), (max-min)*source.size/size));
+}
+
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source) {
  assert_(source && target && source.size != target.size, source, target);
@@ -283,7 +294,7 @@ void render(const Image& target, const Graphics& graphics, vec2 offset) {
  for(const auto& e: graphics.blits) {
   if(int2(e.size) == e.image.size) blit(target, int2(round(offset+e.origin)), e.image, e.color, e.opacity);
   else {
-   blit(target, int2(round(offset+e.origin)), resize(int2(round(e.size)), e.image), e.color, e.opacity);
+   blit(target, int2(round(offset+e.origin)), int2(round(e.size)), e.image, e.color, e.opacity);
   }
  }
  for(const auto& e: graphics.fills) fill(target, int2(round(offset+e.origin)), int2(e.size), e.color, e.opacity);
