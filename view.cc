@@ -282,7 +282,8 @@ struct ViewApp {
                 size_t targetIndex = targetY*targetSizeX+targetX;
                 const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
                 const vec3 d = normalize(vec3(uv, scene.near));
-                bgr3f color = scene.raycast_shade(O, d, randoms[id], 0);
+                Scene::Path path; Scene::Timers timers;
+                bgr3f color = scene.raycast_shade(O, d, randoms[id], 0, path, timers, 1);
                 sumB[targetIndex] += color.b;
                 sumG[targetIndex] += color.g;
                 sumR[targetIndex] += color.r;

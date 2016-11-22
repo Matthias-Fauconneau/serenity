@@ -243,8 +243,6 @@ struct Scene {
         return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
     }
 
-    inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const;
-
     // Uniformly distributed points on sphere (Marsaglia)
     Vec<v8sf, 3> sphere(Random& random) const {
         v8sf t0, t1, sq;
@@ -274,18 +272,22 @@ struct Scene {
         return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
     }
 
-    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const uint bounce) const {
+    enum Bounce { Direct=1, Diffuse, Specular, Max };
+    typedef Bounce Path[3];
+    typedef uint64 Timers[Max*Max*Max];
+    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const int bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
+        const uint64 start = readCycleCounter();
         const Scene::Face& face = faces[faceIndex];
         bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
         if(face.reflect) {
-            if(bounce > 1) return 0;
+            if(bounce > 1) return 0; // -SDS
+            path[bounce] = Specular; // S
 #if RT
             static constexpr int iterations = 1;
 #else
-            static constexpr int iterations = 16;
+            static constexpr int iterations = 1; //16;
 #endif
-            //raycast_shade(P, R, random, bounce+1);
             const vec3 R = normalize(D - 2*dot(N, D)*N);
             for(uint unused i: range(iterations)) {
                 const Vec<v8sf, 3> H = hemisphere(random, N);
@@ -300,7 +302,7 @@ struct Scene {
                 v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Rx,Ry,Rz, t,u,v);
                 for(uint k: range(8)) {
                     vec3 R = vec3(Rx[k],Ry[k],Rz[k]);
-                    out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1);
+                    out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
                 }
             }
         }
@@ -335,7 +337,7 @@ struct Scene {
 #if RT
                 static constexpr int iterations = 1;
 #else
-                const int iterations = (int[]){64,8,1}[bounce];
+                const int iterations = 1; //bounce < 1 ? 8 : 1;
 #endif
                 for(uint unused i: range(iterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
@@ -351,11 +353,12 @@ struct Scene {
                 out.g += (1.f/(iterations*8)) * BRDF.g * hsum(sumG);
                 out.r += (1.f/(iterations*8)) * BRDF.r * hsum(sumR);
             }
-            if(bounce < 1) { // Indirect
+            if(bounce < 1) { // Indirect diffuse lighting
+                path[bounce] = Diffuse;
 #if RT
                 static constexpr int iterations = 1;
 #else
-                static constexpr int iterations = 64;
+                static constexpr int iterations = 1;// 64;
 #endif
                 for(uint unused i: range(iterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
@@ -366,15 +369,16 @@ struct Scene {
                     v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
                     for(uint k: range(8)) {
                         vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
-                        out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1);
+                        out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
                     }
                 }
-            }
+            } else path[bounce] = Direct;
         }
+        timers[path[bounce]*stride] += readCycleCounter()-start;
         return out;
     }
 
-    inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce) const {
+    inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
         const vec3 T = (1-u-v) * faces[faceIndex].T[0] +
                 u * faces[faceIndex].T[1] +
                 v * faces[faceIndex].T[2];
@@ -384,8 +388,10 @@ struct Scene {
         const vec3 N = (1-u-v) * faces[faceIndex].N[0] +
                 u * faces[faceIndex].N[1] +
                 v * faces[faceIndex].N[2];
-        return shade(faceIndex, P, D, T, B, N, random, bounce);
+        return shade(faceIndex, P, D, T, B, N, random, bounce, path, timers, stride);
     }
+
+    inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) const;
 
     struct NoShader {
         static constexpr int C = 0;
@@ -504,7 +510,8 @@ struct Scene {
             const vec3 T = normalize(vec3(varying[5], varying[6], varying[7]));
             const vec3 B = normalize(vec3(varying[8], varying[9], varying[10]));
             const vec3 N = normalize(vec3(varying[11], varying[12], varying[13])); // FIXME: cross
-            bgr3f color = scene.shade(index, P, normalize(P-viewpoint), T, B, N, randoms[id], 0);
+            Scene::Timers timers;
+            bgr3f color = scene.shade(index, P, normalize(P-viewpoint), T, B, N, randoms[id], 0, {}, timers, Max);
             return Vec<float, 3>{{color.b, color.g, color.r}};
         }
     };
@@ -556,10 +563,10 @@ struct Scene {
     }
 };
 
-inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const {
+inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) const {
     float t, u, v;
     const size_t faceIndex = raycast(O, D, t, u, v);
-    return shade(faceIndex, O+t*D, D, u, v, random, bounce);
+    return shade(faceIndex, O+t*D, D, u, v, random, bounce, path, timers, stride);
 }
 
 Scene parseScene(ref<byte> scene);

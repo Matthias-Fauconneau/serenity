@@ -3,6 +3,17 @@
 #include "file.h"
 #include "png.h"
 
+void report(uint64 totalTime, const Scene::Timers timers[], const uint bounce, Scene::Path path, const uint offset, const uint stride) {
+    if(bounce > 1) return;
+    for(Scene::Bounce type: {Scene::Direct, Scene::Diffuse, Scene::Specular}) {
+        path[bounce] = type;
+        array<char> s; for(uint i: range(bounce+1)) s.append(" .DS"_[path[i]]);
+        uint64 sum = 0; for(uint i: range(threadCount())) sum += timers[i][offset+type*stride];
+        if(sum) log(s, strD(sum,totalTime));
+        report(totalTime, timers, bounce+1, path, type*stride, stride*Scene::Max);
+    }
+}
+
 struct Render {
     Render() {
         Scene scene {::parseScene(readFile(sceneFile(basename(arguments()[0]))))};
@@ -61,9 +72,10 @@ struct Render {
         mref<half> BGR = mcast<half>(map);
         BGR.clear(0); // Explicitly clears to avoid performance skew from clear on page faults
 
-        uint64 totalTime[threadCount()], innerTime[threadCount()];
+        uint64 totalTime[threadCount()];
+        Scene::Timers timers[threadCount()];
         mref<uint64>(totalTime, threadCount()).clear(0);
-        mref<uint64>(innerTime, threadCount()).clear(0);
+        for(auto& timers: mref<Scene::Timers>(timers, threadCount())) mref<uint64>(timers, Scene::Max*Scene::Max*Scene::Max).clear(0);
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) { random=Random(); }
         Time time {true};
@@ -107,11 +119,10 @@ struct Render {
             const vec3 Nbadc = nA-nB+nC-nD;
 
             // Shades surface
-            parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime, &randoms](const uint id, const uint start, const uint sizeI) {
-                //tsc totalTSC, innerTSC;
-                //totalTSC.start();
-                for(uint svIndex: range(start, start+sizeI))
-            //parallel_for(0, V, [/*=, &scene, &totalTime, &innerTime, &randoms*/&](const uint id, const uint svIndex) {
+            //parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime, &randoms](const uint id, const uint start, const uint sizeI) {
+            parallel_for(0, V, [&](const uint id, const uint svIndex) {
+                tsc totalTSC;
+                totalTSC.start();
                 for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
@@ -124,7 +135,8 @@ struct Render {
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = normalize(P-viewpoint);
-                            bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0);
+                            Scene::Path path;
+                            bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0, path, timers[id], 1);
                             const size_t base = base0 + (sSize * t + s) * VU;
                             faceBGR[0*size4+base] = color.b;
                             faceBGR[1*size4+base] = color.g;
@@ -132,7 +144,8 @@ struct Render {
                         }
                     } else {
                         const vec3 D = normalize(P);
-                        bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0);
+                        Scene::Path path;
+                        bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0, path, timers[id], 1);
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const size_t base = base0 + (sSize * t + s) * VU;
                             faceBGR[0*size4+base] = color.b;
@@ -141,10 +154,11 @@ struct Render {
                         }
                     }
                 }
-                //totalTime[id] += totalTSC.cycleCount();
-                //innerTime[id] += innerTSC.cycleCount();
+                totalTime[id] += totalTSC.cycleCount();
             });
         }
+        Scene::Path path;
+        report(::sum(ref<uint64>(totalTime, threadCount())), timers, 0, path, 0, 1);
         //assert_(sum(ref<uint64>(innerTime, threadCount()))*100 >= 99*sum(ref<uint64>(totalTime, threadCount())));
         log(sampleCount/(1024*1024*1024.f), "G samples in", time, "=", str((float)time.nanoseconds()/sampleCount, 1u), "ns/sample");
 #if 1 // DEBUG
