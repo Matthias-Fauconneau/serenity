@@ -216,6 +216,28 @@ struct Scene {
         return index;
     }
 
+    inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz, v8sf& minT, v8sf& u, v8sf& v) const {
+        minT = inff; v8si index = intX(faces.size);
+        for(size_t i: range(faces.size)) {
+            const float Ax = X[0][i];
+            const float Ay = Y[0][i];
+            const float Az = Z[0][i];
+            const float Bx = X[1][i];
+            const float By = Y[1][i];
+            const float Bz = Z[1][i];
+            const float Cx = X[2][i];
+            const float Cy = Y[2][i];
+            const float Cz = Z[2][i];
+            v8sf det, U, V;
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Ox,Oy,Oz, dx,dy,dz, det, U, V);
+            index = blend(index, i, t < minT);
+            u = blend(u, U/det, t < minT);
+            v = blend(v, V/det, t < minT);
+            minT = ::min(minT, t);
+        }
+        return index;
+    }
+
     static inline vec3 refract(const float r, const vec3 N, const vec3 D) {
         const float c = -dot(N, D);
         return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
@@ -224,54 +246,24 @@ struct Scene {
     inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce) const;
 
     // Uniformly distributed points on sphere (Marsaglia)
-    vec3 sphere(Random& random) const {
-        float t0, t1, sq;
+    Vec<v8sf, 3> sphere(Random& random) const {
+        v8sf t0, t1, sq;
         do {
-            t0 = random()[0]*2-1;
-            t1 = random()[0]*2-1;
+            t0 = random()*2-1;
+            t1 = random()*2-1;
             sq = t0*t0 + t1*t1;
-        } while(sq >= 1);
-        const float r = sqrt(1-sq);
-        return vec3(2*t0*r, 2*t1*r, 1-2*sq);
+        } while(mask(sq >= 1)); // FIXME: TODO: Partial accepts
+        const v8sf r = sqrt(1-sq);
+        return {{2*t0*r, 2*t1*r, 1-2*sq}};
     }
     // Uniformly distributed points on hemisphere directed towards N
-    vec3 hemisphere(Random& random, vec3 N) const {
-        const vec3 S = sphere(random);
-        return dot(S,N) < 0 ? -S: S;
+    Vec<v8sf, 3> hemisphere(Random& random, vec3 N) const {
+        const Vec<v8sf, 3> S = sphere(random);
+        const v8si negate = (N.x*S._[0] + N.y*S._[1] + N.z*S._[2]) < 0;
+        return {{blend(S._[0], -S._[0], negate),
+                        blend(S._[1], -S._[1], negate),
+                        blend(S._[2], -S._[2], negate)}};
     }
-#if 0
-    // Cosine distributed points on hemisphere directed towards N
-    vec3 cosine(Random& random, const vec3 N, float& cosθ /*PDF*/) const {
-        const float ξ1 = random();
-        const float ξ2 = random();
-
-        cosθ = sqrt(1-ξ1);
-        const float sinθ = sqrt(ξ1);
-        const float φ = 2*PI*ξ2;
-
-        const float xs = sinθ * cos(φ);
-        const float ys = cosθ;
-        const float zs = sinθ * sin(φ);
-
-        vec3 h = N;
-        /**/ if(abs(h.x)<=abs(h.y) && abs(h.x)<=abs(h.z)) h.x=1;
-        else if(abs(h.y)<=abs(h.x) && abs(h.y)<=abs(h.z)) h.y=1;
-        else /*                                        */ h.z=1;
-
-        const vec3 x = normalize(cross(h, N));
-        return normalize(xs * x + ys * N + zs * normalize(cross(x, N)));
-    }
-#else
-#if 0
-    vec3 cosine(Random& random) const {
-        const float ξ1 = random()[0];
-        const float ξ2 = random()[0];
-        const float cosθ = sqrt(1-ξ1);
-        const float sinθ = sqrt(ξ1);
-        const float φ = 2*PI*ξ2;
-        return vec3(sinθ * cos(φ), sinθ * sin(φ), cosθ);
-    }
-#else
     Vec<v8sf, 3> cosine(Random& random) const {
         const v8sf ξ1 = random();
         const v8sf ξ2 = random();
@@ -281,17 +273,38 @@ struct Scene {
         const Vec<v8sf, 2> cossinφ = cossin(φ);
         return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
     }
-#endif
-#endif
+
     bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const uint bounce) const {
         const Scene::Face& face = faces[faceIndex];
+        bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
+        const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
         if(face.reflect) {
-            if(bounce > 0) return 0;
-            const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * hemisphere(random, N));
-
-            return bgr3f(1, 1./2, 1./2) * raycast_shade(P, R, random, bounce+1);
+            if(bounce > 1) return 0;
+#if RT
+            static constexpr int iterations = 1;
+#else
+            static constexpr int iterations = 16;
+#endif
+            //raycast_shade(P, R, random, bounce+1);
+            const vec3 R = normalize(D - 2*dot(N, D)*N);
+            for(uint unused i: range(iterations)) {
+                const Vec<v8sf, 3> H = hemisphere(random, N);
+                const v8sf RGx = R.x + face.gloss * H._[0];
+                const v8sf RGy = R.y + face.gloss * H._[1];
+                const v8sf RGz = R.z + face.gloss * H._[2];
+                const v8sf L = sqrt(sq(RGx)+sq(RGy)+sq(RGz));
+                const v8sf Rx = RGx/L;
+                const v8sf Ry = RGy/L;
+                const v8sf Rz = RGz/L;
+                v8sf t,u,v;
+                v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Rx,Ry,Rz, t,u,v);
+                for(uint k: range(8)) {
+                    vec3 R = vec3(Rx[k],Ry[k],Rz[k]);
+                    out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1);
+                }
+            }
         }
-        else if(face.refract) {
+        /*else if(face.refract) {
             if(bounce > 0) return 0;
             const float n1 = 1, n2 = 1; //1.3
             const vec3 R = normalize(refract(n1/n2, N, D));
@@ -314,20 +327,16 @@ struct Scene {
             bgr3f transmitColor = raycast_shade(backP, backR, random, bounce+1);
 
             return (1-a)*volumeColor + a*transmitColor;
-        }
+        }*/
         else { // Diffuse
-            bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
-            const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
-            if(bounce < 1) { // Direct or indirect
-                const Vec<v8sf, 3> l8 = cosine(random);
-                const vec3 l (l8._[0][0], l8._[1][0], l8._[2][0]); // Local frame
-                const vec3 L = l.x * T + l.y * B + l.z * N;
-                float t,u,v;
-                size_t lightRayFaceIndex = raycast(P, L, t, u, v);
-                out += BRDF * shade(lightRayFaceIndex, P+t*L, L, u, v, random, bounce+1);
-            } else { // Last bounce (only direct lighting)
+            {
+                // Direct lighting
                 v8sf sumB=0, sumG=0, sumR=0;
-                const int iterations = 2;
+#if RT
+                static constexpr int iterations = 1;
+#else
+                const int iterations = (int[]){64,8,1}[bounce];
+#endif
                 for(uint unused i: range(iterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
                     const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
@@ -338,24 +347,43 @@ struct Scene {
                     sumG += gather(emittanceG.data, lightRayFaceIndex);
                     sumR += gather(emittanceR.data, lightRayFaceIndex);
                 }
-                out.b += BRDF.b/(iterations*8) * hsum(sumB);
-                out.g += BRDF.g/(iterations*8) * hsum(sumG);
-                out.r += BRDF.r/(iterations*8) * hsum(sumR);
+                out.b += (1.f/(iterations*8)) * BRDF.b * hsum(sumB);
+                out.g += (1.f/(iterations*8)) * BRDF.g * hsum(sumG);
+                out.r += (1.f/(iterations*8)) * BRDF.r * hsum(sumR);
             }
-            return out;
+            if(bounce < 1) { // Indirect
+#if RT
+                static constexpr int iterations = 1;
+#else
+                static constexpr int iterations = 64;
+#endif
+                for(uint unused i: range(iterations)) {
+                    const Vec<v8sf, 3> l = cosine(random);
+                    const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
+                    const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
+                    const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
+                    v8sf t,u,v;
+                    v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
+                    for(uint k: range(8)) {
+                        vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
+                        out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1);
+                    }
+                }
+            }
         }
+        return out;
     }
 
     inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce) const {
         const vec3 T = (1-u-v) * faces[faceIndex].T[0] +
-                             u * faces[faceIndex].T[1] +
-                             v * faces[faceIndex].T[2];
+                u * faces[faceIndex].T[1] +
+                v * faces[faceIndex].T[2];
         const vec3 B = (1-u-v) * faces[faceIndex].B[0] +
-                             u * faces[faceIndex].B[1] +
-                             v * faces[faceIndex].B[2];
+                u * faces[faceIndex].B[1] +
+                v * faces[faceIndex].B[2];
         const vec3 N = (1-u-v) * faces[faceIndex].N[0] +
-                             u * faces[faceIndex].N[1] +
-                             v * faces[faceIndex].N[2];
+                u * faces[faceIndex].N[1] +
+                v * faces[faceIndex].N[2];
         return shade(faceIndex, P, D, T, B, N, random, bounce);
     }
 
@@ -431,7 +459,7 @@ struct Scene {
                 attributes.BGR[1] = face.BGR + 1*size4 + tIndex*size3 + sIndex*size2;
                 attributes.BGR[2] = face.BGR + 2*size4 + tIndex*size3 + sIndex*size2;
                 attributes.sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
-                                     size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
+                                           size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
                 if(sSize == 1 || tSize ==1) // Prevents OOB
                     attributes.sample4D = {    0,           size1/2,         0,       size1/2,
                                                0,           size1/2,         0,       size1/2};
@@ -452,8 +480,8 @@ struct Scene {
             const v4sf vuvu = {v, u, v, u};
             const v4sf w_1mw = abs(vuvu - floor(vuvu) - _1100f); // 1-fract(x), fract(x)
             const v16sf w01 = shuffle(  Wts,   Wts, 0,0,0,0,1,1,1,1, 2,2,2,2,3,3,3,3)  // 0000111122223333
-                            * shuffle(w_1mw, w_1mw, 0,0,2,2,0,0,2,2, 0,0,2,2,0,0,2,2)  // vvVVvvVVvvVVvvVV
-                            * shuffle(w_1mw, w_1mw, 1,3,1,3,1,3,1,3, 1,3,1,3,1,3,1,3); // uUuUuUuUuUuUuUuU
+                    * shuffle(w_1mw, w_1mw, 0,0,2,2,0,0,2,2, 0,0,2,2,0,0,2,2)  // vvVVvvVVvvVVvvVV
+                    * shuffle(w_1mw, w_1mw, 1,3,1,3,1,3,1,3, 1,3,1,3,1,3,1,3); // uUuUuUuUuUuUuUuU
             return Vec<float, 3>{{dot(w01, B), dot(w01, G), dot(w01, R)}};
         }
     };

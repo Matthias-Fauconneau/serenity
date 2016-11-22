@@ -279,7 +279,7 @@ Scene parseScene(ref<byte> file) {
                 const vec3 B = normalize(polygon[2]-polygon[1]);
                 const vec3 N = normalize(cross(T, B));
                 const float reflect = N.z == -1;
-                const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+                const bgr3f color = reflect==0 ? (bgr3f(N)+bgr3f(1))/2.f : bgr3f(1, 1./2, 1./2);
                 scene.faces.append({{0,1,1},{0,0,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
                 for(size_t i: range(3)) {
                     scene.X[i].append(polygon[i].x-viewpoint.x);
@@ -307,7 +307,7 @@ Scene parseScene(ref<byte> file) {
                 const vec3 B = normalize(polygon[3]-polygon[0]);
                 const vec3 N = normalize(cross(T, B));
                 const float reflect = N.z == -1;
-                const bgr3f color = reflect==0 ? (N+vec3(1))/2.f : 0;
+                const bgr3f color = reflect==0 ? (bgr3f(N)+bgr3f(1))/2.f : bgr3f(1, 1./2, 1./2);
                 scene.faces.append({{0,1,0},{0,1,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
                 for(size_t i: range(3)) {
                     scene.X[i].append(polygon[i?1+i:0].x-viewpoint.x);

@@ -65,13 +65,21 @@ struct Render {
         mref<uint64>(totalTime, threadCount()).clear(0);
         mref<uint64>(innerTime, threadCount()).clear(0);
         Random randoms[threadCount()];
-        for(Random& random: mref<Random>(randoms,threadCount())) { random.seed(); }
+        for(Random& random: mref<Random>(randoms,threadCount())) { random=Random(); }
         Time time {true};
         for(const size_t faceIndex: range(scene.faces.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
             const vec3 A (scene.X[0][2*faceIndex+0], scene.Y[0][2*faceIndex+0], scene.Z[0][2*faceIndex+0]);
             const vec3 B (scene.X[1][2*faceIndex+0], scene.Y[1][2*faceIndex+0], scene.Z[1][2*faceIndex+0]);
             const vec3 C (scene.X[2][2*faceIndex+0], scene.Y[2][2*faceIndex+0], scene.Z[2][2*faceIndex+0]);
             const vec3 D (scene.X[2][2*faceIndex+1], scene.Y[2][2*faceIndex+1], scene.Z[2][2*faceIndex+1]);
+            const vec3 tA = scene.faces[2*faceIndex+0].T[0];
+            const vec3 tB = scene.faces[2*faceIndex+0].T[1];
+            const vec3 tC = scene.faces[2*faceIndex+0].T[2];
+            const vec3 tD = scene.faces[2*faceIndex+1].T[2];
+            const vec3 bA = scene.faces[2*faceIndex+0].B[0];
+            const vec3 bB = scene.faces[2*faceIndex+0].B[1];
+            const vec3 bC = scene.faces[2*faceIndex+0].B[2];
+            const vec3 bD = scene.faces[2*faceIndex+1].B[2];
             const vec3 nA = scene.faces[2*faceIndex+0].N[0];
             const vec3 nB = scene.faces[2*faceIndex+0].N[1];
             const vec3 nC = scene.faces[2*faceIndex+0].N[2];
@@ -81,13 +89,18 @@ struct Render {
             half* const faceBGR = BGR.begin()+ (size_t)face.BGR; // base + index
             const size_t VU = V*U;
             const size_t size4 = tSize*sSize*V*U;
-            /*half* const faceB = faceBGR+0*size4;
-            half* const faceG = faceBGR+1*size4;
-            half* const faceR = faceBGR+2*size4;*/
 
             const vec3 ab = B-A;
             const vec3 ad = D-A;
             const vec3 badc = A-B+C-D;
+
+            const vec3 Tab = tB-tA;
+            const vec3 Tad = tD-tA;
+            const vec3 Tbadc = tA-tB+tC-tD;
+
+            const vec3 Bab = bB-bA;
+            const vec3 Bad = bD-bA;
+            const vec3 Bbadc = bA-bB+bC-bD;
 
             const vec3 Nab = nB-nA;
             const vec3 Nad = nD-nA;
@@ -97,165 +110,36 @@ struct Render {
             parallel_chunk(0, V, [=, &scene, &totalTime, &innerTime, &randoms](const uint id, const uint start, const uint sizeI) {
                 //tsc totalTSC, innerTSC;
                 //totalTSC.start();
-                for(uint svIndex: range(start, start+sizeI)) for(uint suIndex: range(U)) {
+                for(uint svIndex: range(start, start+sizeI))
+            //parallel_for(0, V, [/*=, &scene, &totalTime, &innerTime, &randoms*/&](const uint id, const uint svIndex) {
+                for(uint suIndex: range(U)) {
                     const float v = (float(svIndex)+1.f/2)/float(V);
                     const float u = (float(suIndex)+1.f/2)/float(U);
                     const vec3 P = A + ad*v + (ab + badc*v) * u;
+                    const vec3 T = tA + Tad*v + (Tab + Tbadc*v) * u;
+                    const vec3 B = bA + Bad*v + (Bab + Bbadc*v) * u;
                     const vec3 N = nA + Nad*v + (Nab + Nbadc*v) * u;
                     const size_t base0 = svIndex*U+suIndex;
-#if 1
                     if(scene.faces[faceIndex*2].reflect) {
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const vec3 viewpoint = vec3((s/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
                             const vec3 D = normalize(P-viewpoint);
-                            const uint sampleCount = 512;
-                            bgr3f color = 0;
-                            for(uint unused sampleIndex: range(sampleCount)) {
-                                color += scene.shade(faceIndex*2+0, P, D, N, randoms[id], 0);
-                            }
+                            bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0);
                             const size_t base = base0 + (sSize * t + s) * VU;
-                            faceBGR[0*size4+base] = color.b/sampleCount;
-                            faceBGR[1*size4+base] = color.g/sampleCount;
-                            faceBGR[2*size4+base] = color.r/sampleCount;
+                            faceBGR[0*size4+base] = color.b;
+                            faceBGR[1*size4+base] = color.g;
+                            faceBGR[2*size4+base] = color.r;
                         }
                     } else {
-                        const uint sampleCount = 4096;
-                        bgr3f color = 0;
                         const vec3 D = normalize(P);
-                        for(uint unused sampleIndex: range(sampleCount)) {
-                            color += scene.shade(faceIndex*2+0, P, D, N, randoms[id], 0);
-                        }
+                        bgr3f color = scene.shade(faceIndex*2+0, P, D, T, B, N, randoms[id], 0);
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const size_t base = base0 + (sSize * t + s) * VU;
-                            faceBGR[0*size4+base] = color.b/sampleCount;
-                            faceBGR[1*size4+base] = color.g/sampleCount;
-                            faceBGR[2*size4+base] = color.r/sampleCount;
+                            faceBGR[0*size4+base] = color.b;
+                            faceBGR[1*size4+base] = color.g;
+                            faceBGR[2*size4+base] = color.r;
                         }
                     }
-#else // TODO: SIMD shader
-                    if(!face.reflect) {
-                        // Shader view-independent evaluation
-                        const uint sampleCount = 4096;
-                        bgr3f color = 0;
-                        for(uint unused sampleIndex: range(sampleCount)) {
-                            // Light
-                            size_t light = scene.lights[0];
-                            if(faceIndex == light) color += 1;
-                            else {
-                                const float u = random();
-                                const float v = random();
-                                vec3 L = normalize(vec3(scene.X[0][light] + u * (scene.X[1][light]-scene.X[0][light]) + v * (scene.X[3][light]-scene.X[0][light]),
-                                                        scene.Y[0][light] + u * (scene.Y[1][light]-scene.Y[0][light]) + v * (scene.Y[3][light]-scene.Y[0][light]),
-                                                        scene.Z[0][light] + u * (scene.Z[1][light]-scene.Z[0][light]) + v * (scene.Z[3][light]-scene.Z[0][light]))-O);
-                                float dotNL = dot(N, L);
-                                //color = max(0.f,  dotNL); break;
-                                if(dotNL <= 0) color += 0;
-                                else {
-                                    size_t lightRayHitFaceIndex = scene.raycast(O, L);
-                                    if(lightRayHitFaceIndex != light) color += 0;
-                                    else color += vec3(scene.B[faceIndex], scene.G[faceIndex], scene.R[faceIndex]);
-                                }
-                            }
-                        }
-                        //color = (O-scene.min)/(scene.max-scene.min);
-                        // FIXME: TODO: Mixed view-independent / view-dependent shaders
-                        for(uint t: range(tSize)) for(uint s: range(sSize)) {
-                            const size_t base = base0 + (sSize * t + s) * VU;
-                            faceBGR[0*size4+base] = color.b/sampleCount;
-                            faceBGR[1*size4+base] = color.g/sampleCount;
-                            faceBGR[2*size4+base] = color.r/sampleCount;
-                        }
-                    } else {
-                        //innerTSC.start();
-                        const v8sf Ox = O.x;
-                        const v8sf Oy = O.y;
-                        const v8sf Oz = O.z;
-
-                        // FIXME: TODO: Mixed view-independent / view-dependent shaders
-
-                        // Shader final view-dependent evaluation
-#if 0
-                        static constexpr v8sf seqF = v8sf{0,1,2,3,4,5,6,7};
-                        const float Dx0 = O.x+1./scene.scale;
-                        const float Dy0 = O.y+1./scene.scale;
-                        const float Dz = O.z;
-                        const float Dxs = -2/((sSize-1)*scene.scale);
-                        const float Dyt = -2/((tSize-1)*scene.scale);
-                        const float RxDx = 1 - 2*N.x*N.x;
-                        const float RyDx =   - 2*N.x*N.y;
-                        const float RzDx =   - 2*N.x*N.z;
-                        const float a0 = -2*N.z*Dz;
-
-                        const float Rx00 = a0*N.x + (N.x*N.y+0)*Dy0 + RxDx*Dx0;
-                        const float Rx0t = (N.x*N.y+0)*Dyt;
-                        const float Ry00 = a0*N.y + (N.y*N.y+1)*Dy0 + RyDx*Dx0;
-                        const float Ry0t = (N.y*N.y+1)*Dyt;
-                        const float Rz00 = a0*N.z + (N.z*N.y+1)*Dy0 + RzDx*Dx0;
-                        const float Rz0t = (N.z*N.y+1)*Dyt;
-
-                        const v8sf Rxs = RxDx * Dxs;
-                        const v8sf Rys = RyDx * Dxs;
-                        const v8sf Rzs = RzDx * Dxs;
-                        for(uint t: range(tSize)) {
-                            const v8sf Rx0 = Rx00 + Rx0t*float(t);
-                            const v8sf Ry0 = Ry00 + Ry0t*float(t);
-                            const v8sf Rz0 = Rz00 + Rz0t*float(t);
-                            const size_t baseT = base0 + (sSize * t) * VU;
-                            for(uint s=0; s<sSize; s += 8) {
-
-                                const v8sf S = float8(float(s))+seqF;
-                                const v8sf Rx = Rx0 + Rxs * S;
-                                const v8sf Ry = Ry0 + Rys * S;
-                                const v8sf Rz = Rz0 + Rzs * S;
-#else
-                        for(uint t: range(tSize)) {
-                            const size_t baseT = base0 + (sSize * t) * VU;
-                            for(uint s=0; s<sSize; s += 8) {
-                                v8sf sumB = 0, sumG = 0, sumR = 0;
-                                const uint sampleCount = 64;
-                                for(uint unused sampleIndex: range(sampleCount)) {
-                                    v8sf Rx, Ry, Rz;
-                                    for(int k: range(8)) {
-                                        const vec3 viewpoint = vec3(((s+k)/float(sSize-1))*2-1, (t/float(tSize-1))*2-1, 0)/scene.scale;
-                                        const vec3 D = (O-viewpoint);
-                                        //const vec3 R = D - 2*dot(N, D)*N;
-                                        // Marsaglia
-                                        float t0, t1, sq;
-                                        do {
-                                            t0 = random()*2-1;
-                                            t1 = random()*2-1;
-                                            sq = t0*t0 + t1*t1;
-                                        } while(sq >= 1);
-                                        float r = sqrt(1-sq);
-                                        vec3 U = vec3(2*t0*r, 2*t1*r, 1-2*sq);
-                                        if(dot(U,N) < 0) U = -U; // On hemisphere
-                                        const vec3 R = normalize(normalize(D - 2*dot(N, D)*N) + face.gloss * U);
-                                        Rx[k] = R.x;
-                                        Ry[k] = R.y;
-                                        Rz[k] = R.z;
-                                    }
-#endif
-                                    const v8si index = scene.raycast(Ox,Oy,Oz, Rx,Ry,Rz);
-                                    // FIXME: shader evaluation (i.e with lighting)
-                                    const v8sf B =           gather(scene.B.data, index);
-                                    const v8sf G = (1.f/2) * gather(scene.G.data, index);
-                                    const v8sf R = (1.f/2) * gather(scene.R.data, index);
-                                    sumB += B;
-                                    sumG += G;
-                                    sumR += R;
-                                }
-                                const v8hf b = toHalf(sumB/sampleCount);
-                                const v8hf g = toHalf(sumG/sampleCount);
-                                const v8hf r = toHalf(sumR/sampleCount);
-                                const size_t base = baseT + s * VU;
-                                for(uint k: range(8)) faceB[base + k*VU] = b[k];
-                                for(uint k: range(8)) faceG[base + k*VU] = g[k];
-                                for(uint k: range(8)) faceR[base + k*VU] = r[k];
-                            }
-                        }
-                        innerTSC.stop();
-                    }
-#endif
                 }
                 //totalTime[id] += totalTSC.cycleCount();
                 //innerTime[id] += innerTSC.cycleCount();
