@@ -281,12 +281,13 @@ struct Scene {
         bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
         if(face.reflect) {
-            if(bounce > 1) return 0; // -SDS
+            if(bounce > 0) return 0; // +S
+            //if(bounce > 1) return 0; // -SDS
             path[bounce] = Specular; // S
 #if RT
             static constexpr int iterations = 1;
 #else
-            static constexpr int iterations = 1; //16;
+            static constexpr int iterations = 32;
 #endif
             const vec3 R = normalize(D - 2*dot(N, D)*N);
             for(uint unused i: range(iterations)) {
@@ -337,7 +338,7 @@ struct Scene {
 #if RT
                 static constexpr int iterations = 1;
 #else
-                const int iterations = 1; //bounce < 1 ? 8 : 1;
+                const int iterations = bounce < 1 ? 1024 : 1;
 #endif
                 for(uint unused i: range(iterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
@@ -358,7 +359,7 @@ struct Scene {
 #if RT
                 static constexpr int iterations = 1;
 #else
-                static constexpr int iterations = 1;// 64;
+                static constexpr int iterations = 512;
 #endif
                 for(uint unused i: range(iterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
