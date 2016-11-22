@@ -72,35 +72,24 @@ inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return 
  v16sf(__builtin_shufflevector(a, b, i0, i1, i2, i3, i4, i5, i6, i7), \
        __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))
 
-inline float sum(v4sf v) { // movshdup, addps, movhlps, addss
+inline float hsum(v4sf v) { // movshdup, addps, movhlps, addss
     v4sf t = v+__builtin_shufflevector(v,v, 1,1,3,3);
     return t[0]+t[2];
 }
-inline float sum(v8sf x) {
+inline float hsum(v8sf x) {
     const v4sf sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7
     const v4sf sumDual = sumQuad + __builtin_shufflevector(sumQuad, sumQuad, 2, 3, -1, -1); // 0+4 + 2+6, 1+5 + 3+7 (+movehl)
     return (sumDual + __builtin_shufflevector(sumDual, sumDual, 1, -1, -1, -1))[0]; // 0+4+2+6 + 1+5+3+7
 }
-inline float sum(v16sf v) { return sum(v.r1+v.r2); }
+inline float hsum(v16sf v) { return hsum(v.r1+v.r2); }
 
 /// 16-wide vector operations using 2 v8si AVX registers
 struct v16si {
     v8si r1,r2;
-    //v16si(){}
-    //explicit v16si(int x){ r1 = r2 = intX(x); }
-    //constexpr v16si(const v8si r1, const v8si r2):r1(r1),r2(r2){}
-    //v16si(int x0, int x1, int x2, int x3, int x4, int x5, int x6, int x7, int x8, int x9, int x10, int x11, int x12, int x13, int x14, int x15):r1((v8si){x0,x1,x2,x3,x4,x5,x6,x7}),r2((v8si){x8,x9,x10,x11,x12,x13,x14,x15}){}
-    int& operator [](uint i) { return ((int*)this)[i]; }
-    const int& operator [](uint i) const { return ((int*)this)[i]; }
-    explicit operator v16sf() const;
+    int operator [](uint i) const { return ((int*)this)[i]; }
 };
 
-inline v16sf::operator v16si() const { return {(v8si)r1, (v8si)r2}; }
-inline v16si::operator v16sf() const { return {(v8sf)r1, (v8sf)r2}; }
-
 inline v16si operator~(v16si a) { return {~a.r1, ~a.r2}; }
-
-inline v16si operator*(int a, v16si b) { return {intX(a) * b.r1, intX(a) * b.r2}; }
 
 static inline v16sf gather(const float* P, v16si i) { return v16sf(gather(P, i.r1), gather(P, i.r2)); }
 

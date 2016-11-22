@@ -443,9 +443,9 @@ template<class Shader> struct RenderPass {
                                 // Zeroes hidden samples
                                 const v16sf visible = samples & visibleMask;
                                 // Averages on the visible samples
-                                centroid[i] = sum(visible) / visibleSampleCount;
+                                centroid[i] = hsum(visible) / visibleSampleCount;
                             }
-                            const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
+                            const float centroidZ = hsum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
 
                             Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                             for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
@@ -489,9 +489,9 @@ template<class Shader> struct RenderPass {
                         float centroid[V];
                         for(int i: range(V)) {
                             const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
-                            centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
+                            centroid[i] = hsum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
-                        const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
+                        const float centroidZ = hsum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
                         Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                         for(uint c: range(C)) tile.samples[c][pixelPtr] = blend(v16sf(((float*)tile.pixels[c])[pixelPtr]), v16sf(src._[c]), visibleMask);
                     } else {
@@ -511,9 +511,9 @@ template<class Shader> struct RenderPass {
                         float centroid[V];
                         for(int i: range(V)) {
                             const v16sf samples = w*(v16sf(face.varyings[i].x)*sampleX + v16sf(face.varyings[i].y)*sampleY + v16sf(face.varyings[i].z));
-                            centroid[i] = sum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
+                            centroid[i] = hsum(samples & visibleMask) / visibleSampleCount; // Averages on the visible samples
                         }
-                        const float centroidZ = sum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
+                        const float centroidZ = hsum(z & visibleMask) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
                         Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
                         for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
                     }

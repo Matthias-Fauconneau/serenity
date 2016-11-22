@@ -32,28 +32,6 @@ inline v8sf dot(const v8sf Ax, const v8sf Ay, const v8sf Az, const v8sf Bx, cons
     return Ax*Bx + Ay*By + Az*Bz;
 }
 
-#if 0
-inline bool intersect(vec3 A, vec3 B, vec3 C, vec3 O, vec3 d, float& t, float& u, float& v) { // "Fast, Minimum Storage Ray/Triangle Intersection"
-    vec3 e2 = C - A;
-    vec3 e1 = B - A;
-    vec3 P = cross(d, e2);
-    float det = dot(e1, P);
-    //if(det < 0) return false;
-    vec3 T = O - A;
-    u = dot(T, P);
-    if(u < 0 || u > det) return false;
-    vec3 Q = cross(T, e1);
-    v = dot(d, Q);
-    if(v < 0 || u + v > det) return false;
-    t = dot(e2, Q);
-    //if(t < 0) return false;
-    t /= det;
-    u /= det;
-    v /= det;
-    return true;
-}
-#endif
-
 // "Fast, Minimum Storage Ray/Triangle Intersection"
 static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
                              const v8sf xB, const v8sf yB, const v8sf zB,
@@ -78,48 +56,6 @@ static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
     const v8sf t = dot(eACx, eACy, eACz, Qx, Qy, Qz) / det;
     return blend(float8(inff), t, det > 0 && u >= 0 && v >= 0 && u + v <= det && t > 0);
 }
-
-#if 0
-// "Efficient Ray-Quadrilateral Intersection Test"
-static inline v8sf intersect(const v8sf x00, const v8sf y00, const v8sf z00,
-                             const v8sf x10, const v8sf y10, const v8sf z10,
-                             const v8sf x11, const v8sf y11, const v8sf z11,
-                             const v8sf x01, const v8sf y01, const v8sf z01,
-                             const v8sf  Ox, const v8sf  Oy, const v8sf  Oz,
-                             const v8sf  Dx, const v8sf  Dy, const v8sf  Dz) {
-    const v8sf e03x = x01 - x00;
-    const v8sf e03y = y01 - y00;
-    const v8sf e03z = z01 - z00;
-    v8sf P0x, P0y, P0z; cross(Dx, Dy, Dz, e03x, e03y, e03z, P0x, P0y, P0z);
-    const v8sf T0x = Ox - x00;
-    const v8sf T0y = Oy - y00;
-    const v8sf T0z = Oz - z00;
-    const v8sf a0 = dot(T0x, T0y, T0z, P0x, P0y, P0z);
-    const v8sf e01x = x10 - x00;
-    const v8sf e01y = y10 - y00;
-    const v8sf e01z = z10 - z00;
-    const v8sf det0 = dot(e01x, e01y, e01z, P0x, P0y, P0z);
-    v8sf Q0x, Q0y, Q0z; cross(T0x, T0y, T0z, e01x, e01y, e01z, Q0x, Q0y, Q0z);
-    const v8sf b0 = dot(Dx, Dy, Dz, Q0x, Q0y, Q0z);
-    const v8sf t = dot(e03x, e03y, e03z, Q0x, Q0y, Q0z) / det0;
-
-    const v8sf e21x = x10 - x11;
-    const v8sf e21y = y10 - y11;
-    const v8sf e21z = z10 - z11;
-    v8sf P1x, P1y, P1z; cross(Dx, Dy, Dz, e21x, e21y, e21z, P1x, P1y, P1z);
-    const v8sf T1x = Ox - x11;
-    const v8sf T1y = Oy - y11;
-    const v8sf T1z = Oz - z11;
-    const v8sf a1 = dot(T1x, T1y, T1z, P1x, P1y, P1z);
-    const v8sf e23x = x01 - x11;
-    const v8sf e23y = y01 - y11;
-    const v8sf e23z = z01 - z11;
-    v8sf Q1x, Q1y, Q1z; cross(T1x, T1y, T1z, e23x, e23y, e23z, Q1x, Q1y, Q1z);
-    const v8sf b1 = dot(Dx, Dy, Dz, Q1x, Q1y, Q1z);
-
-    return blend(float8(inff), t, det0 > _0f && a0 >= _0f && b0 >= _0f && a1 >= _0f && b1 >= _0f && t > _0f);
-}
-#endif
 
 inline v8sf hmin(const v8sf x) {
     const v8sf v0 = __builtin_ia32_minps256(x, _mm256_alignr_epi8(x, x, 4));
@@ -163,7 +99,7 @@ struct Scene {
         near = scale*min.z;
         far = scale*max.z;
     }
-#if 1
+
     inline size_t raycast(vec3 O, vec3 d) const {
         assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
         float value = inff; size_t index = faces.size;
@@ -193,7 +129,7 @@ struct Scene {
         }
         return index;
     }
-#endif
+
     inline size_t raycast(vec3 O, vec3 d, float& minT, float& u, float& v) const {
         assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
         minT = inff; size_t index = faces.size;
@@ -226,6 +162,7 @@ struct Scene {
         }
         return index;
     }
+
     inline size_t raycast_reverseWinding(vec3 O, vec3 d, float& minT, float& u, float& v) const {
         assert(faces.size < faces.capacity && align(8, faces.size)==faces.capacity);
         minT = inff; size_t index = faces.size;
@@ -258,7 +195,7 @@ struct Scene {
         }
         return index;
     }
-#if 0
+
     inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
         v8sf value = float8(inff); v8si index = intX(faces.size);
         for(size_t i: range(faces.size)) {
@@ -271,17 +208,13 @@ struct Scene {
             const float Cx = X[2][i];
             const float Cy = Y[2][i];
             const float Cz = Z[2][i];
-            const float Dx = X[3][i];
-            const float Dy = Y[3][i];
-            const float Dz = Z[3][i];
-            const v8sf t = ::intersect(float8(Ax),float8(Ay),float8(Az), float8(Bx),float8(By),float8(Bz), float8(Cx),float8(Cy),float8(Cz), float8(Dx),float8(Dy),float8(Dz),
-                                        Ox,Oy,Oz, dx,dy,dz);
+            v8sf det, U, V;
+            const v8sf t = ::intersect(Ax,Ay,Az, Bx,By,Bz, Cx,Cy,Cz, Ox,Oy,Oz, dx,dy,dz, det, U, V);
             index = blend(index, i, t < value);
             value = ::min(value, t);
         }
         return index;
     }
-#endif
 
     static inline vec3 refract(const float r, const vec3 N, const vec3 D) {
         const float c = -dot(N, D);
@@ -393,13 +326,21 @@ struct Scene {
                 size_t lightRayFaceIndex = raycast(P, L, t, u, v);
                 out += BRDF * shade(lightRayFaceIndex, P+t*L, L, u, v, random, bounce+1);
             } else { // Last bounce (only direct lighting)
-                //const vec3 l = cosine(random); // Local frame
-                const Vec<v8sf, 3> l8 = cosine(random);
-                const vec3 l (l8._[0][0], l8._[1][0], l8._[2][0]); // Local frame
-                const vec3 L = l.x * T + l.y * B + l.z * N;
-                float t,u,v;
-                size_t lightRayFaceIndex = raycast(P, L, t, u, v);
-                out += BRDF * bgr3f(emittanceB[lightRayFaceIndex], emittanceG[lightRayFaceIndex], emittanceR[lightRayFaceIndex]);
+                v8sf sumB=0, sumG=0, sumR=0;
+                const int iterations = 2;
+                for(uint unused i: range(iterations)) {
+                    const Vec<v8sf, 3> l = cosine(random);
+                    const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
+                    const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
+                    const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
+                    v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
+                    sumB += gather(emittanceB.data, lightRayFaceIndex);
+                    sumG += gather(emittanceG.data, lightRayFaceIndex);
+                    sumR += gather(emittanceR.data, lightRayFaceIndex);
+                }
+                out.b += BRDF.b/(iterations*8) * hsum(sumB);
+                out.g += BRDF.g/(iterations*8) * hsum(sumG);
+                out.r += BRDF.r/(iterations*8) * hsum(sumR);
             }
             return out;
         }
