@@ -37,3 +37,4 @@ ui/gl.cc
 
 music/MusicXML.cc
 music/music-test.cc
+music/music-video.cc

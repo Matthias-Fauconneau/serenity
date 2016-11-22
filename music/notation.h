@@ -226,11 +226,11 @@ inline String strKey(int fifths, int key) {
     assert_(key>0);
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
-    int step = keyStep(fifths, key)+37;
-    //int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
-    int alt = keyAlteration(fifths, key)+1;
+    const int step = keyStep(fifths, key)+37;
+    const int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    const int alt = keyAlteration(fifths, key)+1;
     assert_(alt >= 0 && alt <= 2);
-    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+str(octave);
+    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt]+superDigit(octave);
     //return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
 }
 inline String strNote(int octave, int step, Accidental accidental) {
@@ -324,7 +324,7 @@ inline void toRelative(mref<Sign> signs) {
    tuplet.last.max = tuplet.last.max - signIndex;
    tuplet.min = tuplet.min - signIndex;
    tuplet.max = tuplet.max - signIndex;
-   assert_(tuplet.first.min<0&&tuplet.first.max<0&&tuplet.last.min<0&&tuplet.last.max<0&&tuplet.min<0&&tuplet.max<0);
+   //assert_(tuplet.first.min<0&&tuplet.first.max<0&&tuplet.last.min<0&&tuplet.last.max<0&&tuplet.min<0&&tuplet.max<0);
   }
  }
 }

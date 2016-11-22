@@ -11,9 +11,9 @@ notrace inline bool operator <(const MidiNote& a, const MidiNote& b) { return a.
 inline String str(const MidiNote& o) { return /*str(o.time,*/( strKey(0, o.key)); }
 
 struct MidiNotes : array<MidiNote> {
-	MidiNotes() {}
-	MidiNotes(array<MidiNote>&& notes, uint ticksPerSeconds) : array<MidiNote>(::move(notes)), ticksPerSeconds(ticksPerSeconds) {}
-	uint ticksPerSeconds=0;
+    MidiNotes() {}
+    MidiNotes(array<MidiNote>&& notes, uint ticksPerSeconds) : array<MidiNote>(::move(notes)), ticksPerSeconds(ticksPerSeconds) {}
+    uint ticksPerSeconds=0;
 };
 inline MidiNotes copy(const MidiNotes& o) { return {copy((array<MidiNote>&)o), o.ticksPerSeconds}; }
 inline String str(const MidiNotes& o) { return str(o.ticksPerSeconds, str(ref<MidiNote>(o))); }
@@ -29,14 +29,14 @@ struct Track {
 
 /// Standard MIDI file player
 struct MidiFile {
-	MidiNotes notes;
+    MidiNotes notes;
     array<Track> tracks;
-	uint duration = 0; // Duration in ticks
+    uint duration = 0; // Duration in ticks
 
-	array<Sign> signs;
+    array<Sign> signs;
     uint ticksPerBeat = 0; // Time unit (ticks) per beat (quarter note)
 
-	MidiFile() {}
-	MidiFile(ref<byte> file);
-	explicit operator bool() const {  return tracks.size; }
+    MidiFile() {}
+    MidiFile(ref<byte> file);
+    explicit operator bool() const {  return tracks.size; }
 };

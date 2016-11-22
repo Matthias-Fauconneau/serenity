@@ -67,12 +67,12 @@ template<Type... Args> struct signal {
 template<Type... Args> signal<Args...> copy(const signal<Args...>& b) { signal<Args...> a; a.delegates=copy(b.delegates); return a; }
 
 // Sort using anonymous comparison function
-generic uint partition(function<bool(const T&, const T&)> less, const mref<T>& at, size_t left, size_t right, size_t pivotIndex) {
+generic uint partition(const mref<T>& at, size_t left, size_t right, size_t pivotIndex) {
     swap(at[pivotIndex], at[right]);
     const T& pivot = at[right];
     uint storeIndex = left;
     for(uint i: range(left,right)) {
-        if(less(pivot, at[i])) {
+        if(pivot < at[i]) {
             swap(at[i], at[storeIndex]);
             storeIndex++;
         }
@@ -81,14 +81,14 @@ generic uint partition(function<bool(const T&, const T&)> less, const mref<T>& a
     return storeIndex;
 }
 
-generic void quicksort(function<bool(const T&, const T&)> less, const mref<T>& at, int left, int right) {
+generic void quicksort(const mref<T>& at, int left, int right) {
     if(left < right) { // If the list has 2 or more items
-        int pivotIndex = partition(less, at, left, right, (left + right)/2);
-        if(pivotIndex) quicksort(less, at, left, pivotIndex-1);
-        quicksort(less, at, pivotIndex+1, right);
+        int pivotIndex = partition(at, left, right, (left + right)/2);
+        if(pivotIndex) quicksort(at, left, pivotIndex-1);
+        quicksort(at, pivotIndex+1, right);
     }
 }
 /// Quicksorts the array in-place
-generic const mref<T>& sort(function<bool(const T&, const T&)> less, const mref<T>& at) {
-    if(at.size) quicksort(less, at, 0, at.size-1); return at;
+generic const mref<T>& sort(const mref<T>& at) {
+    if(at.size) quicksort(at, 0, at.size-1); return at;
 }

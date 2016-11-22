@@ -15,6 +15,7 @@ extern "C" {
 //__attribute((constructor(1001))) void initialize_FFmpeg() { av_register_all(); }
 
 FFmpeg::FFmpeg(string path) {
+ av_register_all();
  if(avformat_open_input(&file, strz(path), 0, 0)) { log("No such file"_, path); return; }
  avformat_find_stream_info(file, 0);
  if(file->duration <= 0) { file=0; log("Invalid file"); return; }

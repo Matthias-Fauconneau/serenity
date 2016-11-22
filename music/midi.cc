@@ -152,7 +152,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     if(newTimeSignature.beats != timeSignature.beats || newTimeSignature.beatUnit != timeSignature.beatUnit) {
      timeSignature = newTimeSignature;
      insertSign({Sign::TimeSignature, track.time, .timeSignature=timeSignature});
-     assert_(track.time == 0, track.time);
+     //assert_(track.time == 0, track.time);
     }
    }
    else if(MIDI(key)==MIDI::Tempo) {
@@ -225,7 +225,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
       uint nextMeasureStart = lastMeasureStart+measureLengthUS;
       if(trackTimeUS >= nextMeasureStart) {
        lastMeasureStart = nextMeasureStart;
-       assert_(tupletCurrentSize == 0, tupletCurrentSize, measureIndex);
+       //assert_(tupletCurrentSize == 0, tupletCurrentSize, measureIndex);
        insertSign({Sign::Measure, nextMeasureStart, .measure={Measure::NoBreak, measureIndex, 1, 1, measureIndex}});
        measureIndex++;
       }
