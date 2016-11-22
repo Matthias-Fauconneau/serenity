@@ -30,3 +30,4 @@ view.cc
 scene.cc
 test.cc
 filesync.cc
+mwc.h

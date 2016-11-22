@@ -7,9 +7,13 @@
 typedef uint8 mask8;
 typedef uint16 mask16;
 
+typedef uint64 v4uq __attribute((ext_vector_type(4)));
+
 typedef int v2si __attribute((ext_vector_type(2)));
 typedef int v4si __attribute((ext_vector_type(4)));
 typedef int v8si __attribute((ext_vector_type(8)));
+
+typedef uint v8ui __attribute((ext_vector_type(8)));
 
 typedef float v2sf __attribute((ext_vector_type(2)));
 typedef float v4sf __attribute((ext_vector_type(4)));

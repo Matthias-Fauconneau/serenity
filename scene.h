@@ -1,6 +1,7 @@
 #pragma once
 #include "matrix.h"
 #include "parallel.h"
+#include "mwc.h"
 
 inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
     const float left = (-1-s), right = (1-s);
@@ -293,8 +294,8 @@ struct Scene {
     vec3 sphere(Random& random) const {
         float t0, t1, sq;
         do {
-            t0 = random()*2-1;
-            t1 = random()*2-1;
+            t0 = random()[0]*2-1;
+            t1 = random()[0]*2-1;
             sq = t0*t0 + t1*t1;
         } while(sq >= 1);
         const float r = sqrt(1-sq);
@@ -329,8 +330,8 @@ struct Scene {
     }
 #else
     vec3 cosine(Random& random) const {
-        const float ξ1 = random();
-        const float ξ2 = random();
+        const float ξ1 = random()[0];
+        const float ξ2 = random()[0];
         const float cosθ = sqrt(1-ξ1);
         const float sinθ = sqrt(ξ1);
         const float φ = 2*PI*ξ2;
@@ -510,7 +511,7 @@ struct Scene {
 
         RaycastShader(const Scene& scene) : scene(scene) {
             randoms = buffer<Random>(threadCount());
-            for(auto& random: randoms) random.seed();
+            for(auto& random: randoms) random=Random();
         }
 
         inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(id, face, z, varying, mask); }

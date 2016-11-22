@@ -274,7 +274,7 @@ struct ViewApp {
 #if 1 // Raycast (FIXME: sheared)
         const vec3 O = vec3(s,t,0)/scene.scale;
         Random randoms[threadCount()];
-        for(Random& random: mref<Random>(randoms,threadCount())) { random.seed(); }
+        for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {

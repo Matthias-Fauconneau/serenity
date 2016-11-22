@@ -98,6 +98,7 @@ String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 Date parseDate(TextData& s);
 inline Date parseDate(string s) { TextData t(s); Date date = parseDate(t); return t ? Date() : date; }
 
+#if 0
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers
 struct Random {
     uint sz,sw;
@@ -113,6 +114,7 @@ struct Random {
     operator uint64() { return next(); }
     float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
 };
+#endif
 
 #include "thread.h"
 struct Timer : Stream, Poll {
