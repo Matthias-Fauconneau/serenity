@@ -58,13 +58,13 @@ struct MusicTest {
   rawImageFileMap = Map(imageFile);
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   target = copy(image);
-  view = cropRef(target,0,int2(1366*2,870));
-  window = ::window(&view);
+
   array<uint> measureX; // X position in image of start of each measure
   for(uint x: range(image.size.x)) {
+   if(measureX && x<=measureX.last()+200) continue; // Minimum interval between measures
    uint sum = 0;
    for(uint y: range(image.size.y)) sum += image(x,y).g;
-   if(sum < 255u*image.size.y*2/3) { // Measure Bar
+   if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
     for(size_t y: range(image.size.y)) target(x,y) = 0;
     measureX.append(x);
    }
@@ -152,6 +152,8 @@ struct MusicTest {
   // Evaluates _strictly_ monotonous map by walking back the best path on the cumulative score matrix
   // Forward scan (chronologic)
   size_t i = 0, j = 0; // Score and MIDI bins indices
+  size_t signIndex = 0;
+  array<int64> measureT;
   while(i<m && j<n) {
    /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
     i++;
@@ -160,19 +162,36 @@ struct MusicTest {
     for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
     j++;
    } else {
-    log(apply(S[i], [](uint key){return strKey(-4, key);}),":", apply(M[j], [](uint key){return strKey(-4, key);}));
+    //log(apply(S[i], [](uint key){return strKey(-4, key);}),":", apply(M[j], [](uint key){return strKey(-4, key);}));
     for(size_t k: range(M[j].size)) {
      //assert_(i < notes.values.size && k < notes.values[i].size, i, k, notes.values.size);
      Sign sign{};
      if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Map original MIDI index to sorted to original note index
      //assert_(sign.note.signIndex != invalid);
+     size_t midiIndex = midiToSign.size;
      midiToSign.append( sign );
+     if(sign.note.signIndex != invalid) {
+      size_t nextSignIndex = sign.note.signIndex;
+      for(;signIndex < nextSignIndex;signIndex++) {
+       Sign sign = signs[signIndex];
+       if(sign.type == Sign::Measure) measureT.append(midiNotes[midiIndex].time);
+      }
+     }
     }
     //for(size_t unused k: range(S[i].size, M[j].size)) midiToSign.append(Sign{});
     i++; j++;
    }
   }
   for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
+
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
+  //for(size_t midiNotesIndex: range(midiNotes.size)) {
+   //log(strKey(0, midiToSign[midiNotesIndex].note.key()), strKey(0,midiNotes[midiNotesIndex].key));
+  //}
+  if(measureT.size != measureX.size) writeFile("output.png", encodePNG(target), currentWorkingDirectory(), true);
+  assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
+  log(measureT);
+  view = cropRef(target,0,int2(1366*2,870));
+  window = ::window(&view);
  }
 } test;
