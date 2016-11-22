@@ -287,7 +287,7 @@ struct Scene {
 #if RT
             static constexpr int iterations = 1;
 #else
-            static constexpr int iterations = 32;
+            static constexpr int iterations = 64;
 #endif
             const vec3 R = normalize(D - 2*dot(N, D)*N);
             for(uint unused i: range(iterations)) {
@@ -332,36 +332,33 @@ struct Scene {
             return (1-a)*volumeColor + a*transmitColor;
         }*/
         else { // Diffuse
-            {
-                // Direct lighting
-                v8sf sumB=0, sumG=0, sumR=0;
+            // Direct lighting
+            v8sf sumB=0, sumG=0, sumR=0;
 #if RT
-                static constexpr int iterations = 1;
+            static constexpr int directIterations = 1;
+            static constexpr int indirectIterations = 1;
 #else
-                const int iterations = bounce < 1 ? 1024 : 1;
+            const int directIterations = bounce < 1 ? 2048 : 1;
+            constexpr int indirectIterations = 1;
 #endif
-                for(uint unused i: range(iterations)) {
-                    const Vec<v8sf, 3> l = cosine(random);
-                    const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
-                    const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
-                    const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
-                    v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
-                    sumB += gather(emittanceB.data, lightRayFaceIndex);
-                    sumG += gather(emittanceG.data, lightRayFaceIndex);
-                    sumR += gather(emittanceR.data, lightRayFaceIndex);
-                }
-                out.b += (1.f/(iterations*8)) * BRDF.b * hsum(sumB);
-                out.g += (1.f/(iterations*8)) * BRDF.g * hsum(sumG);
-                out.r += (1.f/(iterations*8)) * BRDF.r * hsum(sumR);
+            const float scale = 1.f/(directIterations*8+indirectIterations*8);
+            for(uint unused i: range(directIterations)) {
+                const Vec<v8sf, 3> l = cosine(random);
+                const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
+                const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
+                const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
+                v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
+                sumB += gather(emittanceB.data, lightRayFaceIndex);
+                sumG += gather(emittanceG.data, lightRayFaceIndex);
+                sumR += gather(emittanceR.data, lightRayFaceIndex);
             }
+            out.b += scale * BRDF.b * hsum(sumB);
+            out.g += scale * BRDF.g * hsum(sumG);
+            out.r += scale * BRDF.r * hsum(sumR);
             if(bounce < 1) { // Indirect diffuse lighting
                 path[bounce] = Diffuse;
-#if RT
-                static constexpr int iterations = 1;
-#else
-                static constexpr int iterations = 512;
-#endif
-                for(uint unused i: range(iterations)) {
+                bgr3f sum;
+                for(uint unused i: range(indirectIterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
                     const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
                     const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
@@ -370,9 +367,10 @@ struct Scene {
                     v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
                     for(uint k: range(8)) {
                         vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
-                        out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
+                        sum += shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
                     }
                 }
+                out += scale * BRDF * sum;
             } else path[bounce] = Direct;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;
