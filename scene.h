@@ -329,6 +329,7 @@ struct Scene {
         return normalize(xs * x + ys * N + zs * normalize(cross(x, N)));
     }
 #else
+#if 0
     vec3 cosine(Random& random) const {
         const float ξ1 = random()[0];
         const float ξ2 = random()[0];
@@ -337,6 +338,18 @@ struct Scene {
         const float φ = 2*PI*ξ2;
         return vec3(sinθ * cos(φ), sinθ * sin(φ), cosθ);
     }
+#else
+
+    Vec<v8sf, 3> cosine(Random& random) const {
+        const v8sf ξ1 = random();
+        const v8sf ξ2 = random();
+        const v8sf cosθ = sqrt(_1f-ξ1);
+        const v8sf sinθ = sqrt(ξ1);
+        const v8sf φ = 2*_PI*ξ2;
+        const Vec<v8sf, 2> cossinφ = cossin(φ);
+        return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
+    }
+#endif
 #endif
     bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const uint bounce) const {
         const Scene::Face& face = faces[faceIndex];
@@ -374,13 +387,16 @@ struct Scene {
             bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
             const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
             if(bounce < 1) { // Direct or indirect
-                const vec3 l = cosine(random); // Local frame
+                const Vec<v8sf, 3> l8 = cosine(random);
+                const vec3 l (l8._[0][0], l8._[1][0], l8._[2][0]); // Local frame
                 const vec3 L = l.x * T + l.y * B + l.z * N;
                 float t,u,v;
                 size_t lightRayFaceIndex = raycast(P, L, t, u, v);
                 out += BRDF * shade(lightRayFaceIndex, P+t*L, L, u, v, random, bounce+1);
             } else { // Last bounce (only direct lighting)
-                const vec3 l = cosine(random); // Local frame
+                //const vec3 l = cosine(random); // Local frame
+                const Vec<v8sf, 3> l8 = cosine(random);
+                const vec3 l (l8._[0][0], l8._[1][0], l8._[2][0]); // Local frame
                 const vec3 L = l.x * T + l.y * B + l.z * N;
                 float t,u,v;
                 size_t lightRayFaceIndex = raycast(P, L, t, u, v);

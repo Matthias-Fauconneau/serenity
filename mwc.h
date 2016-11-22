@@ -16,7 +16,6 @@ struct Random {
         y ^= y << 13;
         return v8ui(y);
     }
-
     v8sf operator()() {
         v8ui const one = 0x3F800000;          // Binary representation of 1.0f
         v8ui randomBits = next();          // Get random bits

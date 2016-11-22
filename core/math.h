@@ -19,9 +19,9 @@ inline float rsqrt(float f) { return 1/__builtin_sqrtf(f); }
 inline float sqrt(float f) { return __builtin_sqrtf(f); }
 
 constexpr float PI = 3.14159265358979323846;
-inline float cos(float t) { return __builtin_cos(t); }
-inline float acos(float t) { return __builtin_acos(t); }
-inline float sin(float t) { return __builtin_sin(t); }
+inline float cos(float t) { return __builtin_cosf(t); }
+inline float acos(float t) { return __builtin_acosf(t); }
+inline float sin(float t) { return __builtin_sinf(t); }
 inline float atan(float y, float x) { return __builtin_atan2f(y, x); }
 
 inline double pow(double x, double y) { return __builtin_pow(x,y); }

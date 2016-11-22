@@ -28,7 +28,7 @@ static v8si unused _0i = intX(0);
 static v8si unused _1i = intX(-1);
 
 inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
-inline v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
+inline constexpr v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
 inline v8sf float8(v4sf a, v4sf b) { return __builtin_shufflevector(a, b, 0,1,2,3,4,5,6,7); }
 
 //static constexpr v4sf _0011f = {0,0,1,1};
@@ -40,6 +40,10 @@ static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gather
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
+
+static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
+static inline v8sf rsqrt(v8sf x) { return __builtin_ia32_rsqrtps256(x); }
+static inline v8sf rcp(v8sf x) { return __builtin_ia32_rcpps256(x); }
 
 struct v16si;
 
@@ -54,11 +58,6 @@ struct v16sf {
     const float& operator [](uint i) const { return ((float*)this)[i]; }
     explicit operator v16si() const;
 };
-
-static v4sf unused _0f4 {0,0,0,0};
-static v8sf unused _0f {0,0,0,0,0,0,0};
-static v8sf unused _1f = v8sf(1);
-static v16sf unused __1f = v16sf(-1);
 
 inline v16sf operator-(v16sf a) { return v16sf(-a.r1, -a.r2); }
 inline v16sf& operator+=(v16sf& a, v16sf b) { a.r1 += b.r1; a.r2 += b.r2; return a; }
@@ -146,11 +145,14 @@ inline v4sf floor(const v4sf v) { return __builtin_ia32_roundps(v, 1/*-∞*/); }
 inline v8sf floor(const v8sf v) { return __builtin_ia32_roundps256(v, 1/*-∞*/); }
 inline v16sf floor(const v16sf v) { return v16sf(floor(v.r1), floor(v.r2)); }
 
-const v4si notSignBit4 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
+static unused const v4si notSignBit4 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
 inline v4sf abs(v4sf a) { return (v4sf)(notSignBit4 & (v4si)a); }
 
-const v8si notSignBit8 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF, 0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
+static unused const v8si notSignBit8 = {0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF};
 inline v8sf abs(v8sf a) { return (v8sf)(notSignBit8 & (v8si)a); }
+
+static unused const v8ui signBit8 = {0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000};
+inline v8si sign(v8sf a) { return (v8si)signBit8 & (v8si)a; }
 
 inline v8sf toFloat(const v8si v) { return __builtin_ia32_cvtdq2ps256(v); }
 inline v8hf toHalf(const v8sf v) { return __builtin_ia32_vcvtps2ph256(v, 0); }
@@ -163,6 +165,9 @@ inline v16sf toFloat(const v16hf v) {
                  __builtin_ia32_vcvtph2ps256(__builtin_shufflevector(v, v, 8+0, 8+1, 8+2, 8+3, 8+4, 8+5, 8+6, 8+7)));
 }
 
+inline v8si cvtt(const v8sf v) { return __builtin_ia32_cvttps2dq256(v); }
+
+
 inline float dot(v4sf a, v4sf b) { return __builtin_ia32_dpps(a, b, 0xFF)[0]; }
 inline v4sf low(v8sf a) { return __builtin_shufflevector(a,a, 0,1,2,3); } // vextractf128 0
 inline v4sf high(v8sf a) { return __builtin_shufflevector(a,a, 4,5,6,7); } // vextractf128 1
@@ -171,6 +176,24 @@ inline float dot(v8sf a, v8sf b) {
     return (low(dot4)+high(dot4))[0];
 }
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
+
+template<Type T, uint N> struct Vec { T _[N]; };
+
+#include "math.h"
+static inline Vec<v8sf, 2> cossin(const v8sf angle) {
+  const v8sf absAngle = abs(angle);
+  const v8si octant = (cvtt((4/PI) * absAngle)+1) & (~1);
+  const v8si cosSign = ((~(octant-2))&4) << 29;
+  const v8si swap = (octant&4) << 29;
+  const v8si sinSign = swap ^ sign(angle);
+  const v8sf y = toFloat(octant);
+  const v8sf x = float8(-3.77489497744594108e-8) * y + (float8(-2.4187564849853515625e-4) * y + (float8(-0.78515625) * y + absAngle));
+  const v8sf x2 = x*x;
+  const v8sf y1 = (((float8(2.443315711809948e-5) * x2 + float8(-1.388731625493765e-3)) * x2 + float8(4.166664568298827e-2)) * x2 + float8(-1./2)) * x2 + 1; // 0 <= x <= PI/4
+  const v8sf y2 = (((float8(-1.9515295891E-4) * x2 + float8(8.3321608736E-3)) * x2 + float8(-1.6666654611E-1)) * x2 + 1) * x; // -PI/4 <= x <= 0
+  const v8si select = (octant&2) == 0;
+  return {{(v8sf)(cosSign ^ (v8si)blend(y1, y2, ~select)), (v8sf)(sinSign ^ (v8si)blend(y1, y2, select))}};
+}
 
 template<> inline String str(const half& v) { return str(float(v)); }
 template<> inline String str(const v8sf& v) { return "v8sf("_+str(ref<float>((float*)&v,8))+")"_; }
