@@ -406,7 +406,7 @@ template<class Shader> struct RenderPass {
                     const v16sf w = 1/( v16sf(face.Eiw.x)*XY1x + v16sf(face.Eiw.y)*XY1y + v16sf(face.Eiw.z)); // Perspective correct interpolation E(w) E(v/w)
                     const v16sf z = v16sf(face.Ez.x)*XY1x + v16sf(face.Ez.y)*XY1y + v16sf(face.Ez.z); // Linear interpolation Ez != E(w) E(z/w)
                     v16sf& Z = tile.pixelZ[blockIndex];
-                    const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z & (z >= /*-1*/__1f);
+                    const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z & (z >= v16sf(-1));
                     store(Z, z, mask);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
@@ -426,7 +426,7 @@ template<class Shader> struct RenderPass {
 
                             // Performs Z-Test
                             v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                            const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f);
+                            const v16si visibleMask = (z <= sampleZ) & (z >= v16sf(-1));
                             const mask16 mask = ::mask(visibleMask);
                             if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
@@ -472,7 +472,7 @@ template<class Shader> struct RenderPass {
                     if(!(tile.multisample[pixelPtr/16]&(1<<(pixelPtr%16)))) {
                         // Performs Z-Test
                         const float pixelZ = ((float*)tile.pixelZ)[pixelPtr];
-                        const v16si visibleMask = (z <= pixelZ) & (z >= /*-1*/__1f) & draw.mask;
+                        const v16si visibleMask = (z <= pixelZ) & (z >= v16sf(-1)) & draw.mask;
                         const mask16 mask = ::mask(visibleMask);
                         if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
@@ -497,7 +497,7 @@ template<class Shader> struct RenderPass {
                     } else {
                         // Performs Z-Test
                         v16sf& sampleZ = tile.sampleZ[pixelPtr];
-                        const v16si visibleMask = (z <= sampleZ) & (z >= /*-1*/__1f) & draw.mask;
+                        const v16si visibleMask = (z <= sampleZ) & (z >= v16sf(-1)) & draw.mask;
                         const mask16 mask = ::mask(visibleMask);
                         if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 

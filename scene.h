@@ -76,7 +76,7 @@ static inline v8sf intersect(const v8sf xA, const v8sf yA, const v8sf zA,
     v8sf Qx, Qy, Qz; cross(Tx, Ty, Tz, eABx, eABy, eABz, Qx, Qy, Qz);
     v = dot(Dx, Dy, Dz, Qx, Qy, Qz);
     const v8sf t = dot(eACx, eACy, eACz, Qx, Qy, Qz) / det;
-    return blend(float8(inff), t, det > _0f && u >= _0f && v >= _0f && u + v <= det && t > _0f);
+    return blend(float8(inff), t, det > 0 && u >= 0 && v >= 0 && u + v <= det && t > 0);
 }
 
 #if 0
@@ -339,13 +339,12 @@ struct Scene {
         return vec3(sinθ * cos(φ), sinθ * sin(φ), cosθ);
     }
 #else
-
     Vec<v8sf, 3> cosine(Random& random) const {
         const v8sf ξ1 = random();
         const v8sf ξ2 = random();
-        const v8sf cosθ = sqrt(_1f-ξ1);
+        const v8sf cosθ = sqrt(1-ξ1);
         const v8sf sinθ = sqrt(ξ1);
-        const v8sf φ = 2*_PI*ξ2;
+        const v8sf φ = 2*PI*ξ2;
         const Vec<v8sf, 2> cossinφ = cossin(φ);
         return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
     }
