@@ -83,6 +83,9 @@ struct Scene {
     buffer<float> emittanceB, emittanceG, emittanceR; // Face color attributes
     buffer<float> reflectanceB, reflectanceG, reflectanceR; // 1/PI
     buffer<Face> faces;
+    array<uint> lights; // Face index of lights
+    array<float> area; // Area of lights (sample proportionnal to area) (Divided by sum)
+    array<float> CAF; // Cumulative area of lights (sample proportionnal to area)
 
     vec3 min, max;
     float scale, near, far;
@@ -280,7 +283,7 @@ struct Scene {
         const Scene::Face& face = faces[faceIndex];
         bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
-        if(face.reflect) {
+        if(face.reflect && 0) {
             if(bounce > 0) return 0; // +S
             //if(bounce > 1) return 0; // -SDS
             path[bounce] = Specular; // S
@@ -332,16 +335,17 @@ struct Scene {
             return (1-a)*volumeColor + a*transmitColor;
         }*/
         else { // Diffuse
-            // Direct lighting
-            v8sf sumB=0, sumG=0, sumR=0;
 #if RT
-            static constexpr int directIterations = 1;
+            //static constexpr int directIterations = 1;
             static constexpr int indirectIterations = 1;
 #else
-            const int directIterations = bounce < 1 ? 2048 : 1;
+            //const int directIterations = 1; // bounce < 1 ? 2048 : 1;
             constexpr int indirectIterations = 1;
 #endif
-            const float scale = 1.f/(directIterations*8+indirectIterations*8);
+            const float scale = 1; //1.f/(directIterations*8+indirectIterations*8);
+#if 0
+            // Direct lighting
+            v8sf sumB=0, sumG=0, sumR=0;
             for(uint unused i: range(directIterations)) {
                 const Vec<v8sf, 3> l = cosine(random);
                 const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
@@ -355,7 +359,95 @@ struct Scene {
             out.b += scale * BRDF.b * hsum(sumB);
             out.g += scale * BRDF.g * hsum(sumG);
             out.r += scale * BRDF.r * hsum(sumR);
-            if(bounce < 1) { // Indirect diffuse lighting
+#else
+            const float a = random()[0]; uint lightIndex=0; for(;;lightIndex++) if(a < CAF[lightIndex]) break;
+            const uint lightFaceIndex = lights[lightIndex];
+            const vec3 La (X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex]);
+            const vec3 Lb (X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex]);
+            const vec3 Lc (X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex]);
+            //const vec3 Ln (faces[faceIndex].N[0].x, faces[faceIndex].N[0].y, faces[faceIndex].N[0].z); // Assumes flat face
+            const vec3 OA = La - P;
+            const vec3 OB = Lc - P; // Reverse winding
+            const vec3 OC = Lb - P; // FIXME
+            const float abc = dot(OA, cross(OB, OC)); // FIXME: Winding
+            if(abc > 0) { // sign(O) == sign(abc) // Scalar triple product (Volume of abc)
+                // Precomputes for several shadow rays
+                const float a = length(OA);
+                const float b = length(OB);
+                const float c = length(OC);
+                const float den = a*b*c + dot(OA,OB)*c + dot(OA,OC)*b + dot(OB,OC)*a;
+                const float O = 2*atan(abc, den); // Solid angle (0-4PI)
+                //assert_(O >= 0 && O <= 4*PI, O, abc, den, a,b,c, OA, OB, OC, La, Lb, Lc, P, lightFaceIndex, faces.size);
+                const float areaFactor = area[lightIndex];
+                //assert_(areaFactor);
+                const float unbiasFactor = (O/*/(4*PI)*/) / areaFactor;
+                //if(dot(P-La, Ln) > 0) // Half space clip
+                //if(O > 0) // Half space clip
+#if 1
+                const float A = random()[0] * O; // New area
+                const float cosa = dot(OB-OA, OC-OA)/(length(OB-OA)*length(OC-OA));
+                //assert_(cosa >= -1 && cosa <= 1);
+                const float sina = sqrt(1-sq(cosa)); //length(cross(OB-OA, OC-OA))/(a*b);
+                //assert_(sina >= -1 && sina <= 1);
+                const float alpha = acos(cosa);
+                const float s = sin(A-alpha);
+                //assert_(s >= -1 && s <= 1);
+                const float t = cos(A-alpha);
+                //assert_(t >= -1 && t <= 1);
+                const float u = t - cosa;
+                const float cosc = dot(OA, OB)/(a*b);
+                const float v = s + sina * cosc;
+                const float q = ((v*t -u*s)*cosa-v) / ((v*s+u*t)*sina);
+                //assert_(q >= -1 && q <= 1);
+                const vec3 C = q*OA/a + sqrt(1-q*q)*normalize(OC/c-dot(OC,OA)/(c*a)*OA/a);
+                const float z = 1 - random()[0] * (1 - dot(C, OB)/b);
+                //assert_(z >= -1 && z <= 1, z, C);
+                const vec3 L = z*OB/b + sqrt(1-z*z) * normalize(C-dot(C,OB)/b*OB/b);
+                const float dotNL = dot(N, L);
+                if(dotNL > 0 && raycast(P, L) == lightFaceIndex) { // No Occlusion (No Shadow)
+                    //out += scale * BRDF * unbiasFactor * bgr3f((L+vec3(1))/2.f); //bgr3f(emittanceB[lightFaceIndex], emittanceG[lightFaceIndex], emittanceR[lightFaceIndex]);
+                    out += scale * BRDF * dotNL * unbiasFactor * bgr3f(emittanceB[lightFaceIndex], emittanceG[lightFaceIndex], emittanceR[lightFaceIndex]);
+                }
+#else
+                for(;;) { // TODO: SIMD shadow rays
+                    const Vec<v8sf, 3> l = cosine(random);
+                    const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
+                    const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
+                    const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
+                    v8sf det, u , v;
+                    vec3 L(Lx[0],Ly[0],Lz[0]);
+                    float t = intersect(La.x,La.y,La.z, Lb.x,Lb.y,Lb.z, Lc.x,Lc.y,Lc.z, P.x,P.y,P.z, L.x,L.y,L.z, det,u,v)[0];
+                    if(t==inff) continue; //break; //DEBUG // continue; // Rejection sampling
+                    if(raycast(P, L) != lightFaceIndex) break; // Shadow
+                    //assert_(O >= 0 && O <= 4*PI, O);
+                    out += scale * BRDF * unbiasFactor * bgr3f(emittanceB[lightFaceIndex], emittanceG[lightFaceIndex], emittanceR[lightFaceIndex]);
+                }
+#endif
+            }
+            /*const float u = random();
+            const float v = random();
+            vec3 L = vec3((1-u-v) * X[0][lightFaceIndex] +  u * X[1][lightFaceIndex] + v * X[2][lightFaceIndex],
+                    (1-u-v) * Y[0][lightFaceIndex] +  u * Y[1][lightFaceIndex] + v * Y[2][lightFaceIndex],
+                    (1-u-v) * Z[0][lightFaceIndex] +  u * Z[1][lightFaceIndex] + v * Z[2][lightFaceIndex])-P;
+            float sqL = sq(L);
+            vec3 l = rsqrt(sqL) * L;
+            vec3 Nl = normalize((1-u-v) * faces[lightFaceIndex].N[0] +  u * faces[lightFaceIndex].N[1] + v * faces[lightFaceIndex].N[2]);
+            float dotNlL = dot(Nl, -l);
+            if(dotNlL <= 0) return 0; // Backface light cull
+            else {
+                float dotNL = dot(N, l);
+                if(dotNL <= 0) return 0;
+                else {
+                    size_t lightRayHitFaceIndex = raycast(P, l);
+                    if(lightRayHitFaceIndex != lightFaceIndex) return 0;
+                    else {
+                        const float lightPower = sq(512);
+                        return (lightPower / sqL * dotNlL * dotNL) * vec3(B[faceIndex],G[faceIndex],R[faceIndex]);
+                    }
+                }
+            }*/
+#endif
+            if(bounce < 1 && 0) { // Indirect diffuse lighting
                 path[bounce] = Diffuse;
                 bgr3f sum;
                 for(uint unused i: range(indirectIterations)) {
@@ -565,7 +657,7 @@ struct Scene {
 inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) const {
     float t, u, v;
     const size_t faceIndex = raycast(O, D, t, u, v);
-    return shade(faceIndex, O+t*D, D, u, v, random, bounce, path, timers, stride);
+    return t<inff ? shade(faceIndex, O+t*D, D, u, v, random, bounce, path, timers, stride) : 0;
 }
 
 Scene parseScene(ref<byte> scene);

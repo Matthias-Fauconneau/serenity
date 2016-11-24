@@ -277,7 +277,9 @@ Scene parseScene(ref<byte> file) {
             { // Triangle ABC
                 const vec3 T = normalize(polygon[1]-polygon[0]);
                 const vec3 B = normalize(polygon[2]-polygon[1]);
-                const vec3 N = normalize(cross(T, B));
+                const vec3 cross = ::cross(T, B);
+                const float lengthCross = length(cross);
+                const vec3 N = cross/lengthCross;
                 const float reflect = N.z == -1;
                 const bgr3f color = reflect==0 ? (bgr3f(N)+bgr3f(1))/2.f : bgr3f(1, 1./2, 1./2);
                 scene.faces.append({{0,1,1},{0,0,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
@@ -286,13 +288,16 @@ Scene parseScene(ref<byte> file) {
                     scene.Y[i].append(polygon[i].y-viewpoint.y);
                     scene.Z[i].append(polygon[i].z-viewpoint.z);
                 }
-                if(N.y == 1) {
+                if(N.y == 1 && polygon[0].y==0) {
                     scene.emittanceB.append(1);
                     scene.emittanceG.append(1);
                     scene.emittanceR.append(1);
                     scene.reflectanceB.append(1);
                     scene.reflectanceG.append(1);
                     scene.reflectanceR.append(1);
+                    scene.lights.append(scene.faces.size-1);
+                    scene.area.append(lengthCross/2);
+                    scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
                 } else {
                     scene.emittanceB.append(0);
                     scene.emittanceG.append(0);
@@ -305,7 +310,9 @@ Scene parseScene(ref<byte> file) {
             { // Triangle ACD
                 const vec3 T = normalize(polygon[2]-polygon[3]);
                 const vec3 B = normalize(polygon[3]-polygon[0]);
-                const vec3 N = normalize(cross(T, B));
+                const vec3 cross = ::cross(T, B);
+                const float lengthCross = length(cross);
+                const vec3 N = cross/lengthCross;
                 const float reflect = N.z == -1;
                 const bgr3f color = reflect==0 ? (bgr3f(N)+bgr3f(1))/2.f : bgr3f(1, 1./2, 1./2);
                 scene.faces.append({{0,1,0},{0,1,1},{T,T,T},{B,B,B},{N,N,N},reflect,0,gloss,0,0});
@@ -314,13 +321,16 @@ Scene parseScene(ref<byte> file) {
                     scene.Y[i].append(polygon[i?1+i:0].y-viewpoint.y);
                     scene.Z[i].append(polygon[i?1+i:0].z-viewpoint.z);
                 }
-                if(N.y == 1) {
+                if(N.y == 1 && polygon[0].y==0) {
                     scene.emittanceB.append(1);
                     scene.emittanceG.append(1);
                     scene.emittanceR.append(1);
                     scene.reflectanceB.append(1);
                     scene.reflectanceG.append(1);
                     scene.reflectanceR.append(1);
+                    scene.lights.append(scene.faces.size-1);
+                    scene.area.append(lengthCross/2);
+                    scene.CAF.append((scene.CAF ? scene.CAF.last() : 0)+lengthCross/2);
                 } else {
                     scene.emittanceB.append(0);
                     scene.emittanceG.append(0);
@@ -333,6 +343,9 @@ Scene parseScene(ref<byte> file) {
         }
         assert_(scene.faces.size == 2*quadCount);
     }
+    for(float& v: scene.area) v /= scene.CAF.last();
+    for(float& v: scene.CAF) v /= scene.CAF.last();
+    assert_(scene.CAF.last()==1);
     scene.fit();
     return scene;
 }
