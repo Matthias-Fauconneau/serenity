@@ -76,6 +76,11 @@ inline float hsum(v4sf v) { // movshdup, addps, movhlps, addss
     v4sf t = v+__builtin_shufflevector(v,v, 1,1,3,3);
     return t[0]+t[2];
 }
+inline int hsum(v8si x) {
+    const v4si sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7
+    const v4si sumDual = sumQuad + __builtin_shufflevector(sumQuad, sumQuad, 2, 3, -1, -1); // 0+4 + 2+6, 1+5 + 3+7 (+movehl)
+    return (sumDual + __builtin_shufflevector(sumDual, sumDual, 1, -1, -1, -1))[0]; // 0+4+2+6 + 1+5+3+7
+}
 inline float hsum(v8sf x) {
     const v4sf sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7
     const v4sf sumDual = sumQuad + __builtin_shufflevector(sumQuad, sumQuad, 2, 3, -1, -1); // 0+4 + 2+6, 1+5 + 3+7 (+movehl)
@@ -116,10 +121,10 @@ inline mask8 mask(v8si m) { return __builtin_ia32_movmskps256(m); }
 inline mask16 mask(v16si m) { return mask(m.r1)|(mask(m.r2)<<8); }
 inline v16si mask(const mask16 m) { return {mask(mask8(m)), mask(mask8(m>>8))}; }
 
-inline v4sf and(v4sf a, v4si b) { return (v4sf)((v4si)a & b); }
-inline v8sf and(v8sf a, v8si b) { return (v8sf)((v8si)a & b); }
+inline v8sf and(v8si k, v8sf x) { return (v8sf)(k & (v8si)x); }
 inline v16si operator &(v16si a, v16si b) { return {a.r1 & b.r1, a.r2 & b.r2}; }
-inline v16sf operator &(v16sf a, v16si b) { return v16sf(and(a.r1, b.r1), and(a.r2,b.r2)); }
+//inline v16sf operator &(v16sf a, v16si b) { return v16sf(and(a.r1, b.r1), and(a.r2,b.r2)); }
+inline v16sf and(v16si k, v16sf x) { return v16sf(and(k.r1, x.r1), and(k.r2,x.r2)); }
 
 inline v8si blend(v8si A, v8si B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
 inline v8sf blend(v8sf A, v8sf B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }

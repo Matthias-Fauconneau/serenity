@@ -1,6 +1,7 @@
 // Agner Fog (GPL)
 #include "core.h"
 #include "simd.h"
+#include "time.h"
 
 struct Random {
     v8ui state;
