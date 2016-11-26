@@ -75,8 +75,6 @@ template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a;
 generic inline constexpr T min(T a, T b) { return a<b ? a : b; }
 generic inline constexpr T max(T a, T b) { return a<b ? b : a; }
 generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
-generic T abs(T x) { return x>=0 ? x : -x; }
-//inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
 /// Numeric range
 struct range {

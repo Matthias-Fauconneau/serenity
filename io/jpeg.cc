@@ -14,14 +14,15 @@ Image decodeJPEG(const ref<byte> file) {
       jpeg.out_color_space = JCS_EXT_BGRX;
       jpeg_start_decompress(&jpeg);
       assert_(jpeg.output_components == 4);
-      image = Image(jpeg.output_width, jpeg.output_height);
+      image = Image(jpeg.output_width, jpeg.output_height, /*align(4, jpeg.output_width)*/jpeg.output_width);
       for(int y : range(image.height)) {
-          uint8* line = (uint8*)(image.data+y*image.width);
+          uint8* line = (uint8*)(image.data+y*image.stride);
           jpeg_read_scanlines(&jpeg, &line, 1);
       }
       jpeg_finish_decompress(&jpeg);
   } catch (struct jpeg_error_mgr*) {}
   jpeg_destroy_decompress(&jpeg);
+  //assert_(image.stride%4==0);
   return image;
 }
 
@@ -40,7 +41,7 @@ buffer<byte> encodeJPEG(const Image& image, int quality) {
   jpeg_set_quality(&jpeg, quality, TRUE);
   jpeg_start_compress(&jpeg, TRUE);
   for(size_t y: range(image.height)) {
-	  uint8* line = (uint8*)(image.data+y*image.width);
+          uint8* line = (uint8*)(image.data+y*image.stride);
 	  jpeg_write_scanlines(&jpeg, &line, 1);
   }
   jpeg_finish_compress(&jpeg);

@@ -7,6 +7,8 @@ extern "C" {
 #define _STDLIB_H // Prevent system <stdlib.h> inclusion which conflicts with local "thread.h"
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
+#define _LIBCPP_MATH_H
+#define _LIBCPP_STDLIB_H
 #include <libavformat/avformat.h> //avformat
 #include <libavcodec/avcodec.h> //avcodec
 #include <libavutil/avutil.h> //avutil

@@ -101,7 +101,7 @@ Image decodePNG(const ref<byte> file) {
   predicted = move(unpackedBytes);
  }
  assert_(predicted.size == height*(1+width*depth), "Invalid PNG", predicted.size, height*(1+width*depth), width, height, depth, bitDepth);
- Image image(width,height,alpha);
+ Image image(width,height,width,alpha);
  byte4* target = image.begin();
  int w=width,h=height;
  const byte* source=predicted.data;

@@ -2,7 +2,6 @@
 #include "source-view.h"
 #include "serialization.h"
 #include "image-folder.h"
-#include "split.h"
 #include "operation.h"
 #include "align.h"
 #include "weight.h"
@@ -84,7 +83,7 @@ struct PanoramaWeights : ImageGroupSource {
 		int2 size = max-min;
 		auto reverse = reversibleSort(transforms); // by X offset
 		array<SourceImage> images = apply(transforms.size, [&](size_t index) -> SourceImage {
-			SourceImage image (size);
+            SourceImage image (size); //, align(8, size.x));
 			auto current = transforms[index];
 			int currentMin = current.min(sourceSize).x  - min.x;
 			int previousMax = (index == 0) ? currentMin : (transforms[index-1].max(sourceSize).x - min.x);
@@ -103,8 +102,8 @@ struct PanoramaWeights : ImageGroupSource {
 				for(size_t x : range(currentMax, image.size.x)) image(x,y) = 0;
 			}
 			return image;
-		} );
-		return apply(reverse, [&](size_t index) { return move(images[index]); });
+        } );
+        return apply(reverse, [&](size_t index) { return move(images[index]); });
 	}
 };
 
@@ -142,11 +141,14 @@ struct PanoramaStitchPreview : PanoramaStitch, Application {
 	size_t imageIndex = 0;
 
 #if 0
-    sRGBGroupOperation sRGB [3] = {alignSource, normalizeWeightBands, multiscale};
-    /*array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
-            return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });*/
+    sRGBGroupOperation sRGB[3] = {alignSource, normalizeWeightBands, multiscale};
+#if 0
+    array<Scroll<ImageGroupSourceView>> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
+            return Scroll<ImageGroupSourceView>(source, &index, &imageIndex); });
+#else
     array<ImageGroupSourceView> sRGBView = apply(mref<sRGBGroupOperation>(sRGB), [&](ImageRGBGroupSource& source) {
       return ImageGroupSourceView(source, &index, &imageIndex); });
+#endif
 #else
 	sRGBOperation sRGB [1] = {blend};
     //array<Scroll<ImageSourceView>> sRGBView = apply(mref<sRGBOperation>(sRGB), [&](ImageRGBSource& source) -> Scroll<ImageSourceView> { return {source, &index}; });

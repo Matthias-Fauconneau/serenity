@@ -360,9 +360,10 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  toRelative(signs);
  convertAccidentals(signs);
 
-#if 1
+#if 0
  // HACK: Strips repeat
  {
+  log("Cutting MIDI at half length (HACK: Strips repeat)");
   int index=(signs.size+1)/2+1; for(;;index++) if(signs[index].type == Sign::Measure) break;
   signs = copyRef(signs.slice(0, index+1));
   notes = MidiNotes(copyRef(notes.slice(0, notes.size/2)), notes.ticksPerSeconds);

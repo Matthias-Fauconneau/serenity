@@ -69,7 +69,7 @@ struct Music : Widget {
  Music() {
   string name = arguments()[0];
   String imageFile; int2 size;
-  auto list = currentWorkingDirectory().list(Files);
+  auto list = Folder(name).list(Files);
   for(const String& file: list) {
    TextData s (file);
    if(!s.match(name)) continue;
@@ -84,12 +84,12 @@ struct Music : Widget {
    imageFile = copyRef(file);
   }
   if(!imageFile) {
-   Image image = decodePNG(readFile(name+".png"));
+   Image image = decodePNG(readFile(name+".png", Folder(name)));
    size = image.size;
    imageFile = name+"."+strx(size);
-   writeFile(imageFile, cast<byte>(image));
+   writeFile(imageFile, cast<byte>(image), Folder(name));
   }
-  rawImageFileMap = Map(imageFile);
+  rawImageFileMap = Map(imageFile, Folder(name));
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   //Image target = copy(image);
 
@@ -103,7 +103,7 @@ struct Music : Widget {
    }
   }
 
-  signs = MusicXML(readFile(name+".xml"_)).signs;
+  signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
 
   map<uint, array<Sign>> notes;
   for(size_t signIndex: range(signs.size)) {
@@ -117,10 +117,10 @@ struct Music : Widget {
    }
   }
 
-  String audioFileName = name+".mp3";
+  String audioFileName = name+"/"+name+".mp3";
   audioFile = unique<FFmpeg>(audioFileName);
 
-  this->notes = ::scale(MidiFile(readFile(name+".mid"_)).notes, audioFile->audioFrameRate, audioStart(audioFileName));
+  this->notes = ::scale(MidiFile(readFile(name+".mid"_, Folder(name))).notes, audioFile->audioFrameRate, audioStart(audioFileName));
   buffer<MidiNote> midiNotes = filter(this->notes, [](MidiNote o){return o.velocity==0;});
 
   // Associates MIDI notes with score notes
@@ -149,19 +149,16 @@ struct Music : Widget {
     bin.append(midiNotes[index].key);
     index++;
    }
-   //if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
    array<uint> binS = copyRef(bin);
    sort(binS);
    for(size_t key: bin) binI.append(binS.indexOf(key));
-   //log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
    M.append(move(binS));
    Mi.append(move(binI));
   }
 
   /// Synchronizes MIDI and score using dynamic time warping
   size_t m = S.size, n = M.size;
-  //assert_(m <= n, m, n);
-  //log(m, n);
+  assert_(m <= n, m, n);
 
   // Evaluates cumulative score matrix at each alignment point (i, j)
   struct Matrix {
@@ -193,12 +190,9 @@ struct Music : Widget {
     for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
     j++;
    } else {
-    //log(apply(S[i], [](uint key){return strKey(-4, key);}),":", apply(M[j], [](uint key){return strKey(-4, key);}));
     for(size_t k: range(M[j].size)) {
-     //assert_(i < notes.values.size && k < notes.values[i].size, i, k, notes.values.size);
      Sign sign{};
      if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Map original MIDI index to sorted to original note index
-     //assert_(sign.note.signIndex != invalid);
      size_t midiIndex = midiToSign.size;
      midiToSign.append( sign );
      if(sign.note.signIndex != invalid) {
@@ -209,20 +203,13 @@ struct Music : Widget {
       }
      }
     }
-    //for(size_t unused k: range(S[i].size, M[j].size)) midiToSign.append(Sign{});
     i++; j++;
    }
   }
   for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
 
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
-  //for(size_t midiNotesIndex: range(midiNotes.size)) {
-   //log(strKey(0, midiToSign[midiNotesIndex].note.key()), strKey(0,midiNotes[midiNotesIndex].key));
-  //}
-  //if(measureT.size != measureX.size) writeFile("output.png", encodePNG(target), currentWorkingDirectory(), true);
   assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
-  //log(measureT);
-  //view = cropRef(target,0,int2(1366*2,870));
   scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
   window = ::window(this);

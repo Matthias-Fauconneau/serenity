@@ -105,17 +105,17 @@ struct GroupImageOperation : ImageGroupSource {
 };
 
 struct GenericImageGroupOperation : GenericImageOperation, virtual GenericImageGroupSource {
-	ImageGroupSource& source;
-	GenericImageOperator& operation;
-	GenericImageGroupOperation(ImageGroupSource& source, GenericImageOperator& operation)
-		: GenericImageOperation(source, operation), source(source), operation(operation) {}
+    ImageGroupSource& source;
+    GenericImageOperator& operation;
+    GenericImageGroupOperation(ImageGroupSource& source, GenericImageOperator& operation)
+        : GenericImageOperation(source, operation), source(source), operation(operation) {}
 
-	size_t outputs() const override {
-		if(source.outputs() == operation.inputs()) return operation.outputs();
-		return (operation.inputs() == 0 && operation.outputs() == 0) ? source.outputs() : operation.outputs();
-	}
+    size_t outputs() const override {
+        if(source.outputs() == operation.inputs()) return operation.outputs();
+        return (operation.inputs() == 0 && operation.outputs() == 0) ? source.outputs() : operation.outputs();
+    }
     size_t groupSize(size_t groupIndex) const override { return source.groupSize(groupIndex); }
-	String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
+    String toString() const override { return str(source.toString(), operation.name())+'['+str(outputs())+']'; }
 };
 
 /// Evaluates an operation on every image of an image group

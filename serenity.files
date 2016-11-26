@@ -4,6 +4,7 @@ build.sh
 build.h
 build.cc
 
+core/cache.h
 core/core.h
 core/memory.h
 core/array.h
@@ -40,3 +41,20 @@ ui/graphics.h
 music/MusicXML.cc
 music/music-test.cc
 music/music-video.cc
+audio/audio.cc
+video/encoder.cc
+
+image/image.h
+image/image.cc
+image/image-folder.cc
+image/operator.h
+image/weight.cc
+image/multiscale.cc
+image/split.h
+image/transform.h
+image/align.h
+core/image.cc
+image/stitch.cc
+image/operation.cc
+io/font.cc
+io/png.cc

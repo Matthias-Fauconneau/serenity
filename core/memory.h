@@ -182,5 +182,6 @@ generic shared<T> share(const shared<T>& o) { return shared<T>(o); }
 struct shareable {
  virtual void addUser() { ++userCount; }
  virtual uint removeUser() { return --userCount; }
+ virtual ~shareable() {}
  uint userCount = 1;
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include "source.h"
+#include "algorithm.h"
 
 /// Splits sequence in groups separated when difference between consecutive images is greater than a threshold
 struct DifferenceSplit : GroupSource {

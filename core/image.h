@@ -11,8 +11,8 @@ generic struct ImageT : buffer<T> {
     ImageT() {}
     default_move(ImageT);
     ImageT(buffer<T>&& pixels, int2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {}
-    ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), width(width), height(height), stride(width), alpha(alpha) {}
-	ImageT(int2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
+    ImageT(uint width, uint height, uint stride=0, bool alpha=false) : buffer<T>(height*stride), width(width), height(height), stride(stride?:width), alpha(alpha) {}
+    ImageT(int2 size, uint stride=0, bool alpha=false) : ImageT(size.x, size.y, stride?:size.x, alpha) {}
 
 	explicit operator bool() const { return buffer<T>::data && width && height; }
 	inline T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
@@ -25,7 +25,7 @@ generic void copy(const ImageT<T>& target, const ImageT<T>& o) {
  if(target.stride == o.stride) return target.copy(o);
  for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
 }
-generic ImageT<T> copy(const ImageT<T>& o) { ImageT<T> target(o.size, o.alpha); copy(target, o); return target; }
+generic ImageT<T> copy(const ImageT<T>& o) { ImageT<T> target(o.size, o.stride, o.alpha); copy(target, o); return target; }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> unsafeRef(const ImageT<T>& o) { return ImageT<T>(unsafeRef((const buffer<T>&)o),o.size,o.stride,o.alpha); }
@@ -45,3 +45,12 @@ typedef ImageT<byte4> Image;
 /// 2D array of 32bit floating-point pixels
 typedef ImageT<float> ImageF;
 
+// -- Resample (3x8bit) --
+
+void box(const Image& target, const Image& source);
+inline Image box(Image&& target, const Image& source) { box(target, source); return move(target); }
+void bilinear(const Image& target, const Image& source);
+/// Resizes \a source into \a target
+void resize(const Image& target, const Image& source);
+inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
+inline Image resize(int2 size, const Image& source) { return resize(Image(size, source.stride, source.alpha), source); }

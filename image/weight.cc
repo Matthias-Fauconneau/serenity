@@ -11,8 +11,8 @@ void Exposure::apply(ref<ImageF> Y, ref<ImageF> X) const {
 			for(int dy: range(3)) for(int dx: range(3)) {
 				int2 B = A+int2(dx-1, dy-1);
 				if(!(B >= int2(0) && B < X[index].size)) continue;
-				float b = X[index](B);
-				if(!b) { Y[0](A) = 0; return; } // Discard mask
+                float b = X[index](B.x, B.y);
+                if(!b) { Y[0](A.x, A.y) = 0; return; } // Discard mask
 				sum += b;
 				N += 1;
 			}
@@ -22,7 +22,7 @@ void Exposure::apply(ref<ImageF> Y, ref<ImageF> X) const {
 			assert_(delta[index] >= 0);
 		}
 		float exposure = (delta[0] + delta[1] + delta[2])/3;
-		Y[0](A) = exposure;
+        Y[0](A.x, A.y) = exposure;
 	});
 }
 

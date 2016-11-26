@@ -26,9 +26,10 @@ struct ImageFolder : ImageSource, ImageRGBSource, PropertySource, map<String, ma
         int2 size = parse<int2>(values[index].at("Size"_));
         int2 resize = size; // Defaults to original size
         if(downsample) resize = size / downsample;
-        if(hint.x && hint.x < size.x) { assert_(size.x/hint.x, size, hint); resize = min(resize, size/(size.x/hint.x)); } // Fits width (Integer box resample)
-        if(hint.y && hint.y < size.y) { assert_(size.y/hint.y); resize = min(resize, size/(size.y/hint.y)); } // Fits height (Integer box resample)
+        //if(hint.x && hint.x < size.x) { assert_(size.x/hint.x, size, hint); resize = min(resize, size/(size.x/hint.x)); } // Fits width (Integer box resample)
+        //if(hint.y && hint.y < size.y) { assert_(size.y/hint.y); resize = min(resize, size/(size.y/hint.y)); } // Fits height (Integer box resample)
         //if(resize == size && !(resize<=int2(4096, 3072))) resize /= 2; // Integer box downsample
+        if(hint) resize = hint;
         assert_(size && resize.x/size.x == resize.y/size.y && resize<=int2(4096, 3072), size, resize);
         return resize;
     }

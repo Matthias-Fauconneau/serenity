@@ -17,7 +17,7 @@ map<String, Variant> parseExifTags(ref<byte> data) {
  }
 #else
  (void)data;
- log("EXIF unsupported");
+ //log("EXIF unsupported");
 #endif
  return tags;
 }

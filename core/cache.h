@@ -39,6 +39,7 @@ inline String cache(const Folder& folder, string name, string key, int64 sourceT
 generic struct ImageMapSource : T {
     Map map;
     default_move(ImageMapSource);
+    ImageMapSource(int2 size) : T(size/*, align(8, size.x)*/) {}
     ImageMapSource(T&& image=T(), Map&& map=Map()) : T(move(image)), map(move(map)) {}
 };
 generic auto unsafeRef(ref<ImageMapSource<T>> ref) -> buffer<decltype(unsafeRef(ref[0]))> {
@@ -50,13 +51,13 @@ template<Type T> ImageMapSource<T> cache(string path, string name, int2 size, in
                                          function<void(const T&)> evaluate, bool noCacheWrite = false, string version = __DATE__ " " __TIME__) {
     if(noCacheWrite) { T target(size); evaluate(target); return move(target); }
     File file = cacheFile({path, currentWorkingDirectory(), true}, name, strx(size), sourceTime, [size,&evaluate,&path/*DEBUG*/](File& file) {
-        file.resize(size.y*size.x*sizeof(Type T::type));
+        file.resize(size.y*/*align(8, size.x)*/size.x*sizeof(Type T::type));
         Map map(file, Map::Write);
-        T image(unsafeRef(cast<Type T::type>(map)), size, size.x);
+        T image(unsafeRef(cast<Type T::type>(map)), size/*, align(8, size.x)*/);
         evaluate(image);
     }, version);
     Map map (file);
-    T t (unsafeRef(cast<Type T::type>(map)), size, size.x);
+    T t (unsafeRef(cast<Type T::type>(map)), size/*, align(8, size.x)*/);
     return ImageMapSource<T>(move(t), move(map));
 }
 
@@ -106,15 +107,15 @@ template<Type T> array<ImageMapSource<T>> cacheGroup(const Folder& parent, strin
     Folder folder = cacheFolder(parent, name, strx(size), sourceTime, [groupSize, size, &evaluate](const Folder& folder) {
         array<Map> maps = apply(groupSize, [&folder, size](size_t index) {
             File file(str(index), folder, Flags(ReadWrite|Create|Truncate));
-            file.resize(size.y*size.x*sizeof(Type T::type));
+            file.resize(size.y*/*align(8, size.x)**/size.x*sizeof(Type T::type));
             return Map(file, Map::Write);
         });
-        array<T> images = apply(maps, [size](const Map& map) { return T(unsafeRef(cast<Type T::type>(map)), size, size.x); });
+        array<T> images = apply(maps, [size](const Map& map) { return T(unsafeRef(cast<Type T::type>(map)), size/*, align(8, size.x)*/); });
         evaluate(images);
     }, version);
     return apply(groupSize, [&folder, size](size_t index) {
         Map map(str(index), folder);
-        T t (unsafeRef(cast<Type T::type>(map)), size, size.x);
+        T t (unsafeRef(cast<Type T::type>(map)), size/*, align(8, size.x)*/);
         return ImageMapSource<T>(move(t), move(map));
     });
 }

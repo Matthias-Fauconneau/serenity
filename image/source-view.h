@@ -87,14 +87,14 @@ struct ImageGroupSourceView  : GenericImageSourceView {
 	}
 
 	void update(size_t index, int2 size) override {
-		if(lastGroupIndex != index) {
-			lastGroupIndex = index;
-			int2 sourceSize = source.size(index);
-			size = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
-			images = source.images(min<size_t>(index, source.count(index+1)-1), size);
-		}
-		assert_(images.size);
-        image = unsafeRef(images[min<size_t>(images.size-1, imageIndex)]);
+            if(lastGroupIndex != index) {
+                lastGroupIndex = index;
+                int2 sourceSize = source.size(index);
+                size = max(sourceSize*size.x/sourceSize.x, sourceSize*size.y/sourceSize.y); // Fits aspect ratio
+                images = source.images(min<size_t>(index, source.count(index+1)-1), size);
+            }
+            assert_(images.size);
+            image = unsafeRef(images[min<size_t>(images.size-1, imageIndex)]);
 	}
 
 	/// Cycles between images of a group with the mouse wheel

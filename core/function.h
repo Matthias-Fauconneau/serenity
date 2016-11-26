@@ -34,6 +34,7 @@ template<Type R, Type... Args> struct function;
 template<Type R, Type... Args> struct function<R(Args...)> : functor<R(Args...)> {
     long any[8]; // Always store functor inline
     function() : any{0}{} // Invalid function (segfaults)
+    virtual ~function() {}
     /// Wraps an anonymous function (or a a function pointer)
     template<Type F> function(F f) {
         static_assert(sizeof(anonymous_function<F,R(Args...)>)<=sizeof(any),"");

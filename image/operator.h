@@ -1,6 +1,8 @@
 #pragma once
 #include "time.h"
 #include "image.h"
+#include "algorithm.h"
+#include "simd.h"
 
 struct Operator {
 	virtual string name() const abstract;
@@ -81,7 +83,21 @@ struct Multiply : ImageOperator, OperatorT<Multiply> {
 
 /// Sums together all images in an image group
 struct Sum : ImageGroupOperator1, OperatorT<Sum> {
-	void apply(const ImageF& Y, ref<ImageF> X) const override {
-     Y.apply([&](size_t index) { return sum<float>(::apply(X, [index](const ImageF& x) { return x[index]; })); });
-    }
+ void apply(const ImageF& Y, ref<ImageF> X) const override {
+  assert(Y.ref::size%8 == 0);
+  log("Sum");
+  const uint64 align = 4*sizeof(float);
+  assert_(uint64(Y.data)%align==0);
+  log(hex((uint64)Y.data), Y.size, Y.ref::size, Y.capacity);
+  for(const ImageF& x: X) {
+   assert_(uint64(x.data)%align==0);
+   log(hex((uint64)x.data), x.size, x.ref::size, x.capacity);
+  }
+  for(size_t i=0; i<Y.ref::size; i+=4) {
+   v4sf sum = 0;
+   for(const ImageF& x: X) sum += *(v4sf*)(x.data+i);
+   *(v4sf*)(Y.data+i) = sum;
+  }
+  log("OK");
+ }
 };

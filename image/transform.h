@@ -18,7 +18,7 @@ struct Transform {
 	Transform(int2 size, int2 offset=0) : size(size), offset(offset) { assert_(size); }
 	/// Returns scaled source coordinates for the given scaled target coordinates
 	int2 nearest(int2 target, int2 size) const {
-		assert_(size == this->size, size, this->size);
+        assert_(size == this->size, "Transform", size, this->size);
 		return target + offset;
 	}
 	/// Returns scaled source coordinates for the given scaled target coordinates
@@ -101,7 +101,7 @@ void sample(const ImageF& target, const ImageF& source, Transform transform, int
 		int2 s = int2(round(transform(min+int2(x,y), source.size)));
 		if(!(s >= int2(0) && s < source.size)) return 0.f;
 		//assert_(s >= int2(0) && s < source.size, s, source.size);
-		return source(s);
+        return source(s.x, s.y);
 	});
 }
 ImageF sample(ImageF&& target, const ImageF& source, Transform transform, int2 min, int2 max) { sample(target, source, transform, min, max); return move(target); }

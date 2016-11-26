@@ -158,9 +158,13 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
  for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
  if(!flags.contains("release")) args.append("-g"__);
  if(!flags.contains("debug")) args.append("-O3"__);
- else if(flags.contains("fast")) args.append("-O1"__); // fast-debug
+ else if(flags.contains("fast")) args.append("-O3"__); // fast-debug
  if(flags.contains("profile")) args.append("-finstrument-functions"__);
  if(flags.contains("m32"_)) args.append("-m32"__); // "-mfpmath=sse"__
+ if(flags.contains("asan"_)) {
+  args.append("-fsanitize=address"__);
+  linkArgs.append("-fsanitize=address"__);
+ }
 
  Folder(tmp, currentWorkingDirectory(), true);
  Folder(tmp+"/"+join(flags,"-"), currentWorkingDirectory(), true);
@@ -187,7 +191,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
      mref<String>{"-o"__, unsafeRef(binary), "-L/var/tmp/lib"__, "-Wl,-rpath,/var/tmp/lib"__,} +
      apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
   if(flags.contains("m32"_)) args.append("-m32"__);
-  if(execute(CXX, toRefs(args))) { ::log("Failed to link\n", CXX, args); return; }
+  if(execute(CXX, toRefs(args)+toRefs(linkArgs))) { ::log("Failed to link\n", CXX, args); return; }
  }
 
  // Installs

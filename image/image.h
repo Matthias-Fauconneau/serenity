@@ -15,47 +15,6 @@ template<Type F, Type... S> void forXY(int2 size, F function, const S&... source
 #endif
 }
 
-// -- ImageF --
-
-/// 2D array of floating-point pixels
-struct ImageF : buffer<float> {
- ImageF(){}
- ImageF(buffer<float>&& data, int2 size, size_t stride) : buffer(::move(data)), size(size), stride(stride) {
-  assert_(buffer::size==size_t(size.y*stride), buffer::size, size, stride);
- }
- ImageF(int width, int height) : buffer(height*width), width(width), height(height), stride(width) {
-  assert_(size>int2(0), size, width, height);
- }
- ImageF(int2 size) : ImageF(size.x, size.y) {}
-
- explicit operator bool() const { return data && width && height; }
- inline float& operator()(size_t x, size_t y) const {assert(x<width && y<height, x, y); return at(y*stride+x); }
- inline float& operator()(int2 p) const { return operator()(p.x, p.y); }
-
- union {
-  int2 size = 0;
-  struct { uint width, height; };
- };
- size_t stride = 0;
-};
-inline ImageF copy(const ImageF& o) {
- if(o.width == o.stride) return ImageF(copy((const buffer<float>&)o), o.size, o.stride);
- ImageF target(o.size);
- for(size_t y: range(o.height)) target.slice(y*target.stride, target.width).copy(o.slice(y*o.stride, o.width));
- return target;
-}
-inline String str(const ImageF& o) { return strx(o.size); }
-
-/// Returns a weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF unsafeRef(const ImageF& o) { return ImageF(unsafeRef((const buffer<float>&)o), o.size, o.stride); }
-
-/// Returns a cropped weak reference to \a image (unsafe if referenced image is freed)
-inline ImageF crop(const ImageF& source, int2 origin, int2 size) {
- origin = clamp(int2(0), origin, source.size);
- size = min(size, source.size-origin);
- return ImageF(buffer<float>(source.begin()+origin.y*source.stride+origin.x, size.y*source.stride, 0), size, source.stride);
-}
-
 // -- Applications
 
 template<Type F, Type... S> void apply(const ImageF& target, F function, const S&... sources) {
@@ -219,8 +178,18 @@ inline double SSE(const ImageF& A, const ImageF& B, int2 offset) {
   assert_(b-a==offset, offset, a, b);
   assert_(a >= int2(0) && a < A.size);
   assert_(b >= int2(0) && b < B.size);
-  return sq(A(a) - B(b)); // SSE
+  return sq(A(a.x, a.y) - B(b.x, b.y)); // SSE
  }, 0.0);
  energy /= size.x*size.y;
  return energy;
 }
+
+// -- Convolution --
+
+void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride);
+
+/// Selects image (signal) components of scale (frequency) below threshold
+/// Applies a gaussian blur
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius=0);
+inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma, int radius=0) { gaussianBlur(target, source, sigma, radius); return move(target); }
+inline ImageF gaussianBlur(const ImageF& source, float sigma, int radius=0) { return gaussianBlur(source.size, source, sigma, radius); }
