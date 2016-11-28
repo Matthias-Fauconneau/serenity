@@ -24,6 +24,7 @@ typedef half v8hf __attribute((ext_vector_type(8)));
 typedef half v16hf __attribute((ext_vector_type(16)));
 
 inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
+inline v8ui uintX(uint x) { return (v8ui){x,x,x,x,x,x,x,x}; }
 static v8si unused _0i = intX(0);
 static v8si unused _1i = intX(-1);
 
@@ -36,10 +37,12 @@ static constexpr v4sf _1100f = {1,1,0,0};
 static constexpr v8sf _00001111f = {0,0,0,0,1,1,1,1};
 
 static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
+static inline v8sf gather(const float* P, v8ui i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
+static inline v8sf clamp(v8sf min, v8sf x, v8sf max) { return ::min(::max(min, x), max); }
 
 static inline v8sf sqrt(v8sf x) { return __builtin_ia32_sqrtps256(x); }
 static inline v8sf rsqrt(v8sf x) { return __builtin_ia32_rsqrtps256(x); }
@@ -127,6 +130,7 @@ inline v16si operator &(v16si a, v16si b) { return {a.r1 & b.r1, a.r2 & b.r2}; }
 inline v16sf and(v16si k, v16sf x) { return v16sf(and(k.r1, x.r1), and(k.r2,x.r2)); }
 
 inline v8si blend(v8si A, v8si B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
+inline v8ui blend(v8ui A, v8ui B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
 inline v8sf blend(v8sf A, v8sf B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
 inline v16sf blend(v16sf A, v16sf B, v16si mask) { return v16sf(blend(A.r1, B.r1, mask.r1), blend(A.r2, B.r2, mask.r2)); }
 

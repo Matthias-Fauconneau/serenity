@@ -2,6 +2,7 @@
 #include "matrix.h"
 #include "parallel.h"
 #include "mwc.h"
+#include "time.h"
 
 inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
     const float left = (-1-s), right = (1-s);
@@ -67,7 +68,42 @@ inline uint indexOfEqual(const v8sf x, const v8sf y) {
     return __builtin_ctz(::mask(x == y));
 }
 
-#include "time.h"
+
+static inline vec3 refract(const float r, const vec3 N, const vec3 D) {
+    const float c = -dot(N, D);
+    return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
+}
+
+// Uniformly distributed points on sphere (Marsaglia)
+static inline Vec<v8sf, 3> sphere(Random& random) {
+    v8sf t0, t1, sq;
+    do {
+        t0 = random()*2-1;
+        t1 = random()*2-1;
+        sq = t0*t0 + t1*t1;
+    } while(mask(sq >= 1)); // FIXME: TODO: Partial accepts
+    const v8sf r = sqrt(1-sq);
+    return {{2*t0*r, 2*t1*r, 1-2*sq}};
+}
+
+// Uniformly distributed points on hemisphere directed towards N
+static inline Vec<v8sf, 3> hemisphere(Random& random, vec3 N) {
+    const Vec<v8sf, 3> S = sphere(random);
+    const v8si negate = (N.x*S._[0] + N.y*S._[1] + N.z*S._[2]) < 0;
+    return {{blend(S._[0], -S._[0], negate),
+                    blend(S._[1], -S._[1], negate),
+                    blend(S._[2], -S._[2], negate)}};
+}
+
+static inline Vec<v8sf, 3> cosine(Random& random) {
+    const v8sf ξ1 = random();
+    const v8sf ξ2 = random();
+    const v8sf cosθ = sqrt(1-ξ1);
+    const v8sf sinθ = sqrt(ξ1);
+    const v8sf φ = 2*PI*ξ2;
+    const Vec<v8sf, 2> cossinφ = cossin(φ);
+    return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
+}
 
 struct Scene {
     struct Face {
@@ -199,8 +235,8 @@ struct Scene {
         return index;
     }
 
-    inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
-        v8sf value = float8(inff); v8si index = intX(faces.size);
+    inline v8ui raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz) const {
+        v8sf value = float8(inff); v8ui index = uintX(faces.size);
         for(size_t i: range(faces.size)) {
             const float Ax = X[0][i];
             const float Ay = Y[0][i];
@@ -219,8 +255,8 @@ struct Scene {
         return index;
     }
 
-    inline v8si raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz, v8sf& minT, v8sf& u, v8sf& v) const {
-        minT = inff; v8si index = intX(faces.size);
+    inline v8ui raycast(const v8sf Ox, const v8sf Oy, const v8sf Oz, const v8sf dx, const v8sf dy, const v8sf dz, v8sf& minT, v8sf& u, v8sf& v) const {
+        minT = inff; v8ui index = uintX(faces.size);
         for(size_t i: range(faces.size)) {
             const float Ax = X[0][i];
             const float Ay = Y[0][i];
@@ -241,87 +277,68 @@ struct Scene {
         return index;
     }
 
-    static inline vec3 refract(const float r, const vec3 N, const vec3 D) {
-        const float c = -dot(N, D);
-        return r*D + (r*c - sqrt(1-sq(r)*(1-sq(c))))*N;
-    }
+        struct Lookup {
+            typedef v4uq mask; // 256b  (TODO: 1024?=>12MB/8MB)
+            const uint S = sizeof(mask)*8;
+            static constexpr uint N = 128;
+            mask lookup[6*N*N];  // 3 MB
+            inline vec3 xyz(uint faceIndex, uint uIndex, uint vIndex) const {
+                const float u = 2 * uIndex/float(N-1) - 1;
+                const float v = 2 * vIndex/float(N-1) - 1;
+                if(faceIndex==0) return vec3(+1,+v,-u); // X+
+                if(faceIndex==1) return vec3(-1,+v,+u); // X-
+                if(faceIndex==2) return vec3(+u,+1,-v); // Y+
+                if(faceIndex==3) return vec3(+u,-1,+v); // Y-
+                if(faceIndex==4) return vec3(+u,+v,+1); // Z+
+                if(faceIndex==5) return vec3(-u,+v,-1); // Z-
+                error(faceIndex);
+            }
+            inline mask operator()(const vec3 n) const { assert_(isNumber(n)); return operator()(n.x, n.y, n.z); }
+            inline mask operator()(const float x, const float y, const float z) const { // SIMD?
+              const float absX = abs(x);
+              const float absY = abs(y);
+              const float absZ = abs(z);
+              float maxAxis, u, v; int faceIndex;
+              if(x >  0 && absX >= absY && absX >= absZ) { maxAxis = absX, u = -z, v =  y, faceIndex = 0; } // X+
+              if(x <= 0 && absX >= absY && absX >= absZ) { maxAxis = absX, u =  z, v =  y, faceIndex = 1; } // X-
+              if(y >  0 && absY >= absX && absY >= absZ) { maxAxis = absY, u =  x, v = -z, faceIndex = 2; } // Y+
+              if(y <= 0 && absY >= absX && absY >= absZ) { maxAxis = absY, u =  x, v =  z, faceIndex = 3; } // Y-
+              if(z >  0 && absZ >= absX && absZ >= absY) { maxAxis = absZ, u =  x, v =  y, faceIndex = 4; } // Z+
+              if(z <= 0 && absZ >= absX && absZ >= absY) { maxAxis = absZ, u = -x, v =  y, faceIndex = 5; } // Z+
+              const int uIndex = (u/maxAxis+1)/2*(N-1);
+              const int vIndex = (v/maxAxis+1)/2*(N-1);
+              const uint i = faceIndex*N*N+vIndex*N+uIndex;
+              assert_(i < 6*N*N, i, faceIndex, uIndex, vIndex, N, x, y, z, maxAxis);
+              return lookup[i];
+            }
+            Lookup() {
+                // FIXME: stratified
+                Random random;
+                vec3 samples[S];
+                for(uint i: range(S/8)) {
+                    Vec<v8sf, 3> s8 = sphere(random); //FIXME: cosine(random);
+                    for(uint j: range(8)) samples[i*8+j] = vec3(s8._[0][j], s8._[1][j], s8._[2][j]);
+                }
+                for(uint faceIndex: range(6)) for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
+                    const vec3 n = xyz(faceIndex, uIndex, vIndex);
+                    mask m = 0; for(const uint i: range(S)) if(dot(n, samples[i]) > 0) m[i/64] |= 1ull<<(i%64);
+                    //mask m = 0; for(const uint i: range(S)) { if(dot(n, samples[i]) > 0) m[i/64] |= 1ull<<(i%64);  log(str(1<<(i%64), 64u, '0', 2u), str(m[i/64], 64u, '0', 2u)); }
+                    //uint8 m [32] = {}; for(const uint64 i: range(S)) { if(dot(n, samples[i]) > 0) m[i/8] |= 1<<(i%8); log(str(1<<(i%8), 8u, '0', 2u), str(m[i/8], 8u, '0', 2u)); }
+                    const uint i = faceIndex*N*N+vIndex*N+uIndex;
+                    //lookup[i] = *(v4uq*)m;
+                    lookup[i] = m;
+                }
+            }
+        } lookup;
 
-    // Uniformly distributed points on sphere (Marsaglia)
-    Vec<v8sf, 3> sphere(Random& random) const {
-        v8sf t0, t1, sq;
-        do {
-            t0 = random()*2-1;
-            t1 = random()*2-1;
-            sq = t0*t0 + t1*t1;
-        } while(mask(sq >= 1)); // FIXME: TODO: Partial accepts
-        const v8sf r = sqrt(1-sq);
-        return {{2*t0*r, 2*t1*r, 1-2*sq}};
-    }
-    // Uniformly distributed points on hemisphere directed towards N
-    Vec<v8sf, 3> hemisphere(Random& random, vec3 N) const {
-        const Vec<v8sf, 3> S = sphere(random);
-        const v8si negate = (N.x*S._[0] + N.y*S._[1] + N.z*S._[2]) < 0;
-        return {{blend(S._[0], -S._[0], negate),
-                        blend(S._[1], -S._[1], negate),
-                        blend(S._[2], -S._[2], negate)}};
-    }
-    Vec<v8sf, 3> cosine(Random& random) const {
-        const v8sf ξ1 = random();
-        const v8sf ξ2 = random();
-        const v8sf cosθ = sqrt(1-ξ1);
-        const v8sf sinθ = sqrt(ξ1);
-        const v8sf φ = 2*PI*ξ2;
-        const Vec<v8sf, 2> cossinφ = cossin(φ);
-        return {{sinθ * cossinφ._[0], sinθ * cossinφ._[1], cosθ}};
-    }
-#if 0
-    int clip3 (const vec3 N, vec3& v0, vec3& v1, vec3& v2, vec3& v3) {
-        vec3 dist = vec3(dot(N, v0) , dot (N, v1) , dot (N, v2));
-        const float clipEpsilon = 0.00001 , clipEpsilon2 = 0.01;
-        if(!any(dist >= clipEpsilon2))
-            // Case 1 ( all clipped )
-            return 0;
-        if ( all ( greaterThanEqual ( dist , vec3 ( - clipEpsilon )))) {
-            // Case 2 ( none clipped )
-            v3 = v0 ;
-            return 3;
-        }
-        // There are either 1 or 2 vertices above the clipping plane .
-        bvec3 above = greaterThanEqual ( dist , vec3 (0.0));
-        bool nextIsAbove ;
-        // Find the CCW - most vertex above the plane .
-        if ( above [1] && ! above [0]) {
-            // Cycle once CCW . Use v3 as a temp
-            nextIsAbove = above [2];
-            v3 = v0 ; v0 = v1 ; v1 = v2 ; v2 = v3 ;
-            dist = dist . yzx ;
-        } else if ( above [2] && ! above [1]) {
-            // Cycle once CW . Use v3 as a temp .
-            nextIsAbove = above [0];
-            v3 = v2 ; v2 = v1 ; v1 = v0 ; v0 = v3 ;
-            dist = dist . zxy ;
-        } else nextIsAbove = above [1];
-        // We always need to clip v2 - v0 .
-        v3 = mix ( v0 , v2 , dist [0] / ( dist [0] - dist [2]));
-        if ( nextIsAbove ) {
-            // Case 3
-            v2 = mix ( v1 , v2 , dist [1] / ( dist [1] - dist [2]));
-            return 4;
-        } else {
-            // Case 4
-            v1 = mix ( v0 , v1 , dist [0] / ( dist [0] - dist [1]));
-            v2 = v3 ; v3 = v0 ;
-            return 3;
-        }
-#endif
     enum Bounce { Direct=1, Diffuse, Specular, Max };
     typedef Bounce Path[3];
     typedef uint64 Timers[Max*Max*Max];
-    bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const int bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
+    bgr3f shade(uint faceIndex, const vec3 P, const vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const int bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
         const uint64 start = readCycleCounter();
         const Scene::Face& face = faces[faceIndex];
-        bgr3f out = bgr3f(emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
-        const bgr3f BRDF = bgr3f(reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
+        bgr3f out (emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
+        const bgr3f reflectance (reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
         if(face.reflect) {
             if(bounce > 0) return 0; // +S
             //if(bounce > 1) return 0; // -SDS
@@ -329,9 +346,10 @@ struct Scene {
 #if RT
             static constexpr int iterations = 1;
 #else
-            static constexpr int iterations = 1; //64;
+            static constexpr int iterations = 8;
 #endif
             const vec3 R = normalize(D - 2*dot(N, D)*N);
+            bgr3f sum = 0;
             for(uint unused i: range(iterations)) {
                 const Vec<v8sf, 3> H = hemisphere(random, N);
                 const v8sf RGx = R.x + face.gloss * H._[0];
@@ -342,12 +360,15 @@ struct Scene {
                 const v8sf Ry = RGy/L;
                 const v8sf Rz = RGz/L;
                 v8sf t,u,v;
-                v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Rx,Ry,Rz, t,u,v);
+                v8ui reflectRayFaceIndex = raycast(P.x,P.y,P.z, Rx,Ry,Rz, t,u,v);
                 for(uint k: range(8)) {
+                    if(reflectRayFaceIndex[k]==faces.size) continue;
                     vec3 R = vec3(Rx[k],Ry[k],Rz[k]);
-                    out += (1.f/(iterations*8)) * BRDF * shade(lightRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
+                    assert_(isNumber(P+t[k]*R), t[k]);
+                    sum += shade(reflectRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
                 }
             }
+            out += (1.f/(iterations*8)) * reflectance * sum;
         }
         /*else if(face.refract) {
             if(bounce > 0) return 0;
@@ -376,220 +397,130 @@ struct Scene {
         else { // Diffuse
 #if RT
             static constexpr int directIterations = 1;
-            static constexpr int indirectIterations = 0;
+            static const int indirectIterations = 0; //bounce < 1;
 #else
-            const int directIterations = 1; // bounce < 1 ? 2048 : 1;
-            constexpr int indirectIterations = 0;
+            const int directIterations = bounce < 1 ? 1024 : 8;
+            const int indirectIterations = bounce < 1 ? 2 : 1;
 #endif
             const float scale = 1.f/(directIterations*8+indirectIterations*8);
-            //v8sf sumB=0, sumG=0, sumR=0;
-            uint lightIndex=0; {const float a = random()[0]; for(;;lightIndex++) if(a < CAF[lightIndex]) break;}
-            v8sf lightFactor=0;
-            const uint lightFaceIndex = lights[lightIndex];
-            const vec3 La (X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex]);
-            const vec3 Lb (X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex]);
-            const vec3 Lc (X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex]);
+            // Direct lighting
 #if 1
-            const Vec<v8sf, 3> l = cosine(random);
-            const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
-            const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
-            const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
-            v8sf det, u , v;
-            v8sf t = intersect(La.x,La.y,La.z, Lb.x,Lb.y,Lb.z, Lc.x,Lc.y,Lc.z, P.x,P.y,P.z, Lx,Ly,Lz, det,u,v);
-            lightFactor += and((t<inff) & (raycast(P.x,P.y,P.z, Lx,Ly,Lz) == lightFaceIndex), 1.f);
+            v8sf sumB, sumG, sumR;
+            const uint lightFaceIndex = lights[0]; // FIXME: rectangle
+            if(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1) { sumB=0, sumG=0, sumR=0; }
+            else {
+                const vec3 v00 = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex])-P;
+                const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
+                const vec3 v10 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
+                const vec3 v11 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
+                //const vec3 v11 = v01+v10-v00;
+                log(lightFaceIndex, v00, v01, v10, v11);
+                /*const vec3 nA = cross(v01, v00);
+                const vec3 nB = cross(v11, v01);
+                const vec3 nC = cross(v10, v11);
+                const vec3 nD = cross(v00, v10);*/
+                //mat3 iTBN = mat3(T, B, N).inverse(); // Global to local (FIXME)
+                mat3 iTBN = mat3(1);
+                const vec3 n0 = iTBN*cross(v00, v10);
+                const vec3 n1 = iTBN*cross(v10, v11);
+                const vec3 n2 = iTBN*cross(v11, v01);
+                const vec3 n3 = iTBN*cross(v01, v00);
+                const v4uq light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3);
+                const uint sum = __builtin_popcountll(light[0])+__builtin_popcountll(light[1])+__builtin_popcountll(light[2])+__builtin_popcountll(light[3]);
+                const float factor = (float) sum / lookup.S;
+                // TODO: ~|(&occluder)
+                sumB = emittanceB[lightFaceIndex] * factor;
+                sumG = emittanceG[lightFaceIndex] * factor;
+                sumR = emittanceR[lightFaceIndex] * factor;
+            }
+
+#elif 0
+            v8sf sumB=0, sumG=0, sumR=0;
+            for(uint unused i: range(directIterations)) {
+                const Vec<v8sf, 3> l = cosine(random);
+                const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
+                const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
+                const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
+                const float factor  = 1; // Cosine factor already applied by cosine sampling distribution
+                const v8ui lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
+                sumB += factor * gather(emittanceB.data, lightRayFaceIndex);
+                sumG += factor * gather(emittanceG.data, lightRayFaceIndex);
+                sumR += factor * gather(emittanceR.data, lightRayFaceIndex);
+            }
 #else
-            vec3 v0 = La - P;
-            vec3 v1 = Lb - P;
-            vec3 v2 = Lc - P;
-            vec3 d = vec3(dot(N, v0) , dot(N, v1) , dot(N, v2));
-            const float eps = 0x1p-11;
-            if(d[0] > eps || d[1] > eps || d[2] > eps) { // Not all clipped
-                assert_(faceIndex != lightFaceIndex, d, (float)__builtin_log2(abs(d[0])), (float)__builtin_log2(abs(d[1])), (float)__builtin_log2(abs(d[2])));
-                vec3 v3; bool clip=false, quad=false;
-                /*if(d[0] > 0 && d[1] > 0 && d[2] > 0) {} // No clip
-                else {
-                    bool next;
-                    // Finds the CCW-most vertex above the plane
-                    if(d[1] > 0 && !(d[0] > 0)) {
-                        next = d[2]>0;
-                        vec3 t = v0; v0 = v1; v1 = v2; v2 = t;
-                        d = vec3(d[1], d[2], d[0]);
-                    } else if(d[2]>0 && !(d[1]>0)) {
-                        next = d[0]>0;
-                        vec3 t = v2; v2 = v1; v1 = v0; v0 = t;
-                        d = vec3(d[2], d[0], d[1]);
-                    } else next = d[1]>0;
-                    // We always need to clip v2 - v0 .
-                    const float t = d[0]/(d[0]-d[2]);
-                    v3 = (1-t)*v0+t*v2;
-                    if(next) {
-                        const float t = d[1]/(d[1]-d[2]);
-                        v2 = (1-t)*v1+t*v2;
-                        quad=true;
-                    } else {
-                        const float t = d[0]/(d[0]-d[1]);
-                        v1 = (1-t)*v0+t*v1;
-                        v2 = v3;
-                        v3 = v0; // ?
-                    }
-                    clip=true;
-                }*/
-                {
-                    const float abc = dot(v0, cross(v1, v2));
-                    if(abc < 0) { // Triple product is positive for outwards normal
-                        float a = length(v0);
-                        float b = length(v1);
-                        float c = length(v2);
-                        const float den = a*b*c + dot(v0,v1)*c + dot(v0,v2)*b + dot(v1,v2)*a;
-                        const float O = 2*atan(-abc, den); // Solid angle (0-4PI)
-                        if(den && O > eps && abc/den > 0.0005) { // Triple product is positive for outwards normal
-                            assert_(O > eps, (float)__builtin_log2(O), abc);
-                            const float areaFactor = area[lightIndex];
-                            const float unbiasFactor = (O/(2*PI)) / areaFactor;
-                            const vec3 Nb = normalize(cross(v0, v2));
-                            const vec3 Nc = normalize(cross(v1, v0));
-                            assert_(Nb != Nc, v0, v1, v2);
-                            float dotNBC = dot(Nb, Nc);
-                            if(dotNBC == 1) { // q fails to evaluate if sinα=0
-                                // Cycles vertices
-                                {vec3 t = v0; v0 = v1; v1 = v2; v2 = t;}
-                                {float t = a; a = b; b = c; c = t;}
-                                const vec3 Nb = normalize(cross(v0, v2));
-                                const vec3 Nc = normalize(cross(v1, v0));
-                                dotNBC = dot(Nb, Nc);
-                                assert_(dotNBC != 1);
-                            }
-                            //assert_(dot(Nb, Nc) != 1, Nb, Nc, v0,v1,v2);
-                            const float cosα = dotNBC; //::clamp(-1.f, -dotNBC, 1.f);
-                            assert_(cosα>=0);
-                            const float sinα = sqrt(1-sq(cosα));
-                            //assert_(sinα, O, abc, den, abc/den, dot(Nb, Nc), Nb,Nc, "-", v0,v1,v2, "-", La-P, Lb-P, Lc-P, lightFaceIndex, faceIndex, (float)__builtin_log2(O));
-                            const float α = acos(cosα);
-                            const vec3 oa = v0/a;
-                            const vec3 ob = v1/b;
-                            const vec3 oc = v2/c;
-                            const float cosc = dot(oa, ob);
-                            const vec3 Q = normalize(oc-dot(oa,oc)*oa);
-                            for(uint unused i: range(directIterations)) {
-                                const v8sf A = random() * O; // New area
-                                const Vec<v8sf, 2> st = cossin(A-α);
-                                const v8sf t = st._[0];
-                                const v8sf s = st._[1];
-                                const v8sf u = t - cosα;
-                                const v8sf v = s + sinα * cosc;
-                                const v8sf q = ::min(1.f, ((v*t-u*s)*cosα-v) / ((v*s+u*t)*sinα)); // cos b'
-                                const v8sf q1 = sqrt(1-q*q);
-                                for(int k: range(8)) assert_(q[k] >= -1 && q[k]<=1 && q1[k] >= 0 && q1[k]<=1, q[k], O, A[k], t[k], s[k], v[k], u[k], ((v*s+u*t)*sinα), sinα, dot(Nb, Nc), Nb, Nc,"\t",
-                                                             v0,v1,v2,"\t",
-                                                             La - P, Lb - P, Lc - P);
-                                const v8sf Cx = q*oa.x + q1*Q.x;
-                                const v8sf Cy = q*oa.y + q1*Q.y;
-                                const v8sf Cz = q*oa.z + q1*Q.z;
-                                const v8sf dotBC = ob.x*Cx + ob.y*Cy + ob.z*Cz;
-                                const v8sf z = 1 - random() * (1 - dotBC);
-                                for(int k: range(8)) assert_(z[k] >= -1 && z[k]<=1, z[k], dotBC, ob, Cx[k], Cy[k], Cz[k], q[k], q1[k], cosα, sinα, α, cosc);
-
-                                const vec3 Na = normalize(cross(v2, v1));
-                                const float cosγ = dot(Na, Nb);
-                                for(int k: range(8)) assert_((cosγ <= z[k] && z[k] <= cosα) || (cosα <= z[k] && z[k] <= cosγ), cosα, cosγ, z[k]);
-
-                                const v8sf Zx = Cx - dotBC*ob.x;
-                                const v8sf Zy = Cy - dotBC*ob.y;
-                                const v8sf Zz = Cz - dotBC*ob.z;
-                                const v8sf z1 = sqrt( (1-z*z) / (Zx*Zx+Zy*Zy+Zz*Zz) );
-                                const v8sf Lx = z*ob.x + z1*Zx;
-                                const v8sf Ly = z*ob.y + z1*Zy;
-                                const v8sf Lz = z*ob.z + z1*Zz;
-                                const v8sf dotNL = N.x*Lx + N.y*Ly + N.z*Lz; // FIXME
-                                if(1) for(int k: range(8)) {
-                                    vec3 L(Lx[k], Ly[k], Lz[k]);
-                                    assert_(dotNL[k]>-0.005, "A", dotNL[k], v0, v1, v2, oa, ob, oc, dot(oa, L), dot(ob, L), dot(oc, L), q[k], q1[k], z[k], sqrt(1-z*z)[k]);
-                                }
-                                //for(int k: range(8)) assert_(dotNL[k]>-0.005, "A", N, vec3(Lx[k],Ly[k],Lz[k]), dotNL[k], oa, ob, oc, O, -abc/(a*b*c), dot(N, oa), dot(N, ob), dot(N, oc), Q);
-                                //const v8si shadowRayHitIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
-                                //const v8si mask = shadowRayHitIndex == lightFaceIndex;
-                                //const v8sf dotNL = (v8sf)((shadowRayHitIndex == lightFaceIndex) & (v8si)(::max(0, N.x*Lx + N.y*Ly + N.z*Lz)));
-                                //lightFactor += and(mask, unbiasFactor * dotNL);
-                                //lightFactor += unbiasFactor;
-                                lightFactor += unbiasFactor * dotNL;
-                            }
-                        }
-                    }
+            v8sf sumB, sumG, sumR;
+            const uint lightFaceIndex = lights[0]; // FIXME: rectangle
+            if(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1) { sumB=0, sumG=0, sumR=0; }
+            else {
+                const vec3 s = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex]);
+                const vec3 ex = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-s;
+                const vec3 ey = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-s;
+                const float exl = length(ex), eyl = length(ey);
+                // Local reference system R
+                const vec3 x = ex / exl;
+                const vec3 y = ey / eyl;
+                vec3 z = cross(x, y);
+                // Rectangle coordinates in R
+                const vec3 D = s - P;
+                float z0 = dot(D, z);
+                if(z0 > 0) { z = -z; z0 = -z0; }
+                const float z0sq = z0 * z0;
+                const float x0 = dot(D, x);
+                const float y0 = dot(D, y);
+                const float x1 = x0 + exl;
+                const float y1 = y0 + eyl;
+                const float y0sq = y0 * y0;
+                const float y1sq = y1 * y1;
+                const vec3 v00 (x0, y0, z0);
+                const vec3 v01 (x0, y1, z0);
+                const vec3 v10 (x1, y0, z0);
+                const vec3 v11 (x1, y1, z0);
+                // Normals to edges
+                const vec3 n0 = normalize(cross(v00, v10));
+                const vec3 n1 = normalize(cross(v10, v11));
+                const vec3 n2 = normalize(cross(v11, v01));
+                const vec3 n3 = normalize(cross(v01, v00));
+                // Dihedral angles
+                const float g0 = acos(-dot(n0,n1));
+                const float g1 = acos(-dot(n1,n2));
+                const float g2 = acos(-dot(n2,n3));
+                const float g3 = acos(-dot(n3,n0));
+                // Constants
+                const float b0 = n0.z;
+                const float b1 = n2.z;
+                const float b0sq = b0 * b0;
+                const float k = 2*PI - g2 - g3;
+                // Solid angle
+                const float S = g0 + g1 - k;
+                v8sf sum = 0;
+                for(uint unused i: range(directIterations)) {
+                    const v8sf au = random() * S + k;
+                    const Vec<v8sf, 2> cossinau = cossin(au);
+                    const v8sf fu = (cossinau._[0] * b0 - b1) / cossinau._[1];
+                    const v8sf cu = clamp(-1, (v8sf)((v8si)(rsqrt(fu*fu + b0sq)) ^ sign(fu)), 1);
+                    const v8sf xu = clamp(x0, -(cu * z0) * rsqrt(1 - cu*cu), x1);
+                    const v8sf d2 = xu*xu + z0sq;
+                    const v8sf h0 = y0 * rsqrt(d2 + y0sq);
+                    const v8sf h1 = y1 * rsqrt(d2 + y1sq);
+                    const v8sf hv = h0 + random() * (h1-h0), hv2 = hv*hv;
+                    const v8sf yv = blend(y1, (hv*sqrt(d2))*rsqrt(1-hv2), hv2 < 1/*-eps*/);
+                    const v8sf Lx = x.x*xu + y.x*yv + z.x*z0;
+                    const v8sf Ly = x.y*xu + y.y*yv + z.y*z0;
+                    const v8sf Lz = x.z*xu + y.z*yv + z.z*z0;
+                    const v8sf dotNL = ::max(0, (N.x*Lx + N.y*Ly + N.z*Lz) * rsqrt(Lx*Lx+Ly*Ly+Lz*Lz) ); // TODO: clip
+                    const v8ui lightRayHitFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
+                    sum += and(lightRayHitFaceIndex == lightFaceIndex || lightRayHitFaceIndex == lightFaceIndex+1, dotNL);
                 }
-                if(quad) {
-                    const float abc = dot(v1, cross(v2, v3));
-                    if(abc < 0) { // Triple product is positive for outwards normal
-                        float a = length(v1);
-                        float b = length(v2);
-                        float c = length(v3);
-                        const float den = a*b*c + dot(v1,v2)*c + dot(v1,v3)*b + dot(v2,v3)*a;
-                        const float O = 2*atan(-abc, den); // Solid angle (0-4PI)
-                        assert_(O > 0);
-                        const float areaFactor = area[lightIndex];
-                        const float unbiasFactor = (O/(2*PI)) / areaFactor;
-                        const vec3 Nb = normalize(cross(v1, v3));
-                        const vec3 Nc = normalize(cross(v2, v1));
-                        float dotNBC = dot(Nb, Nc);
-                        if(dotNBC == 1) { // q fails to evaluate if sinα=0
-                            // Cycles vertices
-                            {vec3 t = v1; v1 = v2; v2 = v3; v3 = t;}
-                            {float t = a; a = b; b = c; c = t;}
-                            const vec3 Nb = normalize(cross(v1, v3));
-                            const vec3 Nc = normalize(cross(v2, v1));
-                            dotNBC = dot(Nb, Nc);
-                            assert_(dotNBC != 1);
-                        }
-                        const float cosα = ::clamp(-1.f, -dot(Nb, Nc), 1.f);
-                        const float sinα = sqrt(1-sq(cosα));
-                        const float α = acos(cosα);
-                        const vec3 oa = v1/a;
-                        const vec3 ob = v2/b;
-                        const vec3 oc = v3/c;
-                        const float cosc = dot(oa, ob);
-                        const vec3 Q = normalize(oc-dot(oa,oc)*oa);
-                        for(uint unused i: range(directIterations)) {
-                            const v8sf A = random() * O; // New area
-                            const Vec<v8sf, 2> st = cossin(A-α);
-                            const v8sf t = st._[0];
-                            const v8sf s = st._[1];
-                            const v8sf u = t - cosα;
-                            const v8sf v = s + sinα * cosc;
-                            const v8sf q = ::min(1.f, ((v*t-u*s)*cosα-v) / ((v*s+u*t)*sinα));
-                            const v8sf q1 = sqrt(1-q*q);
-                            const v8sf Cx = q*oa.x + q1*Q.x;
-                            const v8sf Cy = q*oa.y + q1*Q.y;
-                            const v8sf Cz = q*oa.z + q1*Q.z;
-                            const v8sf dotBC = ob.x*Cx + ob.y*Cy + ob.z*Cz;
-                            const v8sf z = 1 - random() * (1 - dotBC);
-                            const v8sf Zx = Cx - dotBC*ob.x;
-                            const v8sf Zy = Cy - dotBC*ob.y;
-                            const v8sf Zz = Cz - dotBC*ob.z;
-                            const v8sf z1 = sqrt( (1-z*z) / (Zx*Zx+Zy*Zy+Zz*Zz) );
-                            const v8sf Lx = z*ob.x + z1*Zx;
-                            const v8sf Ly = z*ob.y + z1*Zy;
-                            const v8sf Lz = z*ob.z + z1*Zz;
-                            const v8sf dotNL = N.x*Lx + N.y*Ly + N.z*Lz;
-                            for(int k: range(8)) assert_(dotNL[k]>0, "B", N, vec3(Lx[k],Ly[k],Lz[k]), dotNL[k], v1, v2, v3, q[k], z[k], q[k], q1[k]);
-                            //const v8si shadowRayHitIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
-                            //const v8sf dotNL = (v8sf)((shadowRayHitIndex == lightFaceIndex) & (v8si)(::max(0, N.x*Lx + N.y*Ly + N.z*Lz)));
-                            //sumB += (unbiasFactor * emittanceB[lightFaceIndex]) * dotNL;
-                            //sumG += (unbiasFactor * emittanceG[lightFaceIndex]) * dotNL;
-                            //sumR += (unbiasFactor * emittanceR[lightFaceIndex]) * dotNL;
-                            //const v8si mask = shadowRayHitIndex == lightFaceIndex;
-                            //lightFactor += and(mask, unbiasFactor);
-                            //lightFactor += unbiasFactor;
-                            lightFactor += unbiasFactor * dotNL;
-                        }
-                    }
-                }
+                sumB = emittanceB[lightFaceIndex] * sum;
+                sumG = emittanceG[lightFaceIndex] * sum;
+                sumR = emittanceR[lightFaceIndex] * sum;
             }
 #endif
             bgr3f sum;
-            float hsum = ::hsum(lightFactor);
-            sum.b = hsum * emittanceB[lightFaceIndex];
-            sum.g = hsum * emittanceG[lightFaceIndex];
-            sum.r = hsum * emittanceR[lightFaceIndex];
-            if(bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
+            sum.b = hsum(sumB);
+            sum.g = hsum(sumG);
+            sum.r = hsum(sumR);
+            if(bounce < 2) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
                 for(uint unused i: range(indirectIterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
@@ -597,14 +528,14 @@ struct Scene {
                     const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
                     const v8sf Lz = T.z * l._[0] + B.z * l._[1] + N.z * l._[2];
                     v8sf t,u,v;
-                    v8si lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
+                    v8ui lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
                     for(uint k: range(8)) {
                         vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
                         sum += shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
                     }
                 }
             } else path[bounce] = Direct;
-            out += scale * BRDF * sum;
+            out += scale * reflectance  * sum;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;
         return out;
