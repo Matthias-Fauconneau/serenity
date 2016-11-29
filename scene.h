@@ -400,6 +400,7 @@ struct Scene {
             bgr3f sum = 0;
             const uint lightFaceIndex = lights[0]; // FIXME: rectangle
             const uint l = bounce==0 ? L : 1;
+            const uint directIterations = l*Lookup::S;
             if(!(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1)) {
                 const mat3 iTBN = mat3(T, B, N).inverse(); // Global to local (FIXME)
                 for(const uint i: range(l)) { const Lookup& lookup = lookups[i];
@@ -460,16 +461,10 @@ struct Scene {
                 }
                 count+=l;
             }
-#if RT
-            static constexpr int indirectIterations = 1;
-#else
-            const int indirectIterations = bounce < 1 ? 512 : 0;
-#endif
-            const float scale = 1.f/(l*Lookup::S+indirectIterations*8);
 #else
             v8sf sumB=0, sumG=0, sumR=0;
-            static constexpr int directIterations = 32;
-            for(uint unused i: range(directIterations)) {
+            static const int directIterations = (bounce==0?L:1)*8;//*32;
+            for(uint unused i: range(directIterations/8)) {
                 const Vec<v8sf, 3> l = cosine(random);
                 const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
                 const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
@@ -481,8 +476,13 @@ struct Scene {
                 sumR += factor * gather(emittanceR.data, lightRayFaceIndex);
             }
             bgr3f sum (hsum(sumB), hsum(sumG), hsum(sumR));
-            const float scale = 1.f/(directIterations*8+8);
 #endif
+#if RT
+            static constexpr int indirectIterations = 1;
+#else
+            const int indirectIterations = bounce < 1 ? 512 : 0;
+#endif
+            const float scale = 1.f/(directIterations+indirectIterations*8);
 #if 1
             if(bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
