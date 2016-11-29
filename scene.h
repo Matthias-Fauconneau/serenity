@@ -108,6 +108,47 @@ static inline Vec<v8sf, 3> cosine(Random& random) {
 
 static inline uint popcount(v4uq m) { return __builtin_popcountll(m[0])+__builtin_popcountll(m[1])+__builtin_popcountll(m[2])+__builtin_popcountll(m[3]); }
 
+struct Lookup {
+    typedef v4uq mask;
+    static constexpr uint S = sizeof(mask)*8;
+    static constexpr uint N = 512;
+    buffer<mask> lookup {N*N}; // 2 MB
+
+    inline v8si index(const v8sf X, const v8sf Y, const v8sf Z) const {
+        const Vec<v8sf, 2> UV = square(X, Y, Z);
+        const v8si uIndex = cvtt((UV._[0]+1)*((N-1)/2.f));
+        const v8si vIndex = cvtt((UV._[1]+1)*((N-1)/2.f));
+        return vIndex*N+uIndex;
+    }
+
+    void generate(Random& random) {
+        // FIXME: stratified
+        vec3 samples[S];
+        for(uint i: range(S/8)) {
+            Vec<v8sf, 3> s8 = cosine(random);
+            for(uint j: range(8)) samples[i*8+j] = vec3(s8._[0][j], s8._[1][j], s8._[2][j]);
+        }
+        for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
+            const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
+            vec3 n (XYZ._[0][0], XYZ._[1][0], XYZ._[2][0]);
+            mask m = {}; for(const uint i: range(S)) if(dot(n, samples[i]) >= 0) m[i/64] |= 1ull<<(i%64);
+            lookup[vIndex*N+uIndex] = m;
+        }
+    }
+
+    inline mask operator()(const vec3 n) const {
+        const uint index = this->index(n.x, n.y, n.z)[0];
+        return lookup[index];
+    }
+};
+
+#define HALF 1
+#if HALF
+typedef half Float;
+#else
+typedef float Float;
+#endif
+
 struct Scene {
     struct Face {
         // Vertex attributes
@@ -116,7 +157,7 @@ struct Scene {
         vec3 T[3], B[3], N[3];
         // Face attributes
         float reflect, refract, gloss; // Render (RaycastShader)
-        const half* BGR; uint2 size; // Display (TextureShader)
+        const Float* BGR; uint2 size; // Display (TextureShader)
     };
     buffer<float> X[3], Y[3], Z[3]; // Quadrilaterals vertices world space positions XYZ coordinates
     buffer<float> emittanceB, emittanceG, emittanceR; // Face color attributes
@@ -128,6 +169,14 @@ struct Scene {
 
     vec3 min, max;
     float scale, near, far;
+
+#if RT
+    static constexpr uint L = 1;
+#else
+    static constexpr uint L = 16;
+#endif
+    Lookup lookups [L];
+    uint count = 0;
 
     void fit() {
         // Fits scene
@@ -280,48 +329,15 @@ struct Scene {
         return index;
     }
 
-    struct Lookup {
-        typedef v4uq mask;
-        static constexpr uint S = sizeof(mask)*8;
-        static constexpr uint N = 512;
-        mask lookup[N*N]; // 2 MB
-
-        inline v8si index(const v8sf X, const v8sf Y, const v8sf Z) const {
-            const Vec<v8sf, 2> UV = square(X, Y, Z);
-            const v8si uIndex = cvtt((UV._[0]+1)*((N-1)/2.f));
-            const v8si vIndex = cvtt((UV._[1]+1)*((N-1)/2.f));
-            return vIndex*N+uIndex;
-        }
-
-        void generate(Random& random) {
-            // FIXME: stratified
-            vec3 samples[S];
-            for(uint i: range(S/8)) {
-                Vec<v8sf, 3> s8 = cosine(random);
-                for(uint j: range(8)) samples[i*8+j] = vec3(s8._[0][j], s8._[1][j], s8._[2][j]);
-            }
-            for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-                const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
-                vec3 n (XYZ._[0][0], XYZ._[1][0], XYZ._[2][0]);
-                mask m = {}; for(const uint i: range(S)) if(dot(n, samples[i]) >= 0) m[i/64] |= 1ull<<(i%64);
-                lookup[vIndex*N+uIndex] = m;
-            }
-        }
-
-        inline mask operator()(const vec3 n) const {
-            const uint index = this->index(n.x, n.y, n.z)[0];
-            return lookup[index];
-        }
-    } lookup;
-
     enum Bounce { Direct=1, Diffuse, Specular, Max };
     typedef Bounce Path[3];
     typedef uint64 Timers[Max*Max*Max];
-    bgr3f shade(uint faceIndex, const vec3 P, const unused vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const int bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
+    bgr3f shade(uint faceIndex, const vec3 P, const unused vec3 D, const vec3 T, const vec3 B, const vec3 N, Random& random, const int bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) /*const*/ {
         const uint64 start = readCycleCounter();
         const Scene::Face& face = faces[faceIndex];
         bgr3f out (emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f reflectance (reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
+#if 1
         if(face.reflect) {
             if(bounce > 0) return 0; // +S
             //if(bounce > 1) return 0; // -SDS
@@ -376,81 +392,83 @@ struct Scene {
 
             return (1-a)*volumeColor + a*transmitColor;
         }*/
-        else { // Diffuse
-#if RT
-            static const int indirectIterations = 1; //bounce < 1;
-#else
-            //const int directIterations = bounce < 1 ? 1024 : 8;
-            const int indirectIterations = bounce < 1 ? 2 : 1;
+        else
 #endif
+        { // Diffuse
             // Direct lighting
 #if 1
-            bgr3f sum;
+            bgr3f sum = 0;
             const uint lightFaceIndex = lights[0]; // FIXME: rectangle
-            if(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1) sum=0;
-            else {
+            const uint l = bounce==0 ? L : 1;
+            if(!(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1)) {
                 const mat3 iTBN = mat3(T, B, N).inverse(); // Global to local (FIXME)
-
-                //assert_(lightFaceIndex == faces.size-2);
-                Lookup::mask occluders = {};
-                for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
-                    const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
-                    const v8sf Y0 = *(v8sf*)(Y[0].data+i)-P.y;
-                    const v8sf Z0 = *(v8sf*)(Z[0].data+i)-P.z;
-                    const v8sf X1 = *(v8sf*)(X[1].data+i)-P.x;
-                    const v8sf Y1 = *(v8sf*)(Y[1].data+i)-P.y;
-                    const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.z;
-                    const v8sf X2 = *(v8sf*)(X[2].data+i)-P.x;
-                    const v8sf Y2 = *(v8sf*)(Y[2].data+i)-P.y;
-                    const v8sf Z2 = *(v8sf*)(Z[2].data+i)-P.z;
-                    const v8sf D0 = N.x * X0 + N.y * Y0 + N.z * Z0;
-                    const v8sf D1 = N.x * X1 + N.y * Y1 + N.z * Z1;
-                    const v8sf D2 = N.x * X2 + N.y * Y2 + N.z * Z2;
-                    const v8si cull = D0 <= 0 || D1 <= 0 || D2 <= 0;
-                    // FIXME: cull/repack here ?
-                    v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
-                    v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
-                    v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
-                    const v8sf N0x = iTBN(0,0) * C0x + iTBN(0,1) * C0y + iTBN(0,2) * C0z;
-                    const v8sf N0y = iTBN(1,0) * C0x + iTBN(1,1) * C0y + iTBN(1,2) * C0z;
-                    const v8sf N0z = iTBN(2,0) * C0x + iTBN(2,1) * C0y + iTBN(2,2) * C0z;
-                    const v8sf N1x = iTBN(0,0) * C1x + iTBN(0,1) * C1y + iTBN(0,2) * C1z;
-                    const v8sf N1y = iTBN(1,0) * C1x + iTBN(1,1) * C1y + iTBN(1,2) * C1z;
-                    const v8sf N1z = iTBN(2,0) * C1x + iTBN(2,1) * C1y + iTBN(2,2) * C1z;
-                    const v8sf N2x = iTBN(0,0) * C2x + iTBN(0,1) * C2y + iTBN(0,2) * C2z;
-                    const v8sf N2y = iTBN(1,0) * C2x + iTBN(1,1) * C2y + iTBN(1,2) * C2z;
-                    const v8sf N2z = iTBN(2,0) * C2x + iTBN(2,1) * C2y + iTBN(2,2) * C2z;
-                    const v8si lookup0 = lookup.index(N0x, N0y, N0z);
-                    const v8si lookup1 = lookup.index(N1x, N1y, N1z);
-                    const v8si lookup2 = lookup.index(N2x, N2y, N2z);
-                    for(uint k: range(8)) { // Cannot gather 256bit loads
-                        if(cull[k] || i+k >= faces.size-2) continue; // FIXME
-                        const Lookup::mask occluder = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
-                        occluders |= occluder;
+                for(const uint i: range(l)) { const Lookup& lookup = lookups[i];
+                    //assert_(lightFaceIndex == faces.size-2);
+                    Lookup::mask occluders = {};
+                    for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
+                        const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
+                        const v8sf Y0 = *(v8sf*)(Y[0].data+i)-P.y;
+                        const v8sf Z0 = *(v8sf*)(Z[0].data+i)-P.z;
+                        const v8sf X1 = *(v8sf*)(X[1].data+i)-P.x;
+                        const v8sf Y1 = *(v8sf*)(Y[1].data+i)-P.y;
+                        const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.z;
+                        const v8sf X2 = *(v8sf*)(X[2].data+i)-P.x;
+                        const v8sf Y2 = *(v8sf*)(Y[2].data+i)-P.y;
+                        const v8sf Z2 = *(v8sf*)(Z[2].data+i)-P.z;
+                        const v8sf D0 = N.x * X0 + N.y * Y0 + N.z * Z0;
+                        const v8sf D1 = N.x * X1 + N.y * Y1 + N.z * Z1;
+                        const v8sf D2 = N.x * X2 + N.y * Y2 + N.z * Z2;
+                        const v8si cull = D0 <= 0 || D1 <= 0 || D2 <= 0;
+                        // FIXME: cull/repack here ?
+                        v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
+                        v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
+                        v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
+                        const v8sf N0x = iTBN(0,0) * C0x + iTBN(0,1) * C0y + iTBN(0,2) * C0z;
+                        const v8sf N0y = iTBN(1,0) * C0x + iTBN(1,1) * C0y + iTBN(1,2) * C0z;
+                        const v8sf N0z = iTBN(2,0) * C0x + iTBN(2,1) * C0y + iTBN(2,2) * C0z;
+                        const v8sf N1x = iTBN(0,0) * C1x + iTBN(0,1) * C1y + iTBN(0,2) * C1z;
+                        const v8sf N1y = iTBN(1,0) * C1x + iTBN(1,1) * C1y + iTBN(1,2) * C1z;
+                        const v8sf N1z = iTBN(2,0) * C1x + iTBN(2,1) * C1y + iTBN(2,2) * C1z;
+                        const v8sf N2x = iTBN(0,0) * C2x + iTBN(0,1) * C2y + iTBN(0,2) * C2z;
+                        const v8sf N2y = iTBN(1,0) * C2x + iTBN(1,1) * C2y + iTBN(1,2) * C2z;
+                        const v8sf N2z = iTBN(2,0) * C2x + iTBN(2,1) * C2y + iTBN(2,2) * C2z;
+                        const v8si lookup0 = lookup.index(N0x, N0y, N0z);
+                        const v8si lookup1 = lookup.index(N1x, N1y, N1z);
+                        const v8si lookup2 = lookup.index(N2x, N2y, N2z);
+                        for(uint k: range(8)) { // Cannot gather 256bit loads
+                            if(cull[k] || i+k >= faces.size-2) continue; // FIXME
+                            const Lookup::mask occluder = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
+                            occluders |= occluder;
+                        }
                     }
+
+                    const vec3 v00 = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex])-P;
+                    const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
+                    const vec3 v11 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
+                    const vec3 v10 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
+                    const vec3 n0 = iTBN*cross(v00, v10);
+                    const vec3 n1 = iTBN*cross(v10, v11);
+                    const vec3 n2 = iTBN*cross(v11, v01);
+                    const vec3 n3 = iTBN*cross(v01, v00);
+                    Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
+
+                    const uint lightSum = popcount(light & ~occluders);
+                    const float factor = (float) lightSum;
+                    sum.b += emittanceB[lightFaceIndex] * factor;
+                    sum.g += emittanceG[lightFaceIndex] * factor;
+                    sum.r += emittanceR[lightFaceIndex] * factor;
                 }
-
-                const vec3 v00 = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex])-P;
-                const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
-                const vec3 v11 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
-                const vec3 v10 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
-                const vec3 n0 = iTBN*cross(v00, v10);
-                const vec3 n1 = iTBN*cross(v10, v11);
-                const vec3 n2 = iTBN*cross(v11, v01);
-                const vec3 n3 = iTBN*cross(v01, v00);
-                Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
-
-                const uint lightSum = popcount(light & ~occluders);
-                const float factor = (float) lightSum;
-                sum.b = emittanceB[lightFaceIndex] * factor;
-                sum.g = emittanceG[lightFaceIndex] * factor;
-                sum.r = emittanceR[lightFaceIndex] * factor;
+                count+=l;
             }
-            const float scale = 1.f/(lookup.S+indirectIterations*8);
+#if RT
+            static constexpr int indirectIterations = 1;
 #else
-            static constexpr int directIterations = 1;
-#if 1
+            const int indirectIterations = bounce < 1 ? 512 : 0;
+#endif
+            const float scale = 1.f/(l*Lookup::S+indirectIterations*8);
+#else
             v8sf sumB=0, sumG=0, sumR=0;
+            static constexpr int directIterations = 32;
             for(uint unused i: range(directIterations)) {
                 const Vec<v8sf, 3> l = cosine(random);
                 const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
@@ -462,78 +480,10 @@ struct Scene {
                 sumG += factor * gather(emittanceG.data, lightRayFaceIndex);
                 sumR += factor * gather(emittanceR.data, lightRayFaceIndex);
             }
-#else
-            v8sf sumB, sumG, sumR;
-            const uint lightFaceIndex = lights[0]; // FIXME: rectangle
-            if(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1) { sumB=0, sumG=0, sumR=0; }
-            else {
-                const vec3 s = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex]);
-                const vec3 ex = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-s;
-                const vec3 ey = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-s;
-                const float exl = length(ex), eyl = length(ey);
-                // Local reference system R
-                const vec3 x = ex / exl;
-                const vec3 y = ey / eyl;
-                vec3 z = cross(x, y);
-                // Rectangle coordinates in R
-                const vec3 D = s - P;
-                float z0 = dot(D, z);
-                if(z0 > 0) { z = -z; z0 = -z0; }
-                const float z0sq = z0 * z0;
-                const float x0 = dot(D, x);
-                const float y0 = dot(D, y);
-                const float x1 = x0 + exl;
-                const float y1 = y0 + eyl;
-                const float y0sq = y0 * y0;
-                const float y1sq = y1 * y1;
-                const vec3 v00 (x0, y0, z0);
-                const vec3 v01 (x0, y1, z0);
-                const vec3 v10 (x1, y0, z0);
-                const vec3 v11 (x1, y1, z0);
-                // Normals to edges
-                const vec3 n0 = normalize(cross(v00, v10));
-                const vec3 n1 = normalize(cross(v10, v11));
-                const vec3 n2 = normalize(cross(v11, v01));
-                const vec3 n3 = normalize(cross(v01, v00));
-                // Dihedral angles
-                const float g0 = acos(-dot(n0,n1));
-                const float g1 = acos(-dot(n1,n2));
-                const float g2 = acos(-dot(n2,n3));
-                const float g3 = acos(-dot(n3,n0));
-                // Constants
-                const float b0 = n0.z;
-                const float b1 = n2.z;
-                const float b0sq = b0 * b0;
-                const float k = 2*PI - g2 - g3;
-                // Solid angle
-                const float S = g0 + g1 - k;
-                v8sf sum = 0;
-                for(uint unused i: range(directIterations)) {
-                    const v8sf au = random() * S + k;
-                    const Vec<v8sf, 2> cossinau = cossin(au);
-                    const v8sf fu = (cossinau._[0] * b0 - b1) / cossinau._[1];
-                    const v8sf cu = clamp(-1, (v8sf)((v8si)(rsqrt(fu*fu + b0sq)) ^ sign(fu)), 1);
-                    const v8sf xu = clamp(x0, -(cu * z0) * rsqrt(1 - cu*cu), x1);
-                    const v8sf d2 = xu*xu + z0sq;
-                    const v8sf h0 = y0 * rsqrt(d2 + y0sq);
-                    const v8sf h1 = y1 * rsqrt(d2 + y1sq);
-                    const v8sf hv = h0 + random() * (h1-h0), hv2 = hv*hv;
-                    const v8sf yv = blend(y1, (hv*sqrt(d2))*rsqrt(1-hv2), hv2 < 1/*-eps*/);
-                    const v8sf Lx = x.x*xu + y.x*yv + z.x*z0;
-                    const v8sf Ly = x.y*xu + y.y*yv + z.y*z0;
-                    const v8sf Lz = x.z*xu + y.z*yv + z.z*z0;
-                    const v8sf dotNL = ::max(0, (N.x*Lx + N.y*Ly + N.z*Lz) * rsqrt(Lx*Lx+Ly*Ly+Lz*Lz) ); // TODO: clip
-                    const v8ui lightRayHitFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz);
-                    sum += and(lightRayHitFaceIndex == lightFaceIndex || lightRayHitFaceIndex == lightFaceIndex+1, dotNL);
-                }
-                sumB = emittanceB[lightFaceIndex] * sum;
-                sumG = emittanceG[lightFaceIndex] * sum;
-                sumR = emittanceR[lightFaceIndex] * sum;
-            }
-#endif
             bgr3f sum (hsum(sumB), hsum(sumG), hsum(sumR));
-            const float scale = 1.f/(directIterations*8+indirectIterations*8);
+            const float scale = 1.f/(directIterations*8+8);
 #endif
+#if 1
             if(bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
                 for(uint unused i: range(indirectIterations)) {
@@ -548,14 +498,16 @@ struct Scene {
                         if(lightRayFaceIndex[k]!=faces.size) sum += shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
                     }
                 }
-            } else path[bounce] = Direct;
+            } else
+#endif
+            path[bounce] = Direct;
             out += scale * reflectance * sum;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;
         return out;
     }
 
-    inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) const {
+    inline bgr3f shade(size_t faceIndex, const vec3 P, const vec3 D, const float u, const float v, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride /*Max^bounce*/) /*const*/ {
         const vec3 T = (1-u-v) * faces[faceIndex].T[0] +
                 u * faces[faceIndex].T[1] +
                 v * faces[faceIndex].T[2];
@@ -568,7 +520,7 @@ struct Scene {
         return shade(faceIndex, P, D, T, B, N, random, bounce, path, timers, stride);
     }
 
-    inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) const;
+    inline bgr3f raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) /*const*/;
 
     struct NoShader {
         static constexpr int C = 0;
@@ -616,7 +568,7 @@ struct Scene {
 
     struct TextureShader : Shader<3, 2, TextureShader> {
         struct Face {
-            const half* BGR[3];
+            const Float* BGR[3];
             v8si sample4D;
             v4sf Wts;
         };
@@ -641,11 +593,19 @@ struct Scene {
                 attributes.BGR[0] = face.BGR + 0*size4 + tIndex*size3 + sIndex*size2;
                 attributes.BGR[1] = face.BGR + 1*size4 + tIndex*size3 + sIndex*size2;
                 attributes.BGR[2] = face.BGR + 2*size4 + tIndex*size3 + sIndex*size2;
+#if HALF // Half
                 attributes.sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                            size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
                 if(sSize == 1 || tSize ==1) // Prevents OOB
                     attributes.sample4D = {    0,           size1/2,         0,       size1/2,
                                                0,           size1/2,         0,       size1/2};
+#else  // Single
+                attributes.sample4D = {    0,           size1,         size2,       (size2+size1),
+                                           size3,   (size3+size1), (size3+size2), (size3+size2+size1)};
+                if(sSize == 1 || tSize ==1) // Prevents OOB
+                    attributes.sample4D = {    0,           size1,         0,       size1,
+                                               0,           size1,         0,       size1};
+#endif
                 attributes.Wts = {(1-fract(t))*(1-fract(s)), (1-fract(t))*fract(s), fract(t)*(1-fract(s)), fract(t)*fract(s)};
             }
         }
@@ -655,10 +615,23 @@ struct Scene {
             const float u = varying[0], v = varying[1];
             const int vIndex = v, uIndex = u; // Floor
             const Face& face = faces[index];
+#if HALF // Half
             const size_t base = 2*face.sample4D[1]*vIndex + uIndex;
             const v16sf B = toFloat((v16hf)gather((float*)(face.BGR[0]+base), face.sample4D));
             const v16sf G = toFloat((v16hf)gather((float*)(face.BGR[1]+base), face.sample4D));
             const v16sf R = toFloat((v16hf)gather((float*)(face.BGR[2]+base), face.sample4D));
+#else  // Single
+            const size_t base = face.sample4D[1]*vIndex + uIndex;
+            const v8sf b0 = gather((float*)(face.BGR[0]+base), face.sample4D);
+            const v8sf b1 = gather((float*)(face.BGR[0]+base+1), face.sample4D);
+            const v16sf B = shuffle(b0, b1, 0, 8+0, 1, 8+1, 2, 8+2, 3, 8+3, 4, 8+4, 5, 8+5, 6, 8+6, 7, 8+7);
+            const v8sf g0 = gather((float*)(face.BGR[1]+base), face.sample4D);
+            const v8sf g1 = gather((float*)(face.BGR[1]+base+1), face.sample4D);
+            const v16sf G = shuffle(g0, g1, 0, 8+0, 1, 8+1, 2, 8+2, 3, 8+3, 4, 8+4, 5, 8+5, 6, 8+6, 7, 8+7);
+            const v8sf r0 = gather((float*)(face.BGR[2]+base), face.sample4D);
+            const v8sf r1 = gather((float*)(face.BGR[2]+base+1), face.sample4D);
+            const v16sf R = shuffle(r0, r1, 0, 8+0, 1, 8+1, 2, 8+2, 3, 8+3, 4, 8+4, 5, 8+5, 6, 8+6, 7, 8+7);
+#endif
             const v4sf Wts = face.Wts;
             const v4sf vuvu = {v, u, v, u};
             const v4sf w_1mw = abs(vuvu - floor(vuvu) - _1100f); // 1-fract(x), fract(x)
@@ -672,11 +645,11 @@ struct Scene {
     struct RaycastShader : Shader<3, 8, RaycastShader> {
         typedef uint FaceAttributes;
 
-        const Scene& scene;
+        /*const*/ Scene& scene;
         vec3 viewpoint; // (s, t)
         buffer<Random> randoms;
 
-        RaycastShader(const Scene& scene) : scene(scene) {
+        RaycastShader(/*const*/ Scene& scene) : scene(scene) {
             randoms = buffer<Random>(threadCount());
             for(auto& random: randoms) random=Random();
         }
@@ -740,7 +713,7 @@ struct Scene {
     }
 };
 
-inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) const {
+inline bgr3f Scene::raycast_shade(const vec3 O, const vec3 D, Random& random, const uint bounce, Path path, uint64* const timers, const size_t stride) /*const*/ {
     float t, u, v;
     const size_t faceIndex = raycast(O, D, t, u, v);
     return t<inff ? shade(faceIndex, O+t*D, D, u, v, random, bounce, path, timers, stride) : 0;

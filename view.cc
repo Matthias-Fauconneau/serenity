@@ -128,7 +128,7 @@ struct ViewApp {
         if(detailCellCount && sSize && tSize) {
             surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
 
-            const ref<half> BGR = cast<half>(surfaceMap);
+            const ref<Float> BGR = cast<Float>(surfaceMap);
 
             size_t index = 0; size_t lastU = 0;
             for(const size_t faceIndex: range(scene.faces.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
@@ -183,17 +183,17 @@ struct ViewApp {
             if(scale>1 && (sSize==sMaxSize||tSize==tMaxSize)) {
                 File file(str(uint(detailCellCount))+'x'+strx(uint2(sSize,tSize)/scale), folder, Flags(ReadWrite|Create));
                 assert_(index%sq(scale)==0);
-                size_t byteSize = (index/sq(scale)+lastU/scale)*sizeof(half);
+                size_t byteSize = (index/sq(scale)+lastU/scale)*sizeof(Float);
                 file.resize(byteSize);
                 Map subsampleMap (file, Map::Prot(Map::Read|Map::Write));
-                const mref<half> target = mcast<half>(subsampleMap);
+                const mref<Float> target = mcast<Float>(subsampleMap);
 
                 size_t sourceIndex = 0;
                 for(size_t faceIndex : range(scene.faces.size/2)) {
                     Scene::Face& face = scene.faces[faceIndex*2];
                     const uint U = face.size.x, V = face.size.y;
-                    const half* const faceSource = face.BGR;
-                    half* const faceTarget = target.begin()+sourceIndex/sq(scale);
+                    const Float* const faceSource = face.BGR;
+                    Float* const faceTarget = target.begin()+sourceIndex/sq(scale);
                     for(size_t c: range(3)) {
                         for(size_t v: range(V)) for(size_t u: range(U)) {
                             for(size_t t: range(tSize/scale)) for(size_t s: range(sSize/scale)) {
@@ -218,7 +218,7 @@ struct ViewApp {
                     const uint U = face.size.x, V = face.size.y;
                     const uint VU = V*U;
                     const uint size4 = tSize*sSize*VU;
-                    const half* const faceBGR = face.BGR; // base + index
+                    const Float* const faceBGR = face.BGR; // base + index
                     Image bgr (sSize*U, tSize*V);
                     extern uint8 sRGB_forward[0x1000];
                     for(uint svIndex: range(V)) for(uint suIndex: range(U)) for(uint t: range(tSize)) for(uint s: range(sSize)) {
@@ -243,8 +243,8 @@ struct ViewApp {
         mat4 M = shearedPerspective(s, t, scene.near, scene.far);
         M.scale(scene.scale); // Fits scene within -1, 1
 
-        ImageH B (target.size), G (target.size), R (target.size);
         if(displayParametrization || (displaySurfaceParametrized && sSize && tSize)) {
+            ImageH B (target.size), G (target.size), R (target.size);
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized && sSize && tSize) {
@@ -276,7 +276,7 @@ struct ViewApp {
         const vec3 O = vec3(s,t,0)/scene.scale;
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
-        {Random random; scene.lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
+        {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
@@ -297,7 +297,6 @@ struct ViewApp {
             for(size_t i: range(G.ref::size)) sumG[i] += G[i];
             for(size_t i: range(R.ref::size)) sumR[i] += R[i];
 #endif
-            assert_(target.size == B.size);
             extern uint8 sRGB_forward[0x1000];
             for(size_t i: range(target.ref::size)) {
                 uint B = uint(sumB[i]/count*0xFFF);
