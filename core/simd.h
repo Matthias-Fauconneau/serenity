@@ -125,6 +125,7 @@ inline mask16 mask(v16si m) { return mask(m.r1)|(mask(m.r2)<<8); }
 inline v16si mask(const mask16 m) { return {mask(mask8(m)), mask(mask8(m>>8))}; }
 
 inline v8sf and(v8si k, v8sf x) { return (v8sf)(k & (v8si)x); }
+inline v8sf xor(v8si k, v8sf x) { return (v8sf)(k ^ (v8si)x); }
 inline v16si operator &(v16si a, v16si b) { return {a.r1 & b.r1, a.r2 & b.r2}; }
 //inline v16sf operator &(v16sf a, v16si b) { return v16sf(and(a.r1, b.r1), and(a.r2,b.r2)); }
 inline v16sf and(v16si k, v16sf x) { return v16sf(and(k.r1, x.r1), and(k.r2,x.r2)); }
@@ -190,7 +191,7 @@ static inline Vec<v8sf, 2> cossin(const v8sf angle) {
   const v8sf y1 = (((float8(2.443315711809948e-5) * x2 + float8(-1.388731625493765e-3)) * x2 + float8(4.166664568298827e-2)) * x2 + float8(-1./2)) * x2 + 1; // 0 <= x <= PI/4
   const v8sf y2 = (((float8(-1.9515295891E-4) * x2 + float8(8.3321608736E-3)) * x2 + float8(-1.6666654611E-1)) * x2 + 1) * x; // -PI/4 <= x <= 0
   const v8si select = (octant&2) == 0;
-  return {{(v8sf)(cosSign ^ (v8si)blend(y1, y2, ~select)), (v8sf)(sinSign ^ (v8si)blend(y1, y2, select))}};
+  return {{xor(cosSign, blend(y1, y2, ~select)), xor(sinSign, blend(y1, y2, select))}};
 }
 
 template<> inline String str(const half& v) { return str(float(v)); }

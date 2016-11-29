@@ -345,11 +345,6 @@ Scene parseScene(ref<byte> file) {
         }
         assert_(scene.faces.size == 2*quadCount);
     }
-    for(uint i: range(3)) {
-        mprotect(scene.X[i].begin(), scene.X[i].size, PROT_READ);
-        mprotect(scene.Y[i].begin(), scene.Y[i].size, PROT_READ);
-        mprotect(scene.Z[i].begin(), scene.Z[i].size, PROT_READ);
-    }
     for(float& v: scene.area) v /= scene.CAF.last();
     for(float& v: scene.CAF) v /= scene.CAF.last();
     assert_(scene.CAF.last()==1);
