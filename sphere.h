@@ -22,12 +22,11 @@ static const v8sf t5 =  0.881770664775316294736387951347e-1f;
 static const v8sf t6 =  0.419038818029165735901852432784e-1f;
 static const v8sf t7 = -0.251390972343483509333252996350e-1f;
 
-// [-1, 1] -> R3
 inline static Vec<v8sf, 3> sphere(const v8sf u, const v8sf v) {
-    const v8sf x = abs(u), y = abs(v);
-    const v8sf sd = 1-(x+y);
+    const v8sf absU = abs(u), absV = abs(v);
+    const v8sf sd = 1-(absU+absV);
     const v8sf r = 1-abs(sd);
-    const v8sf φ = and(r != 0, (y-x)/r) + 1;
+    const v8sf φ = and(r != 0, (absV-absU)/r) + 1;
     const v8sf φ2 = φ*φ;
     const v8sf cosφ = xor(sign(u), (((c4 * φ2 + c3) * φ2 + c2) * φ2 + c1));     // c1   + c2*φ^2 + c3*φ^4 + c4*φ^6
     const v8sf sinφ = xor(sign(v), (((s4 * φ2 + s3) * φ2 + s2) * φ2 + s1) * φ); // s1*φ + s2*φ^3 + s3*φ^5 + s4*φ^7
@@ -36,7 +35,6 @@ inline static Vec<v8sf, 3> sphere(const v8sf u, const v8sf v) {
     return {{sinθ * cosφ, sinθ * sinφ, xor(sign(sd), 1-r2)/*cosθ*/}};
 }
 
-// R3 -> [-1, 1]
 inline static Vec<v8sf, 2> square(const v8sf x, const v8sf y, const v8sf z) {
     const v8sf absX = abs(x), absY = abs(y);
     const v8sf a = max(absX, absY);

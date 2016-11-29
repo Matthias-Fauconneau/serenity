@@ -8,7 +8,7 @@ struct Test {
         const uint N = 512;
         Image image (N);
         for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-            const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
+            const Vec<v8sf, 3> XYZ = hemisphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
             /*const Vec<v8sf, 2> UV = square(XYZ._[0], XYZ._[1], XYZ._[2]);
             const uint uIndex2 = ((UV._[0]+1)*((N-1)/2.f))[0];
             const uint vIndex2 = ((UV._[1]+1)*((N-1)/2.f))[0];*/
