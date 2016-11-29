@@ -3,6 +3,7 @@
 #include "parallel.h"
 #include "mwc.h"
 #include "time.h"
+#include "sphere.h"
 
 inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
     const float left = (-1-s), right = (1-s);
@@ -85,56 +86,6 @@ static inline Vec<v8sf, 3> sphere(Random& random) {
     const v8sf r = sqrt(1-sq);
     return {{2*t0*r, 2*t1*r, 1-2*sq}};
 }*/
-
-// Coefficients for minimax approximation of sin(x*pi/4), x=[0,2].
-static const v8sf s1 =  0.7853975892066955566406250000000000f;
-static const v8sf s2 = -0.0807407423853874206542968750000000f;
-static const v8sf s3 =  0.0024843954015523195266723632812500f;
-static const v8sf s4 = -0.0000341485538228880614042282104492f;
-
-// Coefficients for minimax approximation of cos(x*pi/4), x=[0,2].
-static const v8sf c1 =  0.9999932952821962577665326692990000f;
-static const v8sf c2 = -0.3083711259464511647371969120320000f;
-static const v8sf c3 =  0.0157862649459062213825197189573000f;
-static const v8sf c4 = -0.0002983708648233575495551227373110f;
-
-// Coefficients for 6th degree minimax approximation of atan(x)*2/pi, x=[0,1].
-static const v8sf t1 =  0.406758566246788489601959989e-5f;
-static const v8sf t2 =  0.636226545274016134946890922156f;
-static const v8sf t3 =  0.61572017898280213493197203466e-2f;
-static const v8sf t4 = -0.247333733281268944196501420480f;
-static const v8sf t5 =  0.881770664775316294736387951347e-1f;
-static const v8sf t6 =  0.419038818029165735901852432784e-1f;
-static const v8sf t7 = -0.251390972343483509333252996350e-1f;
-
-// [-1, 1] -> R3
-inline static Vec<v8sf, 3> sphere(const v8sf u, const v8sf v) {
-    const v8sf x = abs(u), y = abs(v);
-    const v8sf sd = 1-(x+y);
-    const v8sf r = 1-abs(sd);
-    const v8sf φ = and(r != 0, (y-x)/r) + 1;
-    const v8sf φ2 = φ*φ;
-    const v8sf cosφ = xor(sign(u), (((c4 * φ2 + c3) * φ2 + c2) * φ2 + c1));     // c1   + c2*φ^2 + c3*φ^4 + c4*φ^6
-    const v8sf sinφ = xor(sign(v), (((s4 * φ2 + s3) * φ2 + s2) * φ2 + s1) * φ); // s1*φ + s2*φ^3 + s3*φ^5 + s4*φ^7
-    const v8sf r2 = r*r;
-    const v8sf sinθ = r*sqrt(2-r2);
-    return {{sinθ * cosφ, sinθ * sinφ, xor(sign(sd), 1-r2)/*cosθ*/}};
-}
-
-// R3 -> [-1, 1]
-inline static Vec<v8sf, 2> square(const v8sf x, const v8sf y, const v8sf z) {
-    const v8sf absX = abs(x), absY = abs(y);
-    const v8sf a = max(absX, absY);
-    const v8sf b = and(a != 0, min(absX, absY) / a);
-    const v8sf φ0 = (((((t7 * b + t6) * b + t5) * b + t4) * b + t3) * b + t2) * b + t1;
-    const v8sf φ = blend(φ0, 1-φ0, absX < absY);
-    const v8sf r = sqrt(max(0, 1-abs(z*rsqrt(x*x+y*y+z*z))));
-    const v8sf v0 = φ * r;
-    const v8sf u0 = r - v0;
-    const v8sf u = blend(u0, 1-v0, z<0);
-    const v8sf v = blend(v0, 1-u0, z<0);
-    return {{xor(sign(x), u), xor(sign(y), v)}};
-}
 
 /*// Uniformly distributed points on hemisphere directed towards N
 static inline Vec<v8sf, 3> hemisphere(Random& random, vec3 N) {
@@ -330,129 +281,17 @@ struct Scene {
     }
 
         struct Lookup {
-            /*static constexpr uint NN = 1;
-            struct mask { // NN*256b
-                v4uq _[NN];
-                inline mask operator&(const mask& o) { mask r; for(const uint i: range(NN)) r._[i]=_[i]&o._[i]; return r; }
-            };*/
             typedef v4uq mask;
             static constexpr uint S = sizeof(mask)*8;
-            static constexpr uint N = 256; // FIXME
-#if 0
-            mask lookup[6*N*N];  // NN*3 MB
-            inline vec3 xyz(uint faceIndex, uint uIndex, uint vIndex) const {
-                const float u = 2 * uIndex/float(N-1) - 1;
-                const float v = 2 * vIndex/float(N-1) - 1;
-                log("->", u, v);
-                if(faceIndex==0) return vec3(+1,+v,-u); // X+
-                if(faceIndex==1) return vec3(-1,+v,+u); // X-
-                if(faceIndex==2) return vec3(+u,+1,-v); // Y+
-                if(faceIndex==3) return vec3(+u,-1,+v); // Y-
-                if(faceIndex==4) return vec3(+u,+v,+1); // Z+
-                if(faceIndex==5) return vec3(-u,+v,-1); // Z-
-                error(faceIndex);
-            }
-            //inline mask operator()(const vec3 n) const { return operator()(n.x, n.y, n.z); }
-            //inline mask operator()(const float x, const float y, const float z) const {
-            inline mask operator()(const vec3 n) const {
-                const float x=n.x, y=n.y, z=n.z;
-                const float absX = abs(x);
-                const float absY = abs(y);
-                const float absZ = abs(z);
-                float maxAxis, u, v; int faceIndex;
-                if(x >  0 && absX >= absY && absX >= absZ) { maxAxis = absX, u = -z, v =  y, faceIndex = 0; } // X+
-                if(x <= 0 && absX >= absY && absX >= absZ) { maxAxis = absX, u =  z, v =  y, faceIndex = 1; } // X-
-                if(y >  0 && absY >= absX && absY >= absZ) { maxAxis = absY, u =  x, v = -z, faceIndex = 2; } // Y+
-                if(y <= 0 && absY >= absX && absY >= absZ) { maxAxis = absY, u =  x, v =  z, faceIndex = 3; } // Y-
-                if(z >  0 && absZ >= absX && absZ >= absY) { maxAxis = absZ, u =  x, v =  y, faceIndex = 4; } // Z+
-                if(z <= 0 && absZ >= absX && absZ >= absY) { maxAxis = absZ, u = -x, v =  y, faceIndex = 5; } // Z+
-                const int uIndex = (u/maxAxis+1)/2*(N-1);
-                const int vIndex = (v/maxAxis+1)/2*(N-1);
-                const uint i = faceIndex*N*N+vIndex*N+uIndex;
-                return maxAxis ? lookup[i] : 0;
-            }
-            inline v8si index(const v8sf x, const v8sf y, const v8sf z) const {
-                const v8sf absX = abs(x); const v8si signX = sign(-x);
-                const v8sf absY = abs(y); const v8si signY = sign(-y);
-                const v8sf absZ = abs(z); const v8si signZ = sign(z);
-
-                // X
-                v8sf maxAxis = absX;
-                v8sf u = (v8sf)((signX) ^ (v8si)z);
-                log(signX[0], z[0], u[0]);
-                v8sf v = y;
-                v8si faceIndex = (x > 0) & 1;
-
-                // Y
-                const v8si Y = absY >= absX & absY >= absZ;
-                maxAxis = blend(maxAxis, absY, Y);
-                u = blend(u, x, Y);
-                log(u[0], x[0]);
-                v = blend(v, (v8sf)(signY ^ (v8si)z), Y);
-                faceIndex = blend(faceIndex, blend((v8si)2,3,y>0), Y);
-
-                // Z
-                const v8si Z = absZ >= absX & absZ >= absY;
-                maxAxis = blend(maxAxis, absZ, Z);
-                u = blend(u, (v8sf)(signZ ^ (v8si)x), Z);
-                log(u[0]);
-                v = blend(v, y, Z);
-                faceIndex = blend(faceIndex, blend((v8si)4,5,z>0), Z);
-
-                static constexpr float c = (N-1)/2.f;
-                log("<-", u[0], v[0]);
-                const v8si uIndex = cvtt(u/maxAxis*c+c);
-                const v8si vIndex = cvtt(v/maxAxis*c+c);
-                //return (maxAxis == 0) & (faceIndex*(N*N)+vIndex*N+uIndex); // FIXME: n==0?
-                const v8si index = (maxAxis == 0) & (faceIndex*(N*N)+vIndex*N+uIndex); // FIXME: n==0?
-                for(uint k: range(8)) assert_((uint)index[k] < 6*N*N || (x[k]==0&&y[k]==0&&z[k]==0),
-                                              "XYZ", x[k], y[k], z[k],
-                                              "||", absX[k], absY[k], absZ[k],
-                                              "max", maxAxis[k],
-                                              "uv", u[k], v[k],
-                                              "f",  faceIndex[k],
-                                              "uvIndex", uIndex[k], vIndex[k],
-                                              "index", index[k]);
-                return index;
-            }
-#endif
-            mask lookup[N*N];  // NN*1 MB
-
-            //inline static Vec<v4sf, 3> sphere(const Vec<v4sf, 2>& p) {
-            /*inline Vec<v8sf, 3> operator()(v8sf uIndex, v8sf vIndex) const {
-                const v8sf u = uIndex/((N-1)/2.f) - 1;
-                const v8sf v = vIndex/((N-1)/2.f) - 1;*/
-
+            static constexpr uint N = 512;
+            mask lookup[N*N]; // 2 MB
 
             inline v8si index(const v8sf X, const v8sf Y, const v8sf Z) const {
                const Vec<v8sf, 2> UV = square(X, Y, Z);
-               const v8si uIndex = ((UV._[0]+1)*((N-1)/2.f))[0];
-               const v8si vIndex = ((UV._[1]+1)*((N-1)/2.f))[0];
+               const v8si uIndex = cvtt((UV._[0]+1)*((N-1)/2.f));
+               const v8si vIndex = cvtt((UV._[1]+1)*((N-1)/2.f));
                return vIndex*N+uIndex;
            }
-#if 0 // DEBUG
-            Lookup() {
-                /*for(uint faceIndex: range(6)) for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-                    const vec3 n = xyz(faceIndex, uIndex, vIndex);
-                    const uint i = faceIndex*N*N+vIndex*N+uIndex;
-                    const uint index = (uint)this->index(n.x,n.y,n.z)[0];
-                    assert_(index == i, n, faceIndex, uIndex, vIndex, index%(N*N), index%N, (index/N)%N);
-                }*/
-                for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-                    const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
-                    const Vec<v8sf, 2> UV = square(XYZ._[0], XYZ._[1], XYZ._[2]);
-                    const uint uIndex2 = ((UV._[0]+1)*((N-1)/2.f))[0];
-                    const uint vIndex2 = ((UV._[1]+1)*((N-1)/2.f))[0];
-                    assert_((uIndex == uIndex2 && vIndex == vIndex2) || (uIndex == 0 && vIndex==N-1-vIndex2) || (vIndex == 0 && uIndex==N-1-uIndex2),
-                            "UVi", uIndex, vIndex,
-                            "UV", uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1,
-                            "XYZ", XYZ._[0][0], XYZ._[1][0], XYZ._[2][0],
-                            "UV", UV._[0][0], UV._[1][0],
-                            "UVi", uIndex2, vIndex2);
-                }
-            }
-
-#endif
 
             void generate(Random& random) {
                 // FIXME: stratified
@@ -461,21 +300,12 @@ struct Scene {
                     Vec<v8sf, 3> s8 = cosine(random);
                     for(uint j: range(8)) samples[i*8+j] = vec3(s8._[0][j], s8._[1][j], s8._[2][j]);
                 }
-#if 0
-                for(uint faceIndex: range(6)) for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-                    const vec3 n = xyz(faceIndex, uIndex, vIndex);
-                    mask m = {}; for(const uint i: range(S)) if(dot(n, samples[i]) >= 0) m/*._[i/256]*/[(i%256)/64] |= 1ull<<(i%64);
-                    const uint i = faceIndex*N*N+vIndex*N+uIndex;
-                    lookup[i] = m;
-                }
-#else
                 for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
                     const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
                     vec3 n (XYZ._[0][0], XYZ._[1][0], XYZ._[2][0]);
                     mask m = {}; for(const uint i: range(S)) if(dot(n, samples[i]) >= 0) m[i/64] |= 1ull<<(i%64);
                     lookup[vIndex*N+uIndex] = m;
                 }
-#endif
             }
 
             inline mask operator()(const vec3 n) const {
@@ -574,12 +404,12 @@ struct Scene {
                 const vec3 n3 = iTBN*cross(v01, v00);
                 Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
 #if 0
-                for(const uint oFaceIndex: range(faces.size)) { // FIXME: SIMD
-                    if(oFaceIndex == faceIndex || oFaceIndex == lightFaceIndex || oFaceIndex == lightFaceIndex+1) continue; // FIXME: only (PVS) occluders (not behind any light)
+                for(const uint oFaceIndex: range(faces.size-2)) { // FIXME: SIMD
+                    if(oFaceIndex == faceIndex) continue;// || oFaceIndex == lightFaceIndex || oFaceIndex == lightFaceIndex+1) continue; // FIXME: only (PVS) occluders (not behind any light)
                     const vec3 v0 = vec3(X[0][oFaceIndex], Y[0][oFaceIndex], Z[0][oFaceIndex])-P;
                     const vec3 v1 = vec3(X[1][oFaceIndex], Y[1][oFaceIndex], Z[1][oFaceIndex])-P;
                     const vec3 v2 = vec3(X[2][oFaceIndex], Y[2][oFaceIndex], Z[2][oFaceIndex])-P;
-                    if(dot(N, v0) < 0 || dot(N, v1) < 0 || dot(N, v2) < 0) continue; // Completely cull triangle (partially) behind face  FIXME: partial clip face
+                    if(dot(N, v0) <= 0 || dot(N, v1) <= 0 || dot(N, v2) <= 0) continue; // Completely cull triangle (partially) behind face  FIXME: partial clip face
                     const vec3 n0 = iTBN*cross(v2, v1);
                     const vec3 n1 = iTBN*cross(v0, v2);
                     const vec3 n2 = iTBN*cross(v1, v0);
@@ -587,13 +417,14 @@ struct Scene {
                     light &= ~occluder;
                 }
 #else
+                //assert_(lightFaceIndex == faces.size-2);
                 for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
                     const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
                     const v8sf Y0 = *(v8sf*)(Y[0].data+i)-P.y;
                     const v8sf Z0 = *(v8sf*)(Z[0].data+i)-P.z;
                     const v8sf X1 = *(v8sf*)(X[1].data+i)-P.x;
                     const v8sf Y1 = *(v8sf*)(Y[1].data+i)-P.y;
-                    const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.y;
+                    const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.z;
                     const v8sf X2 = *(v8sf*)(X[2].data+i)-P.x;
                     const v8sf Y2 = *(v8sf*)(Y[2].data+i)-P.y;
                     const v8sf Z2 = *(v8sf*)(Z[2].data+i)-P.z;
@@ -618,14 +449,15 @@ struct Scene {
                     const v8si lookup1 = lookup.index(N1x, N1y, N1z);
                     const v8si lookup2 = lookup.index(N2x, N2y, N2z);
                     for(uint k: range(8)) { // Cannot gather 256bit loads
-                        if(cull[k] || i+k >= faces.size/*|| i+k==faceIndex*/) continue; // FIXME
+                        if(cull[k] || i+k >= faces.size-2 || i+k==faceIndex) continue; // FIXME
+                        //assert_(i+k != lightFaceIndex && i+k != lightFaceIndex+1);
                         const Lookup::mask occluder = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
                         light &= ~occluder;
                     }
                 }
 #endif
                 const uint sum = popcount(light/*._[0]*/);//+popcount(light._[1])+popcount(light._[2])+popcount(light._[3]);
-                const float factor = (float) sum / lookup.S;
+                const float factor = (float) sum / lookup.S; // / 4; // FIXME
                 // TODO: ~|(&occluder)
                 sumB = emittanceB[lightFaceIndex] * factor;
                 sumG = emittanceG[lightFaceIndex] * factor;
