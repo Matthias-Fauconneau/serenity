@@ -6,6 +6,7 @@
 #include "text.h"
 #include "render.h"
 #include "window.h"
+#include <sys/mman.h>
 
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
@@ -74,6 +75,7 @@ struct ViewApp {
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
         window->actions[Key('s')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
+        window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; count=0; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('1')] = [this]{ load(1<<1); window->render(); };
@@ -266,17 +268,20 @@ struct ViewApp {
                 target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
             }
         } else {
-            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size) { // Resets accumulation
-                sumB = ImageF(target.size);
-                sumG = ImageF(target.size);
-                sumR = ImageF(target.size);
+            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size || count == 0) { // Resets accumulation
+                sumB = ImageF(target.size); sumB.clear(0);
+                sumG = ImageF(target.size); sumG.clear(0);
+                sumR = ImageF(target.size); sumR.clear(0);
                 count = 1;
             } else count++;
 #if 1 // Raycast (FIXME: sheared)
         const vec3 O = vec3(s,t,0)/scene.scale;
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
-        {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
+        Time preTime{true};
+        if(scene.rasterize) if(count%16==1) {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
+        preTime.stop();
+        Time renderTime{true};
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
@@ -290,6 +295,7 @@ struct ViewApp {
                 sumR[targetIndex] += color.r;
             }
         });
+        log(preTime, renderTime, strD(preTime, renderTime));
 #else
             BGRRenderer.shader.viewpoint = vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
