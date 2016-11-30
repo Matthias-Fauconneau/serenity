@@ -111,8 +111,8 @@ static inline uint popcount(v4uq m) { return __builtin_popcountll(m[0])+__builti
 struct Lookup {
     typedef v4uq mask;
     static constexpr uint S = sizeof(mask)*8;
-    static constexpr uint N = 512;
-    buffer<mask> lookup {N*N}; // 2 MB
+    static constexpr uint N = 128;
+    buffer<mask> lookup {N*N}; // 512K
 
     inline v8si index(const v8sf X, const v8sf Y, const v8sf Z) const {
         const Vec<v8sf, 2> UV = square(X, Y, Z);
@@ -343,7 +343,7 @@ struct Scene {
             //if(bounce > 1) return 0; // -SDS
             path[bounce] = Specular; // S
 #if RT
-            static constexpr int iterations = 1;
+            static constexpr int iterations = 0;
 #else
             static constexpr int iterations = 8;
 #endif
@@ -399,12 +399,21 @@ struct Scene {
 #if 1
             bgr3f sum = 0;
             const uint lightFaceIndex = lights[0]; // FIXME: rectangle
-            const uint l = bounce==0 ? L : 1;
-            const uint directIterations = l*Lookup::S;
+            //const uint l = bounce==0 ? L : 1;
+            const uint directIterations = /*l**//*8**/Lookup::S;
             if(!(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1)) {
-                const mat3 iTBN = mat3(T, B, N).inverse(); // Global to local (FIXME)
-                for(const uint i: range(l)) { const Lookup& lookup = lookups[i];
-                    //assert_(lightFaceIndex == faces.size-2);
+                //for(const uint i: range(l)) { const Lookup& lookup = lookups[i];
+                const Lookup& lookup = lookups[0];
+                //assert_(lightFaceIndex == faces.size-2);
+                const v8sf sin = random(), cos = sqrt(1-sin*sin);
+                const v8sf Tx = cos*T.x + sin*B.x;
+                const v8sf Ty = cos*T.y + sin*B.y;
+                const v8sf Tz = cos*T.z + sin*B.z;
+                const v8sf Bx = cos*B.x - sin*T.x;
+                const v8sf By = cos*B.y - sin*T.y;
+                const v8sf Bz = cos*B.z - sin*T.z;
+                for(const uint k: range(1)) {
+                    const mat3 iTBN = mat3(vec3(Tx[k], Ty[k], Tz[k]), vec3(Bx[k], By[k], Bz[k]), N).transpose(); // FIXME
                     Lookup::mask occluders = {};
                     for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
                         const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
@@ -459,7 +468,7 @@ struct Scene {
                     sum.g += emittanceG[lightFaceIndex] * factor;
                     sum.r += emittanceR[lightFaceIndex] * factor;
                 }
-                count+=l;
+                count+=/*l*/1/**8*/;
             }
 #else
             v8sf sumB=0, sumG=0, sumR=0;
@@ -478,7 +487,7 @@ struct Scene {
             bgr3f sum (hsum(sumB), hsum(sumG), hsum(sumR));
 #endif
 #if RT
-            static constexpr int indirectIterations = 1;
+            static constexpr int indirectIterations = 0;
 #else
             const int indirectIterations = bounce < 1 ? 512 : 0;
 #endif
