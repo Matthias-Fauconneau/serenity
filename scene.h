@@ -152,7 +152,7 @@ struct Lookup {
 
     inline mask operator()(const vec3 n) const {
         const uint index = this->index(n.x, n.y, n.z)[0];
-        assert_(index < lookup.size, index, n); // FIXME: Might randomly crash without the assert ...
+        //assert_(index < lookup.size, index, n); // FIXME: Might randomly crash without the assert ...
         return lookup[index];
     }
 };
@@ -192,9 +192,10 @@ struct Scene {
 #endif
     buffer<Lookup> lookups {L};
     Scene() { lookups.clear(); }
-    uint count = 0;
+    //uint count = 0;
     bool rasterize = true;
-    uint specular = 0, indirect = 0;
+    uint specular = 1, indirect = 0;
+    uint texCount = 0;
 
     void fit() {
         // Fits scene
@@ -376,7 +377,15 @@ struct Scene {
                 for(uint k: range(8)) {
                     if(reflectRayFaceIndex[k]==faces.size) continue;
                     vec3 R = vec3(Rx[k],Ry[k],Rz[k]);
-                    sum += shade(reflectRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
+                    if(texCount) {
+                        sum += shade(reflectRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
+                    } else {
+                        assert_(textureShader);
+                        assert_(reflectRayFaceIndex[k] < textureShader->faces.size);
+                        assert_(u[k] >= 0 && u[k] < 1);
+                        assert_(v[k] >= 0 && v[k] < 1);
+                        sum += textureShader->shade(textureShader->faces[reflectRayFaceIndex[k]], u[k], v[k]);
+                    }
                 }
             }
             out += reflectance * (1.f/(iterations*8)) * sum;
@@ -416,77 +425,79 @@ struct Scene {
                 directIterations = l*Lookup::S;
                 sum = 0;
                 if(!(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1)) {
-                    //assert_(lightFaceIndex == faces.size-2);
-                    const float sin = random()[0], cos = sqrt(1-sin*sin);
-                    const float Tx = cos*T.x + sin*B.x;
-                    const float Ty = cos*T.y + sin*B.y;
-                    const float Tz = cos*T.z + sin*B.z;
-                    const float Bx = cos*B.x - sin*T.x;
-                    const float By = cos*B.y - sin*T.y;
-                    const float Bz = cos*B.z - sin*T.z;
-                    const float m00 = Tx,  m01 = Ty,  m02 = Tz;
-                    const float m10 = Bx,  m11 = By,  m12 = Bz;
-                    const float m20 = N.x, m21 = N.y, m22 = N.z;
-                    for(const uint k: range(l)) { const Lookup& lookup = lookups[k];
-                        Lookup::mask occluders = {};
-                        for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
-                            const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
-                            const v8sf Y0 = *(v8sf*)(Y[0].data+i)-P.y;
-                            const v8sf Z0 = *(v8sf*)(Z[0].data+i)-P.z;
-                            const v8sf X1 = *(v8sf*)(X[1].data+i)-P.x;
-                            const v8sf Y1 = *(v8sf*)(Y[1].data+i)-P.y;
-                            const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.z;
-                            const v8sf X2 = *(v8sf*)(X[2].data+i)-P.x;
-                            const v8sf Y2 = *(v8sf*)(Y[2].data+i)-P.y;
-                            const v8sf Z2 = *(v8sf*)(Z[2].data+i)-P.z;
-                            const v8sf D0 = N.x * X0 + N.y * Y0 + N.z * Z0;
-                            const v8sf D1 = N.x * X1 + N.y * Y1 + N.z * Z1;
-                            const v8sf D2 = N.x * X2 + N.y * Y2 + N.z * Z2;
-                            const v8si cull = D0 <= 0 || D1 <= 0 || D2 <= 0;
-                            // FIXME: cull/repack here ?
-                            v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
-                            v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
-                            v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
-                            const v8sf N0x = m00 * C0x + m01 * C0y + m02 * C0z;
-                            const v8sf N0y = m10 * C0x + m11 * C0y + m12 * C0z;
-                            const v8sf N0z = m20 * C0x + m21 * C0y + m22 * C0z;
-                            const v8sf N1x = m00 * C1x + m01 * C1y + m02 * C1z;
-                            const v8sf N1y = m10 * C1x + m11 * C1y + m12 * C1z;
-                            const v8sf N1z = m20 * C1x + m21 * C1y + m22 * C1z;
-                            const v8sf N2x = m00 * C2x + m01 * C2y + m02 * C2z;
-                            const v8sf N2y = m10 * C2x + m11 * C2y + m12 * C2z;
-                            const v8sf N2z = m20 * C2x + m21 * C2y + m22 * C2z;
-                            const v8si lookup0 = lookup.index(N0x, N0y, N0z);
-                            const v8si lookup1 = lookup.index(N1x, N1y, N1z);
-                            const v8si lookup2 = lookup.index(N2x, N2y, N2z);
-                            for(uint k: range(8)) { // Cannot gather 256bit loads
-                                if(cull[k] || i+k >= faces.size-2) continue; // FIXME
-                                const Lookup::mask occluder = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
-                                occluders |= occluder;
+                    const vec3 v00 = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex])-P;
+                    const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
+                    const vec3 v11 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
+                    const vec3 v10 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
+                    const vec3 n0g = cross(v00, v10);
+                    const vec3 n1g = cross(v10, v11);
+                    const vec3 n2g = cross(v11, v01);
+                    const vec3 n3g = cross(v01, v00);
+                    if(n0g && n1g && n2g && n3g) {
+                        //assert_(lightFaceIndex == faces.size-2);
+                        const float sin = random()[0], cos = sqrt(1-sin*sin);
+                        const float Tx = cos*T.x + sin*B.x;
+                        const float Ty = cos*T.y + sin*B.y;
+                        const float Tz = cos*T.z + sin*B.z;
+                        const float Bx = cos*B.x - sin*T.x;
+                        const float By = cos*B.y - sin*T.y;
+                        const float Bz = cos*B.z - sin*T.z;
+                        const float m00 = Tx,  m01 = Ty,  m02 = Tz;
+                        const float m10 = Bx,  m11 = By,  m12 = Bz;
+                        const float m20 = N.x, m21 = N.y, m22 = N.z;
+                        for(const uint k: range(l)) { const Lookup& lookup = lookups[k];
+                            Lookup::mask occluders = {};
+                            for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
+                                const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
+                                const v8sf Y0 = *(v8sf*)(Y[0].data+i)-P.y;
+                                const v8sf Z0 = *(v8sf*)(Z[0].data+i)-P.z;
+                                const v8sf X1 = *(v8sf*)(X[1].data+i)-P.x;
+                                const v8sf Y1 = *(v8sf*)(Y[1].data+i)-P.y;
+                                const v8sf Z1 = *(v8sf*)(Z[1].data+i)-P.z;
+                                const v8sf X2 = *(v8sf*)(X[2].data+i)-P.x;
+                                const v8sf Y2 = *(v8sf*)(Y[2].data+i)-P.y;
+                                const v8sf Z2 = *(v8sf*)(Z[2].data+i)-P.z;
+                                const v8sf D0 = N.x * X0 + N.y * Y0 + N.z * Z0;
+                                const v8sf D1 = N.x * X1 + N.y * Y1 + N.z * Z1;
+                                const v8sf D2 = N.x * X2 + N.y * Y2 + N.z * Z2;
+                                const v8si cull = D0 <= 0 || D1 <= 0 || D2 <= 0;
+                                // FIXME: cull/repack here ?
+                                v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
+                                v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
+                                v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
+                                const v8sf N0x = m00 * C0x + m01 * C0y + m02 * C0z;
+                                const v8sf N0y = m10 * C0x + m11 * C0y + m12 * C0z;
+                                const v8sf N0z = m20 * C0x + m21 * C0y + m22 * C0z;
+                                const v8sf N1x = m00 * C1x + m01 * C1y + m02 * C1z;
+                                const v8sf N1y = m10 * C1x + m11 * C1y + m12 * C1z;
+                                const v8sf N1z = m20 * C1x + m21 * C1y + m22 * C1z;
+                                const v8sf N2x = m00 * C2x + m01 * C2y + m02 * C2z;
+                                const v8sf N2y = m10 * C2x + m11 * C2y + m12 * C2z;
+                                const v8sf N2z = m20 * C2x + m21 * C2y + m22 * C2z;
+                                const v8si lookup0 = lookup.index(N0x, N0y, N0z);
+                                const v8si lookup1 = lookup.index(N1x, N1y, N1z);
+                                const v8si lookup2 = lookup.index(N2x, N2y, N2z);
+                                for(uint k: range(8)) { // Cannot gather 256bit loads
+                                    if(cull[k] || i+k >= faces.size-2) continue; // FIXME
+                                    const Lookup::mask occluder = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
+                                    occluders |= occluder;
+                                }
                             }
+
+                            const vec3 n0 = vec3(m00*n0g.x + m01*n0g.y + m02*n0g.z, m10*n0g.x + m11*n0g.y + m12*n0g.z, m20*n0g.x + m21*n0g.y + m22*n0g.z);
+                            const vec3 n1 = vec3(m00*n1g.x + m01*n1g.y + m02*n1g.z, m10*n1g.x + m11*n1g.y + m12*n1g.z, m20*n1g.x + m21*n1g.y + m22*n1g.z);
+                            const vec3 n2 = vec3(m00*n2g.x + m01*n2g.y + m02*n2g.z, m10*n2g.x + m11*n2g.y + m12*n2g.z, m20*n2g.x + m21*n2g.y + m22*n2g.z);
+                            const vec3 n3 = vec3(m00*n3g.x + m01*n3g.y + m02*n3g.z, m10*n3g.x + m11*n3g.y + m12*n3g.z, m20*n3g.x + m21*n3g.y + m22*n3g.z);
+                            Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
+
+                            const uint lightSum = popcount(light & ~occluders);
+                            const float factor = (float) lightSum;
+                            sum.b += emittanceB[lightFaceIndex] * factor;
+                            sum.g += emittanceG[lightFaceIndex] * factor;
+                            sum.r += emittanceR[lightFaceIndex] * factor;
                         }
-
-                        const vec3 v00 = vec3(X[0][lightFaceIndex], Y[0][lightFaceIndex], Z[0][lightFaceIndex])-P;
-                        const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
-                        const vec3 v11 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
-                        const vec3 v10 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
-                        const vec3 n0g = cross(v00, v10);
-                        const vec3 n1g = cross(v10, v11);
-                        const vec3 n2g = cross(v11, v01);
-                        const vec3 n3g = cross(v01, v00);
-                        const vec3 n0 = vec3(m00*n0g.x + m01*n0g.y + m02*n0g.z, m10*n0g.x + m11*n0g.y + m12*n0g.z, m20*n0g.x + m21*n0g.y + m22*n0g.z);
-                        const vec3 n1 = vec3(m00*n1g.x + m01*n1g.y + m02*n1g.z, m10*n1g.x + m11*n1g.y + m12*n1g.z, m20*n1g.x + m21*n1g.y + m22*n1g.z);
-                        const vec3 n2 = vec3(m00*n2g.x + m01*n2g.y + m02*n2g.z, m10*n2g.x + m11*n2g.y + m12*n2g.z, m20*n2g.x + m21*n2g.y + m22*n2g.z);
-                        const vec3 n3 = vec3(m00*n3g.x + m01*n3g.y + m02*n3g.z, m10*n3g.x + m11*n3g.y + m12*n3g.z, m20*n3g.x + m21*n3g.y + m22*n3g.z);
-                        Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
-
-                        const uint lightSum = popcount(light & ~occluders);
-                        const float factor = (float) lightSum;
-                        sum.b += emittanceB[lightFaceIndex] * factor;
-                        sum.g += emittanceG[lightFaceIndex] * factor;
-                        sum.r += emittanceR[lightFaceIndex] * factor;
                     }
-                    count += l;
+                    //count += l;
                 }
             } else  {
                 v8sf sumB=0, sumG=0, sumR=0;
@@ -504,9 +515,10 @@ struct Scene {
                 }
                 sum = bgr3f(hsum(sumB), hsum(sumG), hsum(sumR));
             }
-            const int indirectIterations = bounce < 1 ? indirect : 0;
+            const int indirectIterations = bounce < 1 && texCount ? indirect : 0;
             if(indirectIterations) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
+                bgr3f indirectSum = 0;
                 for(uint unused i: range(indirectIterations/8)) {
                     const Vec<v8sf, 3> l = cosine(random);
                     const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
@@ -515,13 +527,21 @@ struct Scene {
                     v8sf t,u,v;
                     v8ui lightRayFaceIndex = raycast(P.x,P.y,P.z, Lx,Ly,Lz, t,u,v);
                     for(uint k: range(8)) {
-                        vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
-                        if(lightRayFaceIndex[k]!=faces.size) sum += shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
+                        if(lightRayFaceIndex[k]!=faces.size) {
+                            if(0) {
+                                vec3 L = vec3(Lx[k],Ly[k],Lz[k]);
+                                sum += shade(lightRayFaceIndex[k], P+t[k]*L, L, u[k], v[k], random, bounce+1, path, timers+Diffuse*stride, stride*Max);
+                            } else {
+                                indirectSum += textureShader->shade(textureShader->faces[lightRayFaceIndex[k]], u[k], v[k]);
+                            }
+                        }
                     }
                 }
+                if(0) {}
+                else sum += indirectSum;// / float(texCount);
             } else
                 path[bounce] = Direct;
-            out += reflectance * (1.f/(directIterations+indirectIterations)) * sum;
+            out += reflectance * (1.f/(directIterations+indirectIterations*texCount)) * sum;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;
         return out;
@@ -632,9 +652,11 @@ struct Scene {
 
         inline Vec<v16sf, C> shade(const uint id, FaceAttributes face, v16sf z, v16sf varying[V], v16si mask) const { return Shader::shade(id, face, z, varying, mask); }
         inline Vec<float, 3> shade(const uint, FaceAttributes index, float, float varying[V]) const {
-            const float u = varying[0], v = varying[1];
+            bgr3f bgr = shade(faces[index], varying[0],  varying[1]);
+            return {{bgr.b, bgr.g, bgr.r}};
+        }
+        inline bgr3f shade(const Face& face, const float u, const float v) const {
             const int vIndex = v, uIndex = u; // Floor
-            const Face& face = faces[index];
 #if HALF // Half
             const size_t base = 2*face.sample4D[1]*vIndex + uIndex;
             const v16sf B = toFloat((v16hf)gather((float*)(face.BGR[0]+base), face.sample4D));
@@ -652,15 +674,17 @@ struct Scene {
             const v8sf r1 = gather((float*)(face.BGR[2]+base+1), face.sample4D);
             const v16sf R = shuffle(r0, r1, 0, 8+0, 1, 8+1, 2, 8+2, 3, 8+3, 4, 8+4, 5, 8+5, 6, 8+6, 7, 8+7);
 #endif
-            const v4sf Wts = face.Wts;
+            const v4sf Wts = face.Wts; // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
             const v4sf vuvu = {v, u, v, u};
             const v4sf w_1mw = abs(vuvu - floor(vuvu) - _1100f); // 1-fract(x), fract(x)
             const v16sf w01 = shuffle(  Wts,   Wts, 0,0,0,0,1,1,1,1, 2,2,2,2,3,3,3,3)  // 0000111122223333
                     * shuffle(w_1mw, w_1mw, 0,0,2,2,0,0,2,2, 0,0,2,2,0,0,2,2)  // vvVVvvVVvvVVvvVV
                     * shuffle(w_1mw, w_1mw, 1,3,1,3,1,3,1,3, 1,3,1,3,1,3,1,3); // uUuUuUuUuUuUuUuU
-            return Vec<float, 3>{{dot(w01, B), dot(w01, G), dot(w01, R)}};
+            return bgr3f(dot(w01, B), dot(w01, G), dot(w01, R));
         }
     };
+
+    const TextureShader* textureShader; // FIXME
 
     struct RaycastShader : Shader<3, 8, RaycastShader> {
         typedef uint FaceAttributes;

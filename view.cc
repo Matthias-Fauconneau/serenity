@@ -78,7 +78,7 @@ struct ViewApp {
         window->actions[Key('b')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
         window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
-        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect?256:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
+        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect?8:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('s')] = [this]{ scene.specular=!scene.specular; renderer.scene.specular=scene.specular; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
@@ -90,6 +90,9 @@ struct ViewApp {
         window->setTitle(strx(uint2(sSize,tSize)));
         renderer.clear();
         {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // First set of stratified cosine samples for hemispheric rasterizer
+        TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, 0.5, 0.5); // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
+        scene.textureShader = &TexRenderer.shader; // FIXME
+        renderer.scene.textureShader = &TexRenderer.shader; // FIXME
     }
     void load(const uint scale = 1) {
         surfaceMap = {};
@@ -257,6 +260,7 @@ struct ViewApp {
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized && sSize && tSize) {
                 renderer.step(); // FIXME: async
+                renderer.scene.texCount = renderer.iterations; // Enables radiosity based indirect illumination only after first step of baking
                 TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
                 window->render(); // Accumulates
