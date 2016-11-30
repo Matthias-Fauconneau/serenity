@@ -78,7 +78,7 @@ struct ViewApp {
         window->actions[Key('b')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
         window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
-        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect?8:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
+        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect=scene.indirect?8:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('s')] = [this]{ scene.specular=!scene.specular; renderer.scene.specular=scene.specular; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
@@ -260,7 +260,7 @@ struct ViewApp {
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized && sSize && tSize) {
                 renderer.step(); // FIXME: async
-                renderer.scene.texCount = renderer.iterations; // Enables radiosity based indirect illumination only after first step of baking
+                scene.texCount = renderer.scene.texCount = renderer.iterations; // Enables radiosity based indirect illumination only after first step of baking
                 TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
                 window->render(); // Accumulates
@@ -308,6 +308,7 @@ struct ViewApp {
         }
         //preTime.stop();
         //Time renderTime{true};
+        scene.texCount = renderer.scene.texCount = renderer.iterations; // Uses baking for all indirect rays (diffuse, specular)
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {

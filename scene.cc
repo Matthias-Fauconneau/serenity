@@ -57,6 +57,8 @@ Scene parseScene(ref<byte> file) {
         }
         assert_(polygon.size == 4);
         const float gloss = 1./8;
+        const float emittance = 8;
+        const float reflectance = 1./8;
         { // Triangle ABC
             const vec3 T = normalize(polygon[1]-polygon[0]);
             const vec3 B = normalize(polygon[2]-polygon[1]);
@@ -72,12 +74,12 @@ Scene parseScene(ref<byte> file) {
                 scene.Z[i][faceIndex] = polygon[i].z-viewpoint.z;
             }
             if(N.y == 1 && polygon[0].y==0) {
-                scene.emittanceB[faceIndex] = 1;
-                scene.emittanceG[faceIndex] = 1;
-                scene.emittanceR[faceIndex] = 1;
-                scene.reflectanceB[faceIndex] = 1;
-                scene.reflectanceG[faceIndex] = 1;
-                scene.reflectanceR[faceIndex] = 1;
+                scene.emittanceB[faceIndex] = emittance;
+                scene.emittanceG[faceIndex] = emittance;
+                scene.emittanceR[faceIndex] = emittance;
+                scene.reflectanceB[faceIndex] = reflectance;
+                scene.reflectanceG[faceIndex] = reflectance;
+                scene.reflectanceR[faceIndex] = reflectance;
                 scene.lights.append( faceIndex );
                 scene.area.append( lengthCross/2 );
                 scene.CAF.append( (scene.CAF ? scene.CAF.last() : 0)+lengthCross/2 );
@@ -85,7 +87,7 @@ Scene parseScene(ref<byte> file) {
                 scene.emittanceB[faceIndex] = 0;
                 scene.emittanceG[faceIndex] = 0;
                 scene.emittanceR[faceIndex] = 0;
-                color = color / ::max(::max(color.b, color.g), color.r);
+                color = reflectance * color / ::max(::max(color.b, color.g), color.r);
                 scene.reflectanceB[faceIndex] = color.b;
                 scene.reflectanceG[faceIndex] = color.g;
                 scene.reflectanceR[faceIndex] = color.r;
@@ -107,12 +109,12 @@ Scene parseScene(ref<byte> file) {
                 scene.Z[i][faceIndex] = polygon[i?1+i:0].z-viewpoint.z;
             }
             if(N.y == 1 && polygon[0].y==0) {
-                scene.emittanceB[faceIndex] = 1;
-                scene.emittanceG[faceIndex] = 1;
-                scene.emittanceR[faceIndex] = 1;
-                scene.reflectanceB[faceIndex] = 1;
-                scene.reflectanceG[faceIndex] = 1;
-                scene.reflectanceR[faceIndex] = 1;
+                scene.emittanceB[faceIndex] = emittance;
+                scene.emittanceG[faceIndex] = emittance;
+                scene.emittanceR[faceIndex] = emittance;
+                scene.reflectanceB[faceIndex] = reflectance;
+                scene.reflectanceG[faceIndex] = reflectance;
+                scene.reflectanceR[faceIndex] = reflectance;
                 scene.lights.append( faceIndex );
                 scene.area.append( lengthCross/2 );
                 scene.CAF.append( (scene.CAF ? scene.CAF.last() : 0)+lengthCross/2 );
@@ -120,7 +122,7 @@ Scene parseScene(ref<byte> file) {
                 scene.emittanceB[faceIndex] = 0;
                 scene.emittanceG[faceIndex] = 0;
                 scene.emittanceR[faceIndex] = 0;
-                color = color / ::max(::max(color.b, color.g), color.r);
+                color = reflectance * color / ::max(::max(color.b, color.g), color.r);
                 scene.reflectanceB[faceIndex] = color.b;
                 scene.reflectanceG[faceIndex] = color.g;
                 scene.reflectanceR[faceIndex] = color.r;

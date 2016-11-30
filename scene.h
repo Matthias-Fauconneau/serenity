@@ -157,7 +157,7 @@ struct Lookup {
     }
 };
 
-#define HALF 1 // FIXME: Accumulate singles, sample halfs
+#define HALF 0 // FIXME: Accumulate singles, sample halfs
 #if HALF
 typedef half Float;
 #else
@@ -357,6 +357,8 @@ struct Scene {
         bgr3f out (emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f reflectance (reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
         if(specular && face.reflect) {
+            if(0) {}
+            else if(!texCount) return 0;
             if(bounce > 0) return 0; // +S
             //if(bounce > 1) return 0; // -SDS
             path[bounce] = Specular; // S
@@ -377,18 +379,18 @@ struct Scene {
                 for(uint k: range(8)) {
                     if(reflectRayFaceIndex[k]==faces.size) continue;
                     vec3 R = vec3(Rx[k],Ry[k],Rz[k]);
-                    if(texCount) {
-                        sum += shade(reflectRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
-                    } else {
-                        assert_(textureShader);
-                        assert_(reflectRayFaceIndex[k] < textureShader->faces.size);
-                        assert_(u[k] >= 0 && u[k] < 1);
-                        assert_(v[k] >= 0 && v[k] < 1);
+                    if(0) sum += shade(reflectRayFaceIndex[k], P+t[k]*R, R, u[k], v[k], random, bounce+1, path, timers+Specular*stride, stride*Max);
+                    else {
                         sum += textureShader->shade(textureShader->faces[reflectRayFaceIndex[k]], u[k], v[k]);
+                        /*if(texCount) {
+                            sum += textureShader->shade(textureShader->faces[reflectRayFaceIndex[k]], u[k], v[k]);
+                        } else {
+
+                        }*/
                     }
                 }
             }
-            out += reflectance * (1.f/(iterations*8)) * sum;
+            out += reflectance * (1.f/(iterations*8*texCount)) * sum;
         }
         /*else if(face.refract) {
             if(bounce > 0) return 0;
@@ -516,7 +518,7 @@ struct Scene {
                 sum = bgr3f(hsum(sumB), hsum(sumG), hsum(sumR));
             }
             const int indirectIterations = bounce < 1 && texCount ? indirect : 0;
-            if(indirectIterations) { // Indirect diffuse lighting (TODO: radiosity)
+            if(indirectIterations) { // Indirect diffuse lighting
                 path[bounce] = Diffuse;
                 bgr3f indirectSum = 0;
                 for(uint unused i: range(indirectIterations/8)) {
