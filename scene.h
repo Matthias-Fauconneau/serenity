@@ -152,6 +152,7 @@ struct Lookup {
 
     inline mask operator()(const vec3 n) const {
         const uint index = this->index(n.x, n.y, n.z)[0];
+        assert_(index < lookup.size, index, n); // FIXME: Might randomly crash without the assert ...
         return lookup[index];
     }
 };
@@ -193,7 +194,7 @@ struct Scene {
     Scene() { lookups.clear(); }
     uint count = 0;
     bool rasterize = true;
-    bool specular = false, indirect = false;
+    uint specular = 0, indirect = 0;
 
     void fit() {
         // Fits scene
@@ -503,15 +504,10 @@ struct Scene {
                 }
                 sum = bgr3f(hsum(sumB), hsum(sumG), hsum(sumR));
             }
-#if RT
-            static constexpr int indirectIterations = 1;
-#else
-            const int indirectIterations = bounce < 1 ? 512 : 0;
-#endif
-            const float scale = 1.f/(directIterations+indirectIterations*8);
-            if(indirect && bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
+            const int indirectIterations = bounce < 1 ? indirect : 0;
+            if(indirectIterations) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
-                for(uint unused i: range(indirectIterations)) {
+                for(uint unused i: range(indirectIterations/8)) {
                     const Vec<v8sf, 3> l = cosine(random);
                     const v8sf Lx = T.x * l._[0] + B.x * l._[1] + N.x * l._[2];
                     const v8sf Ly = T.y * l._[0] + B.y * l._[1] + N.y * l._[2];
@@ -525,7 +521,7 @@ struct Scene {
                 }
             } else
                 path[bounce] = Direct;
-            out += scale * reflectance * sum;
+            out += reflectance * (1.f/(directIterations+indirectIterations)) * sum;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;
         return out;

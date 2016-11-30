@@ -78,7 +78,7 @@ struct ViewApp {
         window->actions[Key('b')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
         window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
-        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect; renderer.clear(); count[0]=count[1]=0; window->render(); };
+        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect?256:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('s')] = [this]{ scene.specular=!scene.specular; renderer.scene.specular=scene.specular; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
@@ -296,14 +296,14 @@ struct ViewApp {
         const vec3 O = vec3(s,t,0)/scene.scale;
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
-        Time preTime{true};
+        //Time preTime{true};
         if(scene.rasterize && count[scene.rasterize]>1 /*Reset only after first first iterations (reuse previous set on new view)*/) {
             /*if(randomCount%16==0)*/ {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
             //if(count[1] < randomCount) randomCount = 0; // Do not reset while view changes
             //randomCount++;
         }
-        preTime.stop();
-        Time renderTime{true};
+        //preTime.stop();
+        //Time renderTime{true};
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
@@ -317,7 +317,7 @@ struct ViewApp {
                 sumR[scene.rasterize][targetIndex] += color.r;
             }
         });
-        log(preTime, renderTime, strD(preTime, renderTime));
+        //log(preTime, renderTime, strD(preTime, renderTime));
 #else
             BGRRenderer.shader.viewpoint = vec3(s,t,0)/scene.scale;
             scene.render(BGRRenderer, M, (float[]){1,1,1}, {}, B, G, R);
