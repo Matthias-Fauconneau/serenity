@@ -49,6 +49,7 @@ struct ViewApp {
     bool depthCorrect = true; // when displaying field
     bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
+    uint downsample=1;
 
     ImageF sumB[2], sumG[2], sumR[2];
     uint count[2] = {0, 0}; // Iteration count (Resets on view change)
@@ -80,21 +81,21 @@ struct ViewApp {
         window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
         window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect=scene.indirect?8:0; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('s')] = [this]{ scene.specular=!scene.specular; renderer.scene.specular=scene.specular; renderer.clear(); count[0]=count[1]=0; window->render(); };
-        window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
-        window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
-        window->actions[Key('1')] = [this]{ load(1<<1); window->render(); };
-        window->actions[Key('2')] = [this]{ load(1<<2); window->render(); };
-        window->actions[Key('3')] = [this]{ load(1<<3); window->render(); };
-        window->actions[Key('4')] = [this]{ load(1<<4); window->render(); };
-        window->actions[Key('5')] = [this]{ load(1<<5); window->render(); };
+        window->actions[Key('`')] = [this]{ load(downsample=1<<0); window->render(); };
+        window->actions[Key('0')] = [this]{ load(downsample=1<<0); window->render(); };
+        window->actions[Key('1')] = [this]{ load(downsample=1<<1); window->render(); };
+        window->actions[Key('2')] = [this]{ load(downsample=1<<2); window->render(); };
+        window->actions[Key('3')] = [this]{ load(downsample=1<<3); window->render(); };
+        window->actions[Key('4')] = [this]{ load(downsample=1<<4); window->render(); };
+        window->actions[Key('5')] = [this]{ load(downsample=1<<5); window->render(); };
         window->setTitle(strx(uint2(sSize,tSize)));
         renderer.clear();
         {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // First set of stratified cosine samples for hemispheric rasterizer
-        TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, 0.5, 0.5); // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
+        //TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, 1./2, 1./2); // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
         scene.textureShader = &TexRenderer.shader; // FIXME
         renderer.scene.textureShader = &TexRenderer.shader; // FIXME
     }
-    void load(const uint scale = 1) {
+    void load(const uint inputScale = 1, bool update=true) {
         surfaceMap = {};
         sSize = 0, tSize = 0;
         for(Scene::Face& face : scene.faces) face.BGR = 0;
@@ -129,12 +130,17 @@ struct ViewApp {
             tMaxSize = tSize_;
         }
 
-        sSize = sMaxSize;
-        tSize = tMaxSize;
-        if(scale>1 && existsFile(str(uint(detailCellCount))+'x'+strx(uint2(sSize,tSize)/scale), folder)) {
-            sSize /= scale;
-            tSize /= scale;
+        assert_( (sMaxSize / ((sMaxSize+inputScale-1) / inputScale)) == (tMaxSize / ((tMaxSize+inputScale-1) / inputScale)));
+        const uint scale = sMaxSize / ((sMaxSize+inputScale-1) / inputScale);
+        assert_(scale > 0 && scale <= sMaxSize && scale <= tMaxSize && sMaxSize%scale == 0 && tMaxSize%scale==0);
+        if(scale>1 && existsFile(str(uint(detailCellCount))+'x'+strx(uint2(sMaxSize,tMaxSize)/scale), folder) && !update) {
+            sSize = sMaxSize / scale;
+            tSize = tMaxSize / scale;
+        } else {
+            sSize = sMaxSize;
+            tSize = tMaxSize;
         }
+        assert_(sSize && tSize);
 
         if(detailCellCount && sSize && tSize) {
             surfaceMap = Map(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder);
@@ -192,7 +198,7 @@ struct ViewApp {
             }
 
             if(scale>1 && (sSize==sMaxSize||tSize==tMaxSize)) {
-                File file(str(uint(detailCellCount))+'x'+strx(uint2(sSize,tSize)/scale), folder, Flags(ReadWrite|Create));
+                File file(str(uint(detailCellCount))+'x'+strx(uint2(sMaxSize,tMaxSize)/scale), folder, Flags(ReadWrite|Create));
                 assert_(index%sq(scale)==0);
                 size_t byteSize = (index/sq(scale)+lastU/scale)*sizeof(Float);
                 file.resize(byteSize);
@@ -220,7 +226,7 @@ struct ViewApp {
                     }
                     sourceIndex += 3*V*U*tSize*sSize;
                 }
-                load(scale); // Loads new file
+                load(scale, false); // Loads new file
             }
 #if 0 // DEBUG
             log("DEBUG");
@@ -259,9 +265,11 @@ struct ViewApp {
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized && sSize && tSize) {
+                if(downsample>1) load(downsample);
+                TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, 1./2, 1./2); // FIXME
                 renderer.step(); // FIXME: async
                 scene.texCount = renderer.scene.texCount = renderer.iterations; // Enables radiosity based indirect illumination only after first step of baking
-                TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
+                TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize,(s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
                 window->render(); // Accumulates
             }
@@ -309,6 +317,7 @@ struct ViewApp {
         //preTime.stop();
         //Time renderTime{true};
         scene.texCount = renderer.scene.texCount = renderer.iterations; // Uses baking for all indirect rays (diffuse, specular)
+        TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, 1./2, 1./2); // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
