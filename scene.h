@@ -193,6 +193,7 @@ struct Scene {
     Scene() { lookups.clear(); }
     uint count = 0;
     bool rasterize = true;
+    bool specular = false, indirect = false;
 
     void fit() {
         // Fits scene
@@ -353,16 +354,11 @@ struct Scene {
         const Scene::Face& face = faces[faceIndex];
         bgr3f out (emittanceB[faceIndex], emittanceG[faceIndex], emittanceR[faceIndex]);
         const bgr3f reflectance (reflectanceB[faceIndex],reflectanceG[faceIndex],reflectanceR[faceIndex]);
-#if 1
-        if(face.reflect) {
+        if(specular && face.reflect) {
             if(bounce > 0) return 0; // +S
             //if(bounce > 1) return 0; // -SDS
             path[bounce] = Specular; // S
-#if RT
-            static constexpr int iterations = 0;
-#else
-            static constexpr int iterations = 8;
-#endif
+            static constexpr int iterations = 1;
             bgr3f sum = 0;
             const vec3 R = normalize(D - 2*dot(N, D)*N);
             for(uint unused i: range(iterations)) {
@@ -409,7 +405,6 @@ struct Scene {
             return (1-a)*volumeColor + a*transmitColor;
         }*/
         else
-#endif
         { // Diffuse
             // Direct lighting
             bgr3f sum;
@@ -509,13 +504,12 @@ struct Scene {
                 sum = bgr3f(hsum(sumB), hsum(sumG), hsum(sumR));
             }
 #if RT
-            static constexpr int indirectIterations = 0;
+            static constexpr int indirectIterations = 1;
 #else
             const int indirectIterations = bounce < 1 ? 512 : 0;
 #endif
             const float scale = 1.f/(directIterations+indirectIterations*8);
-#if 1
-            if(bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
+            if(indirect && bounce < 1) { // Indirect diffuse lighting (TODO: radiosity)
                 path[bounce] = Diffuse;
                 for(uint unused i: range(indirectIterations)) {
                     const Vec<v8sf, 3> l = cosine(random);
@@ -530,8 +524,7 @@ struct Scene {
                     }
                 }
             } else
-#endif
-            path[bounce] = Direct;
+                path[bounce] = Direct;
             out += scale * reflectance * sum;
         }
         timers[path[bounce]*stride] += readCycleCounter()-start;

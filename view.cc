@@ -75,9 +75,11 @@ struct ViewApp {
         load(1);
         window->actions[Key('f')] = [this]{ displayField=!displayField; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
-        window->actions[Key('s')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
+        window->actions[Key('b')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
         window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
+        window->actions[Key('i')] = [this]{ scene.indirect=!scene.indirect; renderer.scene.indirect=scene.indirect; renderer.clear(); count[0]=count[1]=0; window->render(); };
+        window->actions[Key('s')] = [this]{ scene.specular=!scene.specular; renderer.scene.specular=scene.specular; renderer.clear(); count[0]=count[1]=0; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('1')] = [this]{ load(1<<1); window->render(); };
