@@ -123,16 +123,25 @@ struct Lookup {
 
     void generate(Random& random) {
         // FIXME: stratified
-        vec3 samples[S];
+        v8sf X[S/8], Y[S/8], Z[S/8];
         for(uint i: range(S/8)) {
             Vec<v8sf, 3> s8 = cosine(random);
-            for(uint j: range(8)) samples[i*8+j] = vec3(s8._[0][j], s8._[1][j], s8._[2][j]);
+            X[i] = s8._[0];
+            Y[i] = s8._[1];
+            Z[i] = s8._[2];
         }
-        for(uint vIndex: range(N)) for(uint uIndex: range(N)) {
-            const Vec<v8sf, 3> XYZ = sphere(uIndex/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
-            vec3 n (XYZ._[0][0], XYZ._[1][0], XYZ._[2][0]);
-            mask m = {}; for(const uint i: range(S)) if(dot(n, samples[i]) >= 0) m[i/64] |= 1ull<<(i%64);
-            lookup[vIndex*N+uIndex] = m;
+        static constexpr v8sf seq {0,1,2,3,4,5,6,7};
+        for(uint vIndex: range(N)) for(uint uIndex: range(N/8)) {
+            const Vec<v8sf, 3> XYZ = sphere((uIndex*8+seq)/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
+            for(uint k: range(8)) {
+                const float x = XYZ._[0][k];
+                const float y = XYZ._[1][k];
+                const float z = XYZ._[2][k];
+                uint8* target = (uint8*)(lookup.begin()+vIndex*N+uIndex*8+k);
+                for(const uint i: range(S/8)) {
+                    target[i] = ::mask((x*X[i] + y*Y[i] + z*Z[i]) >= 0);
+                }
+            }
         }
     }
 
@@ -142,7 +151,7 @@ struct Lookup {
     }
 };
 
-#define HALF 1
+#define HALF 1 // FIXME: Accumulate singles, sample halfs
 #if HALF
 typedef half Float;
 #else

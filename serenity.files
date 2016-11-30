@@ -23,7 +23,7 @@ ui/text.h
 ui/text.cc
 
 test.cc
-render.cc
+prerender.cc
 raster.h
 scene.h
 view.cc
@@ -33,3 +33,4 @@ filesync.cc
 mwc.h
 sphere.h
 sphere.h
+render.h

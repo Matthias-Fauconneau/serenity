@@ -6,7 +6,7 @@
 #include "text.h"
 #include "render.h"
 #include "window.h"
-#include <sys/mman.h>
+#include "render.h"
 
 struct ViewControl : virtual Widget {
     vec2 viewYawPitch = vec2(0, 0); // Current view angles
@@ -33,6 +33,7 @@ struct ViewControl : virtual Widget {
 };
 
 struct ViewApp {
+    Render renderer;
     Folder folder {basename(arguments()[0]),"/var/tmp"_,true};
     const uint2 imageSize = 1024;
     Map surfaceMap; // Needs to stay memory mapped for face B,G,R references
@@ -49,8 +50,9 @@ struct ViewApp {
     bool displaySurfaceParametrized = false; // baked surface parametrized appearance or direct renderer (raycast shader) (when rasterizing)
     bool displayParametrization = false; // or checkerboard pattern (when rasterizing)
 
-    ImageF sumB, sumG, sumR;
-    size_t count = 0;
+    ImageF sumB[2], sumG[2], sumR[2];
+    uint count[2] = {0, 0}; // Iteration count (Resets on view change)
+    uint randomCount = 0; // To regenerate new lookup
     vec2 viewYawPitch;
 
     struct ViewWidget : ViewControl, ImageView {
@@ -75,7 +77,7 @@ struct ViewApp {
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
         window->actions[Key('s')] = [this]{ displaySurfaceParametrized=!displaySurfaceParametrized; window->render(); };
         window->actions[Key('p')] = [this]{ displayParametrization=!displayParametrization; window->render(); };
-        window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; count=0; window->render(); };
+        window->actions[Key('r')] = [this]{ scene.rasterize=!scene.rasterize; window->render(); };
         window->actions[Key('`')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('0')] = [this]{ load(1<<0); window->render(); };
         window->actions[Key('1')] = [this]{ load(1<<1); window->render(); };
@@ -84,6 +86,8 @@ struct ViewApp {
         window->actions[Key('4')] = [this]{ load(1<<4); window->render(); };
         window->actions[Key('5')] = [this]{ load(1<<5); window->render(); };
         window->setTitle(strx(uint2(sSize,tSize)));
+        renderer.clear();
+        {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // First set of stratified cosine samples for hemispheric rasterizer
     }
     void load(const uint scale = 1) {
         surfaceMap = {};
@@ -250,15 +254,18 @@ struct ViewApp {
             if(displayParametrization)
                 scene.render(UVRenderer, M, (float[]){1,1,1}, {}, B, G, R);
             else if(displaySurfaceParametrized && sSize && tSize) {
+                renderer.step(); // FIXME: async
                 TexRenderer.shader.setFaceAttributes(scene.faces, sSize, tSize, (s+1)/2, (t+1)/2);
                 scene.render(TexRenderer, M, (float[]){1,1,1}, {}, B, G, R);
+                window->render(); // Accumulates
             }
             assert_(target.size == B.size);
             extern uint8 sRGB_forward[0x1000];
+            const float scale = float(0xFFF) / (displaySurfaceParametrized && sSize && tSize ? float(renderer.iterations) : 1.f);
             for(size_t i: range(target.ref::size)) {
-                uint b = uint(B[i]*0xFFF);
-                uint g = uint(G[i]*0xFFF);
-                uint r = uint(R[i]*0xFFF);
+                uint b = uint(scale*B[i]);
+                uint g = uint(scale*G[i]);
+                uint r = uint(scale*R[i]);
                 b = clamp(0u, b, 0xFFFu);
                 g = clamp(0u, g, 0xFFFu);
                 r = clamp(0u, r, 0xFFFu);
@@ -268,31 +275,44 @@ struct ViewApp {
                 target[i] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
             }
         } else {
-            if(view.viewYawPitch != viewYawPitch || sumB.size != target.size || count == 0) { // Resets accumulation
-                sumB = ImageF(target.size); sumB.clear(0);
-                sumG = ImageF(target.size); sumG.clear(0);
-                sumR = ImageF(target.size); sumR.clear(0);
-                count = 1;
-            } else count++;
+            if(view.viewYawPitch != viewYawPitch || sumB[scene.rasterize].size != target.size) {
+                viewYawPitch = view.viewYawPitch;
+                for(uint& v: count) v = 0; // Resets accumulation
+            }
+            if(count[scene.rasterize] == 0) {
+                if(sumB[scene.rasterize].size != target.size) {
+                    sumB[scene.rasterize] = ImageF(target.size);
+                    sumG[scene.rasterize] = ImageF(target.size);
+                    sumR[scene.rasterize] = ImageF(target.size);
+                }
+                sumB[scene.rasterize].clear(0);
+                sumG[scene.rasterize].clear(0);
+                sumR[scene.rasterize].clear(0);
+            }
+            count[scene.rasterize]++;
 #if 1 // Raycast (FIXME: sheared)
         const vec3 O = vec3(s,t,0)/scene.scale;
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
         Time preTime{true};
-        if(scene.rasterize) if(count%16==1) {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
+        if(scene.rasterize && count[scene.rasterize]>1 /*Reset only after first first iterations (reuse previous set on new view)*/) {
+            /*if(randomCount%16==0)*/ {Random random; for(Lookup& lookup: scene.lookups) lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
+            //if(count[1] < randomCount) randomCount = 0; // Do not reset while view changes
+            //randomCount++;
+        }
         preTime.stop();
         Time renderTime{true};
         parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
             const int targetSizeX = target.size.x;
             for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
                 size_t targetIndex = targetY*targetSizeX+targetX;
-                const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1);
+                const vec2 uv = (vec2(targetX, targetY) / vec2(target.size-uint2(1)))*2.f - vec2(1) - O.xy()*scene.scale;
                 const vec3 d = normalize(vec3(uv, scene.near));
                 Scene::Path path; Scene::Timers timers;
                 bgr3f color = scene.raycast_shade(O, d, randoms[id], 0, path, timers, 1);
-                sumB[targetIndex] += color.b;
-                sumG[targetIndex] += color.g;
-                sumR[targetIndex] += color.r;
+                sumB[scene.rasterize][targetIndex] += color.b;
+                sumG[scene.rasterize][targetIndex] += color.g;
+                sumR[scene.rasterize][targetIndex] += color.r;
             }
         });
         log(preTime, renderTime, strD(preTime, renderTime));
@@ -305,9 +325,9 @@ struct ViewApp {
 #endif
             extern uint8 sRGB_forward[0x1000];
             for(size_t i: range(target.ref::size)) {
-                uint B = uint(sumB[i]/count*0xFFF);
-                uint G = uint(sumG[i]/count*0xFFF);
-                uint R = uint(sumR[i]/count*0xFFF);
+                uint B = uint(sumB[scene.rasterize][i]/count[scene.rasterize]*0xFFF);
+                uint G = uint(sumG[scene.rasterize][i]/count[scene.rasterize]*0xFFF);
+                uint R = uint(sumR[scene.rasterize][i]/count[scene.rasterize]*0xFFF);
                 B = clamp(0u, B, 0xFFFu);
                 G = clamp(0u, G, 0xFFFu);
                 R = clamp(0u, R, 0xFFFu);
