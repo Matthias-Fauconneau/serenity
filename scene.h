@@ -131,15 +131,20 @@ struct Lookup {
             Z[i] = s8._[2];
         }
         static constexpr v8sf seq {0,1,2,3,4,5,6,7};
-        for(uint vIndex: range(N)) for(uint uIndex: range(N/8)) {
-            const Vec<v8sf, 3> XYZ = sphere((uIndex*8+seq)/((N-1)/2.f)-1, vIndex/((N-1)/2.f)-1);
-            for(uint k: range(8)) {
-                const float x = XYZ._[0][k];
-                const float y = XYZ._[1][k];
-                const float z = XYZ._[2][k];
-                uint8* target = (uint8*)(lookup.begin()+vIndex*N+uIndex*8+k);
-                for(const uint i: range(S/8)) {
-                    target[i] = ::mask((x*X[i] + y*Y[i] + z*Z[i]) >= 0);
+        static constexpr float scale = 1.f/((N-1)/2.f);
+        static const v8sf seqF = scale*seq-1;
+        for(uint vIndex: range(N)) {
+            const v8sf v = scale*vIndex-1;
+            const mask* line = lookup.begin()+vIndex*N;
+            for(uint uIndex=0; uIndex<N; uIndex+=8) {
+                const mask* span8 = line+uIndex;
+                const Vec<v8sf, 3> XYZ = sphere(scale*uIndex+seqF, v);
+                for(uint k: range(8)) {
+                    const float x = XYZ._[0][k];
+                    const float y = XYZ._[1][k];
+                    const float z = XYZ._[2][k];
+                    uint8* mask32 = (uint8*)(span8+k);
+                    for(const uint i: range(S/8)) mask32[i] = ::mask((x*X[i] + y*Y[i] + z*Z[i]) >= 0);
                 }
             }
         }
