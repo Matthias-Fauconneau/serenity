@@ -399,21 +399,21 @@ struct Scene {
 #if 1
             bgr3f sum = 0;
             const uint lightFaceIndex = lights[0]; // FIXME: rectangle
-            //const uint l = bounce==0 ? L : 1;
-            const uint directIterations = /*l**//*8**/Lookup::S;
+            const uint l = bounce==0 ? L : 1;
+            const uint directIterations = l*Lookup::S;
             if(!(faceIndex == lightFaceIndex || faceIndex == lightFaceIndex+1)) {
-                //for(const uint i: range(l)) { const Lookup& lookup = lookups[i];
-                const Lookup& lookup = lookups[0];
                 //assert_(lightFaceIndex == faces.size-2);
-                const v8sf sin = random(), cos = sqrt(1-sin*sin);
-                const v8sf Tx = cos*T.x + sin*B.x;
-                const v8sf Ty = cos*T.y + sin*B.y;
-                const v8sf Tz = cos*T.z + sin*B.z;
-                const v8sf Bx = cos*B.x - sin*T.x;
-                const v8sf By = cos*B.y - sin*T.y;
-                const v8sf Bz = cos*B.z - sin*T.z;
-                for(const uint k: range(1)) {
-                    const mat3 iTBN = mat3(vec3(Tx[k], Ty[k], Tz[k]), vec3(Bx[k], By[k], Bz[k]), N).transpose(); // FIXME
+                const float sin = random()[0], cos = sqrt(1-sin*sin);
+                const float Tx = cos*T.x + sin*B.x;
+                const float Ty = cos*T.y + sin*B.y;
+                const float Tz = cos*T.z + sin*B.z;
+                const float Bx = cos*B.x - sin*T.x;
+                const float By = cos*B.y - sin*T.y;
+                const float Bz = cos*B.z - sin*T.z;
+                const float m00 = Tx,  m01 = Ty,  m02 = Tz;
+                const float m10 = Bx,  m11 = By,  m12 = Bz;
+                const float m20 = N.x, m21 = N.y, m22 = N.z;
+                for(const uint k: range(l)) { const Lookup& lookup = lookups[k];
                     Lookup::mask occluders = {};
                     for(uint i=0; i<faces.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
                         const v8sf X0 = *(v8sf*)(X[0].data+i)-P.x;
@@ -433,15 +433,15 @@ struct Scene {
                         v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
                         v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
                         v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
-                        const v8sf N0x = iTBN(0,0) * C0x + iTBN(0,1) * C0y + iTBN(0,2) * C0z;
-                        const v8sf N0y = iTBN(1,0) * C0x + iTBN(1,1) * C0y + iTBN(1,2) * C0z;
-                        const v8sf N0z = iTBN(2,0) * C0x + iTBN(2,1) * C0y + iTBN(2,2) * C0z;
-                        const v8sf N1x = iTBN(0,0) * C1x + iTBN(0,1) * C1y + iTBN(0,2) * C1z;
-                        const v8sf N1y = iTBN(1,0) * C1x + iTBN(1,1) * C1y + iTBN(1,2) * C1z;
-                        const v8sf N1z = iTBN(2,0) * C1x + iTBN(2,1) * C1y + iTBN(2,2) * C1z;
-                        const v8sf N2x = iTBN(0,0) * C2x + iTBN(0,1) * C2y + iTBN(0,2) * C2z;
-                        const v8sf N2y = iTBN(1,0) * C2x + iTBN(1,1) * C2y + iTBN(1,2) * C2z;
-                        const v8sf N2z = iTBN(2,0) * C2x + iTBN(2,1) * C2y + iTBN(2,2) * C2z;
+                        const v8sf N0x = m00 * C0x + m01 * C0y + m02 * C0z;
+                        const v8sf N0y = m10 * C0x + m11 * C0y + m12 * C0z;
+                        const v8sf N0z = m20 * C0x + m21 * C0y + m22 * C0z;
+                        const v8sf N1x = m00 * C1x + m01 * C1y + m02 * C1z;
+                        const v8sf N1y = m10 * C1x + m11 * C1y + m12 * C1z;
+                        const v8sf N1z = m20 * C1x + m21 * C1y + m22 * C1z;
+                        const v8sf N2x = m00 * C2x + m01 * C2y + m02 * C2z;
+                        const v8sf N2y = m10 * C2x + m11 * C2y + m12 * C2z;
+                        const v8sf N2z = m20 * C2x + m21 * C2y + m22 * C2z;
                         const v8si lookup0 = lookup.index(N0x, N0y, N0z);
                         const v8si lookup1 = lookup.index(N1x, N1y, N1z);
                         const v8si lookup2 = lookup.index(N2x, N2y, N2z);
@@ -456,10 +456,14 @@ struct Scene {
                     const vec3 v01 = vec3(X[1][lightFaceIndex], Y[1][lightFaceIndex], Z[1][lightFaceIndex])-P;
                     const vec3 v11 = vec3(X[2][lightFaceIndex], Y[2][lightFaceIndex], Z[2][lightFaceIndex])-P;
                     const vec3 v10 = vec3(X[2][lightFaceIndex+1], Y[2][lightFaceIndex+1], Z[2][lightFaceIndex+1])-P;
-                    const vec3 n0 = iTBN*cross(v00, v10);
-                    const vec3 n1 = iTBN*cross(v10, v11);
-                    const vec3 n2 = iTBN*cross(v11, v01);
-                    const vec3 n3 = iTBN*cross(v01, v00);
+                    const vec3 n0g = cross(v00, v10);
+                    const vec3 n1g = cross(v10, v11);
+                    const vec3 n2g = cross(v11, v01);
+                    const vec3 n3g = cross(v01, v00);
+                    const vec3 n0 = vec3(m00*n0g.x + m01*n0g.y + m02*n0g.z, m10*n0g.x + m11*n0g.y + m12*n0g.z, m20*n0g.x + m21*n0g.y + m22*n0g.z);
+                    const vec3 n1 = vec3(m00*n1g.x + m01*n1g.y + m02*n1g.z, m10*n1g.x + m11*n1g.y + m12*n1g.z, m20*n1g.x + m21*n1g.y + m22*n1g.z);
+                    const vec3 n2 = vec3(m00*n2g.x + m01*n2g.y + m02*n2g.z, m10*n2g.x + m11*n2g.y + m12*n2g.z, m20*n2g.x + m21*n2g.y + m22*n2g.z);
+                    const vec3 n3 = vec3(m00*n3g.x + m01*n3g.y + m02*n3g.z, m10*n3g.x + m11*n3g.y + m12*n3g.z, m20*n3g.x + m21*n3g.y + m22*n3g.z);
                     Lookup::mask light = lookup(n0) & lookup(n1) & lookup(n2) & lookup(n3); // FIXME: SIMD all lights
 
                     const uint lightSum = popcount(light & ~occluders);
@@ -468,7 +472,7 @@ struct Scene {
                     sum.g += emittanceG[lightFaceIndex] * factor;
                     sum.r += emittanceR[lightFaceIndex] * factor;
                 }
-                count+=/*l*/1/**8*/;
+                count += l;
             }
 #else
             v8sf sumB=0, sumG=0, sumR=0;
