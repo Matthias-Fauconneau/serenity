@@ -407,11 +407,11 @@ template<class Shader> struct RenderPass {
                     const v16sf z = v16sf(face.Ez.x)*XY1x + v16sf(face.Ez.y)*XY1y + v16sf(face.Ez.z); // Linear interpolation Ez != E(w) E(z/w)
                     v16sf& Z = tile.pixelZ[blockIndex];
                     const v16si mask = ::mask(draw.mask) & ~::mask(tile.multisample[blockIndex]) & z <= Z & (z >= v16sf(-1));
-                    store(Z, z, mask);
+                    store(Z, mask, z);
                     v16sf centroid[V];
                     for(int i: range(V)) centroid[i] = w*( v16sf(face.varyings[i].x)*XY1x + v16sf(face.varyings[i].y)*XY1y + v16sf(face.varyings[i].z));
                     Vec<v16sf, C> src = shader.template shade(0, face.faceAttributes, z, centroid, mask);
-                    for(uint c: range(C)) store(tile.pixels[c][blockIndex], src._[c], mask);
+                    for(uint c: range(C)) store(tile.pixels[c][blockIndex], mask, src._[c]);
 
                     for(uint pixelI: range(4*4)) {
                         if(!(draw.mask&(1<<pixelI))) continue;
@@ -431,7 +431,7 @@ template<class Shader> struct RenderPass {
                             if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
                             // Stores accepted pixels in Z buffer
-                            store(sampleZ, z, visibleMask);
+                            store(sampleZ, visibleMask, z);
 
                             // Counts visible samples
                             float centroid[V];
@@ -448,7 +448,7 @@ template<class Shader> struct RenderPass {
                             const float centroidZ = hsum(and(visibleMask, z)) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
 
                             Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
-                            for(uint c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
+                            for(uint c: range(C)) store(tile.samples[c][pixelPtr], visibleMask, v16sf(src._[c]));
                         }
                     }
                 }
@@ -502,7 +502,7 @@ template<class Shader> struct RenderPass {
                         if(!mask) continue; // Avoids NaN centroids (FIXME: HiZ)
 
                         // Stores accepted pixels in Z buffer
-                        store(sampleZ, z, visibleMask);
+                        store(sampleZ, visibleMask, z);
 
                         // Counts visible samples
                         const float visibleSampleCount = __builtin_popcount(mask);
@@ -515,7 +515,7 @@ template<class Shader> struct RenderPass {
                         }
                         const float centroidZ = hsum(and(visibleMask, z)) / visibleSampleCount; // FIXME: asserts elimination when shader ignores Z
                         Vec<float, C> src = shader.template shade(id, face.faceAttributes, centroidZ, centroid);
-                        for(int c: range(C)) store(tile.samples[c][pixelPtr], v16sf(src._[c]), visibleMask);
+                        for(int c: range(C)) store(tile.samples[c][pixelPtr], visibleMask, v16sf(src._[c]));
                     }
                 }
                 profile( sampleTime += readCycleCounter()-start; )

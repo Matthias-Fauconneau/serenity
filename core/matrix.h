@@ -155,3 +155,20 @@ template<int N, int M, Type T> inline String str(const T a[M*N]) {
 inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }
+
+inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
+    const float left = (-1-s), right = (1-s);
+    const float bottom = (-1-t), top = (1-t);
+    mat4 M;
+    M(0,0) = 2*near / (right-left);
+    M(1,1) = 2*near / (top-bottom);
+    M(0,2) = (right+left) / (right-left);
+    M(1,2) = (top+bottom) / (top-bottom);
+    M(2,2) = - (far+near) / (far-near);
+    M(2,3) = - 2*far*near / (far-near);
+    M(3,2) = - 1;
+    M(3,3) = 0;
+    M.scale(vec3(1,1,-1)); // Z-
+    M.translate(vec3(-s,-t,0));
+    return M;
+}

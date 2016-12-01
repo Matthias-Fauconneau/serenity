@@ -34,3 +34,7 @@ mwc.h
 sphere.h
 sphere.h
 render.h
+radiosity.h
+rasterizer.h
+drag.h
+view-widget.h

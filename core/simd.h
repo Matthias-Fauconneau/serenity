@@ -39,6 +39,7 @@ static constexpr v8sf _00001111f = {0,0,0,0,1,1,1,1};
 static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
 static inline v8sf gather(const float* P, v8ui i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
+static inline v8ui gather(const uint* P, v8si i) { return __builtin_ia32_gatherd_d256(_0i, (int*)P, i, _1i, sizeof(int)); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
@@ -116,12 +117,11 @@ inline v16si operator<=(v16sf a, v16sf b) { return {a.r1 <= b.r1, a.r2 <= b.r2};
 inline v16si operator>=(v16sf a, v16sf b) { return {a.r1 >= b.r1, a.r2 >= b.r2}; }
 inline v16si operator>(v16sf a, v16sf b) { return {a.r1 > b.r1, a.r2 > b.r2}; }
 
-static const unused v8si selectMask {1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1<<7};
-inline v8si mask(const uint8 mask) { return (intX(mask) & selectMask) != _0i; }
-
-
 inline mask8 mask(v8si m) { return __builtin_ia32_movmskps256(m); }
 inline mask16 mask(v16si m) { return mask(m.r1)|(mask(m.r2)<<8); }
+
+static const unused v8si selectMask {1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1<<7};
+inline v8si mask(const mask8 mask) { return (intX(mask) & selectMask) != _0i; }
 inline v16si mask(const mask16 m) { return {mask(mask8(m)), mask(mask8(m>>8))}; }
 
 inline v8sf and(v8si k, v8sf x) { return (v8sf)(k & (v8si)x); }
@@ -135,10 +135,9 @@ inline v8ui blend(v8ui A, v8ui B, v8si mask) { return __builtin_ia32_blendvps256
 inline v8sf blend(v8sf A, v8sf B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
 inline v16sf blend(v16sf A, v16sf B, v16si mask) { return v16sf(blend(A.r1, B.r1, mask.r1), blend(A.r2, B.r2, mask.r2)); }
 
-inline void store(v16sf& P, v16sf A, v16si M) {
-    __builtin_ia32_maskstoreps256(&P.r1, M.r1, A.r1);
-    __builtin_ia32_maskstoreps256(&P.r2, M.r2, A.r2);
-}
+inline void store(v8si& P, v8si M, v8si A) { __builtin_ia32_maskstoreps256((v8sf*)&P, M, (v8sf)A); }
+inline void store(v8sf& P, v8si M, v8sf A) { __builtin_ia32_maskstoreps256(&P, M, A); }
+inline void store(v16sf& P, v16si M, v16sf A) { store(P.r1, M.r1, A.r1); store(P.r2, M.r2, A.r2); }
 
 inline v4sf floor(const v4sf v) { return __builtin_ia32_roundps(v, 1/*-∞*/); }
 inline v8sf floor(const v8sf v) { return __builtin_ia32_roundps256(v, 1/*-∞*/); }
