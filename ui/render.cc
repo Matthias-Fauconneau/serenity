@@ -209,15 +209,22 @@ void cubic(const Image& target, ref<vec2> sourcePoints, bgr3f color, float opaci
 #endif
 
 void blit(const Image& target, int2 origin, int2 size, const Image& source, bgr3f color, float opacity) {
- //assert_(origin+size <= target.size, origin, size, target.size);
  int2 min = ::max(int2(0), origin);
  int2 max = ::min(target.size, origin+size);
- assert_(color==bgr3f(1) && opacity==1 && !source.alpha && size != source.size && size*2 <= source.size+int2(1), size, source.size); // Bilinear
- /*for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
-  byte4 s = source(x-origin.x, y-origin.y);
-  target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
- }*/
- bilinear(cropRef(target, min, max-min), cropRef(source, ::max(int2(0), -origin), (max-min)*source.size/size));
+ assert_(color==bgr3f(1) && opacity==1 && !source.alpha); // Bilinear
+ if(size == source.size) {
+  log(min, max, origin);
+  for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
+   byte4 s = source(x-origin.x, y-origin.y);
+   target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
+  }
+ } else {
+  assert_(2*size.y == source.size.y, 2*size, source.size); // DEBUG
+  assert_(size*2 <= source.size+int2(1), size, source.size);
+  bilinear(cropRef(target, min, max-min), cropRef(source, ::max(int2(0), -origin),
+                                                  int2((uint64)(max.x-min.x)*source.size.x/size.x,
+                                                       (uint64)(max.y-min.y)*source.size.y/size.y)));
+ }
 }
 
 void render(const Image& target, const Graphics& graphics, vec2 offset) {

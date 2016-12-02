@@ -6,15 +6,15 @@ shared<Graphics> ScrollArea::graphics(vec2 size) {
     this->viewSize = size;
     vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
     vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
-    offset = min(vec2(0), max(-vec2(hint-size), offset));
+    //offset = min(vec2(0), max(-vec2(hint-size), offset));
     //assert(offset <= vec2(0) && (!(size < view) || offset==vec2(0)));
     shared<Graphics> graphics;
     graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(vec2(-offset), size)));
     if(scrollbar) {
 	if(size.y<view.y)
-        graphics->fills.append( vec2(size.x-scrollBarWidth, -offset.y*size.y/view.y), vec2(scrollBarWidth, size.y*size.y/view.y), 1.f/2, 1.f/2);
+        graphics->fills.append( vec2(size.x-scrollBarWidth, -(int64)offset.y*size.y/view.y), vec2(scrollBarWidth, (int64)size.y*size.y/view.y), 1.f/2, 1.f/2);
 	if(size.x<view.x)
-        graphics->fills.append( vec2(-offset.x*size.x/view.x, size.y-scrollBarWidth), vec2(size.x*size.x/view.x, scrollBarWidth), 1.f/2, 1.f/2);
+        graphics->fills.append( vec2(-(int64)offset.x*size.x/view.x, size.y-scrollBarWidth), vec2((int64)size.x*size.x/view.x, scrollBarWidth), 1.f/2, 1.f/2);
     }
     return graphics;
 }
@@ -102,15 +102,15 @@ shared<Graphics> Progress::graphics(vec2 size) {
 vec2 ImageView::sizeHint(vec2 size) {
  if(!image) return 0;
  if(size > vec2(image.size)) return vec2(image.size);
- return size.x && size.x*image.size.y < size.y*image.size.x ?
-    vec2(image.size.x*size.x/image.size.x, image.size.y*size.x/image.size.x) :
-    vec2(image.size.x*size.y/image.size.y, image.size.y*size.y/image.size.y);
+ return size.x && (uint64)size.x*image.size.y < (uint64)size.y*image.size.x ?
+    vec2((uint64)image.size.x*size.x/image.size.x, (uint64)image.size.y*size.x/image.size.x) :
+    vec2((uint64)image.size.x*size.y/image.size.y, (uint64)image.size.y*size.y/image.size.y);
 }
 
 shared<Graphics> ImageView::graphics(vec2 size) {
     shared<Graphics> graphics;
     if(image) {
-        graphics->blits.append(vec2(0), vec2(image.size), unsafeRef(image));
+        //graphics->blits.append(vec2(0), vec2(image.size), unsafeRef(image));
         // Crop
         /*int2 offset = max(int2(0),image.size-int2(size))/2;
         graphics->blits.append(

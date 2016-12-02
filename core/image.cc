@@ -37,10 +37,10 @@ void bilinear(const Image& target, const Image& source) {
  const uint stride = source.stride;
  for(size_t y: range(target.height)) {
   for(uint x: range(target.width)) {
-   const uint fx = x*256*(source.width-1)/target.width, fy = y*256*(source.height-1)/target.height; //TODO: incremental
+   const uint64 fx = (uint64)x*256*(source.width-1)/target.width, fy = (uint64)y*256*(source.height-1)/target.height; //TODO: incremental
    uint ix = fx/256, iy = fy/256;
    uint u = fx%256, v = fy%256;
-   const ref<byte4> span = source.slice(iy*stride+ix);
+   const ref<byte4> span = source.slice((uint64)iy*stride+ix);
    byte4 d = 0;
    uint a  = ((uint(span[      0][3]) * (256-u) + uint(span[           1][3])  * u) * (256-v)
      + (uint(span[stride][3]) * (256-u) + uint(span[stride+1][3]) * u) * (       v) ) / (256*256);

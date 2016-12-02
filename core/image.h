@@ -33,7 +33,7 @@ generic ImageT<T> unsafeRef(const ImageT<T>& o) { return ImageT<T>(unsafeRef((co
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> cropRef(const ImageT<T>& o, int2 offset, int2 size) {
     assert_(offset+size <= o.size, offset, size, o.size);
-    return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)),size,o.stride,o.alpha);
+    return ImageT<T>(unsafeRef(o.slice((uint64)offset.y*o.stride+offset.x, (uint64)size.y*o.stride-offset.x)),size,o.stride,o.alpha);
 }
 
 /// 2D array of 8bit integer pixels

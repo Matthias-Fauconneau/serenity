@@ -7,6 +7,7 @@
 #include "window.h"
 #include "encoder.h"
 #include "asound.h"
+#include "render.h"
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
@@ -56,14 +57,15 @@ struct Music : Widget {
  Thread audioThread;
  AudioOutput audio = {{this, &Music::read32}, audioThread};
 
+ const bool encode = arguments().contains("encode") || arguments().contains("export");
+
  size_t read32(mref<int2> output) {
-  if(audioFile->channels == audio.channels) return audioFile->read32(mcast<int>(output));
-  else if(audioFile->channels == 1 && audio.channels==2) {
-   int buffer[output.size];
-   audioFile->read32(mref<int>(buffer, output.size));
-   for(size_t i: range(output.size)) output[i] = buffer[i];
-   return output.size;
-  } else error(audioFile->channels);
+  assert_(audioFile->channels == audio.channels);
+  const uint skip = 64;
+  int buffer[output.size*skip];
+  audioFile->read32(mref<int>(buffer, output.size*skip));
+  for(size_t i: range(output.size)) output[i] = buffer[i*skip];
+  return output.size;
  }
 
  Music() {
@@ -91,10 +93,10 @@ struct Music : Widget {
   }
   rawImageFileMap = Map(imageFile, Folder(name));
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
-  //Image target = copy(image);
+  //writeFile("Test.png", encodePNG(image), home(), true); error("");
 
   for(uint x: range(image.size.x)) {
-   if(measureX && x<=measureX.last()+200) continue; // Minimum interval between measures
+   if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
    uint sum = 0;
    for(uint y: range(image.size.y)) sum += image(x,y).g;
    if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
@@ -210,12 +212,89 @@ struct Music : Widget {
 
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
   assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
+  //error(measureX[measureT.size-1], image.size.x, measureT.last(), this->notes.last().time);
   scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
-  window = ::window(this);
 
-  audio.start(audioFile->audioFrameRate, 1024, 32, 2);
-  audioThread.spawn();
+  if(encode) { // Encode
+   Encoder encoder {name+".tutorial.mp4"_};
+   encoder.setH264(int2(1920, 870), 60);
+   if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
+   else error("Unknown codec");
+   encoder.open();
+
+   uint videoTime = 0;
+
+   Time renderTime, videoEncodeTime, totalTime;
+   totalTime.start();
+   for(int lastReport=0;;) {
+    auto writeAudio = [&] {
+     if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) {
+      return encoder.copyAudioPacket(audioFile);
+     } else if(audioFile) {
+      assert_(encoder.audioFrameSize==1024);
+      buffer<int16> source(encoder.audioFrameSize*audioFile->channels);
+      const size_t readSize = audioFile->read16(source);
+      assert_(readSize == encoder.audioFrameSize);
+      buffer<int16> target(readSize*encoder.channels);
+      if(audioFile->channels == 1 && encoder.channels == 2) {
+       for(size_t i: range(readSize)) target[i*2+0] = target[i*2+1] = source[i];
+      } else assert_(audioFile->channels == encoder.channels);
+      if(target.size) encoder.writeAudioFrame(target);
+     }
+     return true;
+    };
+    if(encoder.videoFrameRateNum) { // Interleaved AV
+     //assert_(encoder.audioStream->time_base.num == 1 && encoder.audioStream->time_base.den == (int)encoder.audioFrameRate);
+     // If both streams are at same PTS, starts with audio
+     bool done = false;
+     while((int64)encoder.audioTime*encoder.videoFrameRateNum <= (int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen) {
+      if(!writeAudio()) { done = true; break /*2*/; }
+     }
+     if(done) { log("Audio track end"); break; }
+     while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
+      follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size));
+      renderTime.start();
+      assert_(encoder.size.y == image.size.y);
+      const int width = ::min(image.size.x-(int)(-scroll.offset.x), encoder.size.x);
+      Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
+      //if(width < encoder.size.x) {
+       Image copy (encoder.size); // HACK: Always copy to align row starts (FIXME: it should be swscale which aligns itself)
+       ::copy(cropRef(copy, 0,  int2(width, image.size.y)), target);
+       fill(target, int2(0, width), int2(target.size.x-width, target.size.y), white, 1);
+      //}
+      renderTime.stop();
+      videoEncodeTime.start();
+      encoder.writeVideoFrame(target);
+      videoEncodeTime.stop();
+      videoTime++;
+     }
+    } else { // Audio only
+     if(!writeAudio()) { log("Audio track end"); break; }
+    }
+    uint64 timeTicks;
+    if(encoder.videoFrameRateNum) timeTicks = (uint64)videoTime*encoder.videoFrameRateDen*this->notes.ticksPerSeconds/encoder.videoFrameRateNum;
+    else if(encoder.audioFrameRate) timeTicks = (uint64)encoder.audioTime*this->notes.ticksPerSeconds/encoder.audioFrameRate;
+    else error("");
+    //buffer<uint> onsets = apply(filter(notes, [](MidiNote o){return o.velocity==0;}), [](MidiNote o){return o.time;});
+    //uint64 durationTicks = onsets.last() + 4*notes.ticksPerSeconds;
+    uint64 durationTicks = this->notes.last().time;
+    int percent = round(100.*timeTicks/durationTicks);
+    if(percent!=lastReport) {
+     log(str(percent, 2u)+"%", "Render", strD(renderTime, totalTime), "Encode", strD(videoEncodeTime, totalTime)
+         /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
+     lastReport=percent;
+    }
+    if(timeTicks >= durationTicks) break;
+    //if(video && video.videoTime >= video.duration) break;
+    //if(timeTicks > 8*notes.ticksPerSeconds) break; // DEBUG
+   }
+   log("Done");
+  } else { // Preview
+   window = ::window(this);
+   audio.start(audioFile->audioFrameRate, 1024, 32, 2);
+   audioThread.spawn();
+  }
  }
 
  bool follow(int64 timeNum, int64 timeDen, vec2 size) {
@@ -319,10 +398,17 @@ struct Music : Widget {
  }
 
  vec2 sizeHint(vec2) override { return vec2(1366, 435); }
- shared<Graphics> graphics(vec2 size) override {
+ shared<Graphics> graphics(vec2 unused size) override {
   follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
   window->render();
-  return scroll.ScrollArea::graphics(size);
+  //return scroll.ScrollArea::graphics(size);
+  window->backgroundColor = __builtin_nanf("");
+  assert_(-scroll.offset.x >= 0, scroll.offset.x);
+  uint width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)window->size.x*image.size.y/window->size.y);
+  bilinear(cropRef(window->target, 0,                int2(::min(window->size.x, (int)(uint64)width*window->size.y/image.size.y), window->size.y)),
+           cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
+  fill(window->target, int2(0, width), int2(window->size.x-width, window->size.y), white, 1);
+  return shared<Graphics>();
  }
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
 return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
