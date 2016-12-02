@@ -60,11 +60,8 @@ struct Music : Widget {
  const bool encode = arguments().contains("encode") || arguments().contains("export");
 
  size_t read32(mref<int2> output) {
-  assert_(audioFile->channels == audio.channels);
-  const uint skip = 64;
-  int buffer[output.size*skip];
-  audioFile->read32(mref<int>(buffer, output.size*skip));
-  for(size_t i: range(output.size)) output[i] = buffer[i*skip];
+  assert_(audio.channels == 2 && audioFile->channels == audio.channels && audioFile->audioFrameRate == audio.rate);
+  audioFile->read32(mcast<int>(output));
   return output.size;
  }
 
@@ -93,17 +90,18 @@ struct Music : Widget {
   }
   rawImageFileMap = Map(imageFile, Folder(name));
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
-  //writeFile("Test.png", encodePNG(image), home(), true); error("");
 
+  Image target;// = copy(image);
   for(uint x: range(image.size.x)) {
    if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
    uint sum = 0;
    for(uint y: range(image.size.y)) sum += image(x,y).g;
    if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
-    //for(size_t y: range(image.size.y)) target(x,y) = 0;
+    if(target) for(size_t y: range(image.size.y)) target(x,y) = 0;
     measureX.append(x);
    }
   }
+  if(target) { writeFile("debug.png", encodePNG(target), home(), true); error("debug"); }
 
   signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
 
@@ -212,6 +210,15 @@ struct Music : Widget {
 
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
   assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
+  // Removes skipped measure explicitly (so that scroll smoothes over, instead of jumping)
+  for(uint i=0; i<measureT.size-1;) {
+   if(measureT[i] == measureT[i+1]) {
+    measureT.removeAt(i);
+    measureX.removeAt(i);
+    //uint x = measureX.take(i+1); measureX[i] = (measureX[i] + x) / 2; // New position in middle of skipped measure
+   } else i++;
+  }
+  //assert_(measureT.size == measureX.size-1, measureT.size, measureX.size);
   //error(measureX[measureT.size-1], image.size.x, measureT.last(), this->notes.last().time);
   scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
@@ -258,11 +265,11 @@ struct Music : Widget {
       assert_(encoder.size.y == image.size.y);
       const int width = ::min(image.size.x-(int)(-scroll.offset.x), encoder.size.x);
       Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
-      //if(width < encoder.size.x) {
-       Image copy (encoder.size); // HACK: Always copy to align row starts (FIXME: it should be swscale which aligns itself)
+      if(width < encoder.size.x) {
+       Image copy (encoder.size);
        ::copy(cropRef(copy, 0,  int2(width, image.size.y)), target);
        fill(target, int2(0, width), int2(target.size.x-width, target.size.y), white, 1);
-      //}
+      }
       renderTime.stop();
       videoEncodeTime.start();
       encoder.writeVideoFrame(target);
@@ -296,6 +303,8 @@ struct Music : Widget {
    audioThread.spawn();
   }
  }
+
+ float debugX = 0;
 
  bool follow(int64 timeNum, int64 timeDen, vec2 size) {
   //constexpr int staffCount = 2;
@@ -374,8 +383,10 @@ struct Music : Widget {
     double f = double(t-t1)/double(t2-t1);
     double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
     auto X = [&](int index) { return clamp(0.f, measureX[clamp<int>(0, index, measureX.size-1)] - size.x/2, image.size.x-size.x); };
-    float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+    float newOffset = round( w[0]*X(index) + w[1]*X(index+1) + w[2]*X(index+2) + w[3]*X(index+3) );
     if(newOffset >= -scroll.offset.x) scroll.offset.x = -newOffset;
+    //debugX = (1-f) * measureX[index] + f * measureX[index+1]; scroll.offset.x = -debugX;
+    //log(t, index, t1, t2, f, measureX[index], measureX[index+1], -scroll.offset.x);
     break;
    }
   }
