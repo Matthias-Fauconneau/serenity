@@ -15,65 +15,68 @@ struct Scene {
     Scene(size_t size) : size(size) {}
     const size_t capacity = align(8, size+1);
     // Vertex attributes
-    buffer<float> X0 {size, capacity};
-    buffer<float> X1 {size, capacity};
-    buffer<float> X2 {size, capacity};
-    buffer<float> Y0 {size, capacity};
-    buffer<float> Y1 {size, capacity};
-    buffer<float> Y2 {size, capacity};
-    buffer<float> Z0 {size, capacity};
-    buffer<float> Z1 {size, capacity};
-    buffer<float> Z2 {size, capacity};
-    buffer<float> U0 {size, capacity};
-    buffer<float> U1 {size, capacity};
-    buffer<float> U2 {size, capacity};
-    buffer<float> V0 {size, capacity};
-    buffer<float> V1 {size, capacity};
-    buffer<float> V2 {size, capacity};
-    buffer<float> TX0 {size, capacity};
-    buffer<float> TX1 {size, capacity};
-    buffer<float> TX2 {size, capacity};
-    buffer<float> TY0 {size, capacity};
-    buffer<float> TY1 {size, capacity};
-    buffer<float> TY2 {size, capacity};
-    buffer<float> TZ0 {size, capacity};
-    buffer<float> TZ1 {size, capacity};
-    buffer<float> TZ2 {size, capacity};
-    buffer<float> BX0 {size, capacity};
-    buffer<float> BX1 {size, capacity};
-    buffer<float> BX2 {size, capacity};
-    buffer<float> BY0 {size, capacity};
-    buffer<float> BY1 {size, capacity};
-    buffer<float> BY2 {size, capacity};
-    buffer<float> BZ0 {size, capacity};
-    buffer<float> BZ1 {size, capacity};
-    buffer<float> BZ2 {size, capacity};
-    buffer<float> NX0 {size, capacity};
-    buffer<float> NX1 {size, capacity};
-    buffer<float> NX2 {size, capacity};
-    buffer<float> NY0 {size, capacity};
-    buffer<float> NY1 {size, capacity};
-    buffer<float> NY2 {size, capacity};
-    buffer<float> NZ0 {size, capacity};
-    buffer<float> NZ1 {size, capacity};
-    buffer<float> NZ2 {size, capacity};
+    buffer<float> X0 {capacity, size};
+    buffer<float> X1 {capacity, size};
+    buffer<float> X2 {capacity, size};
+    buffer<float> Y0 {capacity, size};
+    buffer<float> Y1 {capacity, size};
+    buffer<float> Y2 {capacity, size};
+    buffer<float> Z0 {capacity, size};
+    buffer<float> Z1 {capacity, size};
+    buffer<float> Z2 {capacity, size};
+    buffer<float> U0 {capacity, size};
+    buffer<float> U1 {capacity, size};
+    buffer<float> U2 {capacity, size};
+    buffer<float> V0 {capacity, size};
+    buffer<float> V1 {capacity, size};
+    buffer<float> V2 {capacity, size};
+    buffer<float> TX0 {capacity, size};
+    buffer<float> TX1 {capacity, size};
+    buffer<float> TX2 {capacity, size};
+    buffer<float> TY0 {capacity, size};
+    buffer<float> TY1 {capacity, size};
+    buffer<float> TY2 {capacity, size};
+    buffer<float> TZ0 {capacity, size};
+    buffer<float> TZ1 {capacity, size};
+    buffer<float> TZ2 {capacity, size};
+    buffer<float> BX0 {capacity, size};
+    buffer<float> BX1 {capacity, size};
+    buffer<float> BX2 {capacity, size};
+    buffer<float> BY0 {capacity, size};
+    buffer<float> BY1 {capacity, size};
+    buffer<float> BY2 {capacity, size};
+    buffer<float> BZ0 {capacity, size};
+    buffer<float> BZ1 {capacity, size};
+    buffer<float> BZ2 {capacity, size};
+    buffer<float> NX0 {capacity, size};
+    buffer<float> NX1 {capacity, size};
+    buffer<float> NX2 {capacity, size};
+    buffer<float> NY0 {capacity, size};
+    buffer<float> NY1 {capacity, size};
+    buffer<float> NY2 {capacity, size};
+    buffer<float> NZ0 {capacity, size};
+    buffer<float> NZ1 {capacity, size};
+    buffer<float> NZ2 {capacity, size};
      // Face attributes
-    buffer<float> emittanceB {size, capacity};
-    buffer<float> emittanceG {size, capacity};
-    buffer<float> emittanceR {size, capacity};
-    buffer<float> reflectanceB {size, capacity};
-    buffer<float> reflectanceG {size, capacity};
-    buffer<float> reflectanceR {size, capacity};
-    // buffer<float> gloss {size, capacity}; 0=specular .. 1=diffuse
-    // buffer<float> refract {size, capacity};
+    buffer<float> emittanceB {capacity, size+1};
+    buffer<float> emittanceG {capacity, size+1};
+    buffer<float> emittanceR {capacity, size+1};
+    buffer<float> reflectanceB {capacity, size+1};
+    buffer<float> reflectanceG {capacity, size+1};
+    buffer<float> reflectanceR {capacity, size+1};
+    // buffer<float> gloss {capacity, size}; 0=specular .. 1=diffuse
+    // buffer<float> refract {capacity, size};
 
-    buffer<uint> BGR {size, capacity};
-    buffer<uint> BGRst {size, capacity}; // s,t dependent
-    buffer<uint> size1 {size, capacity};
-    buffer<uint> size2 {size, capacity};
-    buffer<uint> size4 {size, capacity};
-    buffer<v8si> sample4D {size, capacity};
-    buffer<v4sf> Wts {size, capacity};
+    // -- FIXME: resolution dependent -- Split Scene here ?
+
+    buffer<uint> BGR {capacity, size};
+    buffer<uint> BGRst {capacity, size}; // s,t dependent
+    buffer<uint> size1 {capacity, size};
+    buffer<uint> V {capacity, size};
+    buffer<uint> size2 {capacity, size};
+    buffer<uint> size4 {capacity, size};
+    buffer<v8si> sample4D {capacity, size};
+    buffer<v4sf> Wts {capacity, size};
 
     array<uint> lights; // Face index of lights
     array<float> area; // Area of lights (sample proportionnal to area) (Divided by sum)
@@ -82,12 +85,14 @@ struct Scene {
     vec3 min, max;
     float scale, near, far;
 
-    Float* base = 0;
+    mref<Float> samples;
+    uint sSize = 0, tSize = 0;
     uint iterations = 0;
 };
 
 
-void setSTSize(const uint sSize, const uint tSize) {
+inline void setSTSize(Scene& scene, const uint sSize, const uint tSize) {
+    scene.sSize = sSize; scene.tSize = tSize;
     for(size_t faceIndex: range(scene.size)) {
         const int    size1 = scene.size1[faceIndex];
         const int    size2 = scene.size2[faceIndex];
@@ -110,15 +115,15 @@ void setSTSize(const uint sSize, const uint tSize) {
     }
 }
 
-void setFaceAttributes(const uint sSize, const uint tSize, const float S, const float T) {
-    const float s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
-    const float t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
+// FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
+inline void setST(Scene& scene, const float S, const float T) {
+    const float s = ::min(S * (scene.sSize-1), scene.sSize-1-0x1p-18f);
+    const float t = ::min(T * (scene.tSize-1), scene.tSize-1-0x1p-18f);
     const size_t sIndex = s;
     const size_t tIndex = t;
     for(size_t faceIndex: range(scene.size)) {
         const int    size2 = scene.size2[faceIndex];
-        const int    size3 = sSize      *size2;
-         // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
+        const int    size3 = scene.sSize     *size2;
         scene.BGRst[faceIndex] = scene.BGR[faceIndex] + tIndex*size3 + sIndex*size2;
         scene.Wts[faceIndex] = {(1-fract(t))*(1-fract(s)), (1-fract(t))*fract(s), fract(t)*(1-fract(s)), fract(t)*fract(s)};
     }

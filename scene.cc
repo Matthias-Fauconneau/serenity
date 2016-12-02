@@ -240,6 +240,5 @@ Scene parseScene(ref<byte> file) {
     scene.scale = 2./::max(scene.max.x-scene.min.x, scene.max.y-scene.min.y);
     scene.near = scene.scale*scene.min.z;
     scene.far = scene.scale*scene.max.z;
-
     return scene;
 }

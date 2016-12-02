@@ -33,7 +33,7 @@ filesync.cc
 mwc.h
 sphere.h
 sphere.h
-render.h
+renderer.h
 radiosity.h
 rasterizer.h
 drag.h

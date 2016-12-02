@@ -141,43 +141,6 @@ struct Radiosity {
 
     Radiosity(const Scene& scene) : scene(scene) {}
 
-    void setSTSize(const uint sSize, const uint tSize) {
-        for(size_t faceIndex: range(scene.size)) {
-            const int    size1 = scene.size1[faceIndex];
-            const int    size2 = scene.size2[faceIndex];
-            const int    size3 = sSize      *size2;
-            const size_t size4 = tSize      *size3;
-            scene.size4[faceIndex] = size4;
-#if HALF // Half
-            scene.sample4D[faceIndex] = {    0,           size1/2,         size2/2,       (size2+size1)/2,
-                                       size3/2,   (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-            if(sSize == 1 || tSize ==1) // Prevents OOB
-                sample4D[faceIndex] = {    0,           size1/2,         0,       size1/2,
-                                           0,           size1/2,         0,       size1/2};
-#else  // Single
-            scene.sample4D[faceIndex] = {    0,           size1,         size2,       (size2+size1),
-                                         size3,   (size3+size1), (size3+size2), (size3+size2+size1)};
-            if(sSize == 1 || tSize ==1) // Prevents OOB
-                scene.sample4D[faceIndex] = {    0,           size1,         0,       size1,
-                                                 0,           size1,         0,       size1};
-#endif
-        }
-    }
-
-    void setFaceAttributes(const uint sSize, const uint tSize, const float S, const float T) {
-        const float s = ::min(S * (sSize-1), sSize-1-0x1p-18f);
-        const float t = ::min(T * (tSize-1), tSize-1-0x1p-18f);
-        const size_t sIndex = s;
-        const size_t tIndex = t;
-        for(size_t faceIndex: range(scene.size)) {
-            const int    size2 = scene.size2[faceIndex];
-            const int    size3 = sSize      *size2;
-             // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
-            scene.BGRst[faceIndex] = scene.BGR[faceIndex] + tIndex*size3 + sIndex*size2;
-            scene.Wts[faceIndex] = {(1-fract(t))*(1-fract(s)), (1-fract(t))*fract(s), fract(t)*(1-fract(s)), fract(t)*fract(s)};
-        }
-    }
-
     inline size_t raycast(vec3 O, vec3 d) const {
         assert(scene.size < scene.capacity && align(8, scene.size)==scene.capacity);
         float value = inff; size_t index = scene.size;
@@ -397,7 +360,7 @@ struct Radiosity {
             const float m10 = Bx,  m11 = By,  m12 = Bz;
             const float m20 = N.x, m21 = N.y, m22 = N.z;
             float T[Lookup::S]; mref<float>(T, Lookup::S).clear(inff);
-            uint id[Lookup::S];
+            uint id[Lookup::S]; mref<uint>(id, Lookup::S).clear(scene.size);
             const float* PX0 = scene.X0.data, *PX1 = scene.X1.data, *PX2 = scene.X2.data;
             const float* PY0 = scene.Y0.data, *PY1 = scene.Y1.data, *PY2 = scene.X2.data;
             const float* PZ0 = scene.Z0.data, *PZ1 = scene.Z1.data, *PZ2 = scene.X2.data;
@@ -475,16 +438,21 @@ struct Radiosity {
                 const v8sf Tx = P.x - X0;
                 const v8sf Ty = P.y - Y0;
                 const v8sf Tz = P.z - Z0;
-                const v8sf u = dot(Tx, Ty, Tz, Px, Py, Pz) / det;
-                v8sf Qx, Qy, Qz; cross(Tx, Ty, Tz, e01x, e01y, e01z, Qx, Qy, Qz);
-                const v8sf v = dot(Dx, Dy, Dz, Qx, Qy, Qz) / det;
-                const v8si vIndex = cvtt(v), uIndex = cvtt(u); // Floor
-                const Float* base = scene.base;
-                const v8ui faces = gather(scene.BGR.data, i);
+                const v8si hit = i != scene.size;
                 const v8ui size1 = gather(scene.size1.data, i);
+                const v8sf u = and(hit, min(max(0.f, dot(Tx, Ty, Tz, Px, Py, Pz) / det), toFloat(size1-1)));
+                v8sf Qx, Qy, Qz; cross(Tx, Ty, Tz, e01x, e01y, e01z, Qx, Qy, Qz);
+                const v8ui V = gather(scene.V.data, i);
+                const v8sf v = and(hit, min(max(0.f, dot(Dx, Dy, Dz, Qx, Qy, Qz) / det), toFloat(V-1)));
+                const v8si vIndex = cvtt(v), uIndex = cvtt(u); // Floor
+                const Float* const base = scene.samples.data;
+                const v8ui faces = gather(scene.BGR.data, i);
+                for(uint k: range(8)) assert_(uIndex[k] >= 0 && (size1[k]==0 || (uint)uIndex[k] < size1[k]), i[k], u[k], size1[k], v[k]);
+                for(uint k: range(8)) assert_(vIndex[k] >= 0 && (size1[k]==0 || (uint)vIndex[k] < V[k]), v[k]);
                 const v8ui size4 = gather(scene.size4.data, i);
                 const v8ui i00 = faces + vIndex*size1 + uIndex;
                 const v8ui ib00 = i00 + 0*size4;
+                for(uint k: range(8)) assert_(ib00[k] < scene.samples.size, i[k], faces[k], size1[k], uIndex[k], vIndex[k], v[k]);
                 const v8sf b00 = gather(base, ib00);
                 const v8sf b01 = gather(base, ib00 + 1);
                 const v8sf b10 = gather(base, ib00 + size1);

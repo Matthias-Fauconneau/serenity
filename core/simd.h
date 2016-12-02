@@ -152,6 +152,7 @@ inline v8sf abs(v8sf a) { return (v8sf)(notSignBit8 & (v8si)a); }
 static unused const v8ui signBit8 = {0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000,0x80000000};
 inline v8si sign(v8sf a) { return (v8si)signBit8 & (v8si)a; }
 
+inline v8sf toFloat(const v8ui v) { return __builtin_ia32_cvtdq2ps256(v); }
 inline v8sf toFloat(const v8si v) { return __builtin_ia32_cvtdq2ps256(v); }
 inline v8hf toHalf(const v8sf v) { return __builtin_ia32_vcvtps2ph256(v, 0); }
 
