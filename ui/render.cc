@@ -2,7 +2,7 @@
 inline float fract(float x) { return x - floor(x); } // math.h
 #include "srgb.h"
 
-static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
+void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
  byte4& target_sRGB = target(x,y);
  bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
  bgr3i linearBlend = bgr3i(round((0xFFF*(1-opacity))*target_linear + (0xFFF*opacity)*source_linear));

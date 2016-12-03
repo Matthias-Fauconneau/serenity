@@ -8,13 +8,29 @@
 #include "encoder.h"
 #include "asound.h"
 #include "render.h"
+#include "algorithm.h"
+
+Image8 toImage8(const Image& image) {
+ return Image8(apply(image, [](byte4 bgr){
+                //assert_(bgr.b==bgr.g && bgr.g==bgr.r, bgr.b, bgr.g, bgr.r);
+                return (uint8)((bgr.b+bgr.g+bgr.r)/3); // FIXME: coefficients ?
+               }), image.size);
+}
+void toImage(const Image& image, const Image8& image8) {
+ assert_(image.size == image8.size);
+ if(image.ref::size == image8.ref::size) {
+  //assert_(image.ref::size == image8.ref::size, image.ref::size, image8.ref::size);
+  for(uint i: range(image.ref::size)) { uint8 g=image8[i]; image[i] = byte4(g,g,g,0xFF); }
+ } else {
+  for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) { uint8 g=image8(x,y); image(x,y) = byte4(g,g,g,0xFF); }
+ }
+}
+Image toImage(const Image8& image8) { Image image(image8.size); toImage(image, image8); return image; }
 
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
  assert_(notes);
  const int offset = start - (int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
- //int offset =     - (int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
- //const int offset = start;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
@@ -23,13 +39,11 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
 }
 
 uint audioStart(string audioFileName) {
- assert_(audioFileName); //if(!audioFileName) return 0;
+ assert_(audioFileName);
  for(FFmpeg file(audioFileName);;) {
-  //return file.audioFrameRate; // FIXME
   int32 buffer[1024  * file.channels];
   size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
   for(size_t i: range(size *file.channels)) if(abs(buffer[i])>1<<23) {
-   //log(file.audioFrameRate, file.audioTime+i, (float)(file.audioTime+i)/file.audioFrameRate);
    return file.audioTime+i;
   }
  }
@@ -40,7 +54,8 @@ struct Music : Widget {
  buffer<Sign> signs;
  // PNG
  Map rawImageFileMap;
- Image image;
+ Image8 image;
+ //Image image;
  array<uint> measureX; // X position in image of start of each measure
  // MIDI
  MidiNotes notes;
@@ -70,6 +85,7 @@ struct Music : Widget {
  }
 
  Music() {
+  Time time;
   string name = arguments()[0];
   String imageFile; int2 size;
   auto list = Folder(name).list(Files);
@@ -90,23 +106,91 @@ struct Music : Widget {
    Image image = decodePNG(readFile(name+".png", Folder(name)));
    size = image.size;
    imageFile = name+"."+strx(size);
-   writeFile(imageFile, cast<byte>(image), Folder(name));
+   writeFile(imageFile, cast<byte>(toImage8(image)), Folder(name));
   }
   rawImageFileMap = Map(imageFile, Folder(name));
-  image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
+  //image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
+  image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
+
+  buffer<Image8> templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
 
   Image target;
-  if(0) target = copy(image);
-  for(uint x: range(image.size.x)) {
+  if(1) target = toImage(cropRef(image,0,int2(image.size.x/8, image.size.y)));
+  uint sumX[image.size.y]; // Σ[x-Tx,x]
+  const uint Tx = templates[0].size.x, Ty = templates[0].size.y;
+  //const uint threshold = ::sum(templates[1]);
+  uint threshold = 0; for(uint8 v: templates[1]) threshold += v;
+  for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
+  log("Start", time, threshold);
+  Image32 corrMap[3] = {image.size,image.size,image.size};
+  Image32 localMax[3] = {image.size,image.size,image.size};
+  for(uint i: range(3)) localMax[i].clear();
+  for(uint x: range(Tx+1, target.size.x)) { // DEBUG
+   {
+    uint sumY=0; // Σ[y-Ty,y]
+    for(uint y: range(1, Ty+1)) {
+     sumX[y] += image(x,y) - image(x-Tx,y);
+     sumY += sumX[y];
+    }
+    for(uint y: range(Ty+1, image.size.y)) {
+     sumX[y] += image(x,y) - image(x-Tx,y);
+     sumY += sumX[y] - sumX[y-Ty];
+     if(sumY < threshold) {
+      //target(x-Tx+1,y-Ty+1) = byte4(0xFF,0,0,0xFF);
+      for(uint t: range(3)) {
+       int corr = 0;
+       const int x0 = x-Tx+1, y0 = y-Ty+1;
+       for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
+        corr += (int(image(x0+dx,y0+dy))-128) * (int(templates[t](dx, dy))-128);
+       }
+       if(corr > int(Tx)*int(Ty)*sq((int[]){112,96,112}[t])) {
+        const int r = 1;
+        for(uint dt: range(3)) for(int dy: range(-r, r)) for(uint dx: range(-r, r /*+1*/)) { // FIXME: -1,{-1,0,1}; 0,-1
+         if(corrMap[dt](x0+dx, y0+dy) >= corr) goto skip;
+        }
+        for(int dy: range(-r, r +1)) for(uint dx: range(-r, r /*+1*/)) {
+         for(uint dt: range(3)) localMax[dt](x0+dy, y0+dx) = 0; // Clears
+         //target(x0+dy, y0+dx) = image(x0+dy,y0+dx);
+        }
+        //target(x0, y0) = byte4((byte3[]){byte3(0,0,0xFF), byte3(0,0xFF,0),byte3(0,0xFF,0xFF)}[t],0xFF);*/
+        localMax[t](x0, y0) = corr;
+        skip:;
+        corrMap[t](x0, y0) = corr; // Helps early cull
+       }
+      }
+     }
+    }
+   }
+
    if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
    uint sum = 0;
-   for(uint y: range(image.size.y)) sum += image(x,y).g;
+   for(uint y: range(image.size.y)) sum += image(x,y);
    if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
     if(target) for(size_t y: range(image.size.y)) target(x,y) = 0;
     measureX.append(x);
    }
   }
-  if(target) { writeFile("debug.png", encodePNG(target), home(), true); error("debug"); }
+
+  // Visualization
+  for(uint x0: range(1, target.size.x-Tx)) {
+   for(uint y0: range(1, target.size.y-Ty)) {
+     for(uint t: range(3)) {
+      if(localMax[t](x0, y0) > 0) {
+       for(uint dy: range(Ty)) for(uint dx: range(templates[t].size.x)) {
+        uint a = 0xFF-templates[t](dx, dy);
+        //target(x0, y0) = byte4((byte3[]){byte3(0,0,0xFF), byte3(0,0xFF,0),byte3(0,0xFF,0xFF)}[t],0xFF);
+        blend(target, x0+dx, y0+dy, (bgr3f[]){red, green, yellow}[t], a/255.f);
+       }
+      }
+     }
+   }
+  }
+
+  log(time);
+  if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
+  //if(target) { writeFile("debug.png", encodePNG(cropRef(target,0,int2(target.size.x/4,target.size.y))), home(), true); error("debug"); }
+  //image = Image(apply(image, [](uint8 g){return byte4(g);}), image.size);
+  //image = toImage(image);
 
   signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
 
@@ -223,13 +307,14 @@ struct Music : Widget {
   }
   assert_(j == n);
   //for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
-  // Last measure bar
+  /*// Last measure bar
   for(;signIndex < signs.size;signIndex++) {
    Sign sign = signs[signIndex];
    if(sign.type == Sign::Measure) {
     measureT.append(midiNotes[midiIndex].time);
    }
-  }
+  }*/
+  measureT.append(this->notes.last().time);
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
   assert_(measureT.size == measureX.size, measureT.size, measureX.size);
   // Removes skipped measure explicitly (so that scroll smoothes over, instead of jumping)
@@ -241,16 +326,12 @@ struct Music : Widget {
     //uint x = measureX.take(i+1); measureX[i] = (measureX[i] + x) / 2; // New position in middle of skipped measure
    } else i++;
   }
-  //log(measureT.size, measureX.size);
-  //log(measureT);
-  //log(measureX);
-  //error(measureX[measureT.size-1], image.size.x, measureT.last(), this->notes.last().time);
-  scroll.image = unsafeRef(image);
+  //scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
 
   if(encode) { // Encode
    Encoder encoder {name+".tutorial.mp4"_};
-   encoder.setH264(int2(1920, 870), 60);
+   encoder.setH264(int2(1920, 870+keyboard.sizeHint(0).y), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
    else error("Unknown codec");
    encoder.open();
@@ -284,17 +365,20 @@ struct Music : Widget {
       if(!writeAudio()) { done = true; break /*2*/; }
      }
      if(done) { log("Audio track end"); break; }
+     Image target (encoder.size);
      while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
       follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size));
       renderTime.start();
-      assert_(encoder.size.y == image.size.y);
+      assert_(encoder.size.y == image.size.y+keyboard.sizeHint(0).y);
       const int width = ::min(image.size.x-(int)(-scroll.offset.x), encoder.size.x);
-      Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
+      /*Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
       if(width < encoder.size.x) {
        Image copy (encoder.size);
-       ::copy(cropRef(copy, 0,  int2(width, image.size.y)), target);
-       fill(target, int2(width, 0), int2(target.size.x-width, image.size.y), white, 1);
-      }
+      }*/
+      toImage(cropRef(target, 0,  int2(width, image.size.y)), cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
+      fill(target, int2(width, 0), int2(target.size.x-width, image.size.y), white, 1);
+      fill(target, int2((scroll.offset.x+playbackLineX), 0), int2(1, image.size.y), blue, 1./2);
+      render(target, keyboard.graphics(vec2(target.size.x, target.size.y-image.size.y)), vec2(0, image.size.y));
       renderTime.stop();
       videoEncodeTime.start();
       encoder.writeVideoFrame(target);
@@ -317,9 +401,9 @@ struct Music : Widget {
          /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
-    if(timeTicks >= durationTicks) break;
+    if(timeTicks >= durationTicks+this->notes.ticksPerSeconds/*1sec fadeout*/) break;
     //if(video && video.videoTime >= video.duration) break;
-    //if(timeTicks > 8*notes.ticksPerSeconds) break; // DEBUG
+    //if(timeTicks > 8*this->notes.ticksPerSeconds) break; // DEBUG
    }
    log("Done");
   } else { // Preview
@@ -399,6 +483,7 @@ struct Music : Widget {
 
   int64 t = (int64)timeNum*(int64)notes.ticksPerSeconds;
   float previousOffset = scroll.offset.x;
+  float previousPlaybackLineX = playbackLineX;
   // Cardinal cubic B-Spline
   for(int index: range(measureT.size-1)) {
    int64 t1 = (int64)measureT[index]*(int64)timeDen;
@@ -410,12 +495,11 @@ struct Music : Widget {
     auto X = [&](int index) { return clamp(0.f, measureX[clamp<int>(0, index, measureX.size-1)] - size.x/2, image.size.x-size.x); };
     float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
     /*if(newOffset >= -scroll.offset.x)*/ scroll.offset.x = -newOffset;
-    log(index, measureX[index], measureX[index+1], f);
     playbackLineX = (1-f) * measureX[index] + f * measureX[index+1];
     break;
    }
   }
-  if(previousOffset != scroll.offset.x) contentChanged = true;
+  if(previousOffset != scroll.offset.x || previousPlaybackLineX != playbackLineX) contentChanged = true;
   //synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
 #if 0
   if(video) {
@@ -432,7 +516,7 @@ struct Music : Widget {
 #endif
   return contentChanged;
  }
- const int height = 435;
+ const int height = 435; //image.size.y/2;
  vec2 sizeHint(vec2) override { return vec2(1366, height+120); }
  shared<Graphics> graphics(vec2 unused size) override {
   follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
@@ -443,9 +527,9 @@ struct Music : Widget {
   const Image& target = window->target;
   int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*image.size.y/height);
   bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width*height/image.size.y), height)),
-           cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
+           toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8
   fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
-  fill(target, int2((scroll.offset.x+playbackLineX)/2, 0), int2(1, height), blue, 1./2);
+  fill(target, int2((scroll.offset.x+playbackLineX)/(image.size.y/height), 0), int2(1, height), blue, 1./2);
   render(target, keyboard.graphics(vec2(target.size.x, 120)), vec2(0, height));
   return shared<Graphics>();
  }

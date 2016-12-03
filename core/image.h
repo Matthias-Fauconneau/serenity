@@ -15,7 +15,7 @@ generic struct ImageT : buffer<T> {
     ImageT(int2 size, uint stride=0, bool alpha=false) : ImageT(size.x, size.y, stride?:size.x, alpha) {}
 
 	explicit operator bool() const { return buffer<T>::data && width && height; }
-	inline T& operator()(uint x, uint y) const { assert(x<width && y<height); return buffer<T>::at(y*stride+x); }
+    inline T& operator()(uint x, uint y) const { assert(x<width && y<height, (int)x, (int)y, size); return buffer<T>::at(y*stride+x); }
     inline mref<T> row(uint y) const { assert(y<height); return buffer<T>::slice(y*stride, width); }
 };
 generic String str(const ImageT<T>& o) { return strx(o.size); }
@@ -40,6 +40,8 @@ generic ImageT<T> cropRef(const ImageT<T>& o, int2 offset, int2 size) {
 typedef ImageT<uint8> Image8;
 /// 2D array of 16bit integer samples
 typedef ImageT<int16> Image16;
+/// 2D array of 32bit integer samples
+typedef ImageT<int32> Image32;
 /// 2D array of BGRA 8-bit unsigned integer pixels (sRGB colorspace)
 typedef ImageT<byte4> Image;
 /// 2D array of 32bit floating-point pixels

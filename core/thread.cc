@@ -181,7 +181,7 @@ template<> void __attribute((noreturn)) error(const string& message) {
   reentrant = false;
  }
  log(message);
- __builtin_trap(); //TODO: detect if running under debugger
+ //__builtin_trap(); //TODO: detect if running under debugger // FIXME: systemd dumps core to SSD even when configured to not do so !!!
  exit_group(-1); // Exits this group (process)
 }
 

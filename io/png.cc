@@ -151,7 +151,7 @@ uint adler32(const ref<byte> data) {
  return a | (b << 16);
 }
 
-template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height) {
+template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height, size_t stride) {
  typedef vec<T,uint8,N> U;
  typedef vec<T,int,N> V;
  buffer<U> prior(width); prior.clear(0);
@@ -168,7 +168,7 @@ template<template<Type> class T, int N> buffer<byte> predict(const byte4* source
    dst[x]= U(source[x]) - Paeth<T,N>(V(a), b, c);
    prior[x]=a= source[x];
   }
-  source += width;
+  source += stride;
   target += width*sizeof(U);
  }
  return data;
@@ -180,8 +180,8 @@ buffer<byte> encodePNG(const Image& image) {
  buffer<byte> IHDR = "IHDR"_+raw(ihdr);
 
  buffer<byte> predicted;
- if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height);
- else predicted = predict<rgba,4>(image.data, image.width, image.height);
+ if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height, image.stride);
+ else predicted = predict<rgba,4>(image.data, image.width, image.height, image.stride);
  buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);
 
  return "\x89PNG\r\n\x1A\n"_
