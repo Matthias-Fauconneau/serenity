@@ -8,7 +8,7 @@
 #include "encoder.h"
 #include "asound.h"
 #include "render.h"
-#include "algorithm.h"
+#include "text.h"
 
 Image8 toImage8(const Image& image) {
  return Image8(apply(image, [](byte4 bgr){
@@ -57,6 +57,13 @@ struct Music : Widget {
  Image8 image;
  //Image image;
  array<uint> measureX; // X position in image of start of each measure
+ struct OCRNote {
+  int confidence;
+  int value; // 0: Quarter, 1: Half, 2: Whole
+  int2 position;
+  bool operator <(const OCRNote& b) const { return position.y < b.position.y; }
+ };
+ array<OCRNote> OCRNotes;
  // MIDI
  MidiNotes notes;
  buffer<Sign> midiToSign;
@@ -85,7 +92,7 @@ struct Music : Widget {
  }
 
  Music() {
-  Time time;
+  Time time{true};
   string name = arguments()[0];
   String imageFile; int2 size;
   auto list = Folder(name).list(Files);
@@ -113,19 +120,18 @@ struct Music : Widget {
   image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
 
   buffer<Image8> templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
+  buffer<Image8> negatives = apply(1, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
 
   Image target;
-  if(1) target = toImage(cropRef(image,0,int2(image.size.x/8, image.size.y)));
+  if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
   uint sumX[image.size.y]; // Σ[x-Tx,x]
-  const uint Tx = templates[0].size.x, Ty = templates[0].size.y;
+  const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
   //const uint threshold = ::sum(templates[1]);
   uint threshold = 0; for(uint8 v: templates[1]) threshold += v;
   for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
-  log("Start", time, threshold);
-  Image32 corrMap[3] = {image.size,image.size,image.size};
-  Image32 localMax[3] = {image.size,image.size,image.size};
-  for(uint i: range(3)) localMax[i].clear();
-  for(uint x: range(Tx+1, target.size.x)) { // DEBUG
+  Image16 corrMap (target.size); corrMap.clear(0);
+  Image8 localMax (target.size); localMax.clear(0);
+  for(uint x: range(Tx+1, target?target.size.x:image.size.x)) {
    {
     uint sumY=0; // Σ[y-Ty,y]
     for(uint y: range(1, Ty+1)) {
@@ -143,19 +149,28 @@ struct Music : Widget {
        for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
         corr += (int(image(x0+dx,y0+dy))-128) * (int(templates[t](dx, dy))-128);
        }
-       if(corr > int(Tx)*int(Ty)*sq((int[]){112,96,112}[t])) {
-        const int r = 1;
-        for(uint dt: range(3)) for(int dy: range(-r, r)) for(uint dx: range(-r, r /*+1*/)) { // FIXME: -1,{-1,0,1}; 0,-1
-         if(corrMap[dt](x0+dx, y0+dy) >= corr) goto skip;
+       if(corr < int(Tx)*int(Ty)*sq((int[]){96,98,104}[t])) continue;
+       int ncorr = 0;
+       if(t<=0) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
+        ncorr += (int(image(x0+dx,y0+dy))-128) * (int(negatives[t](dx, dy))-128);
+       }
+       if(corr*2 > ncorr*3) {
+        //if(corr < ncorr*2) log(corr, ncorr);
+        corr /= 256;
+        assert_(corr < 65536);
+
+        const int r = 3;
+        for(int dy: range(-r, r)) for(uint dx: range(-r, r +1)) { // FIXME: -1,{-1,0,1}; 0,-1
+         if(corrMap(x0+dx, y0+dy) >= corr) goto skip;
         }
-        for(int dy: range(-r, r +1)) for(uint dx: range(-r, r /*+1*/)) {
-         for(uint dt: range(3)) localMax[dt](x0+dy, y0+dx) = 0; // Clears
+        for(int dy: range(-r, r +1)) for(uint dx: range(-r, r +1)) {
+         localMax(x0+dy, y0+dx) = 0; // Clears
          //target(x0+dy, y0+dx) = image(x0+dy,y0+dx);
         }
         //target(x0, y0) = byte4((byte3[]){byte3(0,0,0xFF), byte3(0,0xFF,0),byte3(0,0xFF,0xFF)}[t],0xFF);*/
-        localMax[t](x0, y0) = corr;
+        localMax(x0, y0) = 1+t;
         skip:;
-        corrMap[t](x0, y0) = corr; // Helps early cull
+        if(corr > corrMap(x0, y0)) corrMap(x0, y0) = corr; // Helps early cull
        }
       }
      }
@@ -165,46 +180,68 @@ struct Music : Widget {
    if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
    uint sum = 0;
    for(uint y: range(image.size.y)) sum += image(x,y);
-   if(sum < 255u*image.size.y*3/5) { // Measure Bar (2/3, 3/5, 3/4)
+   if(sum < 255u*image.size.y*3/5) { // Measure Bar
     if(target) for(size_t y: range(image.size.y)) target(x,y) = 0;
     measureX.append(x);
    }
   }
 
-  // Visualization
   for(uint x0: range(1, target.size.x-Tx)) {
    for(uint y0: range(1, target.size.y-Ty)) {
-     for(uint t: range(3)) {
-      if(localMax[t](x0, y0) > 0) {
-       for(uint dy: range(Ty)) for(uint dx: range(templates[t].size.x)) {
-        uint a = 0xFF-templates[t](dx, dy);
-        //target(x0, y0) = byte4((byte3[]){byte3(0,0,0xFF), byte3(0,0xFF,0),byte3(0,0xFF,0xFF)}[t],0xFF);
-        blend(target, x0+dx, y0+dy, (bgr3f[]){red, green, yellow}[t], a/255.f);
-       }
-      }
+    if(localMax(x0, y0) > 0) {
+     int confidence = corrMap(x0, y0);
+     int t = localMax(x0, y0)-1;
+     OCRNotes.append({confidence, t, int2(x0, y0)});
+     // Visualization
+     if(target) for(uint dy: range(Ty)) for(uint dx: range(templates[t].size.x)) {
+      uint a = 0xFF-templates[t](dx, dy);
+      blend(target, x0+dx, y0+dy, (bgr3f[]){red, green, yellow}[t], a/255.f);
      }
+    }
    }
   }
 
-  log(time);
-  if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
-  //if(target) { writeFile("debug.png", encodePNG(cropRef(target,0,int2(target.size.x/4,target.size.y))), home(), true); error("debug"); }
-  //image = Image(apply(image, [](uint8 g){return byte4(g);}), image.size);
-  //image = toImage(image);
-
   signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
 
-  map<uint, array<Sign>> notes;
+  map<uint, array<Sign>> notes; // skips tied (for MIDI)
+  map<uint, array<Sign>> allNotes; // also tied (for OCR)
   for(size_t signIndex: range(signs.size)) {
    Sign sign = signs[signIndex];
    if(sign.type == Sign::Note) {
     Note& note = sign.note;
     note.signIndex = signIndex;
+    allNotes.sorted(sign.time).append( sign );
     if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
      notes.sorted(sign.time).append( sign );
     }
    }
   }
+
+  array<OCRNote> sorted; // Bins close X together
+  array<OCRNote> bin; int lastX = 0;
+  for(OCRNote note: OCRNotes) {
+   if(note.position.x > lastX+templates[0].size.x) {
+    sorted.append(bin);
+    bin.clear();
+    lastX = note.position.x;
+   }
+   bin.insertSorted(note); // Top to Bottom
+  }
+  OCRNotes = ::move(sorted);
+
+  uint glyphIndex = 0; // X (Time), Top to Bottom
+  for(ref<Sign> chord: allNotes.values) {
+   for(Sign note: chord.reverse()) { // Top to Bottom
+    note.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
+    if(glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key())).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
+    glyphIndex++;
+   }
+  }
+
+  log(time);
+  if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
+
+  assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
 
   String audioFileName = name+"/"+name+".mp3";
   audioFile = unique<FFmpeg>(audioFileName);
@@ -222,7 +259,7 @@ struct Music : Widget {
    array<uint> binI;
    for(Sign note: chord) bin.append(note.note.key());
    array<uint> binS = copyRef(bin);
-   sort(binS);
+   sort(binS); // FIXME: already sorted ?
    for(size_t key: binS) binI.append(bin.indexOf(key));
    S.append(move(binS));
    Si.append(move(binI));
