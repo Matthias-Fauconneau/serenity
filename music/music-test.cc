@@ -14,6 +14,7 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
  assert_(notes);
  const int offset = start - (int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
  //int offset =     - (int64)notes.first().time*targetTicksPerSeconds/notes.ticksPerSeconds;
+ //const int offset = start;
  for(MidiNote& note: notes) {
   note.time = offset + (int64)note.time*targetTicksPerSeconds/notes.ticksPerSeconds;
  }
@@ -22,11 +23,15 @@ MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
 }
 
 uint audioStart(string audioFileName) {
- if(!audioFileName) return 0;
+ assert_(audioFileName); //if(!audioFileName) return 0;
  for(FFmpeg file(audioFileName);;) {
+  //return file.audioFrameRate; // FIXME
   int32 buffer[1024  * file.channels];
   size_t size = file.read32(mref<int32>(buffer, 1024 * file.channels));
-  for(size_t i: range(size  * file.channels)) if(abs(buffer[i])>1<<23) return file.audioTime+i;
+  for(size_t i: range(size *file.channels)) if(abs(buffer[i])>1<<23) {
+   //log(file.audioFrameRate, file.audioTime+i, (float)(file.audioTime+i)/file.audioFrameRate);
+   return file.audioTime+i;
+  }
  }
 }
 
@@ -47,10 +52,9 @@ struct Music : Widget {
  // View
  Scroll<ImageView> scroll;
  Keyboard keyboard; // 1/6 ~ 120
-
- // Highlighting
  map<uint, Sign> active; // Maps active keys to notes (indices)
  uint midiIndex = 0, noteIndex = 0;
+ float playbackLineX = 0;
 
  // Preview
  unique<Window> window = nullptr;
@@ -91,7 +95,8 @@ struct Music : Widget {
   rawImageFileMap = Map(imageFile, Folder(name));
   image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
 
-  Image target;// = copy(image);
+  Image target;
+  if(0) target = copy(image);
   for(uint x: range(image.size.x)) {
    if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
    uint sum = 0;
@@ -145,12 +150,14 @@ struct Music : Widget {
    array<uint> bin;
    array<uint> binI;
    int64 time = midiNotes[index].time;
-    while(index < midiNotes.size && int64(midiNotes[index].time) <= time+1302) { // TODO: cluster size with most similar bin count/size
+   while(index < midiNotes.size && int64(midiNotes[index].time) <= time+1607) { // TODO: cluster size with most similar bin count/size
     bin.append(midiNotes[index].key);
     index++;
    }
+   if(0) if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
    array<uint> binS = copyRef(bin);
    sort(binS);
+   if(0) log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
    for(size_t key: bin) binI.append(binS.indexOf(key));
    M.append(move(binS));
    Mi.append(move(binI));
@@ -170,7 +177,7 @@ struct Music : Widget {
   // Reversed scan here to have the forward scan when walking back the best path
   for(size_t i: reverse_range(m)) for(size_t j: reverse_range(n)) { // Evaluates match (i,j)
    float d = 0;
-   for(uint s: S[i]) for(uint m: M[j]) d += s==m;
+   for(uint s: S[i]) for(uint m: M[j]) d += s%12==m%12; // No octave penalty
    // Evaluates best cumulative score to an alignment point (i,j)
    D(i,j) = max(max(
                  j+1==n?0:D(i,j+1), // Ignores peak j
@@ -182,12 +189,16 @@ struct Music : Widget {
   // Forward scan (chronologic)
   size_t i = 0, j = 0; // Score and MIDI bins indices
   size_t signIndex = 0;
+  measureT.append(0);
+  if(0) log("|", measureT.last(), measureX[measureT.size-1]);
   while(i<m && j<n) {
    /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
+    error(""); if(0) log("S", apply(S[i], [](uint key){return strKey(-4, key);}));
     i++;
    }
    else if(j+1<n && D(i,j) == D(i,j+1)) {
     for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
+    if(0) log("M", apply(M[j], [](uint key){return strKey(-4, key);})); // Trills, tremolos
     j++;
    } else {
     for(size_t k: range(M[j].size)) {
@@ -199,26 +210,40 @@ struct Music : Widget {
       size_t nextSignIndex = sign.note.signIndex;
       for(;signIndex < nextSignIndex;signIndex++) {
        Sign sign = signs[signIndex];
-       if(sign.type == Sign::Measure) measureT.append(midiNotes[midiIndex].time);
+       if(sign.type == Sign::Measure) {
+        measureT.append(midiNotes[midiIndex].time);
+        if(0) log("|", measureT.last(), measureX[measureT.size-1]);
+       }
       }
      }
     }
+    if(0) log(apply(S[i], [](uint key){return strKey(-4, key);}), "=", apply(M[j], [](uint key){return strKey(-4, key);}));
     i++; j++;
    }
   }
-  for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
-
+  assert_(j == n);
+  //for(;j<n;j++) for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
+  // Last measure bar
+  for(;signIndex < signs.size;signIndex++) {
+   Sign sign = signs[signIndex];
+   if(sign.type == Sign::Measure) {
+    measureT.append(midiNotes[midiIndex].time);
+   }
+  }
   assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
-  assert_(measureT.size <= measureX.size-1, measureT.size, measureX.size);
+  assert_(measureT.size == measureX.size, measureT.size, measureX.size);
   // Removes skipped measure explicitly (so that scroll smoothes over, instead of jumping)
-  for(uint i=0; i<measureT.size-1;) {
+  if(1) for(uint i=0; i<measureT.size-1;) {
    if(measureT[i] == measureT[i+1]) {
+    error("-", i, measureT[i], measureX[i]);
     measureT.removeAt(i);
     measureX.removeAt(i);
     //uint x = measureX.take(i+1); measureX[i] = (measureX[i] + x) / 2; // New position in middle of skipped measure
    } else i++;
   }
-  //assert_(measureT.size == measureX.size-1, measureT.size, measureX.size);
+  //log(measureT.size, measureX.size);
+  //log(measureT);
+  //log(measureX);
   //error(measureX[measureT.size-1], image.size.x, measureT.last(), this->notes.last().time);
   scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
@@ -268,7 +293,7 @@ struct Music : Widget {
       if(width < encoder.size.x) {
        Image copy (encoder.size);
        ::copy(cropRef(copy, 0,  int2(width, image.size.y)), target);
-       fill(target, int2(0, width), int2(target.size.x-width, target.size.y), white, 1);
+       fill(target, int2(width, 0), int2(target.size.x-width, image.size.y), white, 1);
       }
       renderTime.stop();
       videoEncodeTime.start();
@@ -304,11 +329,10 @@ struct Music : Widget {
   }
  }
 
- float debugX = 0;
-
  bool follow(int64 timeNum, int64 timeDen, vec2 size) {
   //constexpr int staffCount = 2;
   bool contentChanged = false;
+  //log(midiIndex, notes.size, (float)notes[midiIndex].time/notes.ticksPerSeconds, (float)timeNum/timeDen);
   for(;midiIndex < notes.size && (int64)notes[midiIndex].time*timeDen <= timeNum*(int64)notes.ticksPerSeconds; midiIndex++) {
    MidiNote note = notes[midiIndex];
    if(note.velocity) {
@@ -373,20 +397,21 @@ struct Music : Widget {
    }
   }
 
-  int64 t = (int64)timeNum*notes.ticksPerSeconds;
+  int64 t = (int64)timeNum*(int64)notes.ticksPerSeconds;
   float previousOffset = scroll.offset.x;
   // Cardinal cubic B-Spline
   for(int index: range(measureT.size-1)) {
-   int64 t1 = (int64)measureT[index]*timeDen;
-   int64 t2 = (int64)measureT[index+1]*timeDen;
+   int64 t1 = (int64)measureT[index]*(int64)timeDen;
+   int64 t2 = (int64)measureT[index+1]*(int64)timeDen;
    if(t1 <= t && t < t2) {
     double f = double(t-t1)/double(t2-t1);
+    assert_(f >= 0 && f <= 1);
     double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
     auto X = [&](int index) { return clamp(0.f, measureX[clamp<int>(0, index, measureX.size-1)] - size.x/2, image.size.x-size.x); };
-    float newOffset = round( w[0]*X(index) + w[1]*X(index+1) + w[2]*X(index+2) + w[3]*X(index+3) );
-    if(newOffset >= -scroll.offset.x) scroll.offset.x = -newOffset;
-    //debugX = (1-f) * measureX[index] + f * measureX[index+1]; scroll.offset.x = -debugX;
-    //log(t, index, t1, t2, f, measureX[index], measureX[index+1], -scroll.offset.x);
+    float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
+    /*if(newOffset >= -scroll.offset.x)*/ scroll.offset.x = -newOffset;
+    log(index, measureX[index], measureX[index+1], f);
+    playbackLineX = (1-f) * measureX[index] + f * measureX[index+1];
     break;
    }
   }
@@ -407,18 +432,21 @@ struct Music : Widget {
 #endif
   return contentChanged;
  }
-
- vec2 sizeHint(vec2) override { return vec2(1366, 435); }
+ const int height = 435;
+ vec2 sizeHint(vec2) override { return vec2(1366, height+120); }
  shared<Graphics> graphics(vec2 unused size) override {
   follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
   window->render();
   //return scroll.ScrollArea::graphics(size);
   window->backgroundColor = __builtin_nanf("");
   assert_(-scroll.offset.x >= 0, scroll.offset.x);
-  uint width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)window->size.x*image.size.y/window->size.y);
-  bilinear(cropRef(window->target, 0,                int2(::min(window->size.x, (int)(uint64)width*window->size.y/image.size.y), window->size.y)),
+  const Image& target = window->target;
+  int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*image.size.y/height);
+  bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width*height/image.size.y), height)),
            cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
-  fill(window->target, int2(0, width), int2(window->size.x-width, window->size.y), white, 1);
+  fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
+  fill(target, int2((scroll.offset.x+playbackLineX)/2, 0), int2(1, height), blue, 1./2);
+  render(target, keyboard.graphics(vec2(target.size.x, 120)), vec2(0, height));
   return shared<Graphics>();
  }
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
