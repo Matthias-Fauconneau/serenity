@@ -61,7 +61,10 @@ struct Music : Widget {
   int confidence;
   int value; // 0: Quarter, 1: Half, 2: Whole
   int2 position;
+  bgr3f color;
+  size_t glyphIndex;
   bool operator <(const OCRNote& b) const { return position.y < b.position.y; }
+  bool operator ==(size_t glyphIndex) const { return this->glyphIndex == glyphIndex; }
  };
  array<OCRNote> OCRNotes;
  // MIDI
@@ -77,6 +80,7 @@ struct Music : Widget {
  map<uint, Sign> active; // Maps active keys to notes (indices)
  uint midiIndex = 0, noteIndex = 0;
  float playbackLineX = 0;
+ buffer<Image8> templates;
 
  // Preview
  unique<Window> window = nullptr;
@@ -119,29 +123,31 @@ struct Music : Widget {
   //image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
 
-  buffer<Image8> templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
-  buffer<Image8> negatives = apply(1, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
+  templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
 
   Image target;
-  if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
-  uint sumX[image.size.y]; // Σ[x-Tx,x]
-  const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
-  //const uint threshold = ::sum(templates[1]);
-  uint threshold = 0; for(uint8 v: templates[1]) threshold += v;
-  for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
-  Image16 corrMap (target.size); corrMap.clear(0);
-  Image8 localMax (target.size); localMax.clear(0);
-  for(uint x: range(Tx+1, target?target.size.x:image.size.x)) {
-   {
-    uint sumY=0; // Σ[y-Ty,y]
-    for(uint y: range(1, Ty+1)) {
-     sumX[y] += image(x,y) - image(x-Tx,y);
-     sumY += sumX[y];
-    }
-    for(uint y: range(Ty+1, image.size.y)) {
-     sumX[y] += image(x,y) - image(x-Tx,y);
-     sumY += sumX[y] - sumX[y-Ty];
-     if(sumY < threshold) {
+  if(!existsFile("OCRNotes",name)) {
+   buffer<Image8> negatives = apply(1, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
+
+   if(0) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
+   uint sumX[image.size.y]; // Σ[x-Tx,x]
+   const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
+   uint intensityThreshold = 0; for(uint x: range(Tx)) for(uint y: range(Ty)) intensityThreshold += templates[1](x, y);
+   const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
+   for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
+   Image16 corrMap (image.size); corrMap.clear(0);
+   Image8 localMax (image.size); localMax.clear(0);
+   for(uint x: range(Tx+1, target?target.size.x:image.size.x)) {
+    {
+     uint sumY=0; // Σ[y-Ty,y]
+     for(uint y: range(1, Ty+1)) {
+      sumX[y] += image(x,y) - image(x-Tx,y);
+      sumY += sumX[y];
+     }
+     for(uint y: range(Ty+1, image.size.y)) {
+      sumX[y] += image(x,y) - image(x-Tx,y);
+      sumY += sumX[y] - sumX[y-Ty];
+      if(sumY >= intensityThreshold) continue;
       //target(x-Tx+1,y-Ty+1) = byte4(0xFF,0,0,0xFF);
       for(uint t: range(3)) {
        int corr = 0;
@@ -149,13 +155,12 @@ struct Music : Widget {
        for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
         corr += (int(image(x0+dx,y0+dy))-128) * (int(templates[t](dx, dy))-128);
        }
-       if(corr < int(Tx)*int(Ty)*sq((int[]){96,98,104}[t])) continue;
+       if(corr < correlationThreshold) continue;
        int ncorr = 0;
        if(t<=0) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
         ncorr += (int(image(x0+dx,y0+dy))-128) * (int(negatives[t](dx, dy))-128);
        }
        if(corr*2 > ncorr*3) {
-        //if(corr < ncorr*2) log(corr, ncorr);
         corr /= 256;
         assert_(corr < 65536);
 
@@ -169,37 +174,42 @@ struct Music : Widget {
         }
         //target(x0, y0) = byte4((byte3[]){byte3(0,0,0xFF), byte3(0,0xFF,0),byte3(0,0xFF,0xFF)}[t],0xFF);*/
         localMax(x0, y0) = 1+t;
-        skip:;
+skip:;
         if(corr > corrMap(x0, y0)) corrMap(x0, y0) = corr; // Helps early cull
        }
       }
      }
     }
+
+    if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
+    uint sum = 0;
+    for(uint y: range(image.size.y)) sum += image(x,y);
+    if(sum < 255u*image.size.y*3/5) { // Measure Bar
+     if(target) for(size_t y: range(image.size.y)) target(x,y) = 0;
+     measureX.append(x);
+    }
    }
 
-   if(measureX && x<=measureX.last()+200*image.size.y/870) continue; // Minimum interval between measures
-   uint sum = 0;
-   for(uint y: range(image.size.y)) sum += image(x,y);
-   if(sum < 255u*image.size.y*3/5) { // Measure Bar
-    if(target) for(size_t y: range(image.size.y)) target(x,y) = 0;
-    measureX.append(x);
-   }
-  }
-
-  for(uint x0: range(1, target.size.x-Tx)) {
-   for(uint y0: range(1, target.size.y-Ty)) {
-    if(localMax(x0, y0) > 0) {
-     int confidence = corrMap(x0, y0);
-     int t = localMax(x0, y0)-1;
-     OCRNotes.append({confidence, t, int2(x0, y0)});
-     // Visualization
-     if(target) for(uint dy: range(Ty)) for(uint dx: range(templates[t].size.x)) {
-      uint a = 0xFF-templates[t](dx, dy);
-      blend(target, x0+dx, y0+dy, (bgr3f[]){red, green, yellow}[t], a/255.f);
+   for(uint x0: range(1, localMax.size.x-Tx)) {
+    for(uint y0: range(1, localMax.size.y-Ty)) {
+     if(localMax(x0, y0) > 0) {
+      int confidence = corrMap(x0, y0);
+      int t = localMax(x0, y0)-1;
+      OCRNotes.append({confidence, t, int2(x0, y0), black, invalid});
+      // Visualization
+      if(target) for(uint dy: range(Ty)) for(uint dx: range(templates[t].size.x)) {
+       uint a = 0xFF-templates[t](dx, dy);
+       blend(target, x0+dx, y0+dy, (bgr3f[]){red, green, yellow}[t], a/255.f);
+      }
      }
     }
    }
+
+   writeFile("measureX", cast<byte>(measureX), name, true);
+   writeFile("OCRNotes", cast<byte>(OCRNotes), name, true);
   }
+  measureX = cast<uint>(readFile("measureX", name));
+  OCRNotes = cast<OCRNote>(readFile("OCRNotes", name));
 
   signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
 
@@ -227,18 +237,19 @@ struct Music : Widget {
    }
    bin.insertSorted(note); // Top to Bottom
   }
+  sorted.append(bin);
   OCRNotes = ::move(sorted);
 
   uint glyphIndex = 0; // X (Time), Top to Bottom
   for(ref<Sign> chord: allNotes.values) {
    for(Sign note: chord.reverse()) { // Top to Bottom
-    note.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
-    if(glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key())).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
+    for(mref<Sign> chord: notes.values) for(Sign& o: chord)
+     if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
+    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key())).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
    }
   }
 
-  log(time);
   if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
 
   assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
@@ -414,7 +425,15 @@ struct Music : Widget {
       }*/
       toImage(cropRef(target, 0,  int2(width, image.size.y)), cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
       fill(target, int2(width, 0), int2(target.size.x-width, image.size.y), white, 1);
-      fill(target, int2((scroll.offset.x+playbackLineX), 0), int2(1, image.size.y), blue, 1./2);
+      //fill(target, int2((scroll.offset.x+playbackLineX), 0), int2(1, image.size.y), blue, 1./2);
+      for(OCRNote note: highlight) {
+       const int x0 = scroll.offset.x+note.position.x;
+       const int y0 = scroll.offset.y+note.position.y;
+       for(uint dy: range(templates[note.value].size.y)) for(uint dx: range(templates[note.value].size.x)) {
+        uint a = 0xFF-templates[note.value](dx, dy);
+        blend(target, x0+dx, y0+dy, note.color, a/255.f);
+       }
+      }
       render(target, keyboard.graphics(vec2(target.size.x, target.size.y-image.size.y)), vec2(0, image.size.y));
       renderTime.stop();
       videoEncodeTime.start();
@@ -450,6 +469,8 @@ struct Music : Widget {
   }
  }
 
+ array<OCRNote> highlight;
+
  bool follow(int64 timeNum, int64 timeDen, vec2 size) {
   //constexpr int staffCount = 2;
   bool contentChanged = false;
@@ -462,11 +483,13 @@ struct Music : Widget {
     if(sign.type == Sign::Note) {
      active.insertMulti(note.key, sign);
      (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
-     /*if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
-      assert_(sign.note.pageIndex == 0);
-      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid) system.glyphs[index].color = (sign.staff?red:(staffCount==1?blue:green));
-      contentChanged = true;
-     }*/
+     if(sign.note.glyphIndex[0] != invalid) {
+      OCRNote note = OCRNotes[sign.note.glyphIndex[0]];
+      note.glyphIndex = sign.note.glyphIndex[0];
+      note.color = (sign.staff?red:green);
+      highlight.append(note);
+     }
+     contentChanged = true;
     }
     // Updates next notes
 #if 0
@@ -489,13 +512,8 @@ struct Music : Widget {
    else if(!note.velocity && active.contains(note.key)) {
     while(active.contains(note.key)) {
      Sign sign = active.take(note.key);
-     //fret.active.take(note.key);
-     //if(fret.measure.contains(note.key)) fret.measure.remove(note.key);
      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-     /*if(sign.note.pageIndex != invalid && sign.note.glyphIndex[0] != invalid) {
-      assert_(sign.note.pageIndex == 0);
-      for(size_t index: ref<size_t>(sign.note.glyphIndex)) if(index!=invalid)  system.glyphs[index].color = black;
-     }*/
+     if(sign.note.glyphIndex[0] != invalid) highlight.remove(sign.note.glyphIndex[0]);
 #if 0
      // Updates next notes
      //keyboard.measure.clear();
@@ -566,7 +584,16 @@ struct Music : Widget {
   bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width*height/image.size.y), height)),
            toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8
   fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
-  fill(target, int2((scroll.offset.x+playbackLineX)/(image.size.y/height), 0), int2(1, height), blue, 1./2);
+  //fill(target, int2((scroll.offset.x+playbackLineX)/(image.size.y/height), 0), int2(1, height), blue, 1./2);
+  for(OCRNote note: highlight) {
+   const int x0 = scroll.offset.x+note.position.x;
+   const int y0 = scroll.offset.y+note.position.y;
+   for(uint dy: range(templates[note.value].size.y/2)) for(uint dx: range(templates[note.value].size.x/2)) {
+    uint a = 0xFF-templates[note.value](dx*2, dy*2);
+    blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
+   }
+  }
+
   render(target, keyboard.graphics(vec2(target.size.x, 120)), vec2(0, height));
   return shared<Graphics>();
  }
