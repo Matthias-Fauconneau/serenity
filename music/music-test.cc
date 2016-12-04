@@ -240,11 +240,15 @@ skip:;
   sorted.append(bin);
   OCRNotes = ::move(sorted);
 
+
   uint glyphIndex = 0; // X (Time), Top to Bottom
   for(ref<Sign> chord: allNotes.values) {
    for(Sign note: chord.reverse()) { // Top to Bottom
-    for(mref<Sign> chord: notes.values) for(Sign& o: chord)
+    // Transfers to notes
+    for(mref<Sign> chord: notes.values) for(Sign& o: chord) {
      if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
+     if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) o.note.glyphIndex[1] = glyphIndex; // Also highlights tied notes
+    }
     if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key())).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
    }
@@ -483,11 +487,13 @@ skip:;
     if(sign.type == Sign::Note) {
      active.insertMulti(note.key, sign);
      (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
-     if(sign.note.glyphIndex[0] != invalid) {
-      OCRNote note = OCRNotes[sign.note.glyphIndex[0]];
-      note.glyphIndex = sign.note.glyphIndex[0];
-      note.color = (sign.staff?red:green);
-      highlight.append(note);
+     for(int i: range(2)) {
+      if(sign.note.glyphIndex[i] != invalid) {
+       OCRNote note = OCRNotes[sign.note.glyphIndex[i]];
+       note.glyphIndex = sign.note.glyphIndex[i]; // For removal
+       note.color = (sign.staff?red:green);
+       highlight.append(note);
+      }
      }
      contentChanged = true;
     }
@@ -513,7 +519,7 @@ skip:;
     while(active.contains(note.key)) {
      Sign sign = active.take(note.key);
      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-     if(sign.note.glyphIndex[0] != invalid) highlight.remove(sign.note.glyphIndex[0]);
+     for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
 #if 0
      // Updates next notes
      //keyboard.measure.clear();

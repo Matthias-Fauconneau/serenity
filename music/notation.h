@@ -117,9 +117,9 @@ struct Note {
     bool grace = false;
     bool acciaccatura = false; // Before principal beat (slashed)
     bool accent = false;
-    bool staccato= false;
-    bool tenuto= false;
-    bool trill= false;
+    bool staccato = false;
+    bool tenuto = false;
+    bool trill = false;
     enum Tremolo { NoTremolo, Start=1, Stop=2 } tremolo = NoTremolo;
     bool arpeggio = false;
     int finger = 0;
