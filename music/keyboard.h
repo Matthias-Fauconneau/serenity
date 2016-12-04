@@ -2,9 +2,10 @@
 #include "widget.h"
 
 /// Displays active notes on a keyboard representation
-struct Keyboard : Widget {
-    array<uint> left, right;
+struct Keyboard /*: Widget*/ {
+    array<uint> left, right, unknown;
     void midiNoteEvent(uint key, uint vel);
-    vec2 sizeHint(vec2) override { return vec2(1920, 210); }
-    shared<Graphics> graphics(vec2 size) override;
+    //vec2 sizeHint(vec2) override { return vec2(1920, 210); }
+    //shared<Graphics> graphics(vec2 size) override;
+    void render(const Image& target);
 };

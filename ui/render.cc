@@ -11,7 +11,7 @@ void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opaci
 }
 
 
-static void fill(uint* target, uint stride, uint w, uint h, uint value) {
+static inline void fill(uint* target, uint stride, uint w, uint h, uint value) {
  for(uint y=0; y<h; y++) {
   for(uint x=0; x<w; x++) target[x] = value;
   target += stride;

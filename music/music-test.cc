@@ -383,7 +383,7 @@ skip:;
 
   if(encode) { // Encode
    Encoder encoder {name+".tutorial.mp4"_};
-   encoder.setH264(int2(1920, 870+keyboard.sizeHint(0).y), 60);
+   encoder.setH264(int2(1920, 1080), 60);
    if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
    else error("Unknown codec");
    encoder.open();
@@ -421,7 +421,7 @@ skip:;
      while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
       follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size));
       renderTime.start();
-      assert_(encoder.size.y == image.size.y+keyboard.sizeHint(0).y);
+      assert_(encoder.size.y >= image.size.y/*+keyboard.sizeHint(0).y*/);
       const int width = ::min(image.size.x-(int)(-scroll.offset.x), encoder.size.x);
       /*Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
       if(width < encoder.size.x) {
@@ -438,7 +438,8 @@ skip:;
         blend(target, x0+dx, y0+dy, note.color, a/255.f);
        }
       }
-      render(target, keyboard.graphics(vec2(target.size.x, target.size.y-image.size.y)), vec2(0, image.size.y));
+      //render(target, keyboard.graphics(vec2(target.size.x, target.size.y-image.size.y)), vec2(0, image.size.y));
+      keyboard.render(cropRef(target, int2(0, image.size.y), int2(target.size.x, target.size.y-image.size.y)));
       renderTime.stop();
       videoEncodeTime.start();
       encoder.writeVideoFrame(target);
@@ -485,6 +486,12 @@ skip:;
     //assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
     Sign sign = midiToSign[noteIndex];
     if(sign.type == Sign::Note) {
+     // Removes trills highlight on known (marked) note press of same key
+     if(active.contains(note.key) && active.at(note.key).note.trill) {
+      Sign sign = active.take(note.key);
+      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
+      for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
+     }
      active.insertMulti(note.key, sign);
      (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
      for(int i: range(2)) {
@@ -495,8 +502,8 @@ skip:;
        highlight.append(note);
       }
      }
-     contentChanged = true;
-    }
+    } else keyboard.unknown.append( note.key );
+    contentChanged = true;
     // Updates next notes
 #if 0
     size_t firstSignIndex = sign.note.signIndex;
@@ -515,29 +522,34 @@ skip:;
 #endif
     noteIndex++;
    }
-   else if(!note.velocity && active.contains(note.key)) {
-    while(active.contains(note.key)) {
-     Sign sign = active.take(note.key);
-     (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-     for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
+   else if(!note.velocity) {
+    if(active.contains(note.key)) {
+     while(active.contains(note.key) && !active.at(note.key).note.trill) {
+      if(active.at(note.key).note.trill) continue; // Will be removed on known (marked) note press of same key
+      Sign sign = active.take(note.key);
+      (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
+      for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
 #if 0
-     // Updates next notes
-     //keyboard.measure.clear();
-     size_t firstSignIndex = sign.note.signIndex+1;
-     assert_(firstSignIndex != invalid);
-     //bool firstNote = true;
-     for(size_t signIndex: range(firstSignIndex, signs.size)) {
-      assert_(signIndex < signs.size, signIndex);
-      const Sign& sign = signs[signIndex];
-      if(sign.type == Sign::Note) {
-       //keyboard.measure.insertMulti(sign.note.key(), sign);
-       //if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
-       //firstNote = false;
+      // Updates next notes
+      //keyboard.measure.clear();
+      size_t firstSignIndex = sign.note.signIndex+1;
+      assert_(firstSignIndex != invalid);
+      //bool firstNote = true;
+      for(size_t signIndex: range(firstSignIndex, signs.size)) {
+       assert_(signIndex < signs.size, signIndex);
+       const Sign& sign = signs[signIndex];
+       if(sign.type == Sign::Note) {
+        //keyboard.measure.insertMulti(sign.note.key(), sign);
+        //if(!firstNote && sign.note.finger) break; // Shows all notes until next hand position change
+        //firstNote = false;
+       }
+       if(sign.type == Sign::Measure) break;
       }
-      if(sign.type == Sign::Measure) break;
-     }
 #endif
+     }
      contentChanged = true;
+    } else {
+     keyboard.unknown.remove(note.key);
     }
    }
   }
@@ -577,8 +589,8 @@ skip:;
 #endif
   return contentChanged;
  }
- const int height = 435; //image.size.y/2;
- vec2 sizeHint(vec2) override { return vec2(1366, height+120); }
+
+ vec2 sizeHint(vec2) override { return vec2(1920/2, 1080/2); }
  shared<Graphics> graphics(vec2 unused size) override {
   follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
   window->render();
@@ -586,11 +598,10 @@ skip:;
   window->backgroundColor = __builtin_nanf("");
   assert_(-scroll.offset.x >= 0, scroll.offset.x);
   const Image& target = window->target;
-  int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*image.size.y/height);
-  bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width*height/image.size.y), height)),
+  int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*2);
+  bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2)),
            toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8
   fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
-  //fill(target, int2((scroll.offset.x+playbackLineX)/(image.size.y/height), 0), int2(1, height), blue, 1./2);
   for(OCRNote note: highlight) {
    const int x0 = scroll.offset.x+note.position.x;
    const int y0 = scroll.offset.y+note.position.y;
@@ -599,8 +610,7 @@ skip:;
     blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
    }
   }
-
-  render(target, keyboard.graphics(vec2(target.size.x, 120)), vec2(0, height));
+  keyboard.render(cropRef(target, int2(0, image.size.y/2), int2(target.size.x, target.size.y-image.size.y/2)));
   return shared<Graphics>();
  }
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {

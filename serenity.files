@@ -58,3 +58,5 @@ image/stitch.cc
 image/operation.cc
 io/font.cc
 io/png.cc
+music/notation.h
+music/keyboard.cc
