@@ -55,8 +55,8 @@ void fill(const Image& target, int2 origin, int2 size, bgr3f color, float opacit
   fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
  } else {
   /**/ if(op==Src) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, opacity);
-  else if(op==Sub && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::sub(target, x, y, color);
-  //else if(op==Mul && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::mul(target, x, y, color);
+  //else if(op==Sub && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::sub(target, x, y, color);
+  else if(op==Mul && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::mul(target, x, y, color);
   //else if(op==Min && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::min(target, x, y, color);
   else error("");
  }
