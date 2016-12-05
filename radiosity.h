@@ -88,16 +88,18 @@ static inline Vec<v8sf, 3> cosine(Random& random) {
 static inline uint popcount(v4uq m) { return __builtin_popcountll(m[0])+__builtin_popcountll(m[1])+__builtin_popcountll(m[2])+__builtin_popcountll(m[3]); }
 
 struct Lookup {
+    //typedef uint8 mask;
     typedef v4uq mask;
     static constexpr uint S = sizeof(mask)*8;
     static constexpr uint N = 128;
     buffer<float> X {S}, Y{S}, Z{S};
     buffer<mask> lookup {N*N}; // 512K
 
-    inline v8si index(const v8sf X, const v8sf Y, const v8sf Z) const {
+    inline v8ui index(const v8sf X, const v8sf Y, const v8sf Z) const {
         const Vec<v8sf, 2> UV = square(X, Y, Z);
-        const v8si uIndex = cvtt((UV._[0]+1)*((N-1)/2.f));
-        const v8si vIndex = cvtt((UV._[1]+1)*((N-1)/2.f));
+        const v8ui uIndex = (v8ui)cvtt((UV._[0]+1)*((N-1)/2.f));
+        const v8ui vIndex = (v8ui)cvtt((UV._[1]+1)*((N-1)/2.f));
+        //for(uint k: range(8)) assert_(uIndex[k] >= 0 && uIndex[k] < N && vIndex[k] >= 0 && vIndex[k] < N, UV._[0][k], UV._[1][k], X[k], Y[k], Z[k]);
         return vIndex*N+uIndex;
     }
 
@@ -122,8 +124,8 @@ struct Lookup {
                     const float x = XYZ._[0][k];
                     const float y = XYZ._[1][k];
                     const float z = XYZ._[2][k];
-                    uint8* mask32 = (uint8*)(span8+k);
-                    for(const uint i: range(S/8)) mask32[i] = ::mask((x*(*(v8sf*)(X.begin()+i*8)) + y*(*(v8sf*)(Y.begin()+i*8)) + z*(*(v8sf*)(Z.begin()+i*8))) >= 0);
+                    uint8* mask = (uint8*)(span8+k);
+                    for(const uint i: range(S/8)) mask[i] = ::mask((x*(*(v8sf*)(X.begin()+i*8)) + y*(*(v8sf*)(Y.begin()+i*8)) + z*(*(v8sf*)(Z.begin()+i*8))) >= 0);
                 }
             }
         }
@@ -348,6 +350,7 @@ struct Radiosity {
             return (1-a)*volumeColor + a*transmitColor;
         } else
 #endif
+#if 1
         { // Diffuse
             const float sin = random()[0], cos = sqrt(1-sin*sin);
             const float Tx = cos*T.x + sin*B.x;
@@ -361,13 +364,18 @@ struct Radiosity {
             const float m20 = N.x, m21 = N.y, m22 = N.z;
             float T[Lookup::S]; mref<float>(T, Lookup::S).clear(inff);
             uint id[Lookup::S]; mref<uint>(id, Lookup::S).clear(scene.size);
+            const float* NX0 = scene.NX0.data, *NY0 = scene.NX1.data, *NZ0 = scene.NX2.data; // FIXME: face normal
             const float* PX0 = scene.X0.data, *PX1 = scene.X1.data, *PX2 = scene.X2.data;
             const float* PY0 = scene.Y0.data, *PY1 = scene.Y1.data, *PY2 = scene.X2.data;
             const float* PZ0 = scene.Z0.data, *PZ1 = scene.Z1.data, *PZ2 = scene.X2.data;
             const float* Sx = lookup.X.data;
             const float* Sy = lookup.Y.data;
             const float* Sz = lookup.Z.data;
-            for(uint i=0; i<scene.size-2; i+=8) { // FIXME: only (PVS) occluders (not behind any light)
+            for(uint i=0; i<scene.size; i+=8) {
+                const v8sf FNX = *(v8sf*)(NX0+i);
+                const v8sf FNY = *(v8sf*)(NY0+i);
+                const v8sf FNZ = *(v8sf*)(NZ0+i);
+                //v8sf FNx, FNy, FNz; cross(X1-X0,Y1-Y0,Z1-Z0, X2-X0,Y2-Y0,Z2-Z0, FNx,FNy,FNz);
                 const v8sf X0 = *(v8sf*)(PX0+i)-P.x;
                 const v8sf Y0 = *(v8sf*)(PY0+i)-P.y;
                 const v8sf Z0 = *(v8sf*)(PZ0+i)-P.z;
@@ -380,8 +388,9 @@ struct Radiosity {
                 const v8sf D0 = N.x * X0 + N.y * Y0 + N.z * Z0;
                 const v8sf D1 = N.x * X1 + N.y * Y1 + N.z * Z1;
                 const v8sf D2 = N.x * X2 + N.y * Y2 + N.z * Z2;
-                const v8si cull = D0 <= 0 || D1 <= 0 || D2 <= 0;
-                // FIXME: cull/repack here ?
+                static constexpr v8si seq {0,1,2,3,4,5,6,7};
+                const v8sf D = FNX*X0 + FNY*Y0 + FNZ*Z0;
+                const v8si cull = (i+seq >= scene.size) || (D0 <= 0 && D1 <= 0 && D2 <= 0) /*Plane*/ || D <= 0 /*Backward*/;
                 v8sf C0x, C0y, C0z; cross(X2,Y2,Z2, X1,Y1,Z1, C0x,C0y,C0z);
                 v8sf C1x, C1y, C1z; cross(X0,Y0,Z0, X2,Y2,Z2, C1x,C1y,C1z);
                 v8sf C2x, C2y, C2z; cross(X1,Y1,Z1, X0,Y0,Z0, C2x,C2y,C2z);
@@ -394,27 +403,43 @@ struct Radiosity {
                 const v8sf N2x = m00 * C2x + m01 * C2y + m02 * C2z;
                 const v8sf N2y = m10 * C2x + m11 * C2y + m12 * C2z;
                 const v8sf N2z = m20 * C2x + m21 * C2y + m22 * C2z;
-                const v8si lookup0 = lookup.index(N0x, N0y, N0z);
-                const v8si lookup1 = lookup.index(N1x, N1y, N1z);
-                const v8si lookup2 = lookup.index(N2x, N2y, N2z);
-                v8sf FNx, FNy, FNz; cross(X1-X0,Y1-Y0,Z1-Z0, X2-X0,Y2-Y0,Z2-Z0, FNx,FNy,FNz);
-                const v8sf D = FNx*X0 + FNy*Y0 + FNz*Z0;
-                for(uint k: range(8)) { // Cannot gather 256bit loads
-                    if(cull[k] || i+k >= scene.size-2) continue; // FIXME
+                // FIXME: cull/repack here ?
+                const v8ui lookup0 = lookup.index(N0x, N0y, N0z);
+                const v8ui lookup1 = lookup.index(N1x, N1y, N1z);
+                const v8ui lookup2 = lookup.index(N2x, N2y, N2z);
+                for(uint k: range(8)) {
+                    if(cull[k]) continue; // FIXME
+                    if(i+k == faceIndex) continue; //assert_(i+k != faceIndex, D[k]); // FIXME:
+                    /*assert_(lookup0[k] < Lookup::N*Lookup::N && lookup1[k] < Lookup::N*Lookup::N && lookup2[k] < Lookup::N*Lookup::N, i, k, lookup0[k], lookup1[k], lookup2[k], N2x[k], N2y[k], N2z[k],
+                            m00, m01, m02, m10, m11, m12, m20, m21, m22, C2x[k], C2y[k], C2z[k], X0[k], Y0[k], Z0[k], X1[k], Y1[k], Z1[k], D0[k], D1[k], D2[k], D[k]);*/
                     const Lookup::mask mask = lookup.lookup[lookup0[k]] & lookup.lookup[lookup1[k]] & lookup.lookup[lookup2[k]];
                     // FIXME: cull/repack here ?
                     for(uint s=0; s<Lookup::S; s+=8) {
-                        const v8sf ti = D / (FNx*(*(v8sf*)(Sx+s)) + FNy*(*(v8sf*)(Sy+s)) + FNz*(*(v8sf*)(Sz+s)));
+                        const v8sf ti = D / (FNX*(*(v8sf*)(Sx+s)) + FNY*(*(v8sf*)(Sy+s)) + FNZ*(*(v8sf*)(Sz+s)));
                         v8sf& t = *(v8sf*)(T+s);
-                        const v8si mask8 = ::mask(((uint8*)&mask)[s/8]) & (ti < t);
+                        const v8si mask8 = ::mask(((uint8*)&mask)[s/8]) & (ti > 0) & (ti < t);
                         store(t, mask8, ti);
-                        store(*(v8si*)(id+s), mask8, i);
+                        store(*(v8si*)(id+s), mask8, i+k);
                     }
                 }
             }
             v8sf sumB = 0, sumG = 0, sumR = 0;
+            //sumB = sumG = sumR = Lookup::S/8.f; // Ambient
             for(uint s=0; s<Lookup::S; s+=8) {
+#if 1 // "AO"
+                v8sf t = *(v8sf*)(T+s);
+                //for(int k: range(8)) assert_(t[k]>0, t[k]);
+                t = min(t, 1);
+                const v8sf b = t;
+                const v8sf g = t;
+                const v8sf r = t;
+#else
                 const v8si i = *(v8si*)(id+s);
+#if 1 // Direct
+                const v8sf b = gather(scene.emittanceB.data, i);
+                const v8sf g = gather(scene.emittanceG.data, i);
+                const v8sf r = gather(scene.emittanceR.data, i);
+#else // Indirect
                 const v8sf Dx = *(v8sf*)(Sx+s);
                 const v8sf Dy = *(v8sf*)(Sy+s);
                 const v8sf Dz = *(v8sf*)(Sz+s);
@@ -447,12 +472,9 @@ struct Radiosity {
                 const v8si vIndex = cvtt(v), uIndex = cvtt(u); // Floor
                 const Float* const base = scene.samples.data;
                 const v8ui faces = gather(scene.BGR.data, i);
-                for(uint k: range(8)) assert_(uIndex[k] >= 0 && (size1[k]==0 || (uint)uIndex[k] < size1[k]), i[k], u[k], size1[k], v[k]);
-                for(uint k: range(8)) assert_(vIndex[k] >= 0 && (size1[k]==0 || (uint)vIndex[k] < V[k]), v[k]);
                 const v8ui size4 = gather(scene.size4.data, i);
                 const v8ui i00 = faces + vIndex*size1 + uIndex;
                 const v8ui ib00 = i00 + 0*size4;
-                for(uint k: range(8)) assert_(ib00[k] < scene.samples.size, i[k], faces[k], size1[k], uIndex[k], vIndex[k], v[k]);
                 const v8sf b00 = gather(base, ib00);
                 const v8sf b01 = gather(base, ib00 + 1);
                 const v8sf b10 = gather(base, ib00 + size1);
@@ -473,15 +495,18 @@ struct Radiosity {
                 const v8sf w01 =    fu *(1-fv);
                 const v8sf w10 = (1-fu)*   fv ;
                 const v8sf w11 =    fu *   fv ;
-                const v8sf b = w00 * b00 + w01 * b01 + w10 * b10 + w11 * b11 ;
-                const v8sf g = w00 * g00 + w01 * g01 + w10 * g10 + w11 * g11 ;
-                const v8sf r = w00 * r00 + w01 * r01 + w10 * r10 + w11 * r11 ;
+                const v8sf b = w00 * b00 + w01 * b01 + w10 * b10 + w11 * b11;
+                const v8sf g = w00 * g00 + w01 * g01 + w10 * g10 + w11 * g11;
+                const v8sf r = w00 * r00 + w01 * r01 + w10 * r10 + w11 * r11;
+#endif
+#endif
                 sumB += b;
                 sumG += g;
                 sumR += r;
             }
             out += reflectance * (1.f/(Lookup::S*scene.iterations)) * bgr3f(hsum(sumB), hsum(sumG), hsum(sumR));
         }
+#endif
         return out;
     }
 

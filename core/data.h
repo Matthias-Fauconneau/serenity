@@ -173,6 +173,8 @@ struct TextData : Data {
  string whileAny(char key);
  /// Advances while input doesn't match \a key. \sa until
  string whileNot(char key);
+ /// Advances while input doesn't match \a key. \sa until
+ string whileNot(const string key);
  /// Advances while input match any of \a any
  string whileAny(const string any);
  /// Advances while input match none of \a any

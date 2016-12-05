@@ -16,7 +16,7 @@ struct ViewApp {
     Rasterizer<TextureShader> rasterizer {scene};
 
     const uint2 imageSize = 1024;
-    bool rasterize = false; // Rasterizes prerendered textures or renders first bounce
+    bool rasterize = true; // Rasterizes prerendered textures or renders first bounce
     ImageF sumB, sumG, sumR;
     uint count = 0; // Iteration count (Resets on view angle change)
     vec2 angles = 0;
@@ -73,7 +73,6 @@ struct ViewApp {
             Random randoms[threadCount()];
             for(Random& random: mref<Random>(randoms,threadCount())) random=Random();
             if(count>1) { Random random; renderer.radiosity.lookup.generate(random); } // Reuses previous set while view changes (temporal stability)
-            Time time{true};
             parallel_chunk(target.size.y, [this, &target, O, &randoms](const uint id, const size_t start, const size_t sizeI) {
                 const int targetSizeX = target.size.x;
                 for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(targetSizeX)) {
@@ -86,7 +85,6 @@ struct ViewApp {
                     sumR[targetIndex] += color.r;
                 }
             });
-            log(time);
 
             extern uint8 sRGB_forward[0x1000];
             for(size_t i: range(target.ref::size)) {

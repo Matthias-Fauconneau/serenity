@@ -130,6 +130,7 @@ inline void setST(Scene& scene, const float S, const float T) {
 }
 
 inline bgr3f sample(const Scene& scene, const uint face, const float u, const float v) {
+    assert_(u >= 0 && u < scene.size1[face] && v >= 0 && v < scene.V[face], u, v);
     const int vIndex = v, uIndex = u; // Floor
 #if HALF // Half
     const size_t base = 2*sample4D[face][1]*vIndex + uIndex;

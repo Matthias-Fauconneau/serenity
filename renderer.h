@@ -76,34 +76,43 @@ struct Render {
         scene.samples= mcast<Float>(map);
         setSTSize(scene, sSize, tSize);
     }
-    void clear() { mcast<Float>(map).clear(0); scene.iterations=0; } // FIXME: TODO: initialize with emittance
+    void clear() {
+        for(size_t face : range(scene.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
+            const size_t size4 = tSize*sSize*scene.size2[face*2+0];
+            const mref<Float> faceBGR = scene.samples.slice(scene.BGR[face], size4);
+            faceBGR.slice(0*size4, size4).clear(scene.emittanceB[face]);
+            faceBGR.slice(1*size4, size4).clear(scene.emittanceG[face]);
+            faceBGR.slice(2*size4, size4).clear(scene.emittanceR[face]);
+        }
+        scene.iterations=1;
+    }
     void step() {
         Random randoms[threadCount()];
         for(Random& random: mref<Random>(randoms,threadCount())) { random=Random(); }
         {Random random; radiosity.lookup.generate(random);} // New set of stratified cosine samples for hemispheric rasterizer
         // FIXME: TODO: store diffuse (average s,t) texture for non-primary (diffuse) evaluation
         setST(scene, 1./2, 1./2);
-        for(size_t faceIndex : range(scene.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
-            const vec3 p00 (scene.X0[2*faceIndex+0], scene.Y0[2*faceIndex+0], scene.Z0[2*faceIndex+0]);
-            const vec3 p01 (scene.X1[2*faceIndex+0], scene.Y1[2*faceIndex+0], scene.Z1[2*faceIndex+0]);
-            const vec3 p11 (scene.X2[2*faceIndex+0], scene.Y2[2*faceIndex+0], scene.Z2[2*faceIndex+0]);
-            const vec3 p10 (scene.X2[2*faceIndex+1], scene.Y2[2*faceIndex+1], scene.Z2[2*faceIndex+1]);
-            const vec3 t00 = (scene.TX0[2*faceIndex+0], scene.TY0[2*faceIndex+0], scene.TZ0[2*faceIndex+0]);
-            const vec3 t01 = (scene.TX1[2*faceIndex+0], scene.TY1[2*faceIndex+0], scene.TZ1[2*faceIndex+0]);
-            const vec3 t11 = (scene.TX2[2*faceIndex+0], scene.TY2[2*faceIndex+0], scene.TZ2[2*faceIndex+0]);
-            const vec3 t10 = (scene.TX2[2*faceIndex+1], scene.TY2[2*faceIndex+1], scene.TZ0[2*faceIndex+1]);
-            const vec3 b00 = (scene.BX0[2*faceIndex+0], scene.BY0[2*faceIndex+0], scene.BZ0[2*faceIndex+0]);
-            const vec3 b01 = (scene.BX1[2*faceIndex+0], scene.BY1[2*faceIndex+0], scene.BZ1[2*faceIndex+0]);
-            const vec3 b11 = (scene.BX2[2*faceIndex+0], scene.BY2[2*faceIndex+0], scene.BZ2[2*faceIndex+0]);
-            const vec3 b10 = (scene.BX2[2*faceIndex+1], scene.BY2[2*faceIndex+1], scene.BZ0[2*faceIndex+1]);
-            const vec3 n00 = (scene.NX0[2*faceIndex+0], scene.NY0[2*faceIndex+0], scene.NZ0[2*faceIndex+0]);
-            const vec3 n01 = (scene.NX1[2*faceIndex+0], scene.NY1[2*faceIndex+0], scene.NZ1[2*faceIndex+0]);
-            const vec3 n11 = (scene.NX2[2*faceIndex+0], scene.NY2[2*faceIndex+0], scene.NZ2[2*faceIndex+0]);
-            const vec3 n10 = (scene.NX2[2*faceIndex+1], scene.NY2[2*faceIndex+1], scene.NZ0[2*faceIndex+1]);
+        for(size_t face : range(scene.size/2)) { // FIXME: Assumes quads (TODO: generic triangle UV mapping)
+            const vec3 p00 (scene.X0[2*face+0], scene.Y0[2*face+0], scene.Z0[2*face+0]);
+            const vec3 p01 (scene.X1[2*face+0], scene.Y1[2*face+0], scene.Z1[2*face+0]);
+            const vec3 p11 (scene.X2[2*face+0], scene.Y2[2*face+0], scene.Z2[2*face+0]);
+            const vec3 p10 (scene.X2[2*face+1], scene.Y2[2*face+1], scene.Z2[2*face+1]);
+            const vec3 t00 = (scene.TX0[2*face+0], scene.TY0[2*face+0], scene.TZ0[2*face+0]);
+            const vec3 t01 = (scene.TX1[2*face+0], scene.TY1[2*face+0], scene.TZ1[2*face+0]);
+            const vec3 t11 = (scene.TX2[2*face+0], scene.TY2[2*face+0], scene.TZ2[2*face+0]);
+            const vec3 t10 = (scene.TX2[2*face+1], scene.TY2[2*face+1], scene.TZ0[2*face+1]);
+            const vec3 b00 = (scene.BX0[2*face+0], scene.BY0[2*face+0], scene.BZ0[2*face+0]);
+            const vec3 b01 = (scene.BX1[2*face+0], scene.BY1[2*face+0], scene.BZ1[2*face+0]);
+            const vec3 b11 = (scene.BX2[2*face+0], scene.BY2[2*face+0], scene.BZ2[2*face+0]);
+            const vec3 b10 = (scene.BX2[2*face+1], scene.BY2[2*face+1], scene.BZ0[2*face+1]);
+            const vec3 n00 = (scene.NX0[2*face+0], scene.NY0[2*face+0], scene.NZ0[2*face+0]);
+            const vec3 n01 = (scene.NX1[2*face+0], scene.NY1[2*face+0], scene.NZ1[2*face+0]);
+            const vec3 n11 = (scene.NX2[2*face+0], scene.NY2[2*face+0], scene.NZ2[2*face+0]);
+            const vec3 n10 = (scene.NX2[2*face+1], scene.NY2[2*face+1], scene.NZ0[2*face+1]);
 
-            const uint U = scene.size1[faceIndex*2+0], V = scene.V[faceIndex*2+0], size2 = V*U;
+            const uint U = scene.size1[face*2+0], V = scene.V[face*2+0], size2 = V*U;
             const size_t size4 = tSize*sSize*V*U;
-            const mref<Float> faceBGR = scene.samples.slice(scene.BGR[faceIndex], size4);
+            const mref<Float> faceBGR = scene.samples.slice(scene.BGR[face], size4);
 
             const vec3 ab = p01-p00;
             const vec3 ad = p10-p00;
@@ -145,7 +154,7 @@ struct Render {
                         }
                     } else*/ {
                         const vec3 D = normalize(P);
-                        bgr3f color = radiosity.shade(faceIndex*2+0, P, D, T, B, N, randoms[id]);
+                        bgr3f color = radiosity.shade(face*2+0, P, D, T, B, N, randoms[id]);
                         for(uint t: range(tSize)) for(uint s: range(sSize)) {
                             const size_t base = base0 + (sSize * t + s) * size2;
                             faceBGR[0*size4+base] += color.b;

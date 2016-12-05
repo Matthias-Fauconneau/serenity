@@ -123,6 +123,15 @@ string TextData::whileNot(char key) {
  }
  return slice(start, end-start);
 }
+string TextData::whileNot(const string key) {
+ uint start=index, end;
+ for(;;advance(1)) {
+  if(available(key.size)<key.size) { advance(key.size-1); end=index; break; }
+  if(peek(key.size) == key) { end=index; break; }
+ }
+ return slice(start, end-start);
+}
+
 string TextData::whileNo(const string any) {
  uint start=index; while(available(1) && matchNo(any)){} return slice(start,index-start);
 }

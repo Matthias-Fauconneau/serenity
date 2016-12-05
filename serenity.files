@@ -38,3 +38,4 @@ radiosity.h
 rasterizer.h
 drag.h
 view-widget.h
+dual-plane.cc
