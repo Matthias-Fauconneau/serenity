@@ -1,6 +1,7 @@
 #include "file.h"
+#include "matrix.h"
+#include "simd.h"
 #include "parallel.h"
-#include "scene.h"
 #include "png.h"
 #include "interface.h"
 #include "text.h"
@@ -8,9 +9,9 @@
 #include "window.h"
 #include "view-widget.h"
 
-Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
+static Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
-mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
+static mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)
     const float S = 2*s-1, T = 2*t-1; // [0,1] -> [-1, 1]
     const float left = (-1-S), right = (1-S);
     const float bottom = (-1-T), top = (1-T);
@@ -40,19 +41,19 @@ struct Render {
         uint2 size (1280, 1024);
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), cacheFolder, Flags(ReadWrite|Create));
-        size_t byteSize = 4*N*N*size.y*size.x*sizeof(half);
+        size_t byteSize = 4ull*N*N*size.y*size.x*sizeof(half);
         assert_(byteSize <= 16ull*1024*1024*1024);
         file.resize(byteSize);
         Map map (file, Map::Prot(Map::Read|Map::Write));
         mref<half> field = mcast<half>(map);
-        log("Reserving", byteSize/1024.f/1024/1024, "G");
-        field.clear(); // Explicitly clears to avoid performance skew from clear on page faults (and forces memory allocation)
-        log("OK");
+        assert_(field.size == 4ull*N*N*size.y*size.x);
+        //field.clear(); // Explicitly clears to avoid performance skew from clear on page faults (and forces memory allocation)
 
-        Time time (true);
+        Time time (true); Time lastReport (true);
         //parallel_for(0, N*N, [&](uint unused threadID, size_t stIndex) {
         for(int stIndex: range(N*N)) {
             int sIndex = stIndex%N, tIndex = stIndex/N;
+            if(lastReport.seconds()>1) { log(strD(stIndex,N*N)); lastReport.reset(); }
 
             // Sheared perspective (rectification)
             const float s = sIndex/float(N-1), t = tIndex/float(N-1);
@@ -67,10 +68,11 @@ struct Render {
             Image source = decodeImage(Map(str(sIndex-N/2)+","+str(tIndex-N/2)+".png", Folder("unsheared", sourceFolder)));
             assert_(source.size == size);
             // FIXME: shear
-            for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
-                B(x, y) = source(x, y).b;
-                G(x, y) = source(x, y).g;
-                R(x, y) = source(x, y).r;
+            for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                extern float sRGB_reverse[0x100];
+                B(x, y) = sRGB_reverse[source(x, y).b];
+                G(x, y) = sRGB_reverse[source(x, y).g];
+                R(x, y) = sRGB_reverse[source(x, y).r];
             }
         }//);
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
@@ -166,33 +168,33 @@ struct ViewApp {
             M = shearedPerspective(s, t);
         }
 
-        assert_(imageSize.x == imageSize.y && imageCount.x == imageCount.y);
+        assert_(/*imageSize.x == imageSize.y &&*/ imageCount.x == imageCount.y);
 
-        parallel_chunk(target.size.y, [this, &target, M](uint, size_t start, size_t sizeI) {
-            const int targetStride = target.size.x;
-            const int size1 = imageSize.x *1;
-            const int size2 = imageSize.y *size1;
-            const int size3 = imageCount.x*size2;
-            const size_t size4 = (size_t)imageCount.y*size3;
+        parallel_chunk(target.size.y, [this, &target, M](uint, uint start, uint sizeI) {
+            const uint targetStride = target.size.x;
+            const uint size1 = imageSize.x *1;
+            const uint size2 = imageSize.y *size1;
+            const uint size3 = imageCount.x*size2;
+            const uint64 size4 = uint64(imageCount.y)*uint64(size3);
             const struct Image4DH : ref<half> {
                 uint4 size;
                 Image4DH(uint2 imageCount, uint2 imageSize, ref<half> data) : ref<half>(data), size(imageCount.y, imageCount.x, imageSize.y, imageSize.x) {}
                 const half& operator ()(uint s, uint t, uint u, uint v) const {
-                    assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], (int)s, (int)t, (int)u, (int)v);
-                    size_t index = (((uint64)t*size[1]+s)*size[2]+v)*size[3]+u;
-                    assert_(index < ref<half>::size, int(index), ref<half>::size, (int)s, (int)t, (int)u, (int)v, size);
+                    assert_(t < size[0] && s < size[1] && v < size[2] && u < size[3], int(s), int(t), int(u), int(v));
+                    size_t index = ((uint64(t)*size[1]+s)*size[2]+v)*size[3]+u;
+                    assert_(index < ref<half>::size, int(index), ref<half>::size, int(s), int(t), int(u), int(v), size);
                     return operator[](index);
                 }
             } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
-                     fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
-                            fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
-                                   fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
+              fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
+              fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
+              fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
             assert_(imageSize.x%2==0); // Gather 32bit / half
-            const v2si unused sample2D = {    0,           size1/2};
-            const v8si unused sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
+            //const v2ui sample2D = {    0,           size1/2};
+            const v8ui sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                               size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
             //const float scale = (float) imageSize.x / imageCount.x; // st -> uv
-            for(size_t targetY: range(start, start+sizeI)) for(size_t targetX: range(target.size.x)) {
+            for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
                 size_t targetIndex = targetY*targetStride + targetX;
                 const vec3 O = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
                 const vec3 P = M.inverse() * vec3(2.f*targetX/float(targetStride-1)-1, 2.f*targetY/float(target.size.y-1)-1, +1);
@@ -211,8 +213,8 @@ struct ViewApp {
                 const vec2 uv_uncorrected = vec2(1-0x1p-16) * UV * vec2(imageSize-uint2(1));
 
                 if(st[0] < -0 || st[1] < -0) { target[targetIndex]=byte4(0xFF,0,0,0xFF); continue; }
-                const int sIndex = st[0], tIndex = st[1];
-                if(sIndex >= int(imageCount.x)-1 || tIndex >= int(imageCount.y)-1) { target[targetIndex]=byte4(0,0xFF,0xFF,0xFF); continue; }
+                const uint sIndex = uint(st[0]), tIndex = uint(st[1]);
+                if(sIndex >= uint(imageCount.x)-1 || tIndex >= uint(imageCount.y)-1) { target[targetIndex]=byte4(0,0xFF,0xFF,0xFF); continue; }
 
                 bgr3f S = 0;
 #if 0
@@ -258,13 +260,13 @@ struct ViewApp {
                 } else
 #endif
                 {
-                    const int uIndex = uv_uncorrected[0], vIndex = uv_uncorrected[1];
+                    const uint uIndex = uint(uv_uncorrected[0]), vIndex = uint(uv_uncorrected[1]);
                     if(uv_uncorrected[0] < 0 || uv_uncorrected[1] < 0) { target[targetIndex]=byte4(0,0,0xFF,0xFF); continue; }
-                    if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
-                    const size_t base = (size_t)tIndex*size3 + sIndex*size2 + vIndex*size1 + uIndex;
-                    const v16sf B = toFloat((v16hf)gather((float*)(fieldB.data+base), sample4D));
-                    const v16sf G = toFloat((v16hf)gather((float*)(fieldG.data+base), sample4D));
-                    const v16sf R = toFloat((v16hf)gather((float*)(fieldR.data+base), sample4D));
+                    if(uIndex >= uint(imageSize.x)-1 || vIndex >= uint(imageSize.y)-1) { target[targetIndex]=byte4(0xFF,0xFF,0,0xFF); continue; }
+                    const size_t base = uint64(tIndex)*uint64(size3) + sIndex*size2 + vIndex*size1 + uIndex;
+                    const v16sf B = toFloat(v16hf(gather(reinterpret_cast<const float*>(fieldB.data+base), sample4D)));
+                    const v16sf G = toFloat(v16hf(gather(reinterpret_cast<const float*>(fieldG.data+base), sample4D)));
+                    const v16sf R = toFloat(v16hf(gather(reinterpret_cast<const float*>(fieldR.data+base), sample4D)));
 
                     const v4sf x = {st[1], st[0], uv_uncorrected[1], uv_uncorrected[0]}; // tsvu
                     const v8sf X = __builtin_shufflevector(x, x, 0,1,2,3, 0,1,2,3);

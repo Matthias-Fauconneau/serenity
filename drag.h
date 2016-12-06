@@ -1,5 +1,6 @@
 #pragma once
 #include "widget.h"
+#include "function.h"
 
 struct Drag : virtual Widget {
     vec2 value = vec2(0, 0);

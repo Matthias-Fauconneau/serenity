@@ -13,6 +13,7 @@ typedef int v2si __attribute((ext_vector_type(2)));
 typedef int v4si __attribute((ext_vector_type(4)));
 typedef int v8si __attribute((ext_vector_type(8)));
 
+typedef uint v2ui __attribute((ext_vector_type(2)));
 typedef uint v8ui __attribute((ext_vector_type(8)));
 
 typedef float v2sf __attribute((ext_vector_type(2)));
@@ -25,8 +26,8 @@ typedef half v16hf __attribute((ext_vector_type(16)));
 
 inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 inline v8ui uintX(uint x) { return (v8ui){x,x,x,x,x,x,x,x}; }
-static v8si unused _0i = intX(0);
-static v8si unused _1i = intX(-1);
+inline v8si _0i = intX(0);
+inline v8si _1i = intX(-1);
 
 inline v4sf float4(float f) { return (v4sf){f,f,f,f}; }
 inline constexpr v8sf float8(float f) { return (v8sf){f,f,f,f,f,f,f,f}; }
@@ -39,7 +40,7 @@ static constexpr v8sf _00001111f = {0,0,0,0,1,1,1,1};
 static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
 static inline v8sf gather(const float* P, v8ui i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
-static inline v8ui gather(const uint* P, v8si i) { return __builtin_ia32_gatherd_d256(_0i, (int*)P, i, _1i, sizeof(int)); }
+static inline v8ui gather(const uint* P, v8si i) { return __builtin_ia32_gatherd_d256(_0i, reinterpret_cast<const int*>(P), i, _1i, sizeof(int)); }
 
 static inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 static inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }

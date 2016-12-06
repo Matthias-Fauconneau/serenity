@@ -15,7 +15,7 @@ struct ViewWidget : Drag {
         };
     }
     virtual vec2 sizeHint(vec2) override { return vec2(size); }
-    virtual shared<Graphics> graphics(vec2 size) override {
+    virtual shared<Graphics> graphics(vec2) override {
         image = render(uint2(size), angles);
         shared<Graphics> graphics;
         graphics->blits.append(vec2(0), vec2(image.size), unsafeShare(image));

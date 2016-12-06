@@ -60,7 +60,8 @@ void Build::tryParseDefines(TextData& s) {
 bool Build::tryParseConditions(TextData& s, string fileName) {
  if(!s.match("#if ")) return false;
  bool condition = !s.match('!');
- string id = s.whileInteger() ?: s.identifier("_");
+ string id = s.whileInteger();
+ if(!id) id = s.identifier("_");
  bool value = false;
  /**/  if(id=="0") value=false;
  else if(id=="1") value=true;

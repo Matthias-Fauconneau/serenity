@@ -125,7 +125,7 @@ struct File : Stream {
  void touch(int64 time = 0);
 
  /// Resizes file
- const File& resize(int64 size);
+ const File& resize(size_t size);
  /// Seeks to \a index
  void seek(int index);
 };

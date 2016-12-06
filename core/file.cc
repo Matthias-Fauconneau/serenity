@@ -162,7 +162,7 @@ void File::touch(int64 time) {
  check(futimens(fd, times));
 }
 
-const File& File::resize(int64 size) { check(ftruncate(fd, size), fd.pointer, size); return *this; }
+const File& File::resize(size_t size) { check(ftruncate(fd, size), fd.pointer, size); return *this; }
 
 void File::seek(int index) { check(::lseek(fd,index,0)); }
 

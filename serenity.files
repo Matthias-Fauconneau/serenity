@@ -16,7 +16,11 @@ core/thread.cc
 core/data.h
 core/data.cc
 core/map.h
+core/file.h
+core/file.cc
+
 io/variant.h
+io/png.cc
 
 ui/gl.h
 ui/text.h

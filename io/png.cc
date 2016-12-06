@@ -8,25 +8,25 @@ generic struct luma { T i; operator byte4() const {return byte4(i,i,i,0xFF); } }
 typedef vec<rgb,uint8,3> rgb3;
 
 // Paeth median
-template<template<Type> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
+template<template<Type> class T, uint N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
  vec<T, int, N> d = a + b - c;
  vec<T, int, N> pa = abs(d-a), pb = abs(d-b), pc = abs(d-c);
- vec<T, uint8, N> p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+ vec<T, uint8, N> p; for(uint i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
  return p;
 }
 
 enum class Predictor { None, Left, Up, Average, Paeth };
 
 template<template<Type> class T, int N>
-void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
+void unpredict(byte4* target, const byte* source, size_t width, int height, size_t xStride, size_t yStride) {
  typedef vec<T, uint8, N> U;
  typedef vec<T, int, N> V;
  buffer<U> prior(width); prior.clear(0);
- for(size_t unused y: range(height)) {
+ for(int unused y: range(height)) {
   Predictor predictor = Predictor(*source++);
-  U* src = (U*)source;
+  const U* src = reinterpret_cast<const U*>(source);
   U a = 0;
-  /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];
+  /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=     src[x];
   else if(predictor==Predictor::Left) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
   else if(predictor==Predictor::Up) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
   else if(predictor==Predictor::Average) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= U((V(prior[x])+V(a))/2)+src[x];

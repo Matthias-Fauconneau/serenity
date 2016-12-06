@@ -226,7 +226,7 @@ int TextData::integer(bool maySign, int base) {
  int sign=1;
  if(maySign) { if(match('-')) sign=-1; else match('+'); }
  assert_(isInteger(base), "Expected integer, got '"+/*escape(*/slice(index, min(16ul, data.size-index))/*)*/+"'", line(), data);
- long value=0;
+ int value=0;
  do {
   char c = peek();
   int n;
@@ -256,7 +256,8 @@ string TextData::whileDecimal() {
   /**/ if(c>='0'&&c<='9') { gotNumber=true; advance(1); }
   else if(gotNumber && c=='.') { if(gotDot||gotE) break; gotDot=true; advance(1); }
   else if(gotNumber &&  (c=='e' || c=='E')) {
-   if(gotE) break; gotE=true;
+   if(gotE) break;
+   gotE=true;
    advance(1);
    matchAny("-+");
   }

@@ -69,8 +69,7 @@ typedef signed long long int64;
 typedef unsigned long long uint64;
 typedef __SIZE_TYPE__ size_t;
 typedef __fp16 half;
-constexpr size_t invalid = ~0; // Invalid index
-#define null nullptr
+constexpr size_t invalid = ~0ull; // Invalid index
 
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
@@ -84,7 +83,7 @@ inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 /// Numeric range
 struct range {
  inline range(int start, int stop) : start(start), stop(stop){}
- inline range(int size) : range(0, size) {}
+ inline range(uint size) : range(0, int(size)) {}
  struct iterator {
   int i;
   inline int operator*() { return i; }
