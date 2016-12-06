@@ -20,12 +20,14 @@ __attribute((constructor(1001))) void generate_sRGB_forward() {
 }
 
 float sRGB_reverse[0x100];
+half sRGB_reverse_half[0x100];
 __attribute((constructor(1002))) void generate_sRGB_reverse() {
  for(uint index: range(0x100)) {
   double sRGB = (double) index / 0xFF;
   double linear = sRGB > 0.04045 ? pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
   assert(abs(sRGB-(linear > 0.0031308 ? 1.055*pow(linear,1/2.4)-0.055 : 12.92*linear))< 0x1p-50);
   sRGB_reverse[index] = linear;
+  sRGB_reverse_half[index] = linear;
   assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index,
     sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))], index);
  }

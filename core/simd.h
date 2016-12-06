@@ -24,6 +24,9 @@ typedef half v4hf __attribute((ext_vector_type(4)));
 typedef half v8hf __attribute((ext_vector_type(8)));
 typedef half v16hf __attribute((ext_vector_type(16)));
 
+typedef uint8 v8ub __attribute((ext_vector_type(8)));
+typedef uint8 v32ub __attribute((ext_vector_type(32)));
+
 inline v8si intX(int x) { return (v8si){x,x,x,x,x,x,x,x}; }
 inline v8ui uintX(uint x) { return (v8ui){x,x,x,x,x,x,x,x}; }
 inline v8si _0i = intX(0);

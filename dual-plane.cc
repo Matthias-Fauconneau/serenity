@@ -50,8 +50,8 @@ struct Render {
         //field.clear(); // Explicitly clears to avoid performance skew from clear on page faults (and forces memory allocation)
 
         Time time (true); Time lastReport (true);
-        //parallel_for(0, N*N, [&](uint unused threadID, size_t stIndex) {
-        for(int stIndex: range(N*N)) {
+        parallel_for(0, N*N, [&](uint unused threadID, size_t stIndex) {
+        //for(int stIndex: range(N*N)) {
             int sIndex = stIndex%N, tIndex = stIndex/N;
             if(lastReport.seconds()>1) { log(strD(stIndex,N*N)); lastReport.reset(); }
 
@@ -68,13 +68,32 @@ struct Render {
             Image source = decodeImage(Map(str(sIndex-N/2)+","+str(tIndex-N/2)+".png", Folder("unsheared", sourceFolder)));
             assert_(source.size == size);
             // FIXME: shear
-            for(uint y: range(size.y)) for(uint x: range(size.x)) {
-                extern float sRGB_reverse[0x100];
-                B(x, y) = sRGB_reverse[source(x, y).b];
-                G(x, y) = sRGB_reverse[source(x, y).g];
-                R(x, y) = sRGB_reverse[source(x, y).r];
+            extern half sRGB_reverse_half[0x100];
+#if 0
+            const uint8* src = (const uint8*)source.data;
+            const half* targetB = B.data;
+            const half* targetG = G.data;
+            const half* targetR = R.data;
+            for(uint i=0; i<size.y*size.x; i+=8) {
+                v32ub v = *(v32ub*)(src+i*4);
+                v8ub b = __builtin_shufflevector(v, v, 0*4+0, 1*4+0, 2*4+0, 3*4+0, 4*4+0, 5*4+0, 6*4+0, 7*4+0);
+                v8ub g = __builtin_shufflevector(v, v, 0*4+1, 1*4+1, 2*4+1, 3*4+1, 4*4+1, 5*4+1, 6*4+1, 7*4+1);
+                v8ub r = __builtin_shufflevector(v, v, 0*4+2, 1*4+2, 2*4+2, 3*4+2, 4*4+2, 5*4+2, 6*4+2, 7*4+2);
+                v16hf B = (v16hf)gather(reinterpret_cast<float*>(sRGB_reverse_half), __builtin_convertvector(b, v8ui));
+                v16hf G = (v16hf)gather(reinterpret_cast<float*>(sRGB_reverse_half), __builtin_convertvector(g, v8ui));
+                v16hf R = (v16hf)gather(reinterpret_cast<float*>(sRGB_reverse_half), __builtin_convertvector(r, v8ui));
+                *(v8hf*)(targetB+i) = __builtin_shufflevector(B, B, 0*2, 1*2, 2*2, 3*2, 4*2, 5*2, 6*2, 7*2);
+                *(v8hf*)(targetG+i) = __builtin_shufflevector(G, G, 0*2, 1*2, 2*2, 3*2, 4*2, 5*2, 6*2, 7*2);
+                *(v8hf*)(targetR+i) = __builtin_shufflevector(R, R, 0*2, 1*2, 2*2, 3*2, 4*2, 5*2, 6*2, 7*2);
             }
-        }//);
+#else
+            for(uint y: range(size.y)) for(uint x: range(size.x)) {
+                B(x, y) = sRGB_reverse_half[source(x, y).b];
+                G(x, y) = sRGB_reverse_half[source(x, y).g];
+                R(x, y) = sRGB_reverse_half[source(x, y).r];
+            }
+#endif
+        });
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
     }
 } prerender;
