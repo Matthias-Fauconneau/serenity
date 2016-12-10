@@ -286,7 +286,7 @@ skip:;
   for(ref<Sign> chord: notes.values) {
    array<uint> bin;
    array<uint> binI;
-   for(Sign note: chord) bin.append(note.note.key());
+   for(Sign note: chord) bin.add(note.note.key());
    array<uint> binS = copyRef(bin);
    sort(binS); // FIXME: already sorted ?
    for(size_t key: binS) binI.append(bin.indexOf(key));
@@ -300,17 +300,32 @@ skip:;
    array<uint> bin;
    array<uint> binI;
    int64 time = midiNotes[index].time;
-   while(index < midiNotes.size && int64(midiNotes[index].time) <= time+1607) { // TODO: cluster size with most similar bin count/size
-    bin.append(midiNotes[index].key);
+   while(index < midiNotes.size && (int64(midiNotes[index].time) < time+2000 ||
+                                   (int64(midiNotes[index].time) <= time+/*2137*//*3091*//*6455*//*9637*//*10091*//*10818*//*12273*//*12999*//*13681*/16985 && S[min(M.size, S.size-1)].contains(midiNotes[index].key)
+                                     && bin.size < S[min(M.size, S.size-1)].size)) ) { //FIXME: merge bins at sync time
+    if(0) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
+    bin.add(midiNotes[index].key);
     index++;
    }
    if(0) if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
    array<uint> binS = copyRef(bin);
    sort(binS);
    if(0) log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
+   if(S[min(M.size, S.size-1)] != binS) {
+       log("≠");
+       if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
+       log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
+       log("≠");
+   }
+   //assert_(S[min(M.size, S.size-1)] == binS, "≠");
    for(size_t key: bin) binI.append(binS.indexOf(key));
-   M.append(move(binS));
    Mi.append(move(binI));
+   if(M.size < S.size && S[min(M.size, S.size-1)] != binS && S[min(M.size, S.size-1)].size == 1 && binS.size == 1) { // FIXME: let sync handle missing MIDI notes
+       M.append(); // Missing in MIDI
+       index--; // Rewind to match next time
+       continue;
+   }
+   M.append(move(binS));
   }
 
   /// Synchronizes MIDI and score using dynamic time warping
@@ -343,7 +358,8 @@ skip:;
   if(0) log("|", measureT.last(), measureX[measureT.size-1]);
   while(i<m && j<n) {
    /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
-    error(""); if(0) log("S", apply(S[i], [](uint key){return strKey(-4, key);}));
+    error("S", apply(S[i], [](uint key){return strKey(-4, key);}));
+    if(1) log("S", apply(S[i], [](uint key){return strKey(-4, key);}));
     i++;
    }
    else if(j+1<n && D(i,j) == D(i,j+1)) {
@@ -381,7 +397,8 @@ skip:;
    }
   }*/
   measureT.append(this->notes.last().time);
-  assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
+  if(midiToSign.size != midiNotes.size) log(midiNotes.size, midiToSign.size);
+  //assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
   assert_(measureT.size == measureX.size, measureT.size, measureX.size);
   // Removes skipped measure explicitly (so that scroll smoothes over, instead of jumping)
   if(1) for(uint i=0; i<measureT.size-1;) {
@@ -404,7 +421,7 @@ skip:;
 
    uint videoTime = 0;
 
-   Time renderTime, videoEncodeTime, totalTime;
+   Time resampleTime, renderTime, videoEncodeTime, totalTime;
    totalTime.start();
    for(int lastReport=0;;) {
     auto writeAudio = [&] {
@@ -437,8 +454,12 @@ skip:;
       renderTime.start();
       assert_(encoder.size.y >= image.size.y/2/*+keyboard.sizeHint(0).y*/, encoder.size.y, image.size.y);
       const int width = ::min((image.size.x-(int)(-scroll.offset.x))/2, encoder.size.x);
-      toImage(cropRef(target, 0,  int2(width, image.size.y/2)),
+      const int y1 = image.size.y/2, y2=target.size.y;
+      const int height = ::min(y2-y1, 240);
+      resampleTime.start();
+      toImage(cropRef(target, int2(0, (target.size.y-height-image.size.y)/2),  int2(width, image.size.y/2)),
               downsample(cropRef(image, int2(-scroll.offset.x, 0), int2(width*2, image.size.y))));
+      resampleTime.stop();
       fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
       for(OCRNote note: highlight) {
        const int x0 = scroll.offset.x+note.position.x;
@@ -449,8 +470,6 @@ skip:;
         blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
        }
       }
-      const int y1 = image.size.y/2, y2=target.size.y;
-      const int height = ::min(y2-y1, 240);
       fill(target, int2(0, y1), int2(target.size.x, (y2-height)-y1), white);
       keyboard.render(cropRef(target, int2(0, target.size.y-height), int2(target.size.x, height)));
       renderTime.stop();
@@ -471,7 +490,7 @@ skip:;
     uint64 durationTicks = this->notes.last().time;
     int percent = round(100.*timeTicks/durationTicks);
     if(percent!=lastReport) {
-     log(str(percent, 2u)+"%", "Render", strD(renderTime, totalTime), "Encode", strD(videoEncodeTime, totalTime)
+     log(str(percent, 2u)+"%", "Resample", strD(resampleTime, totalTime), "Render", strD(renderTime, totalTime), "Encode", strD(videoEncodeTime, totalTime)
          /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
@@ -602,28 +621,39 @@ skip:;
   return contentChanged;
  }
 
- vec2 sizeHint(vec2) override { return vec2(1920/2, 1440/2); }
+ vec2 sizeHint(vec2) override { return vec2(1920/*/2*/, /*1440/2+240*/1080); }
+ Time resampleTime, renderTime, totalTime{true};
  shared<Graphics> graphics(vec2 unused size) override {
-  follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
-  window->render();
-  //return scroll.ScrollArea::graphics(size);
-  window->backgroundColor = __builtin_nanf("");
-  assert_(-scroll.offset.x >= 0, scroll.offset.x);
-  const Image& target = window->target;
-  int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*2);
-  bilinear(cropRef(target, 0, int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2)),
-           toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8
-  fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
-  for(OCRNote note: highlight) {
-   const int x0 = scroll.offset.x+note.position.x;
-   const int y0 = scroll.offset.y+note.position.y;
-   for(uint dy: range(templates[note.value].size.y/2)) for(uint dx: range(templates[note.value].size.x/2)) {
-    uint a = 0xFF-templates[note.value](dx*2, dy*2);
-    blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
-   }
-  }
-  keyboard.render(cropRef(target, int2(0, image.size.y/2), int2(target.size.x, target.size.y-image.size.y/2)));
-  return shared<Graphics>();
+     renderTime.start();
+     follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
+     window->render();
+     //return scroll.ScrollArea::graphics(size);
+     window->backgroundColor = __builtin_nanf("");
+     assert_(-scroll.offset.x >= 0, scroll.offset.x);
+     const Image& target = window->target;
+     int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*2);
+     const int y1 = image.size.y/2, y2=target.size.y;
+     const int height = ::min(y2-y1, 240);
+     resampleTime.start(); // FIXME: single pass downsample and toImage
+     const Image targetArea = cropRef(target, int2(0, (target.size.y-height-image.size.y)/2), int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2));
+     const Image8 source = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
+     bilinear(targetArea, toImage(source));
+     /*bilinear(cropRef(target, int2(0, (target.size.y-height-image.size.y)/2), int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2)),
+              toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8*/
+     resampleTime.stop();
+     fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
+     for(OCRNote note: highlight) {
+         const int x0 = scroll.offset.x+note.position.x;
+         const int y0 = scroll.offset.y+note.position.y;
+         for(uint dy: range(templates[note.value].size.y/2)) for(uint dx: range(templates[note.value].size.x/2)) {
+             uint a = 0xFF-templates[note.value](dx*2, dy*2);
+             blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
+         }
+     }
+     keyboard.render(cropRef(target, int2(0, /*image.size.y/2*/target.size.y-height), int2(target.size.x, /*target.size.y-image.size.y/2*/height)));
+     renderTime.stop();
+     log(strD(resampleTime, totalTime), strD(renderTime, totalTime));
+     return shared<Graphics>();
  }
  bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override {
 return scroll.ScrollArea::mouseEvent(cursor, size, event, button, focus);
