@@ -442,6 +442,7 @@ buffer<byte> inflate(const ref<byte> source, bool zlib) {
 	buffer<byte> data; size_t size;
 	data.data = (byte*)decompress_mem_to_heap(source.data, source.size, &size, zlib?FLAG_PARSE_ZLIB_HEADER:0);
 	data.capacity=data.size=size;
+        assert_(size);
 	return data;
 }
 

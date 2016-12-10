@@ -84,6 +84,7 @@ Image decodePNG(const ref<byte> file) {
   assert(s);
  }
  buffer<byte> predicted = inflate(IDAT, true);
+ assert_(predicted, IDAT.size);
  if(bitDepth==1 || bitDepth==4) {
   assert(type==0 || type==3, type);
   assert(depth==1,depth);

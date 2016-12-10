@@ -21,15 +21,18 @@ struct Time {
  void stop() { if(!stopTime) stopTime=realTime(); }
  uint64 reset() { stop(); uint64 t = stopTime-startTime; startTime=stopTime; stopTime=0; return t; }
  operator uint64() const { return ((stopTime?:realTime()) - startTime); }
- double toReal() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
+ uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
+ uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
+ uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
+ float seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
  explicit operator bool() const { return !stopTime; }
 };
 
 String strD(uint64 num, uint64 div);
-template<> inline String str(const Time& t) { return str(t.toReal(), 1u)+'s'; }
+template<> inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
 
-inline bool operator<(float a, const Time& b) { return a < b.toReal(); }
-inline bool operator<(double a, const Time& b) { return a < b.toReal(); }
+inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
+inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;

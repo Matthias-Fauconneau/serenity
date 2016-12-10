@@ -27,6 +27,14 @@ void toImage(const Image& image, const Image8& image8) {
 }
 Image toImage(const Image8& image8) { Image image(image8.size); toImage(image, image8); return image; }
 
+Image8 downsample(Image8&& target, const Image8& source) {
+ assert_(target.size == source.size/2, target.size, source.size);
+ for(uint y: range(target.height)) for(uint x: range(target.width))
+  target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;
+ return move(target);
+}
+inline Image8 downsample(const Image8& source) { return downsample(source.size/2, source); }
+
 /// Converts MIDI time base to audio sample rate
 MidiNotes scale(MidiNotes&& notes, uint targetTicksPerSeconds, int64 start) {
  assert_(notes);
@@ -126,30 +134,34 @@ struct Music : Widget {
   templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
 
   Image target;
-  if(!existsFile("OCRNotes",name)) {
-   buffer<Image8> negatives = apply(1, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
+  if(!existsFile("OCRNotes",name) || 0) {
+   buffer<Image8> negatives = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
 
-   if(0) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
+   if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
    uint sumX[image.size.y]; // Σ[x-Tx,x]
    const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
    uint intensityThreshold = 0; for(uint x: range(Tx)) for(uint y: range(Ty)) intensityThreshold += templates[1](x, y);
-   const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
    for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
    Image16 corrMap (image.size); corrMap.clear(0);
    Image8 localMax (image.size); localMax.clear(0);
+   Time lastReport{true};
    for(uint x: range(Tx+1, target?target.size.x:image.size.x)) {
+    if(lastReport.seconds()>1) { lastReport.reset(); log(strD(x, target.size.x)); };
     {
      uint sumY=0; // Σ[y-Ty,y]
-     for(uint y: range(1, Ty+1)) {
+     const int y0=256-Ty, y1=image.size.y-128;
+     for(uint y: range(y0, y0+Ty)) {
       sumX[y] += image(x,y) - image(x-Tx,y);
       sumY += sumX[y];
      }
-     for(uint y: range(Ty+1, image.size.y)) {
+     for(uint y: range(y0+Ty, y1)) {
       sumX[y] += image(x,y) - image(x-Tx,y);
       sumY += sumX[y] - sumX[y-Ty];
       if(sumY >= intensityThreshold) continue;
       //target(x-Tx+1,y-Ty+1) = byte4(0xFF,0,0,0xFF);
       for(uint t: range(3)) {
+       //const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
+       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){96,96,104}[t]);
        int corr = 0;
        const int x0 = x-Tx+1, y0 = y-Ty+1;
        for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
@@ -157,14 +169,14 @@ struct Music : Widget {
        }
        if(corr < correlationThreshold) continue;
        int ncorr = 0;
-       if(t<=0) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
+       if(t==0 || t==2) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
         ncorr += (int(image(x0+dx,y0+dy))-128) * (int(negatives[t](dx, dy))-128);
        }
        if(corr*2 > ncorr*3) {
-        corr /= 256;
-        assert_(corr < 65536);
+        corr /= 512;
+        assert_(corr < 65536, corr);
 
-        const int r = 3;
+        const int r = 6;
         for(int dy: range(-r, r)) for(uint dx: range(-r, r +1)) { // FIXME: -1,{-1,0,1}; 0,-1
          if(corrMap(x0+dx, y0+dy) >= corr) goto skip;
         }
@@ -249,14 +261,16 @@ skip:;
      if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
      if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) o.note.glyphIndex[1] = glyphIndex; // Also highlights tied notes
     }
-    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key())).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
+    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key()),64).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
    }
   }
 
+  if(glyphIndex != OCRNotes.size) log(glyphIndex, OCRNotes.size);
   if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
 
-  assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
+  assert_(glyphIndex <= OCRNotes.size, glyphIndex, OCRNotes.size);
+  //assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
 
   String audioFileName = name+"/"+name+".mp3";
   audioFile = unique<FFmpeg>(audioFileName);
@@ -421,25 +435,24 @@ skip:;
      while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
       follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size));
       renderTime.start();
-      assert_(encoder.size.y >= image.size.y/*+keyboard.sizeHint(0).y*/);
-      const int width = ::min(image.size.x-(int)(-scroll.offset.x), encoder.size.x);
-      /*Image target = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
-      if(width < encoder.size.x) {
-       Image copy (encoder.size);
-      }*/
-      toImage(cropRef(target, 0,  int2(width, image.size.y)), cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)));
-      fill(target, int2(width, 0), int2(target.size.x-width, image.size.y), white, 1);
-      //fill(target, int2((scroll.offset.x+playbackLineX), 0), int2(1, image.size.y), blue, 1./2);
+      assert_(encoder.size.y >= image.size.y/2/*+keyboard.sizeHint(0).y*/, encoder.size.y, image.size.y);
+      const int width = ::min((image.size.x-(int)(-scroll.offset.x))/2, encoder.size.x);
+      toImage(cropRef(target, 0,  int2(width, image.size.y/2)),
+              downsample(cropRef(image, int2(-scroll.offset.x, 0), int2(width*2, image.size.y))));
+      fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
       for(OCRNote note: highlight) {
        const int x0 = scroll.offset.x+note.position.x;
        const int y0 = scroll.offset.y+note.position.y;
-       for(uint dy: range(templates[note.value].size.y)) for(uint dx: range(templates[note.value].size.x)) {
-        uint a = 0xFF-templates[note.value](dx, dy);
-        blend(target, x0+dx, y0+dy, note.color, a/255.f);
+       Image8 t = downsample(templates[note.value]);
+       for(uint dy: range(t.size.y)) for(uint dx: range(t.size.x)) {
+        uint a = 0xFF-t(dx, dy);
+        blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
        }
       }
-      //render(target, keyboard.graphics(vec2(target.size.x, target.size.y-image.size.y)), vec2(0, image.size.y));
-      keyboard.render(cropRef(target, int2(0, image.size.y), int2(target.size.x, target.size.y-image.size.y)));
+      const int y1 = image.size.y/2, y2=target.size.y;
+      const int height = ::min(y2-y1, 240);
+      fill(target, int2(0, y1), int2(target.size.x, (y2-height)-y1), white);
+      keyboard.render(cropRef(target, int2(0, target.size.y-height), int2(target.size.x, height)));
       renderTime.stop();
       videoEncodeTime.start();
       encoder.writeVideoFrame(target);
@@ -464,7 +477,7 @@ skip:;
     }
     if(timeTicks >= durationTicks+this->notes.ticksPerSeconds/*1sec fadeout*/) break;
     //if(video && video.videoTime >= video.duration) break;
-    //if(timeTicks > 8*this->notes.ticksPerSeconds) break; // DEBUG
+    //if(timeTicks > 4*this->notes.ticksPerSeconds) break; // DEBUG
    }
    log("Done");
   } else { // Preview
@@ -548,9 +561,8 @@ skip:;
 #endif
      }
      contentChanged = true;
-    } else {
-     keyboard.unknown.remove(note.key);
     }
+    while(keyboard.unknown.contains(note.key)) keyboard.unknown.remove(note.key);
    }
   }
 
@@ -590,7 +602,7 @@ skip:;
   return contentChanged;
  }
 
- vec2 sizeHint(vec2) override { return vec2(1920/2, 1080/2); }
+ vec2 sizeHint(vec2) override { return vec2(1920/2, 1440/2); }
  shared<Graphics> graphics(vec2 unused size) override {
   follow(audioFile->audioTime, audioFile->audioFrameRate, vec2(window->size));
   window->render();
