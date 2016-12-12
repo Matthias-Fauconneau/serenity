@@ -52,7 +52,7 @@ string trim(const string s) {
 }
 
 bool isInteger(const string s) { if(!s) return false; for(char c: s) if(c<'0'||c>'9') return false; return true; }
-int64 parseInteger(const string number, int base) { return TextData(number).integer(true, base); }
+int64 parseInteger(const string number, int base) { assert_(number); return TextData(number).integer(true, base); }
 bool isDecimal(const string s) { return TextData(s).whileDecimal().size == s.size; }
 double parseDecimal(const string number) { return TextData(number).decimal(); }
 
