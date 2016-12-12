@@ -63,7 +63,7 @@ struct Music : Widget {
  // PNG
  Map rawImageFileMap;
  Image8 image;
- //Image image;
+ Image8 imageLo;
  array<uint> measureX; // X position in image of start of each measure
  struct OCRNote {
   int confidence;
@@ -219,7 +219,7 @@ skip:;
 
    writeFile("measureX", cast<byte>(measureX), name, true);
    writeFile("OCRNotes", cast<byte>(OCRNotes), name, true);
-  }
+  } else if(0) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
   measureX = cast<uint>(readFile("measureX", name));
   OCRNotes = cast<OCRNote>(readFile("OCRNotes", name));
 
@@ -241,8 +241,9 @@ skip:;
 
   array<OCRNote> sorted; // Bins close X together
   array<OCRNote> bin; int lastX = 0;
+  assert_(templates.size==3);
   for(OCRNote note: OCRNotes) {
-   if(note.position.x > lastX+templates[0].size.x) {
+   if(note.position.x > lastX+templates[2].size.x) {
     sorted.append(bin);
     bin.clear();
     lastX = note.position.x;
@@ -411,6 +412,7 @@ skip:;
   }
   //scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
+  imageLo = downsample(image);
 
   if(encode) { // Encode
    Encoder encoder {name+".tutorial.mp4"_};
@@ -454,20 +456,23 @@ skip:;
       renderTime.start();
       assert_(encoder.size.y >= image.size.y/2/*+keyboard.sizeHint(0).y*/, encoder.size.y, image.size.y);
       const int width = ::min((image.size.x-(int)(-scroll.offset.x))/2, encoder.size.x);
-      const int y1 = image.size.y/2, y2=target.size.y;
-      const int height = ::min(y2-y1, 240);
+      const int height = ::min(target.size.y-image.size.y/2, 240);
+      const int y0 = (target.size.y-height-image.size.y/2)/2;
+      const int y1 = y0+image.size.y/2, y2=target.size.y;
       resampleTime.start();
-      toImage(cropRef(target, int2(0, (target.size.y-height-image.size.y)/2),  int2(width, image.size.y/2)),
-              downsample(cropRef(image, int2(-scroll.offset.x, 0), int2(width*2, image.size.y))));
+      const Image8 source = cropRef(imageLo, int2(-scroll.offset.x/2, 0), int2(width, image.size.y/2));
+      const Image subTarget = cropRef(target, int2(0, y0),  int2(width, image.size.y/2));
+      /*toImage(subTarget, downsample(source));*/
+      for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) subTarget(x, y) = source(x, y);
       resampleTime.stop();
       fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
       for(OCRNote note: highlight) {
-       const int x0 = scroll.offset.x+note.position.x;
-       const int y0 = scroll.offset.y+note.position.y;
+       const int x = scroll.offset.x+note.position.x;
+       const int y = scroll.offset.y+note.position.y;
        Image8 t = downsample(templates[note.value]);
        for(uint dy: range(t.size.y)) for(uint dx: range(t.size.x)) {
         uint a = 0xFF-t(dx, dy);
-        blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
+        blend(target, x/2+dx, y0+y/2+dy, note.color, a/255.f);
        }
       }
       fill(target, int2(0, y1), int2(target.size.x, (y2-height)-y1), white);
