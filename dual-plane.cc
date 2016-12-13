@@ -1,4 +1,5 @@
 #include "file.h"
+#include "variant.h"
 #include "matrix.h"
 #include "simd.h"
 #include "parallel.h"
@@ -8,6 +9,107 @@
 #include "render.h"
 #include "window.h"
 #include "view-widget.h"
+
+inline Variant parseJSON(TextData& s) {
+    s.whileAny(" \t\n\r"_);
+    if(s.match("true")) return true;
+    else if(s.match("false")) return false;
+    else if(s.match('"')) {
+        return copyRef(s.until('"'));
+    }
+    else if(s.match('{')) {
+        Dict dict;
+        s.whileAny(" \t\n\r"_);
+        if(!s.match('}')) for(;;) {
+            s.skip('"');
+            string key = s.until('"');
+            assert_(key && !dict.contains(key));
+            s.whileAny(" \t\n\r"_);
+            s.skip(':');
+            Variant value = parseJSON(s);
+            dict.insertSorted(copyRef(key), ::move(value));
+            s.whileAny(" \t\n\r"_);
+            if(s.match(',')) { s.whileAny(" \t\n\r"_); continue; }
+            if(s.match('}')) break;
+            error("Expected , or }"_);
+        }
+        return dict;
+    }
+    else if(s.match('[')) {
+        array<Variant> list;
+        s.whileAny(" \t\n\r"_);
+        if(!s.match(']')) for(;;) {
+            Variant value = parseJSON(s);
+            list.append( ::move(value) );
+            s.whileAny(" \t\n\r"_);
+            if(s.match(',')) continue;
+            if(s.match(']')) break;
+            error("Expected , or ]"_);
+        }
+        return list;
+    }
+    else {
+        string d = s.whileDecimal();
+        if(d) return parseDecimal(d);
+        else error("Unexpected"_, s.peek(16));
+    }
+}
+
+const vec2 Vec2(ref<Variant> v) { return vec2((float)v[0],(float)v[1]); }
+const vec3 Vec3(ref<Variant> v) { return vec3((float)v[0],(float)v[1],(float)v[2]); }
+
+const mat4 transform(const Dict& object) {
+    const Dict& t = object.at("transform");
+    mat4 transform;
+#if 1
+    const vec3 look_at = Vec3(t.at("look_at"));
+    const vec3 position = Vec3(t.at("position"));
+    const vec3 z = normalize(look_at - position);
+    const vec3 y = Vec3(t.at("up"));
+    y = normalize(y - dot(y,z)*z); // Projects up on plane orthogonal to z
+    const vec3 x = cross(y, z);
+    transform[0] = vec4(x, 0);
+    transform[1] = vec4(y, 0);
+    transform[2] = vec4(z, 0);
+    transform[3] = vec4(position, 0);
+#else
+    if(t.contains("position")) {
+        ref<Variant> position = t.at("position");
+        transform.translate(vec3((float)position[0],(float)position[1],(float)position[2]));
+    }
+    if(t.contains("scale")) {
+        ref<Variant> scale = t.at("scale");
+        transform.scale(vec3((float)scale[0], (float)scale[1], (float)scale[2]));
+    }
+    if(t.contains("rotation")) {
+        ref<Variant> rotation = t.at("rotation");
+        transform.rotateX(rotation[0]*PI/180);
+        transform.rotateY(rotation[1]*PI/180);
+        transform.rotateZ(rotation[2]*PI/180);
+    }
+    error(t);
+#endif
+    return transform;
+}
+
+mat4 parseCamera(ref<byte> file) {
+    TextData s (file);
+    Variant root = parseJSON(s);
+    const Dict& camera = root.dict.at("camera");
+    const mat4 modelView = ::transform( camera ).inverse();
+    const float fov = float(camera.at("fov"))*PI/180;
+    const float S = 1/(tan(fov/2));
+    const vec2 resolution = Vec2(camera.at("resolution"));
+    mat4 M; // perspective
+    M(0,0) = S;
+    M(1,1) = S*resolution.y/resolution.x;
+    const float near = 0.01, far = 100; // FIXME
+    M(2,2) = -far/(far-near);
+    M(2,3) = -1;
+    M(3,2) = -(far*near)/(far-near);
+    M(3,3) = 0;
+    return M * modelView;
+}
 
 static Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
@@ -50,10 +152,13 @@ struct Render {
         //field.clear(); // Explicitly clears to avoid performance skew from clear on page faults (and forces memory allocation)
 
         Time time (true); Time lastReport (true);
-        parallel_for(0, N*N, [&](uint unused threadID, size_t stIndex) {
-        //for(int stIndex: range(N*N)) {
+        //parallel_for(0, N*N, [&](uint unused threadID, size_t stIndex) {
+        for(int stIndex: range(N*N)) {
             int sIndex = stIndex%N, tIndex = stIndex/N;
             if(lastReport.seconds()>1) { log(strD(stIndex,N*N)); lastReport.reset(); }
+
+            mat4 camera = parseCamera(readFile("st="+str(sIndex-N/2)+","+str(tIndex-N/2)+".json", Folder("configurations", sourceFolder)));
+            error(camera);
 
             // Sheared perspective (rectification)
             const float s = sIndex/float(N-1), t = tIndex/float(N-1);
@@ -93,7 +198,7 @@ struct Render {
                 R(x, y) = sRGB_reverse_half[source(x, y).r];
             }
 #endif
-        });
+        }//);
         log("Rendered",strx(uint2(N)),"x",strx(size),"images in", time);
     }
 } prerender;
