@@ -5,8 +5,6 @@
 #include "math.h"
 #include "map.h"
 
-static inline double round(double x) { return __builtin_round(x); }
-
 // -- sRGB --
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)

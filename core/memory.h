@@ -3,9 +3,13 @@
 #include "core.h"
 
 // C runtime memory allocation
+#if 1
+#include <stdlib.h>
+#else
 extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
+#endif
 
 #if __INTEL_COMPILER
 #define __atomic_fetch_add __atomic_fetch_add_explicit

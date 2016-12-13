@@ -125,7 +125,7 @@ struct atomic {
 };
 
 // -- initializer_list
-
+#ifndef _LIBCPP_INITIALIZER_LIST
 namespace std {
 generic struct initializer_list {
  const T* data;
@@ -136,6 +136,7 @@ generic struct initializer_list {
  constexpr const T* end() const { return (T*)data+length; }
 };
 }
+#endif
 
 // -- ref
 
@@ -225,6 +226,7 @@ template<> void __attribute((noreturn)) error(const string& message);
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) assert_(expr, ## message)
 #else
+#undef assert
 #define assert(expr, message...) ({})
 #endif
 
@@ -245,8 +247,10 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 // -- mref
 
 /// Initializes memory using a constructor (placement new)
-inline void* operator new(size_t, void* p) /*noexcept*/ { return p; }
-inline void operator delete(void*, void*) /*noexcept*/ {}
+#ifndef _LIBCPP_NEW
+inline void* operator new(size_t, void* p) noexcept { return p; }
+inline void operator delete(void*, void*) noexcept {}
+#endif
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
