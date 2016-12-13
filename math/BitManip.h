@@ -1,12 +1,7 @@
-#ifndef BITMANIP_HPP_
-#define BITMANIP_HPP_
-
+#pragma once
 #include "IntTypes.h"
-
 #include <memory>
 #include <string>
-
-namespace Tungsten {
 
 class BitManip
 {
@@ -87,7 +82,3 @@ public:
         return result;
     }
 };
-
-}
-
-#endif /* BITMANIP_HPP_ */

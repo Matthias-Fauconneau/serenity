@@ -1,9 +1,5 @@
-#ifndef ROUGHWIREBCSDF_HPP_
-#define ROUGHWIREBCSDF_HPP_
-
+#pragma once
 #include "bsdfs/Bsdf.h"
-
-namespace Tungsten {
 
 class RoughWireBcsdf : public Bsdf
 {
@@ -37,7 +33,3 @@ public:
 
     virtual void prepareForRender() override;
 };
-
-}
-
-#endif /* ROUGHWIREBCSDF_HPP_ */

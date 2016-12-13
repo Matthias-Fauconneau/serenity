@@ -1,16 +1,8 @@
-#ifndef BVH_PRIMITIVE_HPP_
-#define BVH_PRIMITIVE_HPP_
-
+#pragma once
 #include "math/Vec.h"
 #include "math/Box.h"
-
 #include "AlignedAllocator.h"
-
 #include <vector>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class Primitive
 {
@@ -62,9 +54,3 @@ public:
 };
 
 typedef std::vector<Primitive, AlignedAllocator<Primitive, 16>> PrimVector;
-
-}
-
-}
-
-#endif /* BVH_PRIMITIVE_HPP_ */

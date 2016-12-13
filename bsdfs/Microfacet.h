@@ -1,13 +1,8 @@
-#ifndef MICROFACET_HPP_
-#define MICROFACET_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "Debug.h"
-
-namespace Tungsten {
 
 class Microfacet
 {
@@ -136,7 +131,3 @@ public:
         return Vec3f(std::cos(phi)*r, std::sin(phi)*r, cosTheta);
     }
 };
-
-}
-
-#endif /* MICROFACET_HPP_ */

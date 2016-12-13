@@ -2,15 +2,10 @@
 #include "Microfacet.h"
 #include "ComplexIor.h"
 #include "Fresnel.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 RoughConductorBsdf::RoughConductorBsdf()
 : _distributionName("ggx"),
@@ -133,7 +128,3 @@ void RoughConductorBsdf::prepareForRender()
 {
     _distribution = Microfacet::stringToType(_distributionName);
 }
-
-}
-
-

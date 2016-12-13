@@ -1,12 +1,7 @@
-#ifndef SCATTEREVENT_HPP_
-#define SCATTEREVENT_HPP_
-
+#pragma once
 #include "bsdfs/BsdfLobes.h"
-
 #include "math/TangentFrame.h"
 #include "math/Vec.h"
-
-namespace Tungsten {
 
 struct IntersectionInfo;
 class PathSampleGenerator;
@@ -64,7 +59,3 @@ struct SurfaceScatterEvent
         return copy;
     }
 };
-
-}
-
-#endif /* SCATTEREVENT_HPP_ */

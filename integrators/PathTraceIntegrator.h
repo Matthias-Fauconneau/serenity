@@ -1,26 +1,15 @@
-#ifndef PATHTRACEINTEGRATOR_HPP_
-#define PATHTRACEINTEGRATOR_HPP_
-
 #include "PathTracerSettings.h"
 #include "SampleRecord.h"
 #include "PathTracer.h"
-
 #include "integrators/Integrator.h"
 #include "integrators/ImageTile.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/UniformSampler.h"
-
-#include "thread/TaskGroup.h"
-
 #include "math/MathUtil.h"
-
 #include <thread>
 #include <memory>
 #include <vector>
 #include <atomic>
-
-namespace Tungsten {
 
 struct PathTraceIntegrator : public Integrator
 {
@@ -29,8 +18,6 @@ struct PathTraceIntegrator : public Integrator
     static constexpr uint32 AdaptiveThreshold = 16;
 
     PathTracerSettings _settings;
-
-    std::shared_ptr<TaskGroup> _group;
 
     uint32 _w;
     uint32 _h;
@@ -73,7 +60,3 @@ public:
         return _settings;
     }
 };
-
-}
-
-#endif /* PATHTRACEINTEGRATOR_HPP_ */

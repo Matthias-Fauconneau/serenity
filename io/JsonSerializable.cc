@@ -2,8 +2,6 @@
 
 #include "io/JsonUtils.h"
 
-namespace Tungsten {
-
 JsonSerializable::JsonSerializable(const std::string &name)
 : _name(name)
 {
@@ -20,6 +18,4 @@ rapidjson::Value JsonSerializable::toJson(Allocator &allocator) const
     if (!unnamed())
         v.AddMember("name", JsonUtils::toJson(_name, allocator), allocator);
     return std::move(v);
-}
-
 }

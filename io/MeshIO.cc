@@ -5,10 +5,6 @@
 
 #include "tinyformat.h"
 
-namespace Tungsten {
-
-namespace MeshIO {
-
 bool loadWo3(const Path &path, std::vector<Vertex> &verts, std::vector<TriangleI> &tris)
 {
 
@@ -83,8 +79,4 @@ bool save(const Path &path, const std::vector<Vertex> &verts, const std::vector<
     else if (path.testExtension("obj"))
         return saveObj(path, verts, tris);
     return false;
-}
-
-}
-
 }

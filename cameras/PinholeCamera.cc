@@ -9,8 +9,6 @@
 
 #include <cmath>
 
-namespace Tungsten {
-
 PinholeCamera::PinholeCamera()
 : Camera(),
   _fovDeg(60.0f)
@@ -146,6 +144,4 @@ float PinholeCamera::directionPdf(const PositionSample &/*point*/, const Directi
 bool PinholeCamera::isDirac() const
 {
     return true;
-}
-
 }

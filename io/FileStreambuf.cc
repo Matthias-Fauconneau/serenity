@@ -1,8 +1,5 @@
 #include "FileStreambuf.h"
-
 #include <cstring>
-
-namespace Tungsten {
 
 constexpr size_t FileInputStreambuf::PutBackSize;
 constexpr size_t FileInputStreambuf::BufferSize;
@@ -42,13 +39,7 @@ std::streampos FileInputStreambuf::seekpos(std::streampos pos, std::ios_base::op
 {
     char *end = _buffer.get() + BufferSize;
     setg(end, end, end);
-#if _WIN32
-    return _fseeki64(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#elif __APPLE__
-    return fseeko(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#else
     return fseeko64(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#endif
 }
 
 std::streampos FileInputStreambuf::seekoff(std::streamoff off, std::ios_base::seekdir way,
@@ -64,13 +55,7 @@ std::streampos FileInputStreambuf::seekoff(std::streamoff off, std::ios_base::se
         setg(end, end, end);
     }
 
-#if _WIN32
-    return _fseeki64(_file.get(), off, whence) == 0 ? _ftelli64(_file.get()) : -1;
-#elif __APPLE__
-    return fseeko(_file.get(), off, whence) == 0 ? ftello(_file.get()) : -1;
-#else
     return fseeko64(_file.get(), off, whence) == 0 ? ftello64(_file.get()) : -1;
-#endif
 }
 
 FileOutputStreambuf::FileOutputStreambuf(AutoFilePtr file)
@@ -110,13 +95,7 @@ int FileOutputStreambuf::sync()
 std::streampos FileOutputStreambuf::seekpos(std::streampos pos, std::ios_base::openmode /*which*/)
 {
     sync();
-#if _WIN32
-    return _fseeki64(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#elif __APPLE__
-    return fseeko(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#else
     return fseeko64(_file.get(), pos, SEEK_SET) == 0 ? pos : FailurePos;
-#endif
 }
 
 std::streampos FileOutputStreambuf::seekoff(std::streamoff off, std::ios_base::seekdir way,
@@ -127,14 +106,5 @@ std::streampos FileOutputStreambuf::seekoff(std::streamoff off, std::ios_base::s
         way == std::ios_base::cur ? SEEK_CUR :
                                     SEEK_END;
     sync();
-
-#if _WIN32
-    return _fseeki64(_file.get(), off, whence) == 0 ? _ftelli64(_file.get()) : -1;
-#elif __APPLE__
-    return fseeko(_file.get(), off, whence) == 0 ? ftello(_file.get()) : -1;
-#else
     return fseeko64(_file.get(), off, whence) == 0 ? ftello64(_file.get()) : -1;
-#endif
-}
-
 }

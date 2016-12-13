@@ -1,7 +1,5 @@
 #include "TraceBase.h"
 
-namespace Tungsten {
-
 TraceBase::TraceBase(TraceableScene *scene, const TraceSettings &settings, uint32 threadId)
 : _scene(scene),
   _settings(settings),
@@ -573,6 +571,4 @@ void TraceBase::handleInfiniteLights(IntersectionTemporary &data,
         if (!enableLightSampling || wasSpecular || !info.primitive->isSamplable())
             emission += throughput*info.primitive->evalDirect(data, info);
     }
-}
-
 }

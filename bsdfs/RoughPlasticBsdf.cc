@@ -1,22 +1,15 @@
 #include "RoughPlasticBsdf.h"
 #include "RoughDielectricBsdf.h"
 #include "Fresnel.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 RoughPlasticBsdf::RoughPlasticBsdf()
 : _ior(1.5f),
@@ -180,6 +173,4 @@ void RoughPlasticBsdf::prepareForRender()
     _distribution = Microfacet::stringToType(_distributionName);
 
     _diffuseFresnel = Fresnel::computeDiffuseFresnel(_ior, 1000000);
-}
-
 }

@@ -1,15 +1,10 @@
 #include "HenyeyGreensteinPhaseFunction.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/TangentFrame.h"
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 HenyeyGreensteinPhaseFunction::HenyeyGreensteinPhaseFunction()
 : _g(0.0f)
@@ -66,6 +61,4 @@ bool HenyeyGreensteinPhaseFunction::sample(PathSampleGenerator &sampler, const V
 float HenyeyGreensteinPhaseFunction::pdf(const Vec3f &wi, const Vec3f &wo) const
 {
     return henyeyGreenstein(wi.dot(wo));
-}
-
 }

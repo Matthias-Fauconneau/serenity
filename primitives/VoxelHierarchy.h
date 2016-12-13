@@ -1,14 +1,9 @@
-#ifndef VOXELHIERARCHY_HPP_
-#define VOXELHIERARCHY_HPP_
-
+#pragma once
 #include "math/Vec.h"
 #include "math/Ray.h"
-
 #include <memory>
 #include <limits>
 #include <array>
-
-namespace Tungsten {
 
 template<int SizePower, int NumLevels, typename ElementType>
 class VoxelHierarchy
@@ -234,9 +229,3 @@ public:
         iterateNonZeroVoxels(visitor, NumLevels - 1, 0, 0, 0, 0);
     }
 };
-
-}
-
-
-
-#endif /* VOXELHIERARCHY_HPP_ */

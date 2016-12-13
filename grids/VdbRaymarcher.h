@@ -1,12 +1,8 @@
-#ifndef VDBRAYMARCHER_HPP_
-#define VDBRAYMARCHER_HPP_
-
+#pragma once
 #if OPENVDB_AVAILABLE
 
 #include <openvdb/openvdb.h>
 #include <openvdb/math/DDA.h>
-
-namespace Tungsten {
 
 class DdaRay
 {
@@ -82,8 +78,4 @@ public:
     }
 };
 
-}
-
 #endif
-
-#endif /* VDBRAYMARCHER_HPP_ */

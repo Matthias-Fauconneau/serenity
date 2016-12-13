@@ -1,15 +1,8 @@
-#ifndef VDBGRID_HPP_
-#define VDBGRID_HPP_
-
+#pragma once
 #if OPENVDB_AVAILABLE
-
 #include "Grid.h"
-
 #include "io/FileUtils.h"
-
 #include <openvdb/openvdb.h>
-
-namespace Tungsten {
 
 class VdbGrid : public Grid
 {
@@ -73,8 +66,4 @@ public:
             float sigmaT, float xi) const override;
 };
 
-}
-
 #endif
-
-#endif /* VDBGRID_HPP_ */

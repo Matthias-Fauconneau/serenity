@@ -1,13 +1,7 @@
-#ifndef ATMOSPHERICMEDIUM_HPP_
-#define ATMOSPHERICMEDIUM_HPP_
-
+#pragma once
 #include "Medium.h"
-
 #include "materials/Texture.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 class AtmosphericMedium : public Medium
 {
@@ -51,7 +45,3 @@ public:
     virtual Vec3f transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray &ray, bool startOnSurface,
             bool endOnSurface, float &pdfForward, float &pdfBackward) const override;
 };
-
-}
-
-#endif /* ATMOSPHERICMEDIUM_HPP_ */

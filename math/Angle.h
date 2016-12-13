@@ -1,9 +1,5 @@
-#ifndef ANGLE_HPP_
-#define ANGLE_HPP_
-
+#pragma once
 #include <cmath>
-
-namespace Tungsten {
 
 constexpr float PI          = 3.1415926536f;
 constexpr float PI_HALF     = PI*0.5f;
@@ -33,7 +29,3 @@ public:
         return std::fmod(std::fmod(a, TWO_PI) + TWO_PI, TWO_PI);
     }
 };
-
-}
-
-#endif /* ANGLE_HPP_ */

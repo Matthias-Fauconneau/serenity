@@ -1,9 +1,4 @@
-#ifndef BSPLINE_HPP_
-#define BSPLINE_HPP_
-
-namespace Tungsten {
-
-namespace BSpline {
+#pragma once
 
 // http://www.answers.com/topic/b-spline
 template<typename T>
@@ -33,9 +28,3 @@ inline Vec2f quadraticMinMax(float p0, float p1, float p2)
     }
     return Vec2f(xMin, xMax);
 }
-
-}
-
-}
-
-#endif /* BSPLINE_HPP_ */

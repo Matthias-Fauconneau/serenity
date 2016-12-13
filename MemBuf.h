@@ -1,11 +1,8 @@
-#ifndef MEMBUF_HPP_
-#define MEMBUF_HPP_
-
+#pragma once
 #include <streambuf>
 
 using std::basic_streambuf;
 
-namespace Tungsten {
 
 class MemBuf : public basic_streambuf<char>
 {
@@ -16,7 +13,3 @@ public:
         setp(p, p + n);
     }
 };
-
-}
-
-#endif /* MEMBUF_HPP_ */

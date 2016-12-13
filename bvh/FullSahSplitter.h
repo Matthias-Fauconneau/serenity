@@ -1,14 +1,7 @@
-#ifndef FULLSAHSPLITTER_HPP_
-#define FULLSAHSPLITTER_HPP_
-
+#pragma once
 #include "Primitive.h"
 #include "Splitter.h"
-
 #include <algorithm>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class FullSahSplitter
 {
@@ -81,10 +74,3 @@ public:
     }
 };
 
-}
-
-}
-
-
-
-#endif /* FULLSAHSPLITTER_HPP_ */

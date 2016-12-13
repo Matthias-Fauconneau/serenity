@@ -1,9 +1,5 @@
-#ifndef POSITIONSAMPLE_HPP_
-#define POSITIONSAMPLE_HPP_
-
+#pragma once
 #include "primitives/IntersectionInfo.h"
-
-namespace Tungsten {
 
 struct PositionSample
 {
@@ -24,7 +20,3 @@ struct PositionSample
     {
     }
 };
-
-}
-
-#endif /* POSITIONSAMPLE_HPP_ */

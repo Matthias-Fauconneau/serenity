@@ -1,11 +1,7 @@
-#ifndef OUTPUTBUFFERSETTINGS_HPP_
-#define OUTPUTBUFFERSETTINGS_HPP_
-
+#pragma once
 #include "io/JsonSerializable.h"
 #include "io/JsonObject.h"
 #include "io/FileUtils.h"
-
-namespace Tungsten {
 
 enum OutputBufferType
 {
@@ -137,7 +133,3 @@ public:
     }
 
 };
-
-}
-
-#endif /* OUTPUTBUFFERSETTINGS_HPP_ */

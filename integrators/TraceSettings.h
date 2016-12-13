@@ -1,9 +1,4 @@
-#ifndef TRACESETTINGS_HPP_
-#define TRACESETTINGS_HPP_
-
 #include "io/JsonUtils.h"
-
-namespace Tungsten {
 
 struct TraceSettings
 {
@@ -38,7 +33,3 @@ struct TraceSettings
         return v;
     }
 };
-
-}
-
-#endif /* TRACESETTINGS_HPP_ */

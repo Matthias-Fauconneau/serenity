@@ -1,12 +1,7 @@
-#ifndef GRID_HPP_
-#define GRID_HPP_
-
+#pragma once
 #include "math/Mat4f.h"
 #include "math/Box.h"
-
 #include "io/JsonSerializable.h"
-
-namespace Tungsten {
 
 class PathSampleGenerator;
 
@@ -24,7 +19,3 @@ public:
     virtual Vec2f inverseOpticalDepth(PathSampleGenerator &sampler, Vec3f p, Vec3f w, float t0, float t1,
             float sigmaT, float xi) const = 0;
 };
-
-}
-
-#endif /* GRID_HPP_ */

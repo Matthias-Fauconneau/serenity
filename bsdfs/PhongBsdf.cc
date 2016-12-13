@@ -1,17 +1,11 @@
 #include "PhongBsdf.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/TangentFrame.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 PhongBsdf::PhongBsdf(float exponent, float diffuseRatio)
 : _exponent(exponent),
@@ -129,6 +123,4 @@ void PhongBsdf::prepareForRender()
     _invExponent = 1.0f/(1.0f + _exponent);
     _pdfFactor   = (_exponent + 1.0f)*INV_TWO_PI;
     _brdfFactor  = (_exponent + 2.0f)*INV_TWO_PI;
-}
-
 }

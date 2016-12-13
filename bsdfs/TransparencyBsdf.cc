@@ -8,8 +8,6 @@
 #include "io/JsonObject.h"
 #include "io/Scene.h"
 
-namespace Tungsten {
-
 TransparencyBsdf::TransparencyBsdf()
 : _opacity(std::make_shared<ConstantTexture>(1.0f)),
   _base(std::make_shared<LambertBsdf>())
@@ -60,6 +58,4 @@ float TransparencyBsdf::pdf(const SurfaceScatterEvent &event) const
 void TransparencyBsdf::prepareForRender()
 {
     _lobes = BsdfLobes(BsdfLobes::ForwardLobe, _base->lobes());
-}
-
 }

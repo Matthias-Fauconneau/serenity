@@ -1,9 +1,5 @@
-#ifndef LIGHTSAMPLE_HPP_
-#define LIGHTSAMPLE_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
-namespace Tungsten {
 
 class Medium;
 
@@ -14,7 +10,3 @@ struct LightSample
     float pdf;
     const Medium *medium;
 };
-
-}
-
-#endif /* LIGHTSAMPLE_HPP_ */

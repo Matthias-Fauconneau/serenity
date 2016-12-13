@@ -1,38 +1,23 @@
-#ifndef TRACEBASE_HPP_
-#define TRACEBASE_HPP_
-
 #include "TraceSettings.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
 #include "samplerecords/MediumSample.h"
 #include "samplerecords/LightSample.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/UniformSampler.h"
 #include "sampling/Distribution1D.h"
 #include "sampling/SampleWarp.h"
-
 #include "renderer/TraceableScene.h"
-
 #include "cameras/Camera.h"
-
 #include "media/Medium.h"
-
 #include "math/TangentFrame.h"
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include "bsdfs/Bsdf.h"
-
 #include <vector>
 #include <memory>
 #include <cmath>
 
-namespace Tungsten {
-
-struct TraceBase
-{
-
+struct TraceBase {
     const TraceableScene *_scene;
     TraceSettings _settings;
     uint32 _threadId;
@@ -173,7 +158,3 @@ public:
             IntersectionInfo &info, bool enableLightSampling, Ray &ray,
             Vec3f throughput, bool wasSpecular, Vec3f &emission);
 };
-
-}
-
-#endif /* TRACEBASE_HPP_ */

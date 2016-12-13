@@ -1,16 +1,8 @@
 #include "FileIterator.h"
-
-#ifdef _MSC_VER
-#include <dirent/dirent.h>
-#else
 #include <sys/stat.h>
 #include <dirent.h>
-#endif
 #include <cstring>
-
 #include <iostream>
-
-namespace Tungsten {
 
 FileIterator::FileIterator()
 : _openDir(nullptr)
@@ -71,6 +63,4 @@ Path &FileIterator::operator*()
 const Path &FileIterator::operator*() const
 {
     return _currentEntry;
-}
-
 }

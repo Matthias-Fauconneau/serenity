@@ -1,15 +1,8 @@
-#ifndef SIMDFLOAT_HPP_
-#define SIMDFLOAT_HPP_
-
+#pragma once
 #include "SimdBool.h"
-
 #include "math/MathUtil.h"
-
 #include "IntTypes.h"
-
 #include <immintrin.h>
-
-namespace Tungsten {
 
 template<uint32 N>
 class SimdFloat
@@ -58,9 +51,9 @@ class SimdFloat<1>
 {
     float _a;
 
-    friend SimdFloat<1> min(const Tungsten::SimdFloat<1> &, const Tungsten::SimdFloat<1> &);
-    friend SimdFloat<1> max(const Tungsten::SimdFloat<1> &, const Tungsten::SimdFloat<1> &);
-    friend SimdFloat<1> sqrt(const Tungsten::SimdFloat<1> &);
+    friend SimdFloat<1> min(const SimdFloat<1> &, const SimdFloat<1> &);
+    friend SimdFloat<1> max(const SimdFloat<1> &, const SimdFloat<1> &);
+    friend SimdFloat<1> sqrt(const SimdFloat<1> &);
 public:
     static constexpr uint32 n = 1;
     static constexpr size_t Alignment = sizeof(float);
@@ -116,9 +109,9 @@ class SimdFloat<4>
         uint32 _i[4];
     };
 
-    friend SimdFloat<4> min(const Tungsten::SimdFloat<4> &, const Tungsten::SimdFloat<4> &);
-    friend SimdFloat<4> max(const Tungsten::SimdFloat<4> &, const Tungsten::SimdFloat<4> &);
-    friend SimdFloat<4> sqrt(const Tungsten::SimdFloat<4> &);
+    friend SimdFloat<4> min(const SimdFloat<4> &, const SimdFloat<4> &);
+    friend SimdFloat<4> max(const SimdFloat<4> &, const SimdFloat<4> &);
+    friend SimdFloat<4> sqrt(const SimdFloat<4> &);
 public:
     static constexpr uint32 n = 4;
     static constexpr size_t Alignment = 4*sizeof(float);
@@ -211,9 +204,9 @@ class SimdFloat<8>
     {
     }
 
-    friend SimdFloat<8> min(const Tungsten::SimdFloat<8> &, const Tungsten::SimdFloat<8> &);
-    friend SimdFloat<8> max(const Tungsten::SimdFloat<8> &, const Tungsten::SimdFloat<8> &);
-    friend SimdFloat<8> sqrt(const Tungsten::SimdFloat<8> &);
+    friend SimdFloat<8> min(const SimdFloat<8> &, const SimdFloat<8> &);
+    friend SimdFloat<8> max(const SimdFloat<8> &, const SimdFloat<8> &);
+    friend SimdFloat<8> sqrt(const SimdFloat<8> &);
 
 public:
     static constexpr uint32 n = 8;
@@ -302,27 +295,21 @@ inline SimdFloat<8> max(const SimdFloat<8> &a, const SimdFloat<8> &b)
 }
 #endif
 
-inline Tungsten::SimdFloat<1> sqrt(const Tungsten::SimdFloat<1> &a)
+inline SimdFloat<1> sqrt(const SimdFloat<1> &a)
 {
-    return Tungsten::SimdFloat<1>(std::sqrt(a._a));
+    return SimdFloat<1>(std::sqrt(a._a));
 }
 
 #ifdef __SSE__
-inline Tungsten::SimdFloat<4> sqrt(const Tungsten::SimdFloat<4> &a)
+inline SimdFloat<4> sqrt(const SimdFloat<4> &a)
 {
-    return Tungsten::SimdFloat<4>(_mm_sqrt_ps(a._a));
+    return SimdFloat<4>(_mm_sqrt_ps(a._a));
 }
 #endif
 
 #ifdef __AVX__
-inline Tungsten::SimdFloat<8> sqrt(const Tungsten::SimdFloat<8> &a)
+inline SimdFloat<8> sqrt(const SimdFloat<8> &a)
 {
-    return Tungsten::SimdFloat<8>(_mm256_sqrt_ps(a._a));
+    return SimdFloat<8>(_mm256_sqrt_ps(a._a));
 }
 #endif
-
-
-}
-
-
-#endif /* SIMDFLOAT_HPP_ */

@@ -4,9 +4,6 @@
 #include "MidpointSplitter.h"
 #include "FullSahSplitter.h"
 
-#include "thread/ThreadUtils.h"
-#include "thread/ThreadPool.h"
-
 #include "math/MathUtil.h"
 #include "math/Box.h"
 #include "math/Vec.h"
@@ -16,10 +13,6 @@
 #include "Timer.h"
 
 #include <algorithm>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 struct BuildResult
 {
@@ -169,9 +162,6 @@ void BvhBuilder::build(PrimVector prims)
 {
     if (prims.empty())
         return;
-#ifndef NDEBUG
-    Timer timer;
-#endif
     Box3fp geomBounds, centroidBounds;
     for (const Primitive &p : prims) {
         geomBounds.grow(p.box());
@@ -182,12 +172,6 @@ void BvhBuilder::build(PrimVector prims)
     recursiveBuild(result, *_root, 0, uint32(prims.size() - 1), prims, narrow(geomBounds), narrow(centroidBounds), _branchFactor);
     _numNodes = result.nodeCount;
     _depth = result.depth;
-
-#ifndef NDEBUG
-    timer.bench("Recursive build finished");
-
-    integrityCheck(*_root, 0);
-#endif
 }
 
 void BvhBuilder::integrityCheck(const NaiveBvhNode &node, int depth) const
@@ -200,8 +184,4 @@ void BvhBuilder::integrityCheck(const NaiveBvhNode &node, int depth) const
                 "Child box not contained! %s c/ %s at %d",
                 node.child(i)->bbox(), node.bbox(), depth);
     }
-}
-
-}
-
 }

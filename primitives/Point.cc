@@ -1,14 +1,9 @@
 #include "Point.h"
 #include "TriangleMesh.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "io/JsonObject.h"
-
 #include "Debug.h"
-
-namespace Tungsten {
 
 Point::Point(Mat4f &transform)
 {
@@ -193,6 +188,4 @@ void Point::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)
 Primitive *Point::clone()
 {
     return new Point(_transform);
-}
-
 }

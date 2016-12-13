@@ -1,11 +1,6 @@
-#ifndef IMAGETILE_HPP_
-#define IMAGETILE_HPP_
-
+#pragma once
 #include "IntTypes.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 class PathSampleGenerator;
 
@@ -30,7 +25,3 @@ struct ImageTile
     {
     }
 };
-
-}
-
-#endif /* IMAGETILE_HPP_ */

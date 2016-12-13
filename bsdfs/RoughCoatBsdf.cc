@@ -2,15 +2,10 @@
 #include "RoughDielectricBsdf.h"
 #include "RoughConductorBsdf.h"
 #include "Fresnel.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 RoughCoatBsdf::RoughCoatBsdf()
 : _ior(1.3f),
@@ -247,6 +242,4 @@ void RoughCoatBsdf::prepareForRender()
     _avgTransmittance = std::exp(-2.0f*_scaledSigmaA.avg());
     _distribution = Microfacet::stringToType(_distributionName);
     _lobes = BsdfLobes(BsdfLobes::GlossyReflectionLobe, _substrate->lobes());
-}
-
 }

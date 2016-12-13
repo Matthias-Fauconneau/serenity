@@ -1,17 +1,7 @@
 #include "CliParser.h"
-
 #include "Platform.h"
 #include "Debug.h"
-
 #include "math/MathUtil.h"
-
-#if _WIN32
-#include "io/UnicodeUtils.h"
-
-#include <windows.h>
-#endif
-
-namespace Tungsten {
 
 CliParser::CliParser(const std::string &programName, const std::string &usage)
 : _programName(programName),
@@ -127,6 +117,4 @@ const std::string &CliParser::param(int token) const
         FAIL("Could not find option corresponding to token %i", token);
 
     return _options[iter->second].param;
-}
-
 }

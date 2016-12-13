@@ -1,14 +1,9 @@
-#ifndef VOXELOCTREE_HPP_
-#define VOXELOCTREE_HPP_
-
+#pragma once
 #include "math/Vec.h"
 #include "math/Ray.h"
-
 #include <memory>
 #include <limits>
 #include <array>
-
-namespace Tungsten {
 
 template<int NumLevels, typename ElementType>
 class VoxelOctree
@@ -241,7 +236,3 @@ public:
         iterateNonZeroVoxels(visitor, NumLevels - 1, 0, 0, 0, 0);
     }
 };
-
-}
-
-#endif /* VOXELOCTREE_HPP_ */

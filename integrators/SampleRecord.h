@@ -1,12 +1,6 @@
-#ifndef SAMPLERECORD_HPP_
-#define SAMPLERECORD_HPP_
-
 #include "math/MathUtil.h"
 #include "math/Vec.h"
-
 #include "io/FileUtils.h"
-
-namespace Tungsten {
 
 struct SampleRecord
 {
@@ -64,7 +58,3 @@ struct SampleRecord
         return variance()/(sampleCount*max(mean*mean, 1e-3f));
     }
 };
-
-}
-
-#endif /* SAMPLERECORD_HPP_ */

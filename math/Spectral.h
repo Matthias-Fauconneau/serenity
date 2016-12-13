@@ -1,12 +1,6 @@
-#ifndef SPECTRAL_HPP_
-#define SPECTRAL_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
 #include "math/Vec.h"
-
-namespace Tungsten {
-
-namespace Spectral {
 
 static constexpr int CIE_samples = 471;
 static constexpr float CIE_Min = 360.0f;
@@ -41,9 +35,3 @@ static inline Vec3f wavelengthToRgb(float lambda)
 {
     return xyzToRgb(wavelengthToXyz(lambda));
 }
-
-}
-
-}
-
-#endif /* SPECTRAL_HPP_ */

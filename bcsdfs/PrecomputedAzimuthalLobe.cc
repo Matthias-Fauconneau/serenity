@@ -1,7 +1,5 @@
 #include "PrecomputedAzimuthalLobe.h"
 
-namespace Tungsten {
-
 constexpr int PrecomputedAzimuthalLobe::AzimuthalResolution;
 
 PrecomputedAzimuthalLobe::PrecomputedAzimuthalLobe(std::unique_ptr<Vec3f[]> table)
@@ -28,6 +26,4 @@ PrecomputedAzimuthalLobe::PrecomputedAzimuthalLobe(std::unique_ptr<Vec3f[]> tabl
     }
 
     _sampler.reset(new InterpolatedDistribution1D(std::move(weights), Size, Size));
-}
-
 }

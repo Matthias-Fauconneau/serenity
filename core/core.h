@@ -125,18 +125,7 @@ struct atomic {
 };
 
 // -- initializer_list
-#ifndef _LIBCPP_INITIALIZER_LIST
-namespace std {
-generic struct initializer_list {
- const T* data;
- size_t length;
- constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
- constexpr size_t size() const /*noexcept*/ { return length; }
- constexpr const T* begin() const /*noexcept*/ { return data; }
- constexpr const T* end() const { return (T*)data+length; }
-};
-}
-#endif
+#include <initializer_list>
 
 // -- ref
 

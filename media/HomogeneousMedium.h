@@ -1,9 +1,5 @@
-#ifndef HOMOGENEOUSMEDIUM_HPP_
-#define HOMOGENEOUSMEDIUM_HPP_
-
+#pragma once
 #include "Medium.h"
-
-namespace Tungsten {
 
 class HomogeneousMedium : public Medium
 {
@@ -38,7 +34,3 @@ public:
     Vec3f sigmaA() const { return _sigmaA; }
     Vec3f sigmaS() const { return _sigmaS; }
 };
-
-}
-
-#endif /* HOMOGENEOUSMEDIUM_HPP_ */

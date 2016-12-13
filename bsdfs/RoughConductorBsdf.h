@@ -1,10 +1,5 @@
-#ifndef ROUGHCONDUCTORBSDF_HPP_
-#define ROUGHCONDUCTORBSDF_HPP_
-
 #include "Bsdf.h"
 #include "Microfacet.h"
-
-namespace Tungsten {
 
 class RoughConductorBsdf : public Bsdf
 {
@@ -81,7 +76,3 @@ public:
         _roughness = roughness;
     }
 };
-
-}
-
-#endif /* ROUGHCONDUCTORBSDF_HPP_ */

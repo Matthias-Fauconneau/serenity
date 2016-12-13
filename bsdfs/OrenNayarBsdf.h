@@ -1,9 +1,5 @@
-#ifndef ORENNAYARBSDF_HPP_
-#define ORENNAYARBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -31,7 +27,3 @@ public:
         _roughness = roughness;
     }
 };
-
-}
-
-#endif /* ORENNAYARBSDF_HPP_ */

@@ -6,10 +6,6 @@
 #include <cstdlib>
 #include <cstdio>
 
-namespace Tungsten {
-
-namespace JsonUtils {
-
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name)
 {
     auto member = v.FindMember(name);
@@ -360,8 +356,4 @@ std::string jsonToString(const rapidjson::Document &document)
     document.Accept(writer);
     // Yes, the string is copied here. stringstream does not allow moving the result out (boo!)
     return out.sstream.str();
-}
-
-}
-
 }

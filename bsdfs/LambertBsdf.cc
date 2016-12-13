@@ -1,16 +1,10 @@
 #include "LambertBsdf.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 LambertBsdf::LambertBsdf()
 {
@@ -53,6 +47,4 @@ float LambertBsdf::pdf(const SurfaceScatterEvent &event) const
     if (event.wi.z() <= 0.0f || event.wo.z() <= 0.0f)
         return 0.0f;
     return SampleWarp::cosineHemispherePdf(event.wo);
-}
-
 }

@@ -1,12 +1,8 @@
 #include "Disk.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 struct DiskIntersection
 {
@@ -323,6 +319,4 @@ void Disk::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &bsdf)
 Primitive *Disk::clone()
 {
     return new Disk(*this);
-}
-
 }

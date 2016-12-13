@@ -1,9 +1,5 @@
 #include "EmbreeUtil.h"
 
-namespace Tungsten {
-
-namespace EmbreeUtil {
-
 static RTCDevice globalDevice = nullptr;
 
 void initDevice()
@@ -14,8 +10,4 @@ void initDevice()
 RTCDevice getDevice()
 {
     return globalDevice;
-}
-
-}
-
 }

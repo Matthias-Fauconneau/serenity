@@ -1,11 +1,5 @@
-#ifndef OBJMATERIAL_HPP_
-#define OBJMATERIAL_HPP_
-
 #include "math/Vec.h"
-
 #include <string>
-
-namespace Tungsten {
 
 struct ObjMaterial
 {
@@ -56,8 +50,3 @@ struct ObjMaterial
         return !bumpMap.empty();
     }
 };
-
-}
-
-
-#endif /* OBJMATERIAL_HPP_ */

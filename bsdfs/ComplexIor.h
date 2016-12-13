@@ -1,18 +1,5 @@
-#ifndef COMPLEXIOR_HPP_
-#define COMPLEXIOR_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
 #include <string>
 
-namespace Tungsten {
-
-namespace ComplexIorList {
-
 bool lookup(const std::string &name, Vec3f &eta, Vec3f &k);
-
-}
-
-}
-
-#endif /* COMPLEXIOR_HPP_ */

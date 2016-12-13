@@ -1,41 +1,26 @@
-#ifndef SCENE_HPP_
-#define SCENE_HPP_
-
+#pragma once
 #include <rapidjson/document.h>
 #include <unordered_set>
 #include <unordered_map>
 #include <memory>
 #include <vector>
 #include <map>
-
 #include "JsonSerializable.h"
 #include "TextureCache.h"
 #include "ImageIO.h"
 #include "Path.h"
-
 #include "phasefunctions/PhaseFunction.h"
-
 #include "integrators/Integrator.h"
-
 #include "primitives/Primitive.h"
-
 #include "materials/BitmapTexture.h"
-
 #include "renderer/RendererSettings.h"
 #include "renderer/TraceableScene.h"
-
 #include "cameras/Camera.h"
-
 #include "media/Medium.h"
-
 #include "grids/Grid.h"
-
 #include "bsdfs/Bsdf.h"
 
-namespace Tungsten {
-
-struct Scene : public JsonSerializable
-{
+struct Scene : public JsonSerializable {
     Path _srcDir;
     Path _path;
 
@@ -196,8 +181,3 @@ public:
     static Scene *load(const Path &path, std::shared_ptr<TextureCache> cache = nullptr);
     static void save(const Path &path, const Scene &scene);
 };
-
-}
-
-
-#endif /* SCENE_HPP_ */

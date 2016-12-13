@@ -1,13 +1,8 @@
-#ifndef QUATERNION_HPP_
-#define QUATERNION_HPP_
-
+#pragma once
 #include "Vec.h"
 #include "Mat4f.h"
 #include "Angle.h"
-
 #include <cmath>
-
-namespace Tungsten {
 
 template<typename Type>
 class Quaternion : public Vec<Type, 4>
@@ -152,5 +147,3 @@ inline Quaternion<Type> operator*(const Vec<Type, 3> &a, const Quaternion<Type> 
 typedef Quaternion<float> QuaternionF;
 
 };
-
-#endif /* QUATERNION_HPP_ */

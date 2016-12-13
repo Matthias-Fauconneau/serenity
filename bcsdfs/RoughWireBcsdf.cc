@@ -1,16 +1,10 @@
 #include "RoughWireBcsdf.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "bsdfs/ComplexIor.h"
 #include "bsdfs/Fresnel.h"
-
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 RoughWireBcsdf::RoughWireBcsdf()
 : _materialName("Cu"),
@@ -177,6 +171,4 @@ float RoughWireBcsdf::pdf(const SurfaceScatterEvent &event) const
 void RoughWireBcsdf::prepareForRender()
 {
     _v = sqr(_roughness*PI_HALF);
-}
-
 }

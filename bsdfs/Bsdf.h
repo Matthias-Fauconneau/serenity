@@ -1,25 +1,15 @@
-#ifndef BSDF_HPP_
-#define BSDF_HPP_
-
+#pragma once
 #include "BsdfLobes.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "primitives/IntersectionInfo.h"
-
 #include "materials/Texture.h"
-
 #include "math/TangentFrame.h"
 #include "math/MathUtil.h"
 #include "math/Vec.h"
-
 #include "io/JsonSerializable.h"
 #include "io/JsonUtils.h"
-
 #include <rapidjson/document.h>
 #include <memory>
-
-namespace Tungsten {
 
 class Medium;
 
@@ -136,7 +126,3 @@ public:
         return _bump;
     }
 };
-
-}
-
-#endif /* BSDF_HPP_ */

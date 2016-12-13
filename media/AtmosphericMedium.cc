@@ -1,15 +1,9 @@
 #include "AtmosphericMedium.h"
-
 #include "primitives/Primitive.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/Erf.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 AtmosphericMedium::AtmosphericMedium()
 : _scene(nullptr),
@@ -211,6 +205,4 @@ Vec3f AtmosphericMedium::transmittanceAndPdfs(PathSampleGenerator &/*sampler*/, 
     }
 
     return transmittance;
-}
-
 }

@@ -1,11 +1,6 @@
-#ifndef VOXELMEDIUM_HPP_
-#define VOXELMEDIUM_HPP_
-
+#pragma once
 #include "Medium.h"
-
 #include "grids/Grid.h"
-
-namespace Tungsten {
 
 class VoxelMedium : public Medium
 {
@@ -41,7 +36,3 @@ public:
     virtual Vec3f transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray &ray, bool startOnSurface,
             bool endOnSurface, float &pdfForward, float &pdfBackward) const override;
 };
-
-}
-
-#endif /* VOXELMEDIUM_HPP_ */

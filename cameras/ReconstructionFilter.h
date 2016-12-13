@@ -1,17 +1,10 @@
-#ifndef RECONSTRUCTIONFILTER_HPP_
-#define RECONSTRUCTIONFILTER_HPP_
-
+#pragma once
 #include "sampling/Distribution2D.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "Debug.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 #define RFILTER_RESOLUTION 31
 
@@ -174,7 +167,3 @@ public:
         return _type == Box;
     }
 };
-
-}
-
-#endif /* RECONSTRUCTIONFILTER_HPP_ */

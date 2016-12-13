@@ -1,10 +1,7 @@
 #include "TextureCache.h"
 #include "FileUtils.h"
-
 #include "materials/BitmapTexture.h"
 #include "materials/IesTexture.h"
-
-namespace Tungsten {
 
 TextureCache::TextureCache()
 : _textures([](const BitmapKeyType &a, const BitmapKeyType &b) { return (!a || !b) ? a < b : (*a) < (*b); }),
@@ -85,6 +82,4 @@ void TextureCache::prune()
 {
     pruneSet(_textures);
     pruneSet(_iesTextures);
-}
-
 }

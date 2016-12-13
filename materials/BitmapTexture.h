@@ -1,12 +1,7 @@
-#ifndef BITMAPTEXTURE_HPP_
-#define BITMAPTEXTURE_HPP_
-
+#pragma once
 #include "Texture.h"
-
 #include "io/ImageIO.h"
 #include "io/Path.h"
-
-namespace Tungsten {
 
 class Distribution2D;
 
@@ -171,7 +166,3 @@ public:
             _clamp == o._clamp;
     }
 };
-
-}
-
-#endif /* BITMAPTEXTURE_HPP_ */

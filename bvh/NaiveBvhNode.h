@@ -1,14 +1,7 @@
-#ifndef NAIVEBVHNODE_HPP_
-#define NAIVEBVHNODE_HPP_
-
+#pragma once
 #include "math/Box.h"
-
 #include <memory>
 #include <array>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class NaiveBvhNode
 {
@@ -63,11 +56,3 @@ public:
         return _box;
     }
 };
-
-}
-
-}
-
-
-
-#endif /* NAIVEBVHNODE_HPP_ */

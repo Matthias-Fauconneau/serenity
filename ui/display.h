@@ -1,9 +1,9 @@
 #pragma once
 /// \file display.h
 #include "thread.h"
-#include "function.h" // onEvent
-#include "map.h" // actions
-#include "vector.h" // int2
+#include "function.h"
+#include "map.h"
+#include "vector.h"
 
 static inline string padding(size_t size, uint width=4){
  return "\0\0\0\0"_.slice(0, align(width, size)-size);

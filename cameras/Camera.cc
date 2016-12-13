@@ -10,8 +10,6 @@
 #include <iostream>
 #include <cmath>
 
-namespace Tungsten {
-
 // Default to low-res 16:9
 Camera::Camera()
 : Camera(Mat4f(), Vec2u(1000u, 563u))
@@ -91,7 +89,7 @@ rapidjson::Value Camera::toJson(Allocator &allocator) const
     return result;
 }
 
-bool Camera::samplePosition(PathSampleGenerator &/*sampler*/, PositionSample &/*sample*/, Vec2u pixel) const
+bool Camera::samplePosition(PathSampleGenerator &/*sampler*/, PositionSample &/*sample*/, Vec2u) const
 {
     return false;
 }
@@ -230,6 +228,4 @@ void Camera::deserializeOutputBuffers(InputStreamHandle &in)
     if (    _normalBuffer)     _normalBuffer->deserialize(in);
     if (    _albedoBuffer)     _albedoBuffer->deserialize(in);
     if (_visibilityBuffer) _visibilityBuffer->deserialize(in);
-}
-
 }

@@ -1,19 +1,10 @@
-#ifndef OUTPUTBUFFER_HPP_
-#define OUTPUTBUFFER_HPP_
-
 #include "OutputBufferSettings.h"
-
 #include "math/Vec.h"
 #include "math/Ray.h"
-
 #include "io/JsonSerializable.h"
 #include "io/ImageIO.h"
-
 #include "Memory.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 template<typename T>
 class OutputBuffer
@@ -218,7 +209,3 @@ public:
 
 typedef OutputBuffer<float> OutputBufferF;
 typedef OutputBuffer<Vec3f> OutputBufferVec3f;
-
-}
-
-#endif /* OUTPUTBUFFER_HPP_ */

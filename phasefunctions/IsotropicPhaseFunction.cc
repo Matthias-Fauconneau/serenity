@@ -1,11 +1,7 @@
 #include "IsotropicPhaseFunction.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 rapidjson::Value IsotropicPhaseFunction::toJson(Allocator &allocator) const
 {
@@ -30,6 +26,4 @@ bool IsotropicPhaseFunction::sample(PathSampleGenerator &sampler, const Vec3f &/
 float IsotropicPhaseFunction::pdf(const Vec3f &/*wi*/, const Vec3f &/*wo*/) const
 {
     return SampleWarp::uniformSpherePdf();
-}
-
 }

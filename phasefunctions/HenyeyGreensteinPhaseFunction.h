@@ -1,9 +1,5 @@
-#ifndef HENYEYGREENSTEINPHASEFUNCTION_HPP_
-#define HENYEYGREENSTEINPHASEFUNCTION_HPP_
-
+#pragma once
 #include "PhaseFunction.h"
-
-namespace Tungsten {
 
 class HenyeyGreensteinPhaseFunction : public PhaseFunction
 {
@@ -26,7 +22,3 @@ public:
         return _g;
     }
 };
-
-}
-
-#endif /* HENYEYGREENSTEINPHASEFUNCTION_HPP_ */

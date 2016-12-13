@@ -1,9 +1,5 @@
-#ifndef ISOTROPICPHASEFUNCTION_HPP_
-#define ISOTROPICPHASEFUNCTION_HPP_
-
+#pragma once
 #include "PhaseFunction.h"
-
-namespace Tungsten {
 
 class IsotropicPhaseFunction : public PhaseFunction
 {
@@ -14,7 +10,3 @@ public:
     virtual bool sample(PathSampleGenerator &sampler, const Vec3f &wi, PhaseSample &sample) const override;
     virtual float pdf(const Vec3f &wi, const Vec3f &wo) const override;
 };
-
-}
-
-#endif /* ISOTROPICPHASEFUNCTION_HPP_ */

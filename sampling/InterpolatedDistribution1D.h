@@ -1,11 +1,6 @@
-#ifndef INTERPOLATEDDISTRIBUTION1D_HPP_
-#define INTERPOLATEDDISTRIBUTION1D_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
-
 #include <vector>
-
-namespace Tungsten {
 
 // This class can sample from a procedural 1D distribution that is interpolated from
 // two or more discrete distributions.
@@ -114,7 +109,3 @@ public:
         return _sums[d0]*(1.0f - v) + _sums[d1]*v;
     }
 };
-
-}
-
-#endif /* INTERPOLATEDDISTRIBUTION1D_HPP_ */

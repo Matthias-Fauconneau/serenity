@@ -2,12 +2,6 @@
 #include "thread.h"
 struct TextData;
 
-struct Node {
-	String name;
-	array<Node*> edges;
-	explicit Node(String&& name) : name(move(name)){}
-};
-
 struct Build {
 	// Parameters
  String CXX {
@@ -27,8 +21,10 @@ struct Build {
  function<void(string)> log;
 
  // Variables
+ map<String, int64> lastEdit;
  array<String> defines;
- array<unique<Node>> modules;
+ array<String> units; // to be compiled
+ array<String> modules;
  array<String> files;
  array<String> libraries;
  struct Job {
@@ -52,7 +48,7 @@ struct Build {
  bool tryParseFiles(TextData& s);
 
  /// Returns timestamp of the last modified interface header recursively parsing includes
- int64 parse(string fileName, Node& parent);
+ int64 parse(string fileName);
 
  /// Compiles a module and its dependencies as needed
  /// \return Timestamp of the last modified module implementation (deep)

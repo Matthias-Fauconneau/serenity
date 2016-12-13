@@ -1,7 +1,5 @@
 #include "RecursiveFileIterator.h"
 
-namespace Tungsten {
-
 RecursiveFileIterator::RecursiveFileIterator(const Path &p)
 {
     _iterators.emplace(p, false, false, Path());
@@ -55,4 +53,3 @@ const Path &RecursiveFileIterator::operator*() const
     return *_iterators.top();
 }
 
-}

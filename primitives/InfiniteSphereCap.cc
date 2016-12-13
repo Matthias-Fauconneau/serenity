@@ -1,15 +1,10 @@
 #include "InfiniteSphereCap.h"
 #include "TriangleMesh.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "bsdfs/NullBsdf.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 struct InfiniteSphereCapIntersection
 {
@@ -42,7 +37,6 @@ void InfiniteSphereCap::fromJson(const rapidjson::Value &v, const Scene &scene)
 
     Primitive::fromJson(v, scene);
     JsonUtils::fromJson(v, "sample", _doSample);
-    JsonUtils::fromJson(v, "skydome", _domeName);
     JsonUtils::fromJson(v, "cap_angle", _capAngleDeg);
 }
 rapidjson::Value InfiniteSphereCap::toJson(Allocator &allocator) const
@@ -52,8 +46,6 @@ rapidjson::Value InfiniteSphereCap::toJson(Allocator &allocator) const
         "sample", _doSample,
         "cap_angle", _capAngleDeg
     };
-    if (!_domeName.empty())
-        result.add("skydome", _domeName);
 
     return result;
 }
@@ -240,6 +232,4 @@ void InfiniteSphereCap::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)
 Primitive *InfiniteSphereCap::clone()
 {
     return new InfiniteSphereCap(*this);
-}
-
 }

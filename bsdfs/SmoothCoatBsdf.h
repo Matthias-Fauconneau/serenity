@@ -1,9 +1,5 @@
-#ifndef SMOOTHCOATBSDF_HPP_
-#define SMOOTHCOATBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 class SmoothCoatBsdf : public Bsdf
 {
@@ -68,7 +64,3 @@ public:
         _thickness = thickness;
     }
 };
-
-}
-
-#endif /* SMOOTHCOATBSDF_HPP_ */

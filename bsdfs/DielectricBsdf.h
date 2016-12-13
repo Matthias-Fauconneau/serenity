@@ -1,9 +1,5 @@
-#ifndef DIELECTRICBSDF_HPP_
-#define DIELECTRICBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -48,8 +44,3 @@ public:
         _ior = ior;
     }
 };
-
-}
-
-
-#endif /* DIELECTRICBSDF_HPP_ */

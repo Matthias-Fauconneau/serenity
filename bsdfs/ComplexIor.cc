@@ -1,11 +1,6 @@
 #include "ComplexIor.h"
-
-// http://homepages.rpi.edu/~schubert/Educational-resources/Materials-Refractive-index-and-extinction-coefficient.pdf
 #include "ComplexIorData.h"
-
-namespace Tungsten {
-
-namespace ComplexIorList {
+// http://homepages.rpi.edu/~schubert/Educational-resources/Materials-Refractive-index-and-extinction-coefficient.pdf
 
 bool lookup(const std::string &name, Vec3f &eta, Vec3f &k)
 {
@@ -17,8 +12,4 @@ bool lookup(const std::string &name, Vec3f &eta, Vec3f &k)
         }
     }
     return false;
-}
-
-}
-
 }

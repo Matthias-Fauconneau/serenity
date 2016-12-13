@@ -1,18 +1,11 @@
 #include "MixedBsdf.h"
 #include "ErrorBsdf.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 bool MixedBsdf::adjustedRatio(BsdfLobes requestedLobe, const IntersectionInfo *info, float &ratio) const
 {
@@ -117,7 +110,3 @@ void MixedBsdf::prepareForRender()
 {
     _lobes = BsdfLobes(_bsdf0->lobes(), _bsdf1->lobes());
 }
-
-}
-
-

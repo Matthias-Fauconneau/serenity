@@ -1,10 +1,6 @@
-#ifndef ROUGHCOATBSDF_HPP_
-#define ROUGHCOATBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
 #include "Microfacet.h"
-
-namespace Tungsten {
 
 class RoughCoatBsdf : public Bsdf
 {
@@ -95,7 +91,3 @@ public:
         _thickness = thickness;
     }
 };
-
-}
-
-#endif /* ROUGHCOATBSDF_HPP_ */

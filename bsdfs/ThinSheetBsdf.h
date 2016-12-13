@@ -1,9 +1,5 @@
-#ifndef THINSHEETBSDF_HPP_
-#define THINSHEETBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -64,7 +60,3 @@ public:
         _sigmaA = sigmaA;
     }
 };
-
-}
-
-#endif /* THINSHEETBSDF_HPP_ */

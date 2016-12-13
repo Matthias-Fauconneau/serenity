@@ -1,12 +1,7 @@
-#ifndef UNIFORMSAMPLER_HPP_
-#define UNIFORMSAMPLER_HPP_
-
+#pragma once
 #include "math/BitManip.h"
 #include "math/Vec.h"
-
 #include "io/FileUtils.h"
-
-namespace Tungsten {
 
 class UniformSampler
 {
@@ -68,7 +63,3 @@ public:
         return _sequence;
     }
 };
-
-}
-
-#endif /* UNIFORMSAMPLER_HPP_ */

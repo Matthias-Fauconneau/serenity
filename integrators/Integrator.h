@@ -1,14 +1,8 @@
-#ifndef INTEGRATOR_HPP_
-#define INTEGRATOR_HPP_
-
+#pragma once
 #include "io/JsonSerializable.h"
 #include "io/FileUtils.h"
-
 #include "IntTypes.h"
-
 #include <functional>
-
-namespace Tungsten {
 
 struct TraceableScene;
 struct Scene;
@@ -60,7 +54,3 @@ public:
         return _nextSpp;
     }
 };
-
-}
-
-#endif /* INTEGRATOR_HPP_ */

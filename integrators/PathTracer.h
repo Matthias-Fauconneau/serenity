@@ -1,11 +1,5 @@
-#ifndef PATHTRACER_HPP_
-#define PATHTRACER_HPP_
-
 #include "PathTracerSettings.h"
-
 #include "integrators/TraceBase.h"
-
-namespace Tungsten {
 
 class PathTracer : public TraceBase
 {
@@ -17,7 +11,3 @@ public:
 
     Vec3f traceSample(Vec2u pixel, PathSampleGenerator &sampler);
 };
-
-}
-
-#endif /* PATHTRACER_HPP_ */

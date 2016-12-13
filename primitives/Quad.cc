@@ -1,13 +1,9 @@
 #include "Quad.h"
 #include "TriangleMesh.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 struct QuadIntersection
 {
@@ -310,6 +306,4 @@ void Quad::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &bsdf)
 Primitive *Quad::clone()
 {
     return new Quad(*this);
-}
-
 }

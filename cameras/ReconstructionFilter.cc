@@ -1,8 +1,5 @@
 #include "ReconstructionFilter.h"
-
 #include "io/JsonUtils.h"
-
-namespace Tungsten {
 
 ReconstructionFilter::Type ReconstructionFilter::stringToType(const std::string &s)
 {
@@ -67,6 +64,4 @@ void ReconstructionFilter::precompute()
     float normalizationFactor = filterSum*2.0f*_width/RFILTER_RESOLUTION;
     for (int i = 0; i < RFILTER_RESOLUTION; ++i)
         _filter[i] /= normalizationFactor;
-}
-
 }

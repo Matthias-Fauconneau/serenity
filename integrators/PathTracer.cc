@@ -2,8 +2,6 @@
 
 #include "bsdfs/TransparencyBsdf.h"
 
-namespace Tungsten {
-
 PathTracer::PathTracer(TraceableScene *scene, const PathTracerSettings &settings, uint32 threadId)
 : TraceBase(scene, settings, threadId),
   _settings(settings),
@@ -132,6 +130,4 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
 
         return Vec3f(0.0f);
     }
-}
-
 }

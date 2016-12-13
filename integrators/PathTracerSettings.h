@@ -1,11 +1,6 @@
-#ifndef PATHTRACERSETTINGS_HPP_
-#define PATHTRACERSETTINGS_HPP_
-
+#pragma once
 #include "integrators/TraceSettings.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 struct PathTracerSettings : public TraceSettings
 {
@@ -34,7 +29,3 @@ struct PathTracerSettings : public TraceSettings
         };
     }
 };
-
-}
-
-#endif /* PATHTRACERSETTINGS_HPP_ */

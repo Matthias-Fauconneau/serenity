@@ -1,21 +1,12 @@
-#ifndef BINARYBVH_HPP_
-#define BINARYBVH_HPP_
-
+#pragma once
 #include "BvhBuilder.h"
-
 #include "math/Box.h"
 #include "math/Vec.h"
 #include "sse/SimdUtils.h"
-
 #include "IntTypes.h"
-
-namespace Tungsten {
-
 #include "AlignedAllocator.h"
 
 typedef Vec<float4, 3> Vec3pf;
-
-namespace Bvh {
 
 class BinaryBvh
 {
@@ -283,8 +274,3 @@ pop:
     }
 };
 
-}
-
-}
-
-#endif /* BINARYBVH_HPP_ */

@@ -7,7 +7,6 @@
 
 #include "io/JsonObject.h"
 
-namespace Tungsten {
 
 ExponentialMedium::ExponentialMedium()
 : _materialSigmaA(0.0f),
@@ -195,6 +194,4 @@ Vec3f ExponentialMedium::transmittanceAndPdfs(PathSampleGenerator &/*sampler*/, 
     }
 
     return transmittance;
-}
-
 }

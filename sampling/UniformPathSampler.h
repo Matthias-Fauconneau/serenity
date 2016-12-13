@@ -1,10 +1,6 @@
-#ifndef UNIFORMPATHSAMPLER_HPP_
-#define UNIFORMPATHSAMPLER_HPP_
-
+#pragma once
 #include "PathSampleGenerator.h"
 #include "UniformSampler.h"
-
-namespace Tungsten {
 
 class UniformPathSampler : public PathSampleGenerator
 {
@@ -62,7 +58,3 @@ public:
         return _sampler;
     }
 };
-
-}
-
-#endif /* UNIFORMPATHSAMPLER_HPP_ */

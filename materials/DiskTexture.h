@@ -1,9 +1,5 @@
-#ifndef DISKTEXTURE_HPP_
-#define DISKTEXTURE_HPP_
-
+#pragma once
 #include "Texture.h"
-
-namespace Tungsten {
 
 class DiskTexture : public Texture
 {
@@ -35,7 +31,3 @@ public:
 
     virtual Texture *clone() const override;
 };
-
-}
-
-#endif /* DISKTEXTURE_HPP_ */

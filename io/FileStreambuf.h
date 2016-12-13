@@ -1,11 +1,7 @@
-#ifndef FILESTREAMBUF_HPP_
-#define FILESTREAMBUF_HPP_
-
+#pragma once
 #include <streambuf>
 #include <cstdio>
 #include <memory>
-
-namespace Tungsten {
 
 typedef std::unique_ptr<FILE, int(*)(FILE*)> AutoFilePtr;
 
@@ -45,7 +41,3 @@ public:
     FileOutputStreambuf(AutoFilePtr file);
     ~FileOutputStreambuf();
 };
-
-}
-
-#endif /* FILESTREAMBUF_HPP_ */

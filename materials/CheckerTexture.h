@@ -1,9 +1,5 @@
-#ifndef CHECKERTEXTURE_HPP_
-#define CHECKERTEXTURE_HPP_
-
+#pragma once
 #include "Texture.h"
-
-namespace Tungsten {
 
 class CheckerTexture : public Texture
 {
@@ -77,7 +73,3 @@ public:
         _resV = resV;
     }
 };
-
-}
-
-#endif /* CHECKERTEXTURE_HPP_ */

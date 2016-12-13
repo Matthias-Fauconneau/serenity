@@ -1,12 +1,6 @@
-#ifndef DISTRIBUTION2D_HPP_
-#define DISTRIBUTION2D_HPP_
-
 #include "math/MathUtil.h"
-
 #include <algorithm>
 #include <vector>
-
-namespace Tungsten {
 
 class Distribution2D
 {
@@ -82,7 +76,3 @@ public:
         return _pdf[row*_w + column]*_marginalPdf[row];
     }
 };
-
-}
-
-#endif /* DISTRIBUTION1D_HPP_ */

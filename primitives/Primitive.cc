@@ -1,11 +1,7 @@
 #include "Primitive.h"
-
 #include "bsdfs/Bsdf.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 Primitive::Primitive()
 {
@@ -152,6 +148,4 @@ void Primitive::setupTangentFrame(const IntersectionTemporary &data,
     B = N.cross(T);
 
     dst = TangentFrame(N, T, B);
-}
-
 }

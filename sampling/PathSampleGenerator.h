@@ -1,16 +1,9 @@
-#ifndef PATHSAMPLEGENERATOR_HPP_
-#define PATHSAMPLEGENERATOR_HPP_
-
+#pragma once
 #include "UniformSampler.h"
-
 #include "math/Vec.h"
-
 #include "io/FileUtils.h"
 
-namespace Tungsten {
-
-class PathSampleGenerator
-{
+class PathSampleGenerator {
 public:
     virtual ~PathSampleGenerator() {}
 
@@ -26,7 +19,3 @@ public:
 
     virtual UniformSampler &uniformGenerator() = 0;
 };
-
-}
-
-#endif /* PATHSAMPLEGENERATOR_HPP_ */

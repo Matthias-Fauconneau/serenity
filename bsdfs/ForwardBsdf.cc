@@ -1,10 +1,6 @@
 #include "ForwardBsdf.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 ForwardBsdf::ForwardBsdf()
 {
@@ -31,6 +27,4 @@ Vec3f ForwardBsdf::eval(const SurfaceScatterEvent &event) const
 float ForwardBsdf::pdf(const SurfaceScatterEvent &/*event*/) const
 {
     return 0.0f;
-}
-
 }

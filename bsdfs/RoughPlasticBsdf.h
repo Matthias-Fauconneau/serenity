@@ -1,10 +1,6 @@
-#ifndef ROUGHPLASTICBSDF_HPP_
-#define ROUGHPLASTICBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
 #include "Microfacet.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -83,8 +79,3 @@ public:
         _thickness = thickness;
     }
 };
-
-}
-
-
-#endif /* ROUGHPLASTICBSDF_HPP_ */

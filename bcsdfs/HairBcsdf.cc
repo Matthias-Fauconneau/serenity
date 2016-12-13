@@ -1,14 +1,8 @@
 #include "HairBcsdf.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "bsdfs/Fresnel.h"
-
 #include "math/GaussLegendre.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 HairBcsdf::HairBcsdf()
 : _scaleAngleDeg(2.0f),
@@ -441,7 +435,4 @@ void HairBcsdf::prepareForRender()
     }
 
     precomputeAzimuthalDistributions();
-}
-
-
 }

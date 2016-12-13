@@ -1,9 +1,5 @@
-#ifndef SIMDVEC_HPP_
-#define SIMDVEC_HPP_
-
+#pragma once
 #include "SimdFloat.h"
-
-namespace Tungsten {
 
 // TODO: Implement proper vector functionality
 typedef float4 Vec4fp;
@@ -19,7 +15,3 @@ inline Vec3f narrow(const Vec3fp &a)
 {
     return Vec3f(a[0], a[1], a[2]);
 }
-
-}
-
-#endif /* SIMDVEC_HPP_ */

@@ -1,8 +1,4 @@
-#ifndef SIMDUTILS_HPP_
-#define SIMDUTILS_HPP_
-
+#pragma once
 #include "SimdBool.h"
 #include "SimdFloat.h"
 #include "SimdVec.h"
-
-#endif /* SIMDUTILS_HPP_ */

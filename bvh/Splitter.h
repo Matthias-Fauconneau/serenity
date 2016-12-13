@@ -1,11 +1,5 @@
-#ifndef SPLITTER_HPP_
-#define SPLITTER_HPP_
-
+#pragma once
 #include "math/Box.h"
-
-namespace Tungsten {
-
-namespace Bvh {
 
 struct SplitInfo
 {
@@ -16,13 +10,5 @@ struct SplitInfo
     float cost;
 };
 
-namespace Splitter {
-    static constexpr float IntersectionCost = 1.0f;
-    static constexpr float TraversalCost = 1.0f;
-};
-
-}
-
-}
-
-#endif /* SPLITTER_HPP_ */
+static constexpr float IntersectionCost = 1.0f;
+static constexpr float TraversalCost = 1.0f;

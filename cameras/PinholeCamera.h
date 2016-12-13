@@ -1,9 +1,5 @@
-#ifndef PINHOLECAMERA_HPP_
-#define PINHOLECAMERA_HPP_
-
+#pragma once
 #include "Camera.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -45,7 +41,3 @@ public:
         return _fovDeg;
     }
 };
-
-}
-
-#endif /* PINHOLECAMERA_HPP_ */

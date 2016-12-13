@@ -1,12 +1,7 @@
-#ifndef GAUSSLEGENDRE_HPP_
-#define GAUSSLEGENDRE_HPP_
-
+#pragma once
 #include "MathUtil.h"
-
 #include <iostream>
 #include <array>
-
-namespace Tungsten {
 
 template<int N>
 class GaussLegendre
@@ -93,7 +88,3 @@ public:
         return _weights;
     }
 };
-
-}
-
-#endif /* GAUSSLEGENDRE_HPP_ */

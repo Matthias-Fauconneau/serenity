@@ -1,11 +1,4 @@
-#ifndef ALIGNEDALLOCATOR_HPP_
-#define ALIGNEDALLOCATOR_HPP_
-
-#ifdef __APPLE__
-#include <malloc/malloc.h>
-#else
 #include <malloc.h>
-#endif
 #include <memory>
 
 template <class T, size_t Alignment>
@@ -77,5 +70,3 @@ struct AlignedAllocator : public std::allocator<T>
 #endif
         }
 };
-
-#endif /* ALIGNEDALLOCATOR_HPP_ */

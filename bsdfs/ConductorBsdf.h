@@ -1,9 +1,5 @@
-#ifndef CONDUCTORBSDF_HPP_
-#define CONDUCTORBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -56,10 +52,3 @@ public:
         lookupMaterial();
     }
 };
-
-}
-
-
-
-
-#endif /* CONDUCTORBSDF_HPP_ */

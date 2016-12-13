@@ -1,9 +1,4 @@
-#ifndef QUAD_HPP_
-#define QUAD_HPP_
-
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class Quad : public Primitive
 {
@@ -70,6 +65,3 @@ public:
     virtual Primitive *clone() override;
 };
 
-}
-
-#endif /* QUAD_HPP_ */

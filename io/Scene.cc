@@ -2,40 +2,30 @@
 #include "DirectoryChange.h"
 #include "JsonUtils.h"
 #include "FileUtils.h"
-
 #include "phasefunctions/HenyeyGreensteinPhaseFunction.h"
 #include "phasefunctions/IsotropicPhaseFunction.h"
 #include "phasefunctions/RayleighPhaseFunction.h"
-
-#include "integrators/path_tracer/PathTraceIntegrator.h"
-
+#include "integrators/PathTraceIntegrator.h"
 #include "primitives/InfiniteSphereCap.h"
 #include "primitives/InfiniteSphere.h"
 #include "primitives/TriangleMesh.h"
-#include "primitives/Skydome.h"
 #include "primitives/Sphere.h"
-#include "primitives/Curves.h"
 #include "primitives/Point.h"
 #include "primitives/Cube.h"
 #include "primitives/Quad.h"
 #include "primitives/Disk.h"
-
 #include "materials/ConstantTexture.h"
 #include "materials/CheckerTexture.h"
 #include "materials/DiskTexture.h"
 #include "materials/IesTexture.h"
-
 #include "cameras/PinholeCamera.h"
-
 #include "media/HomogeneousMedium.h"
 #include "media/AtmosphericMedium.h"
 #include "media/ExponentialMedium.h"
 #include "media/VoxelMedium.h"
-
 #include "bcsdfs/LambertianFiberBcsdf.h"
 #include "bcsdfs/RoughWireBcsdf.h"
 #include "bcsdfs/HairBcsdf.h"
-
 #include "bsdfs/RoughDielectricBsdf.h"
 #include "bsdfs/RoughConductorBsdf.h"
 #include "bsdfs/RoughPlasticBsdf.h"
@@ -55,17 +45,11 @@
 #include "bsdfs/MixedBsdf.h"
 #include "bsdfs/NullBsdf.h"
 #include "bsdfs/Bsdf.h"
-
 #include "grids/VdbGrid.h"
-
 #include "io/JsonObject.h"
-
 #include "Debug.h"
-
 #include <rapidjson/document.h>
 #include <functional>
-
-namespace Tungsten {
 
 Scene::Scene()
 : _errorBsdf(std::make_shared<ErrorBsdf>()),
@@ -220,12 +204,8 @@ std::shared_ptr<Primitive> Scene::instantiatePrimitive(std::string type, const r
         result = std::make_shared<InfiniteSphere>();
     else if (type == "infinite_sphere_cap")
         result = std::make_shared<InfiniteSphereCap>();
-    else if (type == "curves")
-        result = std::make_shared<Curves>();
     else if (type == "cube")
         result = std::make_shared<Cube>();
-    else if (type == "skydome")
-        result = std::make_shared<Skydome>();
     else if (type == "point")
         result = std::make_shared<Point>();
     else {
@@ -665,6 +645,4 @@ void Scene::save(const Path &path, const Scene &scene)
     *(static_cast<rapidjson::Value *>(&document)) = scene.toJson(document.GetAllocator());
 
     FileUtils::writeJson(document, path);
-}
-
 }

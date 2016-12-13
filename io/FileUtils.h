@@ -1,10 +1,5 @@
-#ifndef FILEUTILS_HPP_
-#define FILEUTILS_HPP_
-
 #include "Path.h"
-
 #include "IntTypes.h"
-
 #include <rapidjson/document.h>
 #include <unordered_map>
 #include <functional>
@@ -13,8 +8,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-namespace Tungsten {
 
 class ZipReader;
 class Path;
@@ -195,7 +188,3 @@ inline void FileUtils::streamWrite<std::string>(OutputStreamHandle &out, const s
 {
     streamWrite(out, &src[0], src.size() + 1);
 }
-
-}
-
-#endif /* FILEUTILS_HPP_ */

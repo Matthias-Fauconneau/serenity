@@ -1,13 +1,8 @@
 #include "Bsdf.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "media/Medium.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 Bsdf::Bsdf()
 : _albedo(std::make_shared<ConstantTexture>(1.0f))
@@ -31,6 +26,4 @@ rapidjson::Value Bsdf::toJson(Allocator &allocator) const
         result.add("bump", *_bump);
 
     return result;
-}
-
 }

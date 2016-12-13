@@ -1,8 +1,6 @@
 #include "NullBsdf.h"
-
 #include "io/JsonObject.h"
 
-namespace Tungsten {
 
 NullBsdf::NullBsdf()
 {
@@ -29,6 +27,4 @@ Vec3f NullBsdf::eval(const SurfaceScatterEvent &/*event*/) const
 float NullBsdf::pdf(const SurfaceScatterEvent &/*event*/) const
 {
     return 0.0f;
-}
-
 }

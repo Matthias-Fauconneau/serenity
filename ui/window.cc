@@ -28,7 +28,7 @@
 #undef Font
 #undef None
 
-ICON(text);
+//ICON(text);
 Image cursorIcon();
 using namespace X11;
 

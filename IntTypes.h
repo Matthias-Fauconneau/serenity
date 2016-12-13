@@ -1,9 +1,5 @@
-#ifndef INTTYPES_HPP_
-#define INTTYPES_HPP_
-
+#pragma once
 #include <cstdint>
-
-namespace Tungsten {
 
 typedef std::uint8_t  uint8;
 typedef std::uint16_t uint16;
@@ -14,7 +10,3 @@ typedef std::int8_t  int8;
 typedef std::int16_t int16;
 typedef std::int32_t int32;
 typedef std::int64_t int64;
-
-}
-
-#endif /* INTTYPES_HPP_ */

@@ -1,19 +1,12 @@
 #include "OrenNayarBsdf.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 OrenNayarBsdf::OrenNayarBsdf()
 : _roughness(std::make_shared<ConstantTexture>(1.0f))
@@ -108,6 +101,4 @@ float OrenNayarBsdf::pdf(const SurfaceScatterEvent &event) const
     float roughness = (*_roughness)[*event.info].x();
     float ratio = clamp(roughness, 0.01f, 1.0f);
     return SampleWarp::uniformHemispherePdf(event.wo)*ratio + SampleWarp::cosineHemispherePdf(event.wo)*(1.0f - ratio);
-}
-
 }

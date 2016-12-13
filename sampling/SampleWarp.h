@@ -1,17 +1,10 @@
-#ifndef SAMPLE_HPP_
-#define SAMPLE_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
 #include "math/Box.h"
-
 #include <algorithm>
 #include <cmath>
-
-namespace Tungsten {
-
-namespace SampleWarp {
 
 static inline Vec3f uniformHemisphere(const Vec2f &xi)
 {
@@ -178,9 +171,3 @@ static inline float projectedBoxPdf(const Box3f &box, const Vec3f &direction)
 
     return 1.0f/(areaX + areaY + areaZ);
 }
-
-}
-
-}
-
-#endif /* SAMPLE_HPP_ */

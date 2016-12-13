@@ -1,8 +1,5 @@
 #include "Texture.h"
-
 #include "io/JsonUtils.h"
-
-namespace Tungsten {
 
 bool Texture::scalarOrVecFromJson(const rapidjson::Value &v, const char *field, Vec3f &dst)
 {
@@ -21,6 +18,4 @@ rapidjson::Value Texture::scalarOrVecToJson(const Vec3f &src, Allocator &allocat
         return std::move(JsonUtils::toJson(src.x(), allocator));
     else
         return std::move(JsonUtils::toJson(src, allocator));
-}
-
 }

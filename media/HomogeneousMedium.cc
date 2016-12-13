@@ -1,13 +1,8 @@
 #include "HomogeneousMedium.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/TangentFrame.h"
 #include "math/Ray.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 HomogeneousMedium::HomogeneousMedium()
 : _materialSigmaA(0.0f),
@@ -135,6 +130,4 @@ Vec3f HomogeneousMedium::transmittanceAndPdfs(PathSampleGenerator &/*sampler*/, 
         pdfBackward = startOnSurface ? weight.avg() : (_sigmaT*weight).avg();
         return weight;
     }
-}
-
 }

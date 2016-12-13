@@ -1,9 +1,5 @@
-#ifndef LENSSAMPLE_HPP_
-#define LENSSAMPLE_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
-namespace Tungsten {
 
 struct LensSample
 {
@@ -12,7 +8,3 @@ struct LensSample
     float dist;
     Vec3f weight;
 };
-
-}
-
-#endif /* LENSSAMPLE_HPP_ */

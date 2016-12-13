@@ -1,21 +1,12 @@
-#ifndef JSONUTILS_HPP_
-#define JSONUTILS_HPP_
-
+#pragma once
 #include "JsonSerializable.h"
-
 #include "Debug.h"
-
 #include "math/Mat4f.h"
 #include "math/Vec.h"
-
 #include <rapidjson/document.h>
 #include <string>
 
-namespace Tungsten {
-
 class Path;
-
-namespace JsonUtils {
 
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name);
 
@@ -110,8 +101,3 @@ void addObjectMember(rapidjson::Value &v, const char *name, const JsonSerializab
 
 std::string jsonToString(const rapidjson::Document &document);
 
-}
-
-}
-
-#endif /* JSONUTILS_HPP_ */

@@ -1,11 +1,7 @@
 #include "Medium.h"
-
 #include "phasefunctions/IsotropicPhaseFunction.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 Medium::Medium()
 : _phaseFunction(std::make_shared<IsotropicPhaseFunction>()),
@@ -43,6 +39,4 @@ Vec3f Medium::transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray &ray,
 const PhaseFunction *Medium::phaseFunction(const Vec3f &/*p*/) const
 {
     return _phaseFunction.get();
-}
-
 }

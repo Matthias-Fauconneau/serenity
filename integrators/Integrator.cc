@@ -1,24 +1,15 @@
 #include "Integrator.h"
-
 #include "renderer/TraceableScene.h"
-
 #include "cameras/Camera.h"
-
 #include "math/BitManip.h"
-
 #include "io/FileUtils.h"
 #include "io/ImageIO.h"
 #include "io/Scene.h"
-
 #include "Timer.h"
-
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
-#include "lodepng/lodepng.h"
 #include <algorithm>
-
-namespace Tungsten {
 
 Integrator::Integrator()
 : _scene(nullptr),
@@ -66,7 +57,6 @@ void Integrator::saveRenderResumeData(Scene &scene)
     document.SetObject();
     document.AddMember("current_spp", _currentSpp, document.GetAllocator());
     document.AddMember("adaptive_sampling", _scene->rendererSettings().useAdaptiveSampling(), document.GetAllocator());
-    document.AddMember("stratified_sampler", _scene->rendererSettings().useSobol(), document.GetAllocator());
 
     FileUtils::streamWrite(out, JsonUtils::jsonToString(document));
     uint64 jsonHash = sceneHash(scene);
@@ -87,12 +77,9 @@ bool Integrator::resumeRender(Scene &scene)
     if (document.HasParseError() || !document.IsObject())
         return false;
 
-    bool adaptiveSampling, stratifiedSampler;
+    bool adaptiveSampling;
     if (!JsonUtils::fromJson(document, "adaptive_sampling", adaptiveSampling)
             || adaptiveSampling != _scene->rendererSettings().useAdaptiveSampling())
-        return false;
-    if (!JsonUtils::fromJson(document, "stratified_sampler", stratifiedSampler)
-            || stratifiedSampler != _scene->rendererSettings().useSobol())
         return false;
 
     uint32 jsonSpp;
@@ -111,6 +98,4 @@ bool Integrator::resumeRender(Scene &scene)
     advanceSpp();
 
     return true;
-}
-
 }

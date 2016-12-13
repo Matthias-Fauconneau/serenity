@@ -1,13 +1,8 @@
-#ifndef CLIPARSER_HPP_
-#define CLIPARSER_HPP_
-
 #include "tinyformat.h"
 #include <unordered_map>
 #include <iostream>
 #include <vector>
 #include <string>
-
-namespace Tungsten {
 
 class CliParser
 {
@@ -69,7 +64,3 @@ public:
         return _operands;
     }
 };
-
-}
-
-#endif /* CLIPARSER_HPP_ */

@@ -1,31 +1,19 @@
-#ifndef CAMERA_HPP_
-#define CAMERA_HPP_
-
 #include "ReconstructionFilter.h"
 #include "AtomicFramebuffer.h"
 #include "OutputBuffer.h"
 #include "Tonemap.h"
-
 #include "samplerecords/DirectionSample.h"
 #include "samplerecords/PositionSample.h"
 #include "samplerecords/LensSample.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/Mat4f.h"
 #include "math/Vec.h"
-
 #include "io/JsonSerializable.h"
 #include "io/Path.h"
-
 #include <rapidjson/document.h>
 #include <vector>
 #include <memory>
-
 #include "matrix.h"
-#undef Type
-
-namespace Tungsten {
 
 class Ray;
 struct Scene;
@@ -38,8 +26,6 @@ struct Camera : public JsonSerializable
     mat4 M;
 
     std::string _tonemapString;
-
-    Tonemap::Type _tonemapOp;
 
     Mat4f _transform;
     Mat4f _invTransform;
@@ -158,11 +144,6 @@ public:
         return _visibilityBuffer.get();
     }
 
-    inline Vec3f tonemap(const Vec3f &c) const
-    {
-        return Tonemap::tonemap(_tonemapOp, max(c, Vec3f(0.0f)));
-    }
-
     inline Vec3f getLinear(int x, int y) const
     {
         int idx = x + y*_res.x();
@@ -182,11 +163,6 @@ public:
     void setSplatWeight(double weight)
     {
         _splatWeight = weight;
-    }
-
-    inline Vec3f get(int x, int y) const
-    {
-        return tonemap(getLinear(x, y));
     }
 
     const Mat4f &transform() const
@@ -224,11 +200,6 @@ public:
         return _medium;
     }
 
-    Tonemap::Type tonemapOp() const
-    {
-        return _tonemapOp;
-    }
-
     AtomicFramebuffer *splatBuffer()
     {
         return _splatBuffer.get();
@@ -244,7 +215,3 @@ public:
         _tonemapString = name;
     }
 };
-
-}
-
-#endif /* CAMERA_HPP_ */

@@ -1,15 +1,8 @@
-#ifndef DEONHAIR_HPP_
-#define DEONHAIR_HPP_
-
+#pragma once
 #include "PrecomputedAzimuthalLobe.h"
-
 #include "bsdfs/Bsdf.h"
-
 #include "math/Angle.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 // An implementation of the papers "An Energy-Conserving Hair Reflectance Model"
 // and "Importance Sampling for Physically-Based Hair Fiber Models"
@@ -59,7 +52,3 @@ public:
 
     virtual void prepareForRender() override;
 };
-
-}
-
-#endif /* DEONHAIR_HPP_ */

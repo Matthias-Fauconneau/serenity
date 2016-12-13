@@ -1,14 +1,8 @@
-#ifndef TRIANGLE4_HPP_
-#define TRIANGLE4_HPP_
-
+#pragma once
 #include "math/Vec.h"
 #include "math/Ray.h"
-
 #include "sse/SimdUtils.h"
-
 #include <array>
-
-namespace Tungsten {
 
 struct Triangle4
 {
@@ -97,7 +91,3 @@ inline void intersectTriangle4(Ray &ray, const Triangle4 &t,
         resultId = t.id[minId];
     }
 }
-
-}
-
-#endif /* TRIANGLE4_HPP_ */

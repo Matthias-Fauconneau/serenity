@@ -1,21 +1,14 @@
 #include "ThinSheetBsdf.h"
 #include "Fresnel.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 ThinSheetBsdf::ThinSheetBsdf()
 : _ior(1.5f),
@@ -110,6 +103,4 @@ float ThinSheetBsdf::pdf(const SurfaceScatterEvent &event) const
         return 1.0f;
     else
         return 0.0f;
-}
-
 }

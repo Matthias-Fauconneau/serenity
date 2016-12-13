@@ -1,7 +1,5 @@
 #include "ConstantTexture.h"
 
-namespace Tungsten {
-
 ConstantTexture::ConstantTexture()
 : _value(0.0f)
 {
@@ -84,6 +82,4 @@ void ConstantTexture::scaleValues(float factor)
 Texture *ConstantTexture::clone() const
 {
     return new ConstantTexture(*this);
-}
-
 }

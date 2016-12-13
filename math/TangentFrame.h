@@ -1,12 +1,7 @@
-#ifndef TANGENTSPACE_HPP_
-#define TANGENTSPACE_HPP_
-
+#pragma once
 #include <cmath>
-
 #include "Mat4f.h"
 #include "Vec.h"
-
-namespace Tungsten {
 
 struct TangentFrame
 {
@@ -49,7 +44,3 @@ struct TangentFrame
         return Mat4f(tangent, bitangent, normal);
     }
 };
-
-}
-
-#endif /* TANGENTSPACE_HPP_ */

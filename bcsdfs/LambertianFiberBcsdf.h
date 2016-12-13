@@ -1,9 +1,5 @@
-#ifndef LAMBERTIANFIBERBCSDF_HPP_
-#define LAMBERTIANFIBERBCSDF_HPP_
-
+#pragma once
 #include "bsdfs/Bsdf.h"
-
-namespace Tungsten {
 
 class LambertianFiberBcsdf : public Bsdf
 {
@@ -18,7 +14,3 @@ public:
     virtual bool sample(SurfaceScatterEvent &event) const override;
     virtual float pdf(const SurfaceScatterEvent &event) const override;
 };
-
-}
-
-#endif /* LAMBERTIANFIBERBCSDF_HPP_ */

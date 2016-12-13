@@ -1,6 +1,4 @@
-#ifndef PRIMITIVE_HPP_
-#define PRIMITIVE_HPP_
-
+#pragma once
 #include "IntersectionTemporary.h"
 #include "IntersectionInfo.h"
 
@@ -23,7 +21,6 @@
 #include <vector>
 #include <memory>
 
-namespace Tungsten {
 
 struct TraceableScene;
 class TriangleMesh;
@@ -178,7 +175,3 @@ public:
             return currentMedium;
     }
 };
-
-}
-
-#endif /* PRIMITIVE_HPP_ */

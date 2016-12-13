@@ -1,7 +1,5 @@
-#ifndef DIRECTIONSAMPLE_HPP_
-#define DIRECTIONSAMPLE_HPP_
-
-namespace Tungsten {
+#pragma once
+#include "math/Vec.h"
 
 struct DirectionSample
 {
@@ -15,7 +13,3 @@ struct DirectionSample
     {
     }
 };
-
-}
-
-#endif /* DIRECTIONSAMPLE_HPP_ */

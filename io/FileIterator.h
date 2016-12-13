@@ -1,12 +1,7 @@
-#ifndef FILEITERATOR_HPP_
-#define FILEITERATOR_HPP_
-
+#pragma once
 #include "FileUtils.h"
 #include "Path.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 class FileIterator
 {
@@ -32,9 +27,3 @@ public:
     Path &operator*();
     const Path &operator*() const;
 };
-
-}
-
-
-
-#endif /* FILEITERATOR_HPP_ */

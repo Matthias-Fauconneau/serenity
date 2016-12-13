@@ -1,27 +1,11 @@
-#ifndef DEBUG_HPP_
-#define DEBUG_HPP_
-
+#pragma once
 #include <stdexcept>
-
 #include "tinyformat.h"
-
-namespace Tungsten {
-
-namespace DebugUtils
-{
 
 void debugLog(const std::string &message);
 
-}
-
-// Can be enabled for a little bit more speed, but generally not recommended
-#ifndef NO_DEBUG_MACROS
 #define DEBUG_BEGIN
 #define DEBUG_END
-#else
-#define DEBUG_BEGIN if (false) {
-#define DEBUG_END }
-#endif
 
 # define FAIL(...) throw std::runtime_error(tfm::format("PROGRAM FAILURE in %s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__)))
 # define DBG(...) do { DEBUG_BEGIN DebugUtils::debugLog(tfm::format("%s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); DEBUG_END } while(false)
@@ -53,7 +37,3 @@ void debugLog(const std::string &message);
     SELECT_10TH(__VA_ARGS__, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE,\
                 TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, ONE, throwaway)
 #define SELECT_10TH(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, ...) a10
-
-}
-
-#endif /* DEBUG_HPP_ */

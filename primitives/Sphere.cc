@@ -7,8 +7,6 @@
 #include "io/JsonObject.h"
 #include "io/Scene.h"
 
-namespace Tungsten {
-
 struct SphereIntersection
 {
     bool backSide;
@@ -292,6 +290,4 @@ void Sphere::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &bsdf)
 Primitive *Sphere::clone()
 {
     return new Sphere(*this);
-}
-
 }

@@ -1,10 +1,6 @@
-#ifndef ROUGHDIELECTRICBSDF_HPP_
-#define ROUGHDIELECTRICBSDF_HPP_
-
+#pragma once
 #include "Microfacet.h"
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 class RoughDielectricBsdf : public Bsdf
 {
@@ -79,8 +75,3 @@ public:
         _enableT = enableTransmission;
     }
 };
-
-}
-
-
-#endif /* ROUGHDIELECTRICBSDF_HPP_ */

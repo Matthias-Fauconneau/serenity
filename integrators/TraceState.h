@@ -1,11 +1,5 @@
-#ifndef TRACESTATE_HPP_
-#define TRACESTATE_HPP_
-
 #include "media/Medium.h"
-
 #include "math/Ray.h"
-
-namespace Tungsten {
 
 class PathSampleGenerator;
 
@@ -29,7 +23,3 @@ struct TraceState
         mediumState.reset();
     }
 };
-
-}
-
-#endif /* TRACESTATE_HPP_ */

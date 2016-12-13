@@ -1,9 +1,5 @@
-#ifndef INTERSECTIONTEMPORARY_HPP_
-#define INTERSECTIONTEMPORARY_HPP_
-
+#pragma once
 #include "IntTypes.h"
-
-namespace Tungsten {
 
 class Primitive;
 
@@ -27,7 +23,3 @@ struct IntersectionTemporary
         return reinterpret_cast<const T *>(&data[0]);
     }
 };
-
-}
-
-#endif /* INTERSECTIONTEMPORARY_HPP_ */

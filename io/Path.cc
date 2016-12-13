@@ -4,39 +4,21 @@
 
 #include <locale>
 
-namespace Tungsten {
-
 typedef std::string::size_type SizeType;
 
-#if _WIN32
-static const char *separators = "/\\";
-#else
 static const char *separators = "/";
-#endif
 
 static bool isSeparator(char p)
 {
-#if _WIN32
-    return p == '/' || p == '\\';
-#else
     return p == '/';
-#endif
 }
 
 static SizeType findFilenamePos(const std::string &s)
 {
     if (s.empty() || (isSeparator(s.back()) && s.size() == 1))
         return std::string::npos;
-#if _WIN32
-    if (s.back() == ':')
-        return std::string::npos;
-#endif
 
     SizeType n = s.find_last_of(separators, s.size() - 1 - isSeparator(s.back()));
-#if _WIN32
-    if (n == std::string::npos)
-        n = s.find_last_of(':');
-#endif
 
     if (n == std::string::npos)
         return 0;
@@ -102,17 +84,6 @@ bool Path::isRootDirectory() const
     if (size() == 1 && isSeparator(_path[0]))
         return true;
 
-#if _WIN32
-    // Fully qualified drive paths (e.g. C:\)
-    if (size() == 2 && _path[1] == ':')
-        return true;
-    if (size() == 3 && _path[1] == ':' && isSeparator(_path[2]))
-        return true;
-
-    // Network path
-    if (size() == 2 && isSeparator(_path[0]) && isSeparator(_path[1]))
-        return true;
-#endif
     return false;
 }
 
@@ -128,20 +99,6 @@ bool Path::isRelative() const
     if (isSeparator(_path[0]))
         return false;
 
-#if _WIN32
-    // ShlWapi functions do not play well with forward slashes.
-    // Do not replace this with PathIsRelative!
-
-    if (size() >= 2) {
-        // UNC path (e.g. \\foo\bar.txt)
-        if (isSeparator(_path[0]) && isSeparator(_path[1]))
-            return false;
-        // We're ignoring drive relative paths (e.g. C:foo.txt) here,
-        // since not even the WinAPI gets them right.
-        if (_path[1] == ':')
-            return false;
-    }
-#endif
     return true;
 }
 
@@ -279,28 +236,12 @@ Path Path::absolute() const
 Path Path::normalizeSeparators() const
 {
     Path path(*this);
-#if _WIN32
-    for (char &c : path._workingDirectory)
-        if (c == '\\')
-            c = '/';
-    for (char &c : path._path)
-        if (c == '\\')
-            c = '/';
-#endif
     return std::move(path);
 }
 
 Path Path::nativeSeparators() const
 {
     Path path(*this);
-#if _WIN32
-    for (char &c : path._workingDirectory)
-        if (c == '/')
-            c = '\\';
-    for (char &c : path._path)
-        if (c == '/')
-            c = '\\';
-#endif
     return std::move(path);
 }
 
@@ -318,10 +259,6 @@ Path Path::stripSeparator() const
 
     if (size() == 1 && isSeparator(_path[0]))
         return std::move(result);
-#if _WIN32
-    if (size() == 2 && isSeparator(_path[0]) && isSeparator(_path[1]))
-        return std::move(result);
-#endif
     if (!empty() && isSeparator(_path.back()))
         result._path.pop_back();
 
@@ -335,20 +272,6 @@ Path Path::normalize() const
     std::string prefix;
     int offset = 0;
 
-#if _WIN32
-    if (base.size() >= 2 && isSeparator(base[0]) && isSeparator(base[1])) {
-        prefix = "//";
-        offset = 2;
-    } else if (base.size() >= 2 && base[1] == ':') {
-        prefix = base.substr(0, 2);
-        if (base.size() > 2 && isSeparator(base[2])) {
-            prefix += '/';
-            offset = 3;
-        } else {
-            offset = 2;
-        }
-    }
-#endif
     if (prefix.empty() && !base.empty() && isSeparator(base[0])) {
         prefix = '/';
         offset = 1;

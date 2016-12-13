@@ -1,17 +1,11 @@
-#ifndef VEC_HPP_
-#define VEC_HPP_
-
+#pragma once
 #include "math/BitManip.h"
-
 #include "IntTypes.h"
-
 #include <rapidjson/document.h>
 #include <type_traits>
 #include <ostream>
 #include <array>
 #include <cmath>
-
-namespace Tungsten {
 
 template<typename ElementType, unsigned Size>
 class Vec {
@@ -500,10 +494,6 @@ typedef Vec<uint8, 2> Vec2c;
 // but a lot of code relies on vectors being POD. The static_asserts here catch
 // it in case another mistake happens
 
-// MSVC's views on what is POD or not differ from gcc or clang.
-// memcpy and similar code still seem to work, so we ignore this
-// issue for now.
-#ifndef _MSC_VER
 static_assert(std::is_pod<Vec4d>::value, "Vec4d is not a pod!");
 static_assert(std::is_pod<Vec3d>::value, "Vec3d is not a pod!");
 static_assert(std::is_pod<Vec2d>::value, "Vec2d is not a pod!");
@@ -523,32 +513,29 @@ static_assert(std::is_pod<Vec2i>::value, "Vec2i is not a pod!");
 static_assert(std::is_pod<Vec4c>::value, "Vec4c is not a pod!");
 static_assert(std::is_pod<Vec3c>::value, "Vec3c is not a pod!");
 static_assert(std::is_pod<Vec2c>::value, "Vec2c is not a pod!");
-#endif
-
-}
 
 namespace std {
 
 template<unsigned Size>
-class hash<Tungsten::Vec<float, Size>>
+class hash<Vec<float, Size>>
 {
 public:
-    std::size_t operator()(const Tungsten::Vec<float, Size> &v) const {
+    std::size_t operator()(const Vec<float, Size> &v) const {
         // See http://www.boost.org/doc/libs/1_33_1/doc/html/hash_combine.html
-        Tungsten::uint32 result = 0;
+        uint32 result = 0;
         for (unsigned i = 0; i < Size; ++i)
-            result ^= Tungsten::BitManip::floatBitsToUint(v[i]) + 0x9E3779B9 + (result << 6) + (result >> 2);
+            result ^= BitManip::floatBitsToUint(v[i]) + 0x9E3779B9 + (result << 6) + (result >> 2);
         return result;
     }
 };
 
 template<unsigned Size>
-class hash<Tungsten::Vec<Tungsten::uint32, Size>>
+class hash<Vec<uint32, Size>>
 {
 public:
-    std::size_t operator()(const Tungsten::Vec<Tungsten::uint32, Size> &v) const {
+    std::size_t operator()(const Vec<uint32, Size> &v) const {
         // See http://www.boost.org/doc/libs/1_33_1/doc/html/hash_combine.html
-        Tungsten::uint32 result = 0;
+        uint32 result = 0;
         for (unsigned i = 0; i < Size; ++i)
             result ^= v[i] + 0x9E3779B9 + (result << 6) + (result >> 2);
         return result;
@@ -556,108 +543,104 @@ public:
 };
 
 template<unsigned Size>
-class hash<Tungsten::Vec<Tungsten::int32, Size>>
+class hash<Vec<int32, Size>>
 {
 public:
-    std::size_t operator()(const Tungsten::Vec<Tungsten::int32, Size> &v) const {
+    std::size_t operator()(const Vec<int32, Size> &v) const {
         // See http://www.boost.org/doc/libs/1_33_1/doc/html/hash_combine.html
-        Tungsten::uint32 result = 0;
+        uint32 result = 0;
         for (unsigned i = 0; i < Size; ++i)
-            result ^= static_cast<Tungsten::uint32>(v[i]) + 0x9E3779B9 + (result << 6) + (result >> 2);
+            result ^= static_cast<uint32>(v[i]) + 0x9E3779B9 + (result << 6) + (result >> 2);
         return result;
     }
 };
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> exp(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> exp(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::exp(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> sqrt(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> sqrt(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::sqrt(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> pow(const Tungsten::Vec<ElementType, Size> &t, ElementType e)
+Vec<ElementType, Size> pow(const Vec<ElementType, Size> &t, ElementType e)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::pow(t[i], e);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> pow(const Tungsten::Vec<ElementType, Size> &t, const Tungsten::Vec<ElementType, Size> &e)
+Vec<ElementType, Size> pow(const Vec<ElementType, Size> &t, const Vec<ElementType, Size> &e)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::pow(t[i], e[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> log(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> log(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::log(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> abs(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> abs(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::abs(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> floor(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> floor(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::floor(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> ceil(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> ceil(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::ceil(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-Tungsten::Vec<ElementType, Size> trunc(const Tungsten::Vec<ElementType, Size> &t)
+Vec<ElementType, Size> trunc(const Vec<ElementType, Size> &t)
 {
-    Tungsten::Vec<ElementType, Size> result;
+    Vec<ElementType, Size> result;
     for (unsigned i = 0; i < Size; ++i)
         result[i] = std::trunc(t[i]);
     return result;
 }
 
 template<typename ElementType, unsigned Size>
-bool isnan(const Tungsten::Vec<ElementType, Size> &t)
+bool isnan(const Vec<ElementType, Size> &t)
 {
     for (unsigned i = 0; i < Size; ++i)
         if (std::isnan(t[i]))
             return true;
     return false;
 }
-
-}
-
-#endif /* VEC_HPP_ */

@@ -1,9 +1,4 @@
-#ifndef POLYNOMIAL_HPP_
-#define POLYNOMIAL_HPP_
-
-namespace Tungsten {
-
-namespace Polynomial {
+#pragma once
 
 // Computes polynomial P(x)
 template<int Size, typename T>
@@ -44,9 +39,3 @@ static inline double rational(double x, const double P[], const double Q[])
         return s1/s2;
     }
 }
-
-}
-
-}
-
-#endif /* POLYNOMIAL_HPP_ */

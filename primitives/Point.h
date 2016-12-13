@@ -1,9 +1,5 @@
-#ifndef POINT_HPP_
-#define POINT_HPP_
-
+#pragma once
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class Point : public Primitive
 {
@@ -63,7 +59,3 @@ public:
 
     virtual Primitive *clone() override;
 };
-
-}
-
-#endif /* POINT_HPP_ */

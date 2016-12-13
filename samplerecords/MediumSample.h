@@ -1,9 +1,5 @@
-#ifndef MEDIUMSAMPLE_HPP_
-#define MEDIUMSAMPLE_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
-namespace Tungsten {
 
 class PhaseFunction;
 
@@ -16,7 +12,3 @@ struct MediumSample
     float pdf;
     bool exited;
 };
-
-}
-
-#endif /* MEDIUMSAMPLE_HPP_ */

@@ -1,16 +1,9 @@
-#ifndef ATOMICFRAMEBUFFER_HPP_
-#define ATOMICFRAMEBUFFER_HPP_
-
+#pragma once
 #include "ReconstructionFilter.h"
-
 #include "math/Vec.h"
-
 #include "Debug.h"
-
 #include <memory>
 #include <atomic>
-
-namespace Tungsten {
 
 class AtomicFramebuffer
 {
@@ -92,7 +85,3 @@ public:
         std::memset(&_buffer[0].x(), 0, _w*_h*sizeof(Vec3fa));
     }
 };
-
-}
-
-#endif /* ATOMICFRAMEBUFFER_HPP_ */

@@ -1,14 +1,6 @@
-#ifndef BINNEDSAHSPLITTER_HPP_
-#define BINNEDSAHSPLITTER_HPP_
-
 #include "Primitive.h"
 #include "Splitter.h"
-
 #include <algorithm>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class BinnedSahSplitter
 {
@@ -163,11 +155,3 @@ public:
         twoWaySahSplit(start, end, prims, geomBox, split);
     }
 };
-
-}
-
-}
-
-
-
-#endif /* BINNEDSAHSPLITTER_HPP_ */

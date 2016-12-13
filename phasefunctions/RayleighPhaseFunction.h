@@ -1,9 +1,5 @@
-#ifndef RAYLEIGHPHASEFUNCTION_HPP_
-#define RAYLEIGHPHASEFUNCTION_HPP_
-
+#pragma once
 #include "PhaseFunction.h"
-
-namespace Tungsten {
 
 class RayleighPhaseFunction : public PhaseFunction
 {
@@ -15,7 +11,3 @@ public:
     virtual bool sample(PathSampleGenerator &sampler, const Vec3f &wi, PhaseSample &sample) const override;
     virtual float pdf(const Vec3f &wi, const Vec3f &wo) const override;
 };
-
-}
-
-#endif /* RAYLEIGHPHASEFUNCTION_HPP_ */

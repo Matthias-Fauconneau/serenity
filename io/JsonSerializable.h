@@ -1,12 +1,7 @@
-#ifndef JSONSERIALIZABLE_HPP_
-#define JSONSERIALIZABLE_HPP_
-
+#pragma once
 #include <rapidjson/document.h>
 #include <string>
-
 #include "Debug.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -54,11 +49,3 @@ public:
         return _name.empty();
     }
 };
-
-
-}
-
-
-
-#endif /* JSONSERIALIZABLE_HPP_ */
-

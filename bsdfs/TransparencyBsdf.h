@@ -1,9 +1,5 @@
-#ifndef TRANSPARENCYBSDF_HPP_
-#define TRANSPARENCYBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 class TransparencyBsdf : public Bsdf
 {
@@ -43,8 +39,3 @@ public:
         _base = base;
     }
 };
-
-}
-
-
-#endif /* TRANSPARENCYBSDF_HPP_ */

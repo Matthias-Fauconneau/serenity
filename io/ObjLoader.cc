@@ -2,18 +2,14 @@
 #include "DirectoryChange.h"
 #include "FileUtils.h"
 #include "Scene.h"
-
 #include "primitives/TriangleMesh.h"
 #include "primitives/Sphere.h"
 #include "primitives/Curves.h"
 #include "primitives/Cube.h"
 #include "primitives/Quad.h"
 #include "primitives/Disk.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "cameras/PinholeCamera.h"
-
 #include "bsdfs/RoughConductorBsdf.h"
 #include "bsdfs/RoughPlasticBsdf.h"
 #include "bsdfs/TransparencyBsdf.h"
@@ -23,12 +19,9 @@
 #include "bsdfs/MirrorBsdf.h"
 #include "bsdfs/PhongBsdf.h"
 #include "bsdfs/ErrorBsdf.h"
-
 #include "tinyformat.h"
 #include <algorithm>
 #include <cctype>
-
-namespace Tungsten {
 
 template<unsigned Size>
 Vec<float, Size> ObjLoader::loadVector(const char *s)
@@ -512,7 +505,7 @@ std::shared_ptr<Primitive> ObjLoader::finalizeMesh()
 
     prim->setEmission(emission);
 
-    return std::move(prim);
+    return prim;
 }
 
 void ObjLoader::loadFile(std::istream &in)
@@ -602,6 +595,4 @@ bool ObjLoader::loadCurvesOnly(const Path &path, std::vector<uint32> &curveEnds,
     loader.finalizeCurveData(curveEnds, nodeData);
 
     return true;
-}
-
 }

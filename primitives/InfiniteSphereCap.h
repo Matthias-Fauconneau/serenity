@@ -1,9 +1,5 @@
-#ifndef INFINITESPHERECAP_HPP_
-#define INFINITESPHERECAP_HPP_
-
+#pragma once
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class InfiniteSphereCap : public Primitive
 {
@@ -82,8 +78,3 @@ public:
 
     virtual Primitive *clone() override;
 };
-
-}
-
-
-#endif /* INFINITESPHERE_HPP_ */

@@ -1,13 +1,7 @@
-#ifndef SIMDBOOL_HPP_
-#define SIMDBOOL_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
-
 #include "IntTypes.h"
-
 #include <immintrin.h>
-
-namespace Tungsten {
 
 template<uint32 N> class SimdFloat;
 
@@ -134,7 +128,3 @@ public:
 typedef SimdBool<8> bool8;
 
 #endif
-
-}
-
-#endif /* SIMDBOOL_HPP_ */

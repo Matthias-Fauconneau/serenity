@@ -1,12 +1,7 @@
 #include "CheckerTexture.h"
-
 #include "primitives/IntersectionInfo.h"
-
 #include "math/MathUtil.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 CheckerTexture::CheckerTexture()
 : _onColor(0.8f), _offColor(0.2f),
@@ -133,4 +128,3 @@ Texture *CheckerTexture::clone() const
     return new CheckerTexture(*this);
 }
 
-}

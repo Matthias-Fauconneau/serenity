@@ -1,9 +1,5 @@
-#ifndef SPHERE_HPP_
-#define SPHERE_HPP_
-
+#pragma once
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class Sphere : public Primitive
 {
@@ -78,7 +74,3 @@ public:
         return _radius;
     }
 };
-
-}
-
-#endif /* SPHERE_HPP_ */

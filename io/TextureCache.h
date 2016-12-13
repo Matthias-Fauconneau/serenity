@@ -1,16 +1,10 @@
-#ifndef TEXTURECACHE_HPP_
-#define TEXTURECACHE_HPP_
-
 #include "ImageIO.h"
-
 #include <rapidjson/document.h>
 #include <functional>
 #include <utility>
 #include <memory>
 #include <string>
 #include <set>
-
-namespace Tungsten {
 
 class BitmapTexture;
 class IesTexture;
@@ -38,7 +32,3 @@ public:
     void loadResources();
     void prune();
 };
-
-}
-
-#endif /* TEXTURECACHE_HPP_ */

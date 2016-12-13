@@ -1,13 +1,8 @@
-#ifndef RAY_HPP_
-#define RAY_HPP_
-
+#pragma once
 #include "MathUtil.h"
 #include "Angle.h"
 #include "Vec.h"
-
 #include <limits>
-
-namespace Tungsten {
 
 class Ray
 {
@@ -106,7 +101,3 @@ public:
         return std::numeric_limits<float>::infinity();
     }
 };
-
-}
-
-#endif /* RAY_HPP_ */

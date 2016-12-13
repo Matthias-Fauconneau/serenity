@@ -1,20 +1,13 @@
 #include "PlasticBsdf.h"
 #include "Fresnel.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonUtils.h"
-
 #include <rapidjson/document.h>
-
-namespace Tungsten {
 
 PlasticBsdf::PlasticBsdf()
 : _ior(1.5f),
@@ -147,6 +140,4 @@ void PlasticBsdf::prepareForRender()
     _avgTransmittance = std::exp(-2.0f*_scaledSigmaA.avg());
 
     _diffuseFresnel = Fresnel::computeDiffuseFresnel(_ior, 1000000);
-}
-
 }

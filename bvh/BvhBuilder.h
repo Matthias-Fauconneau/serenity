@@ -1,12 +1,6 @@
-#ifndef BVHBUILDER_HPP_
-#define BVHBUILDER_HPP_
-
+#pragma once
 #include "NaiveBvhNode.h"
 #include "Primitive.h"
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class BvhBuilder
 {
@@ -36,9 +30,3 @@ public:
         return _numNodes;
     }
 };
-
-}
-
-}
-
-#endif /* BVHBUILDER_HPP_ */

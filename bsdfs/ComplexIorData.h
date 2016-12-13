@@ -1,10 +1,6 @@
+#pragma once
 #include "math/Vec.h"
-
 #include <string>
-
-namespace Tungsten {
-
-namespace ComplexIorList {
 
 struct ComplexIor
 {
@@ -56,7 +52,3 @@ static const ComplexIor complexIorList[] = {
     {"W", Vec3f(4.3707029924f, 3.3002972445f, 2.9982666528f), Vec3f(3.5006778591f, 2.6048652781f, 2.2731930614f)},
 };
 static const int ComplexIorCount = 40;
-
-}
-
-}

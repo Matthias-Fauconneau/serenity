@@ -1,14 +1,7 @@
-#ifndef PHASEFUNCTION_HPP_
-#define PHASEFUNCTION_HPP_
-
 #include "samplerecords/PhaseSample.h"
-
 #include "io/JsonSerializable.h"
 
-namespace Tungsten {
-
 class PathSampleGenerator;
-struct Scene;
 
 class PhaseFunction : public JsonSerializable
 {
@@ -20,7 +13,3 @@ public:
     virtual bool sample(PathSampleGenerator &sampler, const Vec3f &wi, PhaseSample &sample) const = 0;
     virtual float pdf(const Vec3f &wi, const Vec3f &wo) const = 0;
 };
-
-}
-
-#endif /* PHASEFUNCTION_HPP_ */

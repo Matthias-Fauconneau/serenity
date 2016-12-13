@@ -1,11 +1,6 @@
-#ifndef MATHUTIL_HPP_
-#define MATHUTIL_HPP_
-
+#pragma once
 #include "Vec.h"
-
 #include "IntTypes.h"
-
-namespace Tungsten {
 
 template<typename T>
 T min(const T &a, const T &b)
@@ -155,7 +150,3 @@ public:
         return (b - a).cross(c - a).length()*0.5f;
     }
 };
-
-}
-
-#endif /* MATHUTIL_HPP_ */

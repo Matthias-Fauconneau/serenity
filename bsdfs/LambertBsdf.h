@@ -1,9 +1,5 @@
-#ifndef LAMBERTBSDF_HPP_
-#define LAMBERTBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 struct SurfaceScatterEvent;
@@ -19,7 +15,3 @@ public:
     virtual Vec3f eval(const SurfaceScatterEvent &event) const override;
     virtual float pdf(const SurfaceScatterEvent &event) const override;
 };
-
-}
-
-#endif /* LAMBERTBSDF_HPP_ */

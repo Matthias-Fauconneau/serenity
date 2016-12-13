@@ -1,13 +1,5 @@
-#ifndef MIDPOINTSPLITTER_HPP_
-#define MIDPOINTSPLITTER_HPP_
-
 #include "Primitive.h"
-
 #include <algorithm>
-
-namespace Tungsten {
-
-namespace Bvh {
 
 class MidpointSplitter
 {
@@ -43,12 +35,3 @@ public:
         }
     }
 };
-
-
-}
-
-}
-
-
-
-#endif /* MIDPOINTSPLITTER_HPP_ */

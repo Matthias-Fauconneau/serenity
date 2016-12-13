@@ -1,11 +1,5 @@
-#ifndef MIXEDBSDF_HPP_
-#define MIXEDBSDF_HPP_
-
 #include "Bsdf.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 struct IntersectionInfo;
 struct Scene;
@@ -60,7 +54,3 @@ public:
         _ratio = ratio;
     }
 };
-
-}
-
-#endif /* MIXEDBSDF_HPP_ */

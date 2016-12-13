@@ -1,14 +1,9 @@
 #include "VoxelMedium.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/TangentFrame.h"
 #include "math/Ray.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 VoxelMedium::VoxelMedium()
 : _sigmaA(0.0f),
@@ -211,6 +206,4 @@ Vec3f VoxelMedium::transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray 
     }
 
     return transmittance;
-}
-
 }

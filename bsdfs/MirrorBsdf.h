@@ -1,9 +1,5 @@
-#ifndef MIRRORBSDF_HPP_
-#define MIRRORBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -18,8 +14,3 @@ public:
     virtual Vec3f eval(const SurfaceScatterEvent &event) const override;
     virtual float pdf(const SurfaceScatterEvent &event) const override;
 };
-
-}
-
-
-#endif /* MIRRORBSDF_HPP_ */

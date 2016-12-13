@@ -1,14 +1,8 @@
 #include "DiskTexture.h"
-
 #include "primitives/IntersectionInfo.h"
-
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 DiskTexture::DiskTexture()
 : _value(1.0f)
@@ -85,6 +79,4 @@ void DiskTexture::scaleValues(float factor)
 Texture *DiskTexture::clone() const
 {
     return new DiskTexture(*this);
-}
-
 }

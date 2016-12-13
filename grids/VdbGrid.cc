@@ -16,8 +16,6 @@
 #include <openvdb/tools/Interpolation.h>
 #include <iostream>
 
-namespace Tungsten {
-
 std::string VdbGrid::sampleMethodToString(SampleMethod method)
 {
     switch (method) {
@@ -380,8 +378,6 @@ Vec2f VdbGrid::inverseOpticalDepth(PathSampleGenerator &sampler, Vec3f p, Vec3f 
         } while (ta < t1);
         return Vec2f(t1, integral);
     }
-}
-
 }
 
 #endif

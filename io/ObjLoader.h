@@ -1,24 +1,15 @@
-#ifndef OBJLOADER_HPP_
-#define OBJLOADER_HPP_
-
 #include "TextureCache.h"
 #include "ObjMaterial.h"
 #include "Path.h"
-
 #include "primitives/Triangle.h"
 #include "primitives/Vertex.h"
-
 #include "bsdfs/Bsdf.h"
-
 #include "math/Vec.h"
 #include "math/Box.h"
-
 #include <unordered_map>
 #include <string>
 #include <vector>
 #include <memory>
-
-namespace Tungsten {
 
 class Primitive;
 
@@ -90,7 +81,3 @@ public:
     static bool loadGeometryOnly(const Path &path, std::vector<Vertex> &verts, std::vector<TriangleI> &tris);
     static bool loadCurvesOnly(const Path &path, std::vector<uint32> &curveEnds, std::vector<Vec4f> &nodeData);
 };
-
-}
-
-#endif /* OBJLOADER_HPP_ */

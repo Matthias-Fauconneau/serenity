@@ -1,10 +1,6 @@
-#ifndef FILEITERABLES_HPP_
-#define FILEITERABLES_HPP_
-
+#pragma once
 #include "RecursiveFileIterator.h"
 #include "FileIterator.h"
-
-namespace Tungsten {
 
 class FileIterable
 {
@@ -70,7 +66,3 @@ public:
         return RecursiveFileIterator();
     }
 };
-
-}
-
-#endif /* FILEITERABLES_HPP_ */

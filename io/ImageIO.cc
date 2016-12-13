@@ -6,9 +6,8 @@
 
 #include "Debug.h"
 
-#include "lodepng/lodepng.h"
-#include "stbi/stb_image.h"
 #include <cstring>
+#include "core.h"
 
 #if OPENEXR_AVAILABLE
 #include <ImfChannelList.h>
@@ -41,10 +40,6 @@ static const int GammaCorrection[] = {
     191, 193, 195, 197, 199, 201, 203, 205, 207, 209, 211, 213, 215, 217, 219, 221,
     223, 225, 227, 229, 231, 233, 235, 237, 239, 241, 244, 246, 248, 250, 252, 255
 };
-
-namespace Tungsten {
-
-namespace ImageIO {
 
 #if OPENEXR_AVAILABLE
 // OpenEXR found it necessary to write its own I/OStream abstractions,
@@ -134,26 +129,6 @@ public:
 };
 #endif
 
-static int stbiReadCallback(void *user, char *data, int size)
-{
-    std::istream &in = *static_cast<std::istream *>(user);
-    in.read(data, size);
-    return int(in.gcount());
-}
-static void stbiSkipCallback(void *user, int n)
-{
-    std::istream &in = *static_cast<std::istream *>(user);
-    in.seekg(n, std::ios_base::cur);
-}
-static int stbiEofCallback(void *user)
-{
-    std::istream &in = *static_cast<std::istream *>(user);
-    return in.eof();
-}
-static const stbi_io_callbacks istreamCallback  = stbi_io_callbacks{
-    &stbiReadCallback, &stbiSkipCallback, &stbiEofCallback
-};
-
 bool isHdr(const Path &path)
 {
     if (path.testExtension("pfm"))
@@ -166,7 +141,7 @@ bool isHdr(const Path &path)
     InputStreamHandle in = FileUtils::openInputStream(path);
     if (!in)
         return false;
-    return stbi_is_hdr_from_callbacks(&istreamCallback, in.get()) != 0;
+    return false;
 }
 
 template<typename T>
@@ -322,8 +297,7 @@ static std::unique_ptr<float[]> loadPfm(const Path &path, TexelConversion reques
     for (int y = 0; y < h; ++y)
         in->read(reinterpret_cast<char *>(img.get() + (h - y - 1)*w*channels), w*channels*sizeof(float));
 
-    if (channels == targetChannels)
-        return std::move(img);
+    if (channels == targetChannels) return img;
 
     std::unique_ptr<float[]> texels(new float[w*h*targetChannels]);
 
@@ -334,46 +308,17 @@ static std::unique_ptr<float[]> loadPfm(const Path &path, TexelConversion reques
         for (int i = 0; i < w*h; ++i)
             texels[i] = convertToScalar(request, img[i*3], img[i*3 + 1], img[i*3 + 2], 1.0f, false);
 
-    return std::move(texels);
-}
-
-std::unique_ptr<float[]> loadStbiHdr(const Path &path, TexelConversion request, int &w, int &h)
-{
-    InputStreamHandle in = FileUtils::openInputStream(path);
-    if (!in)
-        return nullptr;
-
-    int channels;
-    std::unique_ptr<float[], void(*)(void *)> img(stbi_loadf_from_callbacks(&istreamCallback, in.get(),
-            &w, &h, &channels, 0), stbi_image_free);
-
-    // We only expect Radiance HDR for now, which only has RGB support.
-    if (!img || channels != 3)
-        return nullptr;
-
-    int targetChannels = (request == TexelConversion::REQUEST_RGB) ? 3 : 1;
-
-    std::unique_ptr<float[]> texels(new float[w*h*targetChannels]);
-    if (targetChannels == 3) {
-        std::memcpy(texels.get(), img.get(), w*h*targetChannels*sizeof(float));
-    } else {
-        for (int i = 0; i < w*h; ++i)
-            texels[i] = convertToScalar(request, img[i*3], img[i*3 + 1], img[i*3 + 2], 1.0f, false);
-    }
-
-    return std::move(texels);
+    return texels;
 }
 
 std::unique_ptr<float[]> loadHdr(const Path &path, TexelConversion request, int &w, int &h)
 {
-    if (path.testExtension("pfm"))
-        return std::move(loadPfm(path, request, w, h));
+    if (path.testExtension("pfm")) return loadPfm(path, request, w, h);
 #if OPENEXR_AVAILABLE
     else if (path.testExtension("exr"))
         return std::move(loadExr(path, request, w, h));
 #endif
-    else
-        return std::move(loadStbiHdr(path, request, w, h));
+    error("HDR");
 }
 
 typedef std::unique_ptr<uint8[], void(*)(void *)> DeletablePixels;
@@ -395,7 +340,7 @@ DeletablePixels loadPng(const Path &path, int &w, int &h, int &channels)
 
     uint8 *dst = nullptr;
     uint32 uw, uh;
-    lodepng_decode_memory(&dst, &uw, &uh, file.get(), size_t(size), LCT_RGBA, 8);
+    error("PNG");
     if (!dst)
         return makeVoidPixels();
 
@@ -480,16 +425,6 @@ DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
 }
 #endif
 
-DeletablePixels loadStbi(const Path &path, int &w, int &h, int &channels)
-{
-    InputStreamHandle in = FileUtils::openInputStream(path);
-    if (!in)
-        return makeVoidPixels();
-
-    return DeletablePixels(stbi_load_from_callbacks(&istreamCallback, in.get(),
-            &w, &h, &channels, 4), stbi_image_free);
-}
-
 std::unique_ptr<uint8[]> loadLdr(const Path &path, TexelConversion request, int &w, int &h, bool gammaCorrect)
 {
     int channels;
@@ -501,7 +436,7 @@ std::unique_ptr<uint8[]> loadLdr(const Path &path, TexelConversion request, int 
         img = loadJpg(path, w, h, channels);
 #endif
     else
-        img = loadStbi(path, w, h, channels);
+        error("LDR");
 
     if (!img)
         return nullptr;
@@ -522,7 +457,7 @@ std::unique_ptr<uint8[]> loadLdr(const Path &path, TexelConversion request, int 
                 int(img[i*4 + 3]), channels == 4);
     }
 
-    return std::move(texels);
+    return texels;
 }
 
 bool savePfm(const Path &path, const float *img, int w, int h, int channels)
@@ -584,28 +519,7 @@ bool saveExr(const Path &path, const float *img, int w, int h, int channels)
 }
 #endif
 
-bool savePng(const Path &path, const uint8 *img, int w, int h, int channels)
-{
-    if (channels <= 0 || channels > 4)
-        return false;
-    OutputStreamHandle out = FileUtils::openOutputStream(path);
-    if (!out) {
-        DBG("Unable to save PNG at path '%s'", path.absolute());
-        return false;
-    }
-
-    LodePNGColorType types[] = {LCT_GREY, LCT_GREY_ALPHA, LCT_RGB, LCT_RGBA};
-
-    uint8 *encoded = nullptr;
-    size_t encodedSize;
-    if (lodepng_encode_memory(&encoded, &encodedSize, img, w, h, types[channels - 1], 8) != 0)
-        return false;
-    DeletablePixels data(encoded, free);
-
-    FileUtils::streamWrite(out, data.get(), encodedSize);
-
-    return true;
-}
+bool savePng(const Path&, const uint8*, int, int, int) { error("PNG"); }
 
 bool saveHdr(const Path &path, const float *img, int w, int h, int channels)
 {
@@ -625,8 +539,4 @@ bool saveLdr(const Path &path, const uint8 *img, int w, int h, int channels)
         return savePng(path, img, w, h, channels);
 
     return false;
-}
-
-}
-
 }

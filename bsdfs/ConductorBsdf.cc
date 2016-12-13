@@ -1,21 +1,14 @@
 #include "ConductorBsdf.h"
 #include "ComplexIor.h"
 #include "Fresnel.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
-
 #include <rapidjson/document.h>
-
-namespace Tungsten {
 
 ConductorBsdf::ConductorBsdf()
 : _materialName("Cu"),
@@ -83,6 +76,4 @@ float ConductorBsdf::pdf(const SurfaceScatterEvent &event) const
         return 1.0f;
     else
         return 0.0f;
-}
-
 }

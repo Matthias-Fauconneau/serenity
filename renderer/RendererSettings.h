@@ -1,14 +1,9 @@
-#ifndef RENDERERSETTINGS_HPP_
-#define RENDERERSETTINGS_HPP_
-
+#pragma once
 #include "cameras/OutputBufferSettings.h"
-
 #include "io/JsonSerializable.h"
 #include "io/DirectoryChange.h"
 #include "io/JsonObject.h"
 #include "io/FileUtils.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -23,7 +18,6 @@ class RendererSettings : public JsonSerializable
     bool _useAdaptiveSampling;
     bool _enableResumeRender;
     bool _useSceneBvh;
-    bool _useSobol;
     uint32 _spp;
     uint32 _sppStep;
     std::string _checkpointInterval;
@@ -38,7 +32,6 @@ public:
       _useAdaptiveSampling(true),
       _enableResumeRender(false),
       _useSceneBvh(true),
-      _useSobol(true),
       _spp(1),
       _sppStep(1),
       _checkpointInterval("0"),
@@ -60,7 +53,6 @@ public:
         JsonUtils::fromJson(v, "overwrite_output_files", _overwriteOutputFiles);
         JsonUtils::fromJson(v, "adaptive_sampling", _useAdaptiveSampling);
         JsonUtils::fromJson(v, "enable_resume_render", _enableResumeRender);
-        JsonUtils::fromJson(v, "stratified_sampler", _useSobol);
         JsonUtils::fromJson(v, "scene_bvh", _useSceneBvh);
         JsonUtils::fromJson(v, "spp", _spp);
         JsonUtils::fromJson(v, "spp_step", _sppStep);
@@ -82,7 +74,6 @@ public:
             "overwrite_output_files", _overwriteOutputFiles,
             "adaptive_sampling", _useAdaptiveSampling,
             "enable_resume_render", _enableResumeRender,
-            "stratified_sampler", _useSobol,
             "scene_bvh", _useSceneBvh,
             "spp", _spp,
             "spp_step", _sppStep,
@@ -170,11 +161,6 @@ public:
         return _enableResumeRender;
     }
 
-    bool useSobol() const
-    {
-        return _useSobol;
-    }
-
     bool useSceneBvh() const
     {
         return _useSceneBvh;
@@ -220,7 +206,3 @@ public:
         _sppStep = step;
     }
 };
-
-}
-
-#endif /* RENDERERSETTINGS_HPP_ */

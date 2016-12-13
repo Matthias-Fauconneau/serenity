@@ -1,22 +1,15 @@
-#ifndef TRIANGLEMESH_HPP_
-#define TRIANGLEMESH_HPP_
-
+#pragma once
 #include "Primitive.h"
 #include "Triangle.h"
 #include "Vertex.h"
-
 #include "sampling/Distribution1D.h"
-
 #include "io/Path.h"
 #include <memory>
 #include <vector>
 #include <string>
-
 #include <embree2/rtcore.h>
 #include <embree2/rtcore_scene.h>
 #include <embree2/rtcore_geometry.h>
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -151,7 +144,3 @@ public:
         return _path;
     }
 };
-
-}
-
-#endif /* TRIANGLEMESH_HPP_ */

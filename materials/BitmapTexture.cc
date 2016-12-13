@@ -1,16 +1,10 @@
 #include "BitmapTexture.h"
-
 #include "primitives/IntersectionInfo.h"
-
 #include "sampling/Distribution2D.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 struct Rgba
 {
@@ -315,10 +309,10 @@ Vec3f BitmapTexture::operator[](const Vec2f &uv) const
         iv0 = ((iv0 % _h) + _h) % _h;
         iv1 = ((iv1 % _h) + _h) % _h;
     } else {
-        iu0 = Tungsten::clamp(iu0, 0, _w - 1);
-        iu1 = Tungsten::clamp(iu1, 0, _w - 1);
-        iv0 = Tungsten::clamp(iv0, 0, _h - 1);
-        iv1 = Tungsten::clamp(iv1, 0, _h - 1);
+        iu0 = clamp(iu0, 0, _w - 1);
+        iu1 = clamp(iu1, 0, _w - 1);
+        iv0 = clamp(iv0, 0, _h - 1);
+        iv1 = clamp(iv1, 0, _h - 1);
     }
 
     if (!linear) {
@@ -450,6 +444,4 @@ void BitmapTexture::scaleValues(float factor)
 Texture *BitmapTexture::clone() const
 {
     return new BitmapTexture(*this);
-}
-
 }

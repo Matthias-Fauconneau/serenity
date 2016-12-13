@@ -1,9 +1,5 @@
-#ifndef PHONGBSDF_HPP_
-#define PHONGBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -47,8 +43,3 @@ public:
         _exponent = exponent;
     }
 };
-
-}
-
-
-#endif /* PHONGBSDF_HPP_ */

@@ -1,10 +1,6 @@
-#ifndef DISK_HPP_
-#define DISK_HPP_
-
+#pragma once
 #include "TriangleMesh.h"
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class Disk : public Primitive
 {
@@ -73,7 +69,3 @@ public:
 
     virtual Primitive *clone() override;
 };
-
-}
-
-#endif /* DISK_HPP_ */

@@ -1,13 +1,9 @@
 #include "Cube.h"
 #include "TriangleMesh.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 struct CubeIntersection
 {
@@ -335,6 +331,4 @@ void Cube::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &bsdf)
 Primitive *Cube::clone()
 {
     return new Cube(*this);
-}
-
 }

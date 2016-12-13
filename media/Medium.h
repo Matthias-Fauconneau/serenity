@@ -1,17 +1,9 @@
-#ifndef MEDIUM_HPP_
-#define MEDIUM_HPP_
-
+#pragma once
 #include "samplerecords/MediumSample.h"
-
 #include "phasefunctions/PhaseFunction.h"
-
 #include "math/Ray.h"
-
 #include "io/JsonSerializable.h"
-
 #include <memory>
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -63,9 +55,3 @@ public:
             bool endOnSurface, float &pdfForward, float &pdfBackward) const;
     virtual const PhaseFunction *phaseFunction(const Vec3f &p) const;
 };
-
-}
-
-
-
-#endif /* MEDIUM_HPP_ */

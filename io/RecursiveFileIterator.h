@@ -1,11 +1,6 @@
-#ifndef RECURSIVEFILEITERATOR_HPP_
-#define RECURSIVEFILEITERATOR_HPP_
-
+#pragma once
 #include "FileIterator.h"
-
 #include <stack>
-
-namespace Tungsten {
 
 class RecursiveFileIterator
 {
@@ -24,9 +19,3 @@ public:
     Path &operator*();
     const Path &operator*() const;
 };
-
-}
-
-
-
-#endif /* RECURSIVEFILEITERATOR_HPP_ */

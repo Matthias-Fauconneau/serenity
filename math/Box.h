@@ -1,15 +1,8 @@
-
-#ifndef MATH_BOX_HPP_
-#define MATH_BOX_HPP_
-
+#pragma once
 #include "IntTypes.h"
 #include "MathUtil.h"
-
 #include "sse/SimdUtils.h"
-
 #include <limits>
-
-namespace Tungsten {
 
 template<typename TVec, typename ElementType, unsigned Size>
 class Box {
@@ -60,7 +53,7 @@ public:
 
     inline TVec diagonal() const
     {
-        return Tungsten::max(_max - _min, TVec(ElementType(0)));
+        return max(_max - _min, TVec(ElementType(0)));
     }
 
     inline ElementType area() const
@@ -90,14 +83,14 @@ public:
 
     void grow(const TVec &p)
     {
-        _min = Tungsten::min(_min, p);
-        _max = Tungsten::max(_max, p);
+        _min = min(_min, p);
+        _max = max(_max, p);
     }
 
     void grow(const Box &box)
     {
-        _min = Tungsten::min(_min, box._min);
-        _max = Tungsten::max(_max, box._max);
+        _min = min(_min, box._min);
+        _max = max(_max, box._max);
     }
 
     inline bool contains(const TVec &p) const
@@ -118,8 +111,8 @@ public:
 
     void intersect(const Box &box)
     {
-        _min = Tungsten::max(_min, box._min);
-        _max = Tungsten::min(_max, box._max);
+        _min = max(_min, box._min);
+        _max = min(_max, box._max);
     }
 
     friend std::ostream &operator<< (std::ostream &stream, const Box &box) {
@@ -157,7 +150,3 @@ inline Box3f narrow(const Box3fp &b)
 {
     return Box3f(narrow(b.min()), narrow(b.max()));
 }
-
-}
-
-#endif // MATH_BOX_HPP_

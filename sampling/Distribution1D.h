@@ -1,12 +1,7 @@
-#ifndef DISTRIBUTION1D_HPP_
-#define DISTRIBUTION1D_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
-
 #include <algorithm>
 #include <vector>
-
-namespace Tungsten {
 
 class Distribution1D
 {
@@ -39,7 +34,3 @@ public:
         return _pdf[idx];
     }
 };
-
-}
-
-#endif /* DISTRIBUTION1D_HPP_ */

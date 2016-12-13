@@ -1,16 +1,10 @@
 #include "IesTexture.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
 #include "Debug.h"
-
 #include <iostream>
-
-namespace Tungsten {
 
 IesTexture::IesTexture()
 : _path(std::make_shared<Path>("")),
@@ -215,6 +209,4 @@ void IesTexture::loadResources()
 Texture *IesTexture::clone() const
 {
     return new IesTexture(*this);
-}
-
 }

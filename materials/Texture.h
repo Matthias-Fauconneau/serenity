@@ -1,11 +1,6 @@
-#ifndef TEXTURE_HPP_
-#define TEXTURE_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
 #include "io/JsonSerializable.h"
-
-namespace Tungsten {
 
 struct IntersectionInfo;
 
@@ -42,7 +37,3 @@ public:
 
     virtual Texture *clone() const = 0;
 };
-
-}
-
-#endif /* TEXTURE_HPP_ */

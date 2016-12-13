@@ -1,9 +1,5 @@
-#ifndef MAT4F_HPP_
-#define MAT4F_HPP_
-
+#pragma once
 #include "Vec.h"
-
-namespace Tungsten {
 
 class Mat4f;
 
@@ -325,7 +321,3 @@ static inline Vec3f operator*(const Mat4f &a, const Vec3f &b)
         a.a31*b.x() + a.a32*b.y() + a.a33*b.z() + a.a34
     );
 }
-
-}
-
-#endif

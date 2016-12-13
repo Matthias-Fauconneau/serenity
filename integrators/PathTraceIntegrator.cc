@@ -1,14 +1,8 @@
 #include "PathTraceIntegrator.h"
 
 #include "sampling/UniformPathSampler.h"
-#include "sampling/SobolPathSampler.h"
 
 #include "cameras/Camera.h"
-
-#include "thread/ThreadUtils.h"
-#include "thread/ThreadPool.h"
-
-namespace Tungsten {
 
 constexpr uint32 PathTraceIntegrator::TileSize;
 constexpr uint32 PathTraceIntegrator::VarianceTileSize;
@@ -33,9 +27,7 @@ void PathTraceIntegrator::diceTiles()
                 y,
                 min(TileSize, _w - x),
                 min(TileSize, _h - y),
-                _scene->rendererSettings().useSobol() ?
-                    std::unique_ptr<PathSampleGenerator>(new SobolPathSampler(MathUtil::hash32(_sampler.nextI()))) :
-                    std::unique_ptr<PathSampleGenerator>(new UniformPathSampler(MathUtil::hash32(_sampler.nextI())))
+                std::unique_ptr<PathSampleGenerator>(new UniformPathSampler(MathUtil::hash32(_sampler.nextI())))
             );
         }
     }
@@ -202,52 +194,10 @@ void PathTraceIntegrator::prepareForRender(TraceableScene &scene, uint32 seed)
 
 void PathTraceIntegrator::teardownAfterRender()
 {
-    _group.reset();
-
     _tracers.clear();
     _samples.clear();
     _tiles  .clear();
     _tracers.shrink_to_fit();
     _samples.shrink_to_fit();
     _tiles  .shrink_to_fit();
-}
-
-void PathTraceIntegrator::startRender(std::function<void()> completionCallback)
-{
-    if (done() || !generateWork()) {
-        _currentSpp = _nextSpp;
-        advanceSpp();
-        completionCallback();
-        return;
-    }
-
-    using namespace std::placeholders;
-    _group = ThreadUtils::pool->enqueue(
-        std::bind(&PathTraceIntegrator::renderTile, this, _3, _1),
-        _tiles.size(),
-        [&, completionCallback]() {
-            _currentSpp = _nextSpp;
-            advanceSpp();
-            completionCallback();
-        }
-    );
-}
-
-void PathTraceIntegrator::waitForCompletion()
-{
-    if (_group) {
-        _group->wait();
-        _group.reset();
-    }
-}
-
-void PathTraceIntegrator::abortRender()
-{
-    if (_group) {
-        _group->abort();
-        _group->wait();
-        _group.reset();
-    }
-}
-
 }

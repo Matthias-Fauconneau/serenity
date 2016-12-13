@@ -1,9 +1,5 @@
-#ifndef JSONOBJECT_HPP_
-#define JSONOBJECT_HPP_
-
+#pragma once
 #include "JsonUtils.h"
-
-namespace Tungsten {
 
 class JsonObject
 {
@@ -55,7 +51,3 @@ public:
         add(std::forward<Ts>(ts)...);
     }
 };
-
-}
-
-#endif /* JSONOBJECT_HPP_ */

@@ -1,8 +1,6 @@
-#include "thread/ThreadUtils.h"
 #include "io/Scene.h"
 #include "integrators/TraceBase.h"
-#include "sampling/SobolPathSampler.h"
-#define Type typename
+#include "sampling/UniformPathSampler.h"
 #include "matrix.h"
 #include "interface.h"
 #include "window.h"
@@ -127,15 +125,15 @@ struct Render {
 
         mat4 camera = parseCamera(readFile("scene.json"));
 
-        Tungsten::EmbreeUtil::initDevice();
-        Tungsten::ThreadUtils::startThreads(8);
-        std::unique_ptr<Tungsten::Scene> scene;
-        scene.reset(Tungsten::Scene::load(Tungsten::Path("scene.json")));
+        EmbreeUtil::initDevice();
+        ThreadUtils::startThreads(8);
+        std::unique_ptr<Scene> scene;
+        scene.reset(Scene::load(Path("scene.json")));
         scene.loadResources();
         scene.rendererSettings().setSpp(1);
         scene.camera()->_res.x() = size.x;
         scene.camera()->_res.y() = size.y;
-        std::unique_ptr<Tungsten::TraceableScene> flattenedScene;
+        std::unique_ptr<TraceableScene> flattenedScene;
         flattenedScene.reset(scene.makeTraceable(readCycleCounter()));
         flattenedScene._cam._res.x() = size.x;
         flattenedScene._cam._res.y() = size.y;
@@ -157,21 +155,20 @@ struct Render {
                 half* const targetB = B.begin();
                 half* const targetG = G.begin();
                 half* const targetR = R.begin();
-                Tungsten::SobolPathSampler sampler(readCycleCounter());
-                Tungsten::PathTracer tracer(flattenedScene.get(), Tungsten::PathTracerSettings(), 0);
+                UniformSampler sampler(readCycleCounter());
+                PathTracer tracer(flattenedScene.get(), PathTracerSettings(), 0);
                 for(int y: range(start, start+sizeI)) for(uint x: range(size.x)) {
                     uint pixelIndex = y*size.x + x;
                     sampler.startPath(pixelIndex, 0);
                     const vec3 O = M.inverse() * vec3(2.f*x/float(size.x-1)-1, -(2.f*y/float(size.y-1)-1), -1);
-                    Tungsten::PositionSample position;
+                    PositionSample position;
                     position.p.x() = O.x;
                     position.p.y() = O.y;
                     position.p.z() = O.z;
-                    using namespace Tungsten;
                     position.weight = Vec3f(1.0f);
                     position.pdf = 1.0f;
                     position.Ng = flattenedScene._cam._transform.fwd();
-                    Tungsten::DirectionSample direction;
+                    DirectionSample direction;
                     const vec3 P = M.inverse() * vec3(2.f*x/float(size.x-1)-1, -(2.f*y/float(size.y-1)-1), +1);
                     const vec3 d = normalize(P-O);
                     direction.d.x() = d.x;
@@ -275,8 +272,6 @@ struct ViewControl : virtual Widget {
     }
 };
 
-using namespace Tungsten;
-
 struct ViewApp {
     string name;
     vec2 min, max;
@@ -290,15 +285,15 @@ struct ViewApp {
     ViewWidget view {uint2(512), {this, &ViewApp::render}};
     unique<Window> window = nullptr;
 
-    struct Scene : Tungsten::Scene {
-        Scene() : Tungsten::Scene(Path(), std::make_shared<TextureCache>()) {
-            Tungsten::EmbreeUtil::initDevice();
+    struct Scene : ::Scene {
+        Scene() : ::Scene(Path(), std::make_shared<TextureCache>()) {
+            EmbreeUtil::initDevice();
             std::string json = FileUtils::loadText(_path = Path("scene.json"));
             rapidjson::Document document;
             document.Parse<0>(json.c_str());
              //fromJson(document, *this);
             const rapidjson::Value& v = document;
-            JsonSerializable::fromJson(v, (Tungsten::Scene&)*this);
+            JsonSerializable::fromJson(v, (Scene&)*this);
 
             auto media      = v.FindMember("media");
             auto bsdfs      = v.FindMember("bsdfs");
@@ -308,15 +303,15 @@ struct ViewApp {
             auto renderer   = v.FindMember("renderer");
 
             if (media != v.MemberEnd() && media->value.IsArray())
-                loadObjectList(media->value, std::bind(&Scene::instantiateMedium, (Tungsten::Scene*)this,
+                loadObjectList(media->value, std::bind(&Scene::instantiateMedium, (Scene*)this,
                         std::placeholders::_1, std::placeholders::_2), _media);
 
             if (bsdfs != v.MemberEnd() && bsdfs->value.IsArray())
-                loadObjectList(bsdfs->value, std::bind(&Scene::instantiateBsdf, (Tungsten::Scene*)this,
+                loadObjectList(bsdfs->value, std::bind(&Scene::instantiateBsdf, (Scene*)this,
                         std::placeholders::_1, std::placeholders::_2), _bsdfs);
 
             if (primitives != v.MemberEnd() && primitives->value.IsArray())
-                loadObjectList(primitives->value, std::bind(&Scene::instantiatePrimitive, (Tungsten::Scene*)this,
+                loadObjectList(primitives->value, std::bind(&Scene::instantiatePrimitive, (Scene*)this,
                         std::placeholders::_1, std::placeholders::_2), _primitives);
 
             if (camera != v.MemberEnd() && camera->value.IsObject()) {
@@ -359,7 +354,7 @@ struct ViewApp {
             }
         }
     } scene;
-    Tungsten::TraceableScene flattenedScene {*scene._camera, *scene._integrator, scene._primitives, scene._bsdfs, scene._media, scene._rendererSettings, (uint32)readCycleCounter()};
+    TraceableScene flattenedScene {*scene._camera, *scene._integrator, scene._primitives, scene._bsdfs, scene._media, scene._rendererSettings, (uint32)readCycleCounter()};
 
     Random random;
 
@@ -408,20 +403,20 @@ struct ViewApp {
         const mat4 M = shearedPerspective(s, t) * camera;
         extern uint8 sRGB_forward[0x1000];
         parallel_chunk(target.size.y, [this, &target, M](uint _threadId, uint start, uint sizeI) {
-            Tungsten::SobolPathSampler sampler(readCycleCounter());
-            Tungsten::TraceBase tracer(&flattenedScene, Tungsten::TraceSettings(), 0);
+            UniformPathSampler sampler(readCycleCounter());
+            TraceBase tracer(&flattenedScene, TraceSettings(), 0);
             for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
                 uint pixelIndex = y*target.size.x + x;
                 sampler.startPath(pixelIndex, 0);
                 const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), -1);
-                Tungsten::PositionSample position;
+                PositionSample position;
                 position.p.x() = O.x;
                 position.p.y() = O.y;
                 position.p.z() = O.z;
                 position.weight = Vec3f(1.0f);
                 position.pdf = 1.0f;
                 position.Ng = flattenedScene._cam._transform.fwd();
-                Tungsten::DirectionSample direction;
+                DirectionSample direction;
                 const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), +1);
                 const vec3 d = normalize(P-O);
                 direction.d.x() = d.x;

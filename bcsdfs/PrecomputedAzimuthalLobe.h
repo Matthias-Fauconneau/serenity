@@ -1,15 +1,9 @@
-#ifndef PRECOMPUTEDAZIMUTHALLOBE_HPP_
-#define PRECOMPUTEDAZIMUTHALLOBE_HPP_
-
+#pragma once
 #include "sampling/InterpolatedDistribution1D.h"
-
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include <vector>
 #include <memory>
-
-namespace Tungsten {
 
 // Utility class used by the RoughDielectricBcsdf for precomputing
 // the azimuthal scattering functions
@@ -64,9 +58,3 @@ public:
         return _sampler->sum(v)*(TWO_PI/AzimuthalResolution);
     }
 };
-
-}
-
-
-
-#endif /* PRECOMPUTEDAZIMUTHALLOBE_HPP_ */

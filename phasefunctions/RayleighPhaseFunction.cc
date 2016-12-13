@@ -1,14 +1,9 @@
 #include "RayleighPhaseFunction.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "math/TangentFrame.h"
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 inline float RayleighPhaseFunction::rayleigh(float cosTheta)
 {
@@ -50,6 +45,4 @@ bool RayleighPhaseFunction::sample(PathSampleGenerator &sampler, const Vec3f &wi
 float RayleighPhaseFunction::pdf(const Vec3f &wi, const Vec3f &wo) const
 {
     return rayleigh(wi.dot(wo));
-}
-
 }

@@ -1,14 +1,7 @@
-#ifndef FRESNEL_HPP_
-#define FRESNEL_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-
 #include <cmath>
-
-namespace Tungsten {
-
-namespace Fresnel {
 
 // Computes total reflectance from an infinitesimally thin film with refraction index eta
 // from all internal reflection/refraction events
@@ -151,9 +144,3 @@ static inline float computeDiffuseFresnel(float ior, const int sampleCount)
 
     return float(diffuseFresnel);
 }
-
-}
-
-}
-
-#endif /* FRESNEL_HPP_ */

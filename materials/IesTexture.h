@@ -1,9 +1,5 @@
-#ifndef IESTEXTURE_HPP_
-#define IESTEXTURE_HPP_
-
+#pragma once
 #include "BitmapTexture.h"
-
-namespace Tungsten {
 
 class IesTexture : public BitmapTexture
 {
@@ -45,7 +41,3 @@ public:
         return _path == o._path && _resolution == o._resolution;
     }
 };
-
-}
-
-#endif /* IESTEXTURE_HPP_ */

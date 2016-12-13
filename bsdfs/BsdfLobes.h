@@ -1,9 +1,5 @@
-#ifndef BSDFLOBES_HPP_
-#define BSDFLOBES_HPP_
-
+#pragma once
 #include "IntTypes.h"
-
-namespace Tungsten {
 
 class BsdfLobes
 {
@@ -110,7 +106,3 @@ public:
         return _lobes != 0 && (_lobes & AllButSpecular) == 0;
     }
 };
-
-}
-
-#endif /* BSDFLOBES_HPP_ */

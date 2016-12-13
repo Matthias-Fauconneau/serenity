@@ -1,26 +1,16 @@
-#ifndef TRACEABLESCENE_HPP_
-#define TRACEABLESCENE_HPP_
-
+#pragma once
 #include "integrators/Integrator.h"
-
 #include "primitives/InfiniteSphere.h"
 #include "primitives/EmbreeUtil.h"
 #include "primitives/Primitive.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "cameras/Camera.h"
-
 #include "media/Medium.h"
-
 #include "RendererSettings.h"
 #include <vector>
 #include <memory>
-
 #include <embree2/rtcore.h> // embree
 #include <embree2/rtcore_ray.h>
-
-namespace Tungsten {
 
 struct TraceableScene
 {
@@ -260,7 +250,3 @@ public:
         return _settings;
     }
 };
-
-}
-
-#endif /* TRACEABLESCENE_HPP_ */

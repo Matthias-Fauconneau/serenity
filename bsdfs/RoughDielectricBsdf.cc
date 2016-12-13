@@ -1,14 +1,9 @@
 #include "RoughDielectricBsdf.h"
 #include "Fresnel.h"
-
 #include "materials/ConstantTexture.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 // Signum that exludes 0
 template <typename T>
@@ -245,7 +240,3 @@ void RoughDielectricBsdf::prepareForRender()
     _distribution = Microfacet::stringToType(_distributionName);
     _invIor = 1.0f/_ior;
 }
-
-}
-
-

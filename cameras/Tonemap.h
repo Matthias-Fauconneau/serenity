@@ -1,12 +1,7 @@
-#ifndef TONEMAP_HPP_
-#define TONEMAP_HPP_
-
+#pragma once
 #include "math/MathUtil.h"
 #include "math/Vec.h"
-
 #include "Debug.h"
-
-namespace Tungsten {
 
 class Tonemap
 {
@@ -48,8 +43,3 @@ public:
         return c;
     }
 };
-
-}
-
-
-#endif /* TONEMAP_HPP_ */

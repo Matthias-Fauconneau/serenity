@@ -1,20 +1,13 @@
 #include "DielectricBsdf.h"
 #include "Fresnel.h"
-
 #include "samplerecords/SurfaceScatterEvent.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-
 #include "io/JsonObject.h"
-
 #include <rapidjson/document.h>
-
-namespace Tungsten {
 
 DielectricBsdf::DielectricBsdf()
 : _ior(1.5f),
@@ -145,6 +138,4 @@ void DielectricBsdf::prepareForRender()
         _lobes = BsdfLobes(BsdfLobes::SpecularReflectionLobe);
 
     _invIor = 1.0f/_ior;
-}
-
 }

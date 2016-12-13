@@ -1,11 +1,7 @@
 #include "Mat4f.h"
-
 #include "Quaternion.h"
 #include "Angle.h"
-
 #include <cmath>
-
-namespace Tungsten {
 
 Mat4f Mat4f::toNormalMatrix() const
 {
@@ -184,7 +180,5 @@ Mat4f Mat4f::lookAt(const Vec3f &pos, const Vec3f &fwd, const Vec3f &up)
         r.z(), u.z(), f.z(), pos.z(),
          0.0f,  0.0f,  0.0f,    1.0f
     );
-
-}
 
 }

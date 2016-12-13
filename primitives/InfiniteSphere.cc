@@ -11,8 +11,6 @@
 #include "io/JsonObject.h"
 #include "io/Scene.h"
 
-namespace Tungsten {
-
 struct InfiniteSphereIntersection
 {
     Vec3f p;
@@ -279,6 +277,4 @@ void InfiniteSphere::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)
 Primitive *InfiniteSphere::clone()
 {
     return new InfiniteSphere(*this);
-}
-
 }

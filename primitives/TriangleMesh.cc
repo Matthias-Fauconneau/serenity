@@ -1,23 +1,17 @@
 #include "TriangleMesh.h"
 #include "EmbreeUtil.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/TangentFrame.h"
 #include "math/Mat4f.h"
 #include "math/Vec.h"
 #include "math/Box.h"
-
 #include "io/JsonSerializable.h"
 #include "io/JsonObject.h"
 #include "io/MeshIO.h"
 #include "io/Scene.h"
-
 #include <unordered_map>
 #include <iostream>
-
-namespace Tungsten {
 
 struct MeshIntersection
 {
@@ -583,6 +577,4 @@ void TriangleMesh::setBsdf(int index, std::shared_ptr<Bsdf> &bsdf)
 Primitive *TriangleMesh::clone()
 {
     return new TriangleMesh(*this);
-}
-
 }

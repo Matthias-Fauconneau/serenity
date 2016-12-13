@@ -1,9 +1,5 @@
-#ifndef CUBE_HPP_
-#define CUBE_HPP_
-
+#pragma once
 #include "Primitive.h"
-
-namespace Tungsten {
 
 class Cube : public Primitive
 {
@@ -70,7 +66,3 @@ public:
 
     virtual Primitive *clone() override;
 };
-
-}
-
-#endif /* CUBE_HPP_ */

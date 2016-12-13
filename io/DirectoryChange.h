@@ -1,10 +1,6 @@
-#ifndef DIRECTORYCHANGE_HPP_
-#define DIRECTORYCHANGE_HPP_
-
+#pragma once
 #include "FileUtils.h"
 #include "Path.h"
-
-namespace Tungsten {
 
 class DirectoryChange
 {
@@ -25,7 +21,3 @@ public:
             FileUtils::changeCurrentDir(_previousDir);
     }
 };
-
-}
-
-#endif /* DIRECTORYCHANGE_HPP_ */

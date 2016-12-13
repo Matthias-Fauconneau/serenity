@@ -1,9 +1,5 @@
-#ifndef INTERSECTIONINFO_HPP_
-#define INTERSECTIONINFO_HPP_
-
+#pragma once
 #include "math/Vec.h"
-
-namespace Tungsten {
 
 class Primitive;
 class Bsdf;
@@ -20,7 +16,3 @@ struct IntersectionInfo
     const Primitive *primitive;
     const Bsdf *bsdf;
 };
-
-}
-
-#endif /* INTERSECTIONINFO_HPP_ */

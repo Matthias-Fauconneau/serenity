@@ -1,16 +1,9 @@
-#ifndef EMBREEUTIL_HPP_
-#define EMBREEUTIL_HPP_
-
+#pragma once
 #include "math/Ray.h"
 #include "math/Box.h"
 #include "math/Mat4f.h"
-
 #include <embree2/rtcore.h>
 #include <embree2/rtcore_ray.h>
-
-namespace Tungsten {
-
-namespace EmbreeUtil {
 
 void initDevice();
 RTCDevice getDevice();
@@ -51,9 +44,3 @@ inline RTCRay convert(const Ray &r)
     ray.primID = RTC_INVALID_GEOMETRY_ID;
     return ray;
 }
-
-}
-
-}
-
-#endif /* EMBREEUTIL_HPP_ */

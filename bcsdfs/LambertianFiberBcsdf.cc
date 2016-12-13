@@ -1,13 +1,8 @@
 #include "LambertianFiberBcsdf.h"
-
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
-
 #include "math/Angle.h"
-
 #include "io/JsonObject.h"
-
-namespace Tungsten {
 
 LambertianFiberBcsdf::LambertianFiberBcsdf()
 {
@@ -65,6 +60,4 @@ float LambertianFiberBcsdf::pdf(const SurfaceScatterEvent &event) const
     if (!event.requestedLobe.test(BsdfLobes::DiffuseLobe))
         return 0.0f;
     return lambertianCylinder(event.wo);
-}
-
 }

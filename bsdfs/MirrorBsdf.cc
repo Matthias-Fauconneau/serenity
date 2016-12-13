@@ -11,8 +11,6 @@
 
 #include "io/JsonObject.h"
 
-namespace Tungsten {
-
 MirrorBsdf::MirrorBsdf()
 {
     _lobes = BsdfLobes(BsdfLobes::SpecularReflectionLobe);
@@ -52,6 +50,4 @@ float MirrorBsdf::pdf(const SurfaceScatterEvent &event) const
         return 1.0f;
     else
         return 0.0f;
-}
-
 }

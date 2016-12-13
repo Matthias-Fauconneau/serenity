@@ -1,13 +1,9 @@
 #include "SmoothCoatBsdf.h"
 #include "RoughConductorBsdf.h"
 #include "Fresnel.h"
-
 #include "sampling/PathSampleGenerator.h"
-
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-
-namespace Tungsten {
 
 SmoothCoatBsdf::SmoothCoatBsdf()
 : _ior(1.3f),
@@ -175,6 +171,4 @@ void SmoothCoatBsdf::prepareForRender()
     _scaledSigmaA = _thickness*_sigmaA;
     _avgTransmittance = std::exp(-2.0f*_scaledSigmaA.avg());
     _lobes = BsdfLobes(BsdfLobes::SpecularReflectionLobe, _substrate->lobes());
-}
-
 }

@@ -1,15 +1,8 @@
-#ifndef TRIANGLE_HPP_
-#define TRIANGLE_HPP_
-
+#pragma once
 #include "Vertex.h"
-
 #include "math/Vec.h"
-
 #include "IntTypes.h"
-
 #include <type_traits>
-
-namespace Tungsten {
 
 struct TriangleI
 {
@@ -27,14 +20,4 @@ struct TriangleI
     }
 };
 
-// MSVC's views on what is POD or not differ from gcc or clang.
-// memcpy and similar code still seem to work, so we ignore this
-// issue for now.
-#ifndef _MSC_VER
 static_assert(std::is_pod<TriangleI>::value, "TriangleI needs to be of POD type!");
-#endif
-
-}
-
-
-#endif /* TRIANGLE_HPP_ */

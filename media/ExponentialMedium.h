@@ -1,9 +1,5 @@
-#ifndef EXPONENTIALMEDIUM_HPP_
-#define EXPONENTIALMEDIUM_HPP_
-
+#pragma once
 #include "Medium.h"
-
-namespace Tungsten {
 
 class ExponentialMedium : public Medium
 {
@@ -44,9 +40,3 @@ public:
     virtual Vec3f transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray &ray, bool startOnSurface,
             bool endOnSurface, float &pdfForward, float &pdfBackward) const override;
 };
-
-}
-
-
-
-#endif /* EXPONENTIALMEDIUM_HPP_ */

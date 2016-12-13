@@ -1,9 +1,5 @@
-#ifndef PLASTICBSDF_HPP_
-#define PLASTICBSDF_HPP_
-
+#pragma once
 #include "Bsdf.h"
-
-namespace Tungsten {
 
 struct Scene;
 
@@ -59,8 +55,3 @@ public:
         _thickness = thickness;
     }
 };
-
-}
-
-
-#endif /* DIELECTRICBSDF_HPP_ */

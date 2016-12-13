@@ -1,9 +1,5 @@
-#ifndef CONSTANTTEXTURE_HPP_
-#define CONSTANTTEXTURE_HPP_
-
+#pragma once
 #include "Texture.h"
-
-namespace Tungsten {
 
 class ConstantTexture : public Texture
 {
@@ -52,7 +48,3 @@ public:
         _value = Vec3f(value);
     }
 };
-
-}
-
-#endif /* CONSTANTTEXTURE_HPP_ */
