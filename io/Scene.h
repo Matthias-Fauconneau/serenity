@@ -13,7 +13,6 @@
 #include "primitives/Primitive.h"
 #include "materials/BitmapTexture.h"
 #include "renderer/RendererSettings.h"
-#include "renderer/TraceableScene.h"
 #include "cameras/Camera.h"
 #include "media/Medium.h"
 #include "grids/Grid.h"
@@ -79,14 +78,6 @@ struct Scene : public JsonSerializable {
 
 public:
     Scene();
-
-    Scene(const Path &srcDir, std::shared_ptr<TextureCache> cache);
-
-    Scene(const Path &srcDir,
-          std::vector<std::shared_ptr<Primitive>> primitives,
-          std::vector<std::shared_ptr<Bsdf>> bsdfs,
-          std::shared_ptr<TextureCache> cache,
-          std::shared_ptr<Camera> camera);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
     virtual rapidjson::Value toJson(Allocator &allocator) const override;
@@ -195,7 +186,4 @@ public:
     {
         return _errorBsdf;
     }
-
-    static Scene *load(const Path &path, std::shared_ptr<TextureCache> cache = nullptr);
-    static void save(const Path &path, const Scene &scene);
 };

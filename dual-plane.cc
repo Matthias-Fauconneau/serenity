@@ -16,7 +16,7 @@
 
 static Folder tmp {"/var/tmp/light",currentWorkingDirectory(), true};
 
-struct ViewApp {
+struct ViewApp : ViewControl {
     string name;
     vec2 min, max;
     uint2 imageCount;
@@ -26,84 +26,15 @@ struct ViewApp {
 
     bool orthographic = true;
 
-    ViewWidget view {uint2(512), {this, &ViewApp::render}};
+    //ViewWidget view {uint2(512), {this, &ViewApp::render}};
     unique<Window> window = nullptr;
 
-    struct Scene : ::Scene {
-        Scene() : ::Scene(Path(), std::make_shared<TextureCache>()) {
-            initDevice();
-            std::string json = FileUtils::loadText(_path = Path("scene.json"));
-            rapidjson::Document document;
-            document.Parse<0>(json.c_str());
-             //fromJson(document, *this);
-            const rapidjson::Value& v = document;
-            JsonSerializable::fromJson(v, (Scene&)*this);
-
-            auto media      = v.FindMember("media");
-            auto bsdfs      = v.FindMember("bsdfs");
-            auto primitives = v.FindMember("primitives");
-            auto camera     = v.FindMember("camera");
-            auto integrator = v.FindMember("integrator");
-            auto renderer   = v.FindMember("renderer");
-
-            if (media != v.MemberEnd() && media->value.IsArray())
-                loadObjectList(media->value, std::bind(&Scene::instantiateMedium, (Scene*)this,
-                        std::placeholders::_1, std::placeholders::_2), _media);
-
-            if (bsdfs != v.MemberEnd() && bsdfs->value.IsArray())
-                loadObjectList(bsdfs->value, std::bind(&Scene::instantiateBsdf, (Scene*)this,
-                        std::placeholders::_1, std::placeholders::_2), _bsdfs);
-
-            if (primitives != v.MemberEnd() && primitives->value.IsArray())
-                loadObjectList(primitives->value, std::bind(&Scene::instantiatePrimitive, (Scene*)this,
-                        std::placeholders::_1, std::placeholders::_2), _primitives);
-
-            if (camera != v.MemberEnd() && camera->value.IsObject()) {
-                auto result = instantiateCamera(as<std::string>(camera->value, "type"), camera->value);
-                if (result)
-                    _camera = std::move(result);
-            }
-
-            if (integrator != v.MemberEnd() && integrator->value.IsObject()) {
-                auto result = instantiateIntegrator(as<std::string>(integrator->value, "type"), integrator->value);
-                if (result)
-                    _integrator = std::move(result);
-            }
-
-            if (renderer != v.MemberEnd() && renderer->value.IsObject())
-                _rendererSettings.fromJson(renderer->value, *this);
-
-            for (const std::shared_ptr<Medium> &b : _media)
-                b->loadResources();
-            for (const std::shared_ptr<Bsdf> &b : _bsdfs)
-                b->loadResources();
-            for (const std::shared_ptr<Primitive> &t : _primitives)
-                t->loadResources();
-
-            _camera->loadResources();
-            _integrator->loadResources();
-            _rendererSettings.loadResources();
-
-            _textureCache->loadResources();
-
-            for (size_t i = 0; i < _primitives.size(); ++i) {
-                auto helperPrimitives = _primitives[i]->createHelperPrimitives();
-                if (!helperPrimitives.empty()) {
-                    _primitives.reserve(_primitives.size() + helperPrimitives.size());
-                    for (size_t t = 0; t < helperPrimitives.size(); ++t) {
-                        _helperPrimitives.insert(helperPrimitives[t].get());
-                        _primitives.emplace_back(std::move(helperPrimitives[t]));
-                    }
-                }
-            }
-        }
-    } scene;
-    TraceableScene flattenedScene {*scene._camera, *scene._integrator, scene._primitives, scene._bsdfs, scene._media, scene._rendererSettings, (uint32)readCycleCounter()};
+    TraceableScene flattenedScene;
 
     ViewApp() {
         assert_(arguments());
         load(arguments()[0]);
-        window = ::window(&view);
+        window = ::window(this);
         window->setTitle(name);
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
     }
@@ -136,6 +67,8 @@ struct ViewApp {
             window->setTitle(name);
         }
     }
+    virtual vec2 sizeHint(vec2) override { return vec2(512); }
+    virtual shared<Graphics> graphics(vec2) override { render(angles); return shared<Graphics>(); }
     void render(vec2 angles) {
         const Image& target = ((XWindow*)window.pointer)->target;
         const mat4 camera = parseCamera(readFile("scene.json"));
@@ -154,7 +87,7 @@ struct ViewApp {
                 position.p.z() = O.z;
                 position.weight = Vec3f(1.0f);
                 position.pdf = 1.0f;
-                position.Ng = flattenedScene._cam._transform.fwd();
+                position.Ng = flattenedScene._camera->_transform.fwd();
                 DirectionSample direction;
                 const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), +1);
                 const vec3 d = normalize(P-O);
@@ -175,7 +108,7 @@ struct ViewApp {
                 state.reset();
                 IntersectionInfo info;
                 Vec3f emission(0.0f);
-                const Medium *medium = flattenedScene.cam().medium().get();
+                const Medium *medium = flattenedScene.camera()->medium().get();
 
                 float hitDistance = 0.0f;
                 bool wasSpecular = true;

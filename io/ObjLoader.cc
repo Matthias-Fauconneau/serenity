@@ -541,35 +541,6 @@ ObjLoader::ObjLoader(std::istream &in)
     loadFile(in);
 }
 
-Scene *ObjLoader::load(const Path &path, std::shared_ptr<TextureCache> cache)
-{
-
-    InputStreamHandle file = FileUtils::openInputStream(path);
-
-    if (file) {
-        if (!cache)
-            cache = std::make_shared<TextureCache>();
-
-        ObjLoader loader(*file, path, cache);
-
-        std::shared_ptr<Camera> cam(std::make_shared<PinholeCamera>());
-        cam->setLookAt(loader._bounds.center());
-        cam->setPos(loader._bounds.center() - Vec3f(0.0f, 0.0f, loader._bounds.diagonal().z()));
-
-        cache->loadResources();
-
-        return new Scene(
-            path.parent(),
-            std::move(loader._meshes),
-            std::move(loader._convertedMaterials),
-            std::move(cache),
-            cam
-        );
-    } else {
-        return nullptr;
-    }
-}
-
 bool ObjLoader::loadGeometryOnly(const Path &path, std::vector<Vertex> &verts, std::vector<TriangleI> &tris)
 {
     InputStreamHandle file = FileUtils::openInputStream(path);

@@ -77,7 +77,6 @@ class ObjLoader
     ObjLoader(std::istream &in);
 
 public:
-    static Scene *load(const Path &path, std::shared_ptr<TextureCache> cache = nullptr);
     static bool loadGeometryOnly(const Path &path, std::vector<Vertex> &verts, std::vector<TriangleI> &tris);
     static bool loadCurvesOnly(const Path &path, std::vector<uint32> &curveEnds, std::vector<Vec4f> &nodeData);
 };

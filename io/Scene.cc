@@ -60,32 +60,71 @@ Scene::Scene()
   _camera(std::make_shared<PinholeCamera>()),
   _integrator(std::make_shared<PathTraceIntegrator>())
 {
-}
+    initDevice();
+    std::string json = FileUtils::loadText(_path = Path("scene.json"));
+    rapidjson::Document document;
+    document.Parse<0>(json.c_str());
+     //fromJson(document, *this);
+    const rapidjson::Value& v = document;
+    JsonSerializable::fromJson(v, (Scene&)*this);
 
-Scene::Scene(const Path &srcDir, std::shared_ptr<TextureCache> cache)
-: _srcDir(srcDir),
-  _errorBsdf(std::make_shared<ErrorBsdf>()),
-  _errorTexture(std::make_shared<ConstantTexture>(Vec3f(1.0f, 0.0f, 0.0f))),
-  _textureCache(std::move(cache)),
-  _camera(std::make_shared<PinholeCamera>()),
-  _integrator(std::make_shared<PathTraceIntegrator>())
-{
-}
+    auto media      = v.FindMember("media");
+    auto bsdfs      = v.FindMember("bsdfs");
+    auto primitives = v.FindMember("primitives");
+    auto camera     = v.FindMember("camera");
+    auto integrator = v.FindMember("integrator");
+    auto renderer   = v.FindMember("renderer");
 
-Scene::Scene(const Path &srcDir,
-      std::vector<std::shared_ptr<Primitive>> primitives,
-      std::vector<std::shared_ptr<Bsdf>> bsdfs,
-      std::shared_ptr<TextureCache> cache,
-      std::shared_ptr<Camera> camera)
-: _srcDir(srcDir),
-  _primitives(std::move(primitives)),
-  _bsdfs(std::move(bsdfs)),
-  _errorBsdf(std::make_shared<ErrorBsdf>()),
-  _errorTexture(std::make_shared<ConstantTexture>(Vec3f(1.0f, 0.0f, 0.0f))),
-  _textureCache(std::move(cache)),
-  _camera(std::move(camera)),
-  _integrator(std::make_shared<PathTraceIntegrator>())
-{
+    if (media != v.MemberEnd() && media->value.IsArray())
+        loadObjectList(media->value, std::bind(&Scene::instantiateMedium, (Scene*)this,
+                std::placeholders::_1, std::placeholders::_2), _media);
+
+    if (bsdfs != v.MemberEnd() && bsdfs->value.IsArray())
+        loadObjectList(bsdfs->value, std::bind(&Scene::instantiateBsdf, (Scene*)this,
+                std::placeholders::_1, std::placeholders::_2), _bsdfs);
+
+    if (primitives != v.MemberEnd() && primitives->value.IsArray())
+        loadObjectList(primitives->value, std::bind(&Scene::instantiatePrimitive, (Scene*)this,
+                std::placeholders::_1, std::placeholders::_2), _primitives);
+
+    if (camera != v.MemberEnd() && camera->value.IsObject()) {
+        auto result = instantiateCamera(as<std::string>(camera->value, "type"), camera->value);
+        if (result)
+            _camera = std::move(result);
+    }
+
+    if (integrator != v.MemberEnd() && integrator->value.IsObject()) {
+        auto result = instantiateIntegrator(as<std::string>(integrator->value, "type"), integrator->value);
+        if (result)
+            _integrator = std::move(result);
+    }
+
+    if (renderer != v.MemberEnd() && renderer->value.IsObject())
+        _rendererSettings.fromJson(renderer->value, *this);
+
+    for (const std::shared_ptr<Medium> &b : _media)
+        b->loadResources();
+    for (const std::shared_ptr<Bsdf> &b : _bsdfs)
+        b->loadResources();
+    for (const std::shared_ptr<Primitive> &t : _primitives)
+        t->loadResources();
+
+    _camera->loadResources();
+    _integrator->loadResources();
+    _rendererSettings.loadResources();
+
+    _textureCache->loadResources();
+
+    for (size_t i = 0; i < _primitives.size(); ++i) {
+        auto helperPrimitives = _primitives[i]->createHelperPrimitives();
+        if (!helperPrimitives.empty()) {
+            _primitives.reserve(_primitives.size() + helperPrimitives.size());
+            for (size_t t = 0; t < helperPrimitives.size(); ++t) {
+                _helperPrimitives.insert(helperPrimitives[t].get());
+                _primitives.emplace_back(std::move(helperPrimitives[t]));
+            }
+        }
+    }
 }
 
 std::shared_ptr<PhaseFunction> Scene::instantiatePhase(std::string type, const rapidjson::Value &value) const
@@ -595,42 +634,4 @@ void Scene::pruneBsdfs()
 void Scene::pruneMedia()
 {
     pruneObjects(_media);
-}
-
-TraceableScene *Scene::makeTraceable(uint32 seed)
-{
-    return new TraceableScene(*_camera, *_integrator, _primitives, _bsdfs, _media, _rendererSettings, seed);
-}
-
-Scene *Scene::load(const Path &path, std::shared_ptr<TextureCache> cache)
-{
-    std::string json = FileUtils::loadText(path);
-    if (json.empty())
-        throw std::runtime_error(format("Unable to open file at '%s'", path));
-
-    rapidjson::Document document;
-    document.Parse<0>(json.c_str());
-    if (document.HasParseError())
-        throw std::runtime_error(format("JSON parse error: %s", document.GetParseError()));
-
-    DirectoryChange context(path.parent());
-
-    if (!cache)
-        cache = std::make_shared<TextureCache>();
-
-    Scene *scene = new Scene(path.parent(), std::move(cache));
-    scene->fromJson(document, *scene);
-    scene->setPath(path);
-
-    return scene;
-}
-
-void Scene::save(const Path &path, const Scene &scene)
-{
-    rapidjson::Document document;
-    document.SetObject();
-
-    *(static_cast<rapidjson::Value *>(&document)) = scene.toJson(document.GetAllocator());
-
-    FileUtils::writeJson(document, path);
 }

@@ -19,9 +19,9 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
     try {
 
     PositionSample point;
-    _scene->cam().samplePosition(sampler, point, pixel);
+    _scene->camera()->samplePosition(sampler, point, pixel);
     DirectionSample direction;
-    _scene->cam().sampleDirection(sampler, point, pixel, direction);
+    _scene->camera()->sampleDirection(sampler, point, pixel, direction);
 
     Vec3f throughput = point.weight*direction.weight;
     Ray ray(point.p, direction.d);
@@ -34,7 +34,7 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
     state.reset();
     IntersectionInfo info;
     Vec3f emission(0.0f);
-    const Medium *medium = _scene->cam().medium().get();
+    const Medium *medium = _scene->camera()->medium().get();
 
     bool recordedOutputValues = false;
     float hitDistance = 0.0f;
@@ -62,11 +62,11 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
                     _settings.enableLightSampling, ray, throughput, emission, wasSpecular, state, &transmittance);
 
             if (_trackOutputValues && !recordedOutputValues && (!wasSpecular || terminate)) {
-                if (_scene->cam().depthBuffer())
-                    _scene->cam().depthBuffer()->addSample(pixel, hitDistance);
-                if (_scene->cam().normalBuffer())
-                    _scene->cam().normalBuffer()->addSample(pixel, info.Ns);
-                if (_scene->cam().albedoBuffer()) {
+                if (_scene->camera()->depthBuffer())
+                    _scene->camera()->depthBuffer()->addSample(pixel, hitDistance);
+                if (_scene->camera()->normalBuffer())
+                    _scene->camera()->normalBuffer()->addSample(pixel, info.Ns);
+                if (_scene->camera()->albedoBuffer()) {
                     Vec3f albedo;
                     if (const TransparencyBsdf *bsdf = dynamic_cast<const TransparencyBsdf *>(info.bsdf))
                         albedo = (*bsdf->base()->albedo())[info];
@@ -74,10 +74,10 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
                         albedo = (*info.bsdf->albedo())[info];
                     if (info.primitive->isEmissive())
                         albedo += info.primitive->evalDirect(data, info);
-                    _scene->cam().albedoBuffer()->addSample(pixel, albedo);
+                    _scene->camera()->albedoBuffer()->addSample(pixel, albedo);
                 }
-                if (_scene->cam().visibilityBuffer() && transmittance != -1.0f)
-                    _scene->cam().visibilityBuffer()->addSample(pixel, transmittance.avg());
+                if (_scene->camera()->visibilityBuffer() && transmittance != -1.0f)
+                    _scene->camera()->visibilityBuffer()->addSample(pixel, transmittance.avg());
                 recordedOutputValues = true;
             }
 
@@ -115,12 +115,12 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
         return nanEnvDirColor;
 
     if (_trackOutputValues && !recordedOutputValues) {
-        if (_scene->cam().depthBuffer() && bounce == 0)
-            _scene->cam().depthBuffer()->addSample(pixel, 0.0f);
-        if (_scene->cam().normalBuffer())
-            _scene->cam().normalBuffer()->addSample(pixel, -ray.dir());
-        if (_scene->cam().albedoBuffer() && info.primitive && info.primitive->isInfinite())
-            _scene->cam().albedoBuffer()->addSample(pixel, info.primitive->evalDirect(data, info));
+        if (_scene->camera()->depthBuffer() && bounce == 0)
+            _scene->camera()->depthBuffer()->addSample(pixel, 0.0f);
+        if (_scene->camera()->normalBuffer())
+            _scene->camera()->normalBuffer()->addSample(pixel, -ray.dir());
+        if (_scene->camera()->albedoBuffer() && info.primitive && info.primitive->isInfinite())
+            _scene->camera()->albedoBuffer()->addSample(pixel, info.primitive->evalDirect(data, info));
     }
 
     return emission;

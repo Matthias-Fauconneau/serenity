@@ -14,7 +14,7 @@ PathTraceIntegrator::PathTraceIntegrator()
   _h(0),
   _varianceW(0),
   _varianceH(0),
-  _sampler(0xBA5EBA11)
+  _sampler()
 {
 }
 
@@ -28,17 +28,17 @@ rapidjson::Value PathTraceIntegrator::toJson(Allocator &allocator) const
     return _settings.toJson(allocator);
 }
 
-void PathTraceIntegrator::prepareForRender(TraceableScene &scene, uint32 seed)
+void PathTraceIntegrator::prepareForRender(TraceableScene &scene, uint32)
 {
-    _sampler = UniformSampler(MathUtil::hash32(seed));
+    _sampler = UniformSampler(0xBA5EBA11);
     _scene = &scene;
-    scene.cam().requestColorBuffer();
+    scene.camera()->requestColorBuffer();
 
     /*for (uint32 i = 0; i < ThreadUtils::pool->threadCount(); ++i)
         _tracers.emplace_back(new PathTracer(&scene, _settings, i));*/
 
-    _w = scene.cam().resolution().x();
-    _h = scene.cam().resolution().y();
+    _w = scene.camera()->resolution().x();
+    _h = scene.camera()->resolution().y();
     _varianceW = (_w + VarianceTileSize - 1)/VarianceTileSize;
     _varianceH = (_h + VarianceTileSize - 1)/VarianceTileSize;
     _samples.resize(_varianceW*_varianceH);

@@ -1,6 +1,6 @@
 #include "InfiniteSphere.h"
 #include "TriangleMesh.h"
-
+#include "TraceableScene.h"
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
 

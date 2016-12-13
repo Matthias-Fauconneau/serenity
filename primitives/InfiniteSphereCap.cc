@@ -1,5 +1,6 @@
 #include "InfiniteSphereCap.h"
 #include "TriangleMesh.h"
+#include "TraceableScene.h"
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
 #include "bsdfs/NullBsdf.h"

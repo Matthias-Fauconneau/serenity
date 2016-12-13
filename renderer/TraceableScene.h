@@ -1,4 +1,5 @@
 #pragma once
+#include "Scene.h"
 #include "integrators/Integrator.h"
 #include "primitives/InfiniteSphere.h"
 #include "primitives/EmbreeUtil.h"
@@ -12,7 +13,7 @@
 #include <embree2/rtcore.h> // embree
 #include <embree2/rtcore_ray.h>
 
-struct TraceableScene
+struct TraceableScene : Scene
 {
     struct IntersectionRay : RTCRay
     {
@@ -34,11 +35,6 @@ struct TraceableScene
 
     const float DefaultEpsilon = 5e-4f;
 
-    Camera &_cam;
-    Integrator &_integrator;
-    std::vector<std::shared_ptr<Primitive>> &_primitives;
-    std::vector<std::shared_ptr<Bsdf>> &_bsdfs;
-    std::vector<std::shared_ptr<Medium>> &_media;
     std::vector<std::shared_ptr<Primitive>> _lights;
     std::vector<std::shared_ptr<Primitive>> _infiniteLights;
     std::vector<const Primitive *> _finites;
@@ -50,21 +46,9 @@ struct TraceableScene
     Box3f _sceneBounds;
 
 public:
-    TraceableScene(Camera &cam, Integrator &integrator,
-            std::vector<std::shared_ptr<Primitive>> &primitives,
-            std::vector<std::shared_ptr<Bsdf>> &bsdfs,
-            std::vector<std::shared_ptr<Medium>> &media,
-            RendererSettings settings,
-            uint32 seed)
-    : _cam(cam),
-      _integrator(integrator),
-      _primitives(primitives),
-      _bsdfs(bsdfs),
-      _media(media),
-      _settings(settings)
-    {
-        _cam.prepareForRender();
-        _cam.requestOutputBuffers(_settings.renderOutputs());
+    TraceableScene() {
+        _camera->prepareForRender();
+        _camera->requestOutputBuffers(_settings.renderOutputs());
 
         for (std::shared_ptr<Medium> &m : _media)
             m->prepareForRender();
@@ -130,13 +114,13 @@ public:
             rtcCommit(_scene);
         }
 
-        _integrator.prepareForRender(*this, seed);
+        _integrator->prepareForRender(*this, 0);
     }
 
     ~TraceableScene()
     {
-        _integrator.teardownAfterRender();
-        _cam.teardownAfterRender();
+        _integrator->teardownAfterRender();
+        _camera->teardownAfterRender();
 
         for (std::shared_ptr<Medium> &m : _media)
             m->teardownAfterRender();
@@ -208,16 +192,6 @@ public:
     const Box3f &bounds() const
     {
         return _sceneBounds;
-    }
-
-    Camera &cam() const
-    {
-        return _cam;
-    }
-
-    Integrator &integrator() const
-    {
-        return _integrator;
     }
 
     const std::vector<std::shared_ptr<Primitive>> &primitives() const
