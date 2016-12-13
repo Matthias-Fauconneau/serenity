@@ -22,9 +22,9 @@ ThinSheetBsdf::ThinSheetBsdf()
 void ThinSheetBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "enable_interference", _enableInterference);
-    JsonUtils::fromJson(v, "sigma_a", _sigmaA);
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "enable_interference", _enableInterference);
+    ::fromJson(v, "sigma_a", _sigmaA);
     scene.textureFromJsonMember(v, "thickness", TexelConversion::REQUEST_AVERAGE, _thickness);
 }
 

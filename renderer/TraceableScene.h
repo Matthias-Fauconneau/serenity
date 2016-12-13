@@ -106,12 +106,12 @@ public:
         }
 
         if (_settings.useSceneBvh()) {
-            _scene = rtcDeviceNewScene(EmbreeUtil::getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
+            _scene = rtcDeviceNewScene(getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
             _userGeomId = rtcNewUserGeometry(_scene, _finites.size());
             rtcSetUserData(_scene, _userGeomId, this);
 
             rtcSetBoundsFunction(_scene, _userGeomId, [](void *ptr, size_t i, RTCBounds &bounds) {
-                bounds = EmbreeUtil::convert(static_cast<TraceableScene *>(ptr)->finites()[i]->bounds());
+                bounds = convert(static_cast<TraceableScene *>(ptr)->finites()[i]->bounds());
             });
             rtcSetIntersectFunction(_scene, _userGeomId, [](void *ptr, RTCRay &embreeRay, size_t i) {
                 IntersectionRay &ray = *static_cast<IntersectionRay *>(&embreeRay);
@@ -160,7 +160,7 @@ public:
         info.primitive = nullptr;
         data.primitive = nullptr;
 
-        IntersectionRay eRay(EmbreeUtil::convert(ray), data, ray, _userGeomId);
+        IntersectionRay eRay(convert(ray), data, ray, _userGeomId);
         rtcIntersect(_scene, eRay);
 
         if (data.primitive) {
@@ -194,7 +194,7 @@ public:
     bool occluded(const Ray &ray) const
     {
         if (_settings.useSceneBvh()) {
-            OcclusionRay eRay(EmbreeUtil::convert(ray), ray, _userGeomId);
+            OcclusionRay eRay(convert(ray), ray, _userGeomId);
             rtcOccluded(_scene, eRay);
             return eRay.geomID != RTC_INVALID_GEOMETRY_ID;
         } else {

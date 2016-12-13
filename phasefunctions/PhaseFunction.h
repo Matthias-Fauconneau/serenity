@@ -1,3 +1,4 @@
+#pragma once
 #include "samplerecords/PhaseSample.h"
 #include "io/JsonSerializable.h"
 

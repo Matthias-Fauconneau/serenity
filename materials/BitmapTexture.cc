@@ -205,10 +205,10 @@ void BitmapTexture::init(void *texels, int w, int h, TexelType texelType)
 void BitmapTexture::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     _path = scene.fetchResource(v, "file");
-    JsonUtils::fromJson(v, "gamma_correct", _gammaCorrect);
-    JsonUtils::fromJson(v, "interpolate", _linear);
-    JsonUtils::fromJson(v, "clamp", _clamp);
-    JsonUtils::fromJson(v, "scale", _scale);
+    ::fromJson(v, "gamma_correct", _gammaCorrect);
+    ::fromJson(v, "interpolate", _linear);
+    ::fromJson(v, "clamp", _clamp);
+    ::fromJson(v, "scale", _scale);
 }
 
 rapidjson::Value BitmapTexture::toJson(Allocator &allocator) const
@@ -226,7 +226,7 @@ rapidjson::Value BitmapTexture::toJson(Allocator &allocator) const
             result.add("file", *_path);
         return result;
     } else {
-        return JsonUtils::toJson(*_path, allocator);
+        return toJson(*_path, allocator);
     }
 }
 
@@ -241,12 +241,12 @@ void BitmapTexture::loadResources()
 
     if (_path) {
         isRgb = _texelConversion == TexelConversion::REQUEST_RGB;
-        isHdr = ImageIO::isHdr(*_path);
+        isHdr = ::isHdr(*_path);
 
         if (isHdr)
-            pixels = ImageIO::loadHdr(*_path, _texelConversion, w, h).release();
+            pixels = loadHdr(*_path, _texelConversion, w, h).release();
         else
-            pixels = ImageIO::loadLdr(*_path, _texelConversion, w, h, _gammaCorrect).release();
+            pixels = loadLdr(*_path, _texelConversion, w, h, _gammaCorrect).release();
     }
 
     if (!pixels) {

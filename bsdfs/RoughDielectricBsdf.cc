@@ -23,9 +23,9 @@ RoughDielectricBsdf::RoughDielectricBsdf()
 void RoughDielectricBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "distribution", _distributionName);
-    JsonUtils::fromJson(v, "enable_refraction", _enableT);
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "distribution", _distributionName);
+    ::fromJson(v, "enable_refraction", _enableT);
 
     scene.textureFromJsonMember(v, "roughness", TexelConversion::REQUEST_AVERAGE, _roughness);
 

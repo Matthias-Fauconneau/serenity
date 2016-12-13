@@ -109,9 +109,9 @@ void TriangleMesh::fromJson(const rapidjson::Value &v, const Scene &scene)
     Primitive::fromJson(v, scene);
 
     _path = scene.fetchResource(v, "file");
-    JsonUtils::fromJson(v, "smooth", _smoothed);
-    JsonUtils::fromJson(v, "backface_culling", _backfaceCulling);
-    JsonUtils::fromJson(v, "recompute_normals", _recomputeNormals);
+    ::fromJson(v, "smooth", _smoothed);
+    ::fromJson(v, "backface_culling", _backfaceCulling);
+    ::fromJson(v, "recompute_normals", _recomputeNormals);
 
     auto bsdf = v.FindMember("bsdf");
     if (bsdf != v.MemberEnd() && bsdf->value.IsArray()) {
@@ -120,7 +120,7 @@ void TriangleMesh::fromJson(const rapidjson::Value &v, const Scene &scene)
         for (int i = 0; i < int(bsdf->value.Size()); ++i)
             _bsdfs.emplace_back(scene.fetchBsdf(bsdf->value[i]));
     } else {
-        _bsdfs.emplace_back(scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf")));
+        _bsdfs.emplace_back(scene.fetchBsdf(fetchMember(v, "bsdf")));
     }
 }
 
@@ -292,7 +292,7 @@ void TriangleMesh::makeCone(float radius, float height)
 
 bool TriangleMesh::intersect(Ray &ray, IntersectionTemporary &data) const
 {
-    RTCRay eRay(EmbreeUtil::convert(ray));
+    RTCRay eRay(convert(ray));
     rtcIntersect(_scene, eRay);
     if (eRay.geomID != RTC_INVALID_GEOMETRY_ID) {
         ray.setFarT(eRay.tfar);
@@ -312,7 +312,7 @@ bool TriangleMesh::intersect(Ray &ray, IntersectionTemporary &data) const
 
 bool TriangleMesh::occluded(const Ray &ray) const
 {
-    RTCRay eRay(EmbreeUtil::convert(ray));
+    RTCRay eRay(convert(ray));
     rtcOccluded(_scene, eRay);
     return eRay.geomID != RTC_INVALID_GEOMETRY_ID;
 }
@@ -400,7 +400,7 @@ bool TriangleMesh::samplePosition(PathSampleGenerator &sampler, PositionSample &
     Vec2f uv2 = _tfVerts[_tris[idx].v2].uv();
     Vec3f normal = (p1 - p0).cross(p2 - p0).normalized();
 
-    Vec2f lambda = SampleWarp::uniformTriangleUv(sampler.next2D());
+    Vec2f lambda = uniformTriangleUv(sampler.next2D());
 
     sample.p = p0*lambda.x() + p1*lambda.y() + p2*(1.0f - lambda.x() - lambda.y());
     sample.uv = uv0*lambda.x() + uv1*lambda.y() + uv2*(1.0f - lambda.x() - lambda.y());
@@ -413,10 +413,10 @@ bool TriangleMesh::samplePosition(PathSampleGenerator &sampler, PositionSample &
 
 bool TriangleMesh::sampleDirection(PathSampleGenerator &sampler, const PositionSample &point, DirectionSample &sample) const
 {
-    Vec3f d = SampleWarp::cosineHemisphere(sampler.next2D());
+    Vec3f d = cosineHemisphere(sampler.next2D());
     sample.d = TangentFrame(point.Ng).toGlobal(d);
     sample.weight = Vec3f(1.0f);
-    sample.pdf = SampleWarp::cosineHemispherePdf(d);
+    sample.pdf = cosineHemispherePdf(d);
 
     return true;
 }
@@ -504,7 +504,7 @@ void TriangleMesh::prepareForRender()
     if (_verts.empty() || _tris.empty())
         return;
 
-    _scene = rtcDeviceNewScene(EmbreeUtil::getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
+    _scene = rtcDeviceNewScene(getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
     _geomId = rtcNewTriangleMesh(_scene, RTC_GEOMETRY_STATIC, _tris.size(), _verts.size(), 1);
     Vec4f *vs = static_cast<Vec4f *>(rtcMapBuffer(_scene, _geomId, RTC_VERTEX_BUFFER));
     Vec3u *ts = static_cast<Vec3u *>(rtcMapBuffer(_scene, _geomId, RTC_INDEX_BUFFER));

@@ -1,5 +1,5 @@
+#pragma once
 #include "Path.h"
-#include "IntTypes.h"
 #include <rapidjson/document.h>
 #include <unordered_map>
 #include <functional>

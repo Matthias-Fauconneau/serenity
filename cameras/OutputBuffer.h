@@ -1,3 +1,4 @@
+#pragma once
 #include "OutputBufferSettings.h"
 #include "math/Vec.h"
 #include "math/Ray.h"
@@ -74,7 +75,7 @@ private:
                 ldr[i] = Vec3c(clamp(Vec3i(Vec3f(f*255.0f)), Vec3i(0), Vec3i(255)));
         }
 
-        ImageIO::saveLdr(path, &ldr[0].x(), _res.x(), _res.y(), 3);
+        saveLdr(path, &ldr[0].x(), _res.x(), _res.y(), 3);
     }
 
 public:
@@ -152,9 +153,9 @@ public:
                 hdr[i] = (*this)[i];
 
             if (!hdrFile.empty()) {
-                ImageIO::saveHdr(hdrFile,  elementPointer(hdr.get()),      _res.x(), _res.y(), elementCount(hdr[0]));
-                ImageIO::saveHdr(hdrFileA, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferA[0]));
-                ImageIO::saveHdr(hdrFileB, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferB[0]));
+                saveHdr(hdrFile,  elementPointer(hdr.get()),      _res.x(), _res.y(), elementCount(hdr[0]));
+                saveHdr(hdrFileA, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferA[0]));
+                saveHdr(hdrFileB, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferB[0]));
             }
             if (!ldrFile.empty()) {
                 saveLdr(hdr.get(), ldrFile, true);
@@ -163,7 +164,7 @@ public:
             }
         } else {
             if (!hdrFile.empty())
-                ImageIO::saveHdr(hdrFile, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferA[0]));
+                saveHdr(hdrFile, elementPointer(_bufferA.get()), _res.x(), _res.y(), elementCount(_bufferA[0]));
             if (!ldrFile.empty())
                 saveLdr(_bufferA.get(), ldrFile, true);
         }
@@ -173,7 +174,7 @@ public:
                 scaled[i] = _variance[i]/float(_sampleCount[i]*max(uint32(1), _sampleCount[i] - 1));
 
             if (!hdrFile.empty())
-                ImageIO::saveHdr(hdrVariance, scaled.get(), _res.x(), _res.y(), 1);
+                saveHdr(hdrVariance, scaled.get(), _res.x(), _res.y(), 1);
             if (!ldrFile.empty())
                 saveLdr(scaled.get(), ldrVariance, false);
         }

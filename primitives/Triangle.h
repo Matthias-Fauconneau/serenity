@@ -1,7 +1,6 @@
 #pragma once
 #include "Vertex.h"
 #include "math/Vec.h"
-#include "IntTypes.h"
 #include <type_traits>
 
 struct TriangleI

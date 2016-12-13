@@ -180,8 +180,8 @@ inline float dot(v8sf a, v8sf b) {
 }
 inline float dot(v16sf a, v16sf b) { return dot(a.r1, b.r1) + dot(a.r2, b.r2); }
 
+#if 0
 template<Type T, uint N> struct Vec { T _[N]; };
-
 #include "math.h"
 static inline Vec<v8sf, 2> cossin(const v8sf angle) {
   const v8sf absAngle = abs(angle);
@@ -197,6 +197,7 @@ static inline Vec<v8sf, 2> cossin(const v8sf angle) {
   const v8si select = (octant&2) == 0;
   return {{xor(cosSign, blend(y1, y2, ~select)), xor(sinSign, blend(y1, y2, select))}};
 }
+#endif
 
 template<> inline String str(const half& v) { return str(float(v)); }
 template<> inline String str(const v8sf& v) { return "v8sf("_+str(ref<float>((float*)&v,8))+")"_; }

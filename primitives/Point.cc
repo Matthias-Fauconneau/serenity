@@ -82,9 +82,9 @@ bool Point::samplePosition(PathSampleGenerator &/*sampler*/, PositionSample &sam
 
 bool Point::sampleDirection(PathSampleGenerator &sampler, const PositionSample &/*point*/, DirectionSample &sample) const
 {
-    sample.d = SampleWarp::uniformSphere(sampler.next2D());
+    sample.d = uniformSphere(sampler.next2D());
     sample.weight = Vec3f(1.0f);
-    sample.pdf = SampleWarp::uniformSpherePdf();
+    sample.pdf = uniformSpherePdf();
 
     return true;
 }
@@ -106,7 +106,7 @@ float Point::positionalPdf(const PositionSample &/*point*/) const
 
 float Point::directionalPdf(const PositionSample &/*point*/, const DirectionSample &/*sample*/) const
 {
-    return SampleWarp::uniformSpherePdf();
+    return uniformSpherePdf();
 }
 
 float Point::directPdf(uint32 /*threadIndex*/, const IntersectionTemporary &/*data*/,

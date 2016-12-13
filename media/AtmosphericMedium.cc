@@ -21,13 +21,13 @@ void AtmosphericMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
     _scene = &scene;
 
     Medium::fromJson(v, scene);
-    JsonUtils::fromJson(v, "pivot", _primName);
-    JsonUtils::fromJson(v, "sigma_a", _materialSigmaA);
-    JsonUtils::fromJson(v, "sigma_s", _materialSigmaS);
-    JsonUtils::fromJson(v, "density", _density);
-    JsonUtils::fromJson(v, "falloff_scale", _falloffScale);
-    JsonUtils::fromJson(v, "radius", _radius);
-    JsonUtils::fromJson(v, "center", _center);
+    ::fromJson(v, "pivot", _primName);
+    ::fromJson(v, "sigma_a", _materialSigmaA);
+    ::fromJson(v, "sigma_s", _materialSigmaS);
+    ::fromJson(v, "density", _density);
+    ::fromJson(v, "falloff_scale", _falloffScale);
+    ::fromJson(v, "radius", _radius);
+    ::fromJson(v, "center", _center);
 }
 
 rapidjson::Value AtmosphericMedium::toJson(Allocator &allocator) const

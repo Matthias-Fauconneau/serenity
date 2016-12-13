@@ -21,12 +21,12 @@ ExponentialMedium::ExponentialMedium()
 void ExponentialMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Medium::fromJson(v, scene);
-    JsonUtils::fromJson(v, "sigma_a", _materialSigmaA);
-    JsonUtils::fromJson(v, "sigma_s", _materialSigmaS);
-    JsonUtils::fromJson(v, "density", _density);
-    JsonUtils::fromJson(v, "falloff_scale", _falloffScale);
-    JsonUtils::fromJson(v, "unit_point", _unitPoint);
-    JsonUtils::fromJson(v, "falloff_direction", _falloffDirection);
+    ::fromJson(v, "sigma_a", _materialSigmaA);
+    ::fromJson(v, "sigma_s", _materialSigmaS);
+    ::fromJson(v, "density", _density);
+    ::fromJson(v, "falloff_scale", _falloffScale);
+    ::fromJson(v, "unit_point", _unitPoint);
+    ::fromJson(v, "falloff_direction", _falloffDirection);
 }
 
 rapidjson::Value ExponentialMedium::toJson(Allocator &allocator) const

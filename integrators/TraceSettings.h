@@ -1,3 +1,4 @@
+#pragma once
 #include "io/JsonUtils.h"
 
 struct TraceSettings
@@ -17,10 +18,10 @@ struct TraceSettings
 
     void fromJson(const rapidjson::Value &v)
     {
-        JsonUtils::fromJson(v, "min_bounces", minBounces);
-        JsonUtils::fromJson(v, "max_bounces", maxBounces);
-        JsonUtils::fromJson(v, "enable_consistency_checks", enableConsistencyChecks);
-        JsonUtils::fromJson(v, "enable_two_sided_shading", enableTwoSidedShading);
+        ::fromJson(v, "min_bounces", minBounces);
+        ::fromJson(v, "max_bounces", maxBounces);
+        ::fromJson(v, "enable_consistency_checks", enableConsistencyChecks);
+        ::fromJson(v, "enable_two_sided_shading", enableTwoSidedShading);
     }
 
     rapidjson::Value toJson(rapidjson::Document::AllocatorType &allocator) const

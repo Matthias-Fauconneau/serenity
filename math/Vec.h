@@ -1,6 +1,5 @@
 #pragma once
 #include "math/BitManip.h"
-#include "IntTypes.h"
 #include <rapidjson/document.h>
 #include <type_traits>
 #include <ostream>
@@ -643,4 +642,6 @@ bool isnan(const Vec<ElementType, Size> &t)
         if (std::isnan(t[i]))
             return true;
     return false;
+}
+
 }

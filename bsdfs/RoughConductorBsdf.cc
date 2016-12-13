@@ -28,10 +28,10 @@ void RoughConductorBsdf::lookupMaterial()
 void RoughConductorBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    if (JsonUtils::fromJson(v, "eta", _eta) && JsonUtils::fromJson(v, "k", _k))
+    if (::fromJson(v, "eta", _eta) && ::fromJson(v, "k", _k))
         _materialName.clear();
-    JsonUtils::fromJson(v, "distribution", _distributionName);
-    if (JsonUtils::fromJson(v, "material", _materialName))
+    ::fromJson(v, "distribution", _distributionName);
+    if (::fromJson(v, "material", _materialName))
         lookupMaterial();
 
     scene.textureFromJsonMember(v, "roughness", TexelConversion::REQUEST_AVERAGE, _roughness);

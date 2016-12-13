@@ -17,8 +17,8 @@ PhongBsdf::PhongBsdf(float exponent, float diffuseRatio)
 void PhongBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "exponent", _exponent);
-    JsonUtils::fromJson(v, "diffuse_ratio", _diffuseRatio);
+    ::fromJson(v, "exponent", _exponent);
+    ::fromJson(v, "diffuse_ratio", _diffuseRatio);
 }
 
 rapidjson::Value PhongBsdf::toJson(Allocator &allocator) const
@@ -61,7 +61,7 @@ bool PhongBsdf::sample(SurfaceScatterEvent &event) const
 
         event.sampledLobe = BsdfLobes::GlossyReflectionLobe;
     } else {
-        event.wo = SampleWarp::cosineHemisphere(event.sampler->next2D());
+        event.wo = cosineHemisphere(event.sampler->next2D());
         event.sampledLobe = BsdfLobes::DiffuseReflectionLobe;
     }
 
@@ -110,9 +110,9 @@ float PhongBsdf::pdf(const SurfaceScatterEvent &event) const
             result += std::pow(cosTheta, _exponent)*_pdfFactor;
     }
     if (evalDiffuse && evalGlossy)
-        result = result*(1.0f - _diffuseRatio) + _diffuseRatio*SampleWarp::cosineHemispherePdf(event.wo);
+        result = result*(1.0f - _diffuseRatio) + _diffuseRatio*cosineHemispherePdf(event.wo);
     else if (evalDiffuse)
-        result = SampleWarp::cosineHemispherePdf(event.wo);
+        result = cosineHemispherePdf(event.wo);
 
     return result;
 }

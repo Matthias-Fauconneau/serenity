@@ -1,6 +1,6 @@
 #pragma once
+#include "core.h"
 #include "Path.h"
-#include "IntTypes.h"
 #include <string>
 #include <memory>
 

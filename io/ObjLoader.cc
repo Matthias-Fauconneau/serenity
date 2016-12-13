@@ -309,7 +309,7 @@ std::shared_ptr<Bsdf> ObjLoader::convertObjMaterial(const ObjMaterial &mat)
 
 std::string ObjLoader::generateDummyName() const
 {
-    return tfm::format("Mesh%d", _meshes.size() + 1);
+    return format("Mesh%d", _meshes.size() + 1);
 }
 
 void ObjLoader::clearPerMeshData()

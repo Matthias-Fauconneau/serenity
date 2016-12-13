@@ -35,7 +35,7 @@ void PinholeCamera::precompute()
 void PinholeCamera::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Camera::fromJson(v, scene);
-    JsonUtils::fromJson(v, "fov", _fovDeg);
+    ::fromJson(v, "fov", _fovDeg);
 
     precompute();
 }

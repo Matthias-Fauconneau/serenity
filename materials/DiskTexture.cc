@@ -63,12 +63,12 @@ void DiskTexture::makeSamplable(TextureMapJacobian /*jacobian*/)
 
 Vec2f DiskTexture::sample(TextureMapJacobian /*jacobian*/, const Vec2f &uv) const
 {
-    return SampleWarp::uniformDisk(uv).xy()*0.5f + 0.5f;
+    return uniformDisk(uv).xy()*0.5f + 0.5f;
 }
 
 float DiskTexture::pdf(TextureMapJacobian /*jacobian*/, const Vec2f &uv) const
 {
-    return (uv - Vec2f(0.5f)).lengthSq() < 0.25f ? SampleWarp::uniformDiskPdf()*4.0f : 0.0f;
+    return (uv - Vec2f(0.5f)).lengthSq() < 0.25f ? uniformDiskPdf()*4.0f : 0.0f;
 }
 
 void DiskTexture::scaleValues(float factor)

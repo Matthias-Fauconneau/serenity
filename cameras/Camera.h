@@ -1,7 +1,5 @@
-#include "ReconstructionFilter.h"
-#include "AtomicFramebuffer.h"
+#pragma once
 #include "OutputBuffer.h"
-#include "Tonemap.h"
 #include "samplerecords/DirectionSample.h"
 #include "samplerecords/PositionSample.h"
 #include "samplerecords/LensSample.h"
@@ -38,7 +36,6 @@ struct Camera : public JsonSerializable
     Vec2f _pixelSize;
 
     std::shared_ptr<Medium> _medium;
-    ReconstructionFilter _filter;
 
     OutputBufferSettings _colorBufferSettings;
 
@@ -51,7 +48,6 @@ protected:
 
     double _colorBufferWeight;
 
-    std::unique_ptr<AtomicFramebuffer> _splatBuffer;
     double _splatWeight;
 
 private:
@@ -150,8 +146,6 @@ public:
         Vec3f result(0.0f);
         if (_colorBuffer)
             result += (*_colorBuffer)[idx]*_colorBufferWeight;
-        if (_splatBuffer)
-            result += Vec3f(Vec3d(_splatBuffer->get(x, y))*_splatWeight);
         return result;
     }
 
@@ -198,16 +192,6 @@ public:
     const std::shared_ptr<Medium> &medium() const
     {
         return _medium;
-    }
-
-    AtomicFramebuffer *splatBuffer()
-    {
-        return _splatBuffer.get();
-    }
-
-    bool isFilterDirac() const
-    {
-        return _filter.isDirac();
     }
 
     void setTonemapString(const std::string &name)

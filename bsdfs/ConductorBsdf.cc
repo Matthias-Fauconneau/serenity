@@ -29,9 +29,9 @@ void ConductorBsdf::lookupMaterial()
 void ConductorBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    if (JsonUtils::fromJson(v, "eta", _eta) && JsonUtils::fromJson(v, "k", _k))
+    if (::fromJson(v, "eta", _eta) && ::fromJson(v, "k", _k))
         _materialName.clear();
-    if (JsonUtils::fromJson(v, "material", _materialName))
+    if (::fromJson(v, "material", _materialName))
         lookupMaterial();
 }
 

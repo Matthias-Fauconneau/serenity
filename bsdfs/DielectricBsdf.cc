@@ -26,8 +26,8 @@ DielectricBsdf::DielectricBsdf(float ior)
 void DielectricBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "enable_refraction", _enableT);
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "enable_refraction", _enableT);
 }
 
 rapidjson::Value DielectricBsdf::toJson(Allocator &allocator) const

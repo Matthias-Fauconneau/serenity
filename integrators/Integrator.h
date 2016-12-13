@@ -1,7 +1,6 @@
 #pragma once
 #include "io/JsonSerializable.h"
 #include "io/FileUtils.h"
-#include "IntTypes.h"
 #include <functional>
 
 struct TraceableScene;

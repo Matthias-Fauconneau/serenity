@@ -51,7 +51,7 @@ void Sphere::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Primitive::fromJson(v, scene);
 
-    _bsdf = scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf"));
+    _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
 rapidjson::Value Sphere::toJson(Allocator &allocator) const
@@ -144,7 +144,7 @@ void Sphere::makeSamplable(const TraceableScene &/*scene*/, uint32 /*threadIndex
 bool Sphere::samplePosition(PathSampleGenerator &sampler, PositionSample &sample) const
 {
     Vec2f xi = sampler.next2D();
-    Vec3f localN = SampleWarp::uniformSphere(xi);
+    Vec3f localN = uniformSphere(xi);
     sample.Ng = _rot*localN;
     sample.p = sample.Ng*_radius + _pos;
     sample.pdf = _invArea;
@@ -158,10 +158,10 @@ bool Sphere::samplePosition(PathSampleGenerator &sampler, PositionSample &sample
 
 bool Sphere::sampleDirection(PathSampleGenerator &sampler, const PositionSample &point, DirectionSample &sample) const
 {
-    Vec3f d = SampleWarp::cosineHemisphere(sampler.next2D());
+    Vec3f d = cosineHemisphere(sampler.next2D());
     sample.d = TangentFrame(point.Ng).toGlobal(d);
     sample.weight = Vec3f(1.0f);
-    sample.pdf = SampleWarp::cosineHemispherePdf(d);
+    sample.pdf = cosineHemispherePdf(d);
 
     return true;
 }
@@ -176,7 +176,7 @@ bool Sphere::sampleDirect(uint32 /*threadIndex*/, const Vec3f &p, PathSampleGene
 
     L.normalize();
     float cosTheta = std::sqrt(C)/d;
-    sample.d = SampleWarp::uniformSphericalCap(sampler.next2D(), cosTheta);
+    sample.d = uniformSphericalCap(sampler.next2D(), cosTheta);
 
     float B = d*sample.d.z();
     float det = std::sqrt(max(B*B - C, 0.0f));
@@ -184,7 +184,7 @@ bool Sphere::sampleDirect(uint32 /*threadIndex*/, const Vec3f &p, PathSampleGene
 
     TangentFrame frame(L);
     sample.d = frame.toGlobal(sample.d);
-    sample.pdf = SampleWarp::uniformSphericalCapPdf(cosTheta);
+    sample.pdf = uniformSphericalCapPdf(cosTheta);
 
     return true;
 }
@@ -204,7 +204,7 @@ float Sphere::directPdf(uint32 /*threadIndex*/, const IntersectionTemporary &/*d
 {
     float dist = (_pos - p).length();
     float cosTheta = std::sqrt(max(dist*dist - _radius*_radius, 0.0f))/dist;
-    return SampleWarp::uniformSphericalCapPdf(cosTheta);
+    return uniformSphericalCapPdf(cosTheta);
 }
 
 Vec3f Sphere::evalPositionalEmission(const PositionSample &sample) const

@@ -275,7 +275,7 @@ Vec3f TraceBase::lightSample(const Primitive &light,
     Vec3f lightF = f*e/sample.pdf;
 
     if (!light.isDirac())
-        lightF *= SampleWarp::powerHeuristic(sample.pdf, event.info->bsdf->pdf(event));
+        lightF *= powerHeuristic(sample.pdf, event.info->bsdf->pdf(event));
 
     return lightF;
 }
@@ -311,7 +311,7 @@ Vec3f TraceBase::bsdfSample(const Primitive &light,
 
     Vec3f bsdfF = e*event.weight;
 
-    bsdfF *= SampleWarp::powerHeuristic(event.pdf, light.directPdf(_threadId, data, info, event.info->p));
+    bsdfF *= powerHeuristic(event.pdf, light.directPdf(_threadId, data, info, event.info->p));
 
     return bsdfF;
 }
@@ -343,7 +343,7 @@ Vec3f TraceBase::volumeLightSample(PathSampleGenerator &sampler,
     Vec3f lightF = f*e/lightSample.pdf;
 
     if (!light.isDirac())
-        lightF *= SampleWarp::powerHeuristic(lightSample.pdf, mediumSample.phase->pdf(parentRay.dir(), lightSample.d));
+        lightF *= powerHeuristic(lightSample.pdf, mediumSample.phase->pdf(parentRay.dir(), lightSample.d));
 
     return lightF;
 }
@@ -371,7 +371,7 @@ Vec3f TraceBase::volumePhaseSample(const Primitive &light,
 
     Vec3f phaseF = e*phaseSample.weight;
 
-    phaseF *= SampleWarp::powerHeuristic(phaseSample.pdf, light.directPdf(_threadId, data, info, mediumSample.p));
+    phaseF *= powerHeuristic(phaseSample.pdf, light.directPdf(_threadId, data, info, mediumSample.p));
 
     return phaseF;
 }

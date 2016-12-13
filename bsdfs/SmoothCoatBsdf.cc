@@ -16,10 +16,10 @@ SmoothCoatBsdf::SmoothCoatBsdf()
 void SmoothCoatBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "thickness", _thickness);
-    JsonUtils::fromJson(v, "sigma_a", _sigmaA);
-    _substrate = scene.fetchBsdf(JsonUtils::fetchMember(v, "substrate"));
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "thickness", _thickness);
+    ::fromJson(v, "sigma_a", _sigmaA);
+    _substrate = scene.fetchBsdf(fetchMember(v, "substrate"));
 }
 
 rapidjson::Value SmoothCoatBsdf::toJson(Allocator &allocator) const

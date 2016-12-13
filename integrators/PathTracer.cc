@@ -126,7 +126,7 @@ Vec3f PathTracer::traceSample(Vec2u pixel, PathSampleGenerator &sampler)
     return emission;
 
     } catch (std::runtime_error &e) {
-        std::cout << tfm::format("Caught an internal error at pixel %s: %s", pixel, e.what()) << std::endl;
+        std::cout << format("Caught an internal error at pixel %s: %s", pixel, e.what()) << std::endl;
 
         return Vec3f(0.0f);
     }

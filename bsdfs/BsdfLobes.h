@@ -1,5 +1,4 @@
 #pragma once
-#include "IntTypes.h"
 
 class BsdfLobes
 {

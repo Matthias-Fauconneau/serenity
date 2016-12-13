@@ -62,7 +62,7 @@ float InfiniteSphere::powerToRadianceFactor() const
 void InfiniteSphere::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Primitive::fromJson(v, scene);
-    JsonUtils::fromJson(v, "sample", _doSample);
+    ::fromJson(v, "sample", _doSample);
 }
 rapidjson::Value InfiniteSphere::toJson(Allocator &allocator) const
 {
@@ -125,7 +125,7 @@ bool InfiniteSphere::samplePosition(PathSampleGenerator &sampler, PositionSample
     Vec2f xi = sampler.next2D();
 
     if (_emission->isConstant()) {
-        sample.Ng = -SampleWarp::uniformSphere(sampler.next2D());
+        sample.Ng = -uniformSphere(sampler.next2D());
         sample.uv = directionToUV(-sample.Ng);
     } else {
         sample.uv = _emission->sample(MAP_SPHERICAL, sampler.next2D());
@@ -133,8 +133,8 @@ bool InfiniteSphere::samplePosition(PathSampleGenerator &sampler, PositionSample
         sample.Ng = -uvToDirection(sample.uv, sinTheta);
     }
 
-    sample.p = SampleWarp::projectedBox(_sceneBounds, sample.Ng, faceXi, xi);
-    sample.pdf = SampleWarp::projectedBoxPdf(_sceneBounds, sample.Ng);
+    sample.p = projectedBox(_sceneBounds, sample.Ng, faceXi, xi);
+    sample.pdf = projectedBoxPdf(_sceneBounds, sample.Ng);
     sample.weight = Vec3f(1.0f/sample.pdf);
 
     return true;
@@ -160,7 +160,7 @@ bool InfiniteSphere::sampleDirection(PathSampleGenerator &/*sampler*/, const Pos
 bool InfiniteSphere::sampleDirect(uint32 /*threadIndex*/, const Vec3f &/*p*/, PathSampleGenerator &sampler, LightSample &sample) const
 {
     if (_emission->isConstant()) {
-        sample.d = SampleWarp::uniformSphere(sampler.next2D());
+        sample.d = uniformSphere(sampler.next2D());
         sample.dist = Ray::infinity();
         sample.pdf = INV_FOUR_PI;
         return true;
@@ -176,7 +176,7 @@ bool InfiniteSphere::sampleDirect(uint32 /*threadIndex*/, const Vec3f &/*p*/, Pa
 
 float InfiniteSphere::positionalPdf(const PositionSample &point) const
 {
-    return SampleWarp::projectedBoxPdf(_sceneBounds, point.Ng);
+    return projectedBoxPdf(_sceneBounds, point.Ng);
 }
 
 float InfiniteSphere::directionalPdf(const PositionSample &point, const DirectionSample &/*sample*/) const

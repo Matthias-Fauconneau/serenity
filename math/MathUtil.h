@@ -1,23 +1,10 @@
 #pragma once
 #include "Vec.h"
-#include "IntTypes.h"
-
-template<typename T>
-T min(const T &a, const T &b)
-{
-    return a < b ? a : b;
-}
 
 template<typename T, typename... Ts>
 T min(const T &a, const T &b, const Ts &... ts)
 {
     return min(min(a, b), ts...);
-}
-
-template<typename T>
-T max(const T &a, const T &b)
-{
-    return a > b ? a : b;
 }
 
 template<typename T, typename... Ts>
@@ -44,12 +31,6 @@ Vec<ElementType, Size> max(const Vec<ElementType, Size> &a, const Vec<ElementTyp
         if (b.data()[i] > a.data()[i])
             result.data()[i] = b.data()[i];
     return result;
-}
-
-template<typename T>
-T clamp(T val, T minVal, T maxVal)
-{
-    return min(max(val, minVal), maxVal);
 }
 
 template<typename T>

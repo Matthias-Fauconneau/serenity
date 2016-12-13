@@ -367,7 +367,7 @@ DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
     jerr.output_message = [](j_common_ptr cinfo) {
         char buffer[JMSG_LENGTH_MAX];
         (*cinfo->err->format_message) (cinfo, buffer);
-        std::cout << tfm::format("Jpg decoding issue for file '%s': %s\n",
+        std::cout << format("Jpg decoding issue for file '%s': %s\n",
                 static_cast<CustomJerr *>(cinfo->err)->fileName, buffer);
         std::cout.flush();
     };

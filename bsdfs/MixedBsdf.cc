@@ -42,8 +42,8 @@ void MixedBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
 
-    _bsdf0 = scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf0"));
-    _bsdf1 = scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf1"));
+    _bsdf0 = scene.fetchBsdf(fetchMember(v, "bsdf0"));
+    _bsdf1 = scene.fetchBsdf(fetchMember(v, "bsdf1"));
     if (_bsdf0.get() == this || _bsdf1.get() == this) {
         DBG("Warning: Recursive mixed BSDF not supported");
         _bsdf0 = scene.errorBsdf();

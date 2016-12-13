@@ -39,7 +39,7 @@ public:
     void fail(const char *fmt, const T1 &v1, const Ts &... ts)
     {
         std::cerr << _programName << ": ";
-        tfm::format(std::cerr, fmt, v1, ts...);
+        format(std::cerr, fmt, v1, ts...);
         exit(-1);
     }
 

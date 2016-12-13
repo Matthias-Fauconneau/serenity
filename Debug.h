@@ -7,12 +7,12 @@ void debugLog(const std::string &message);
 #define DEBUG_BEGIN
 #define DEBUG_END
 
-# define FAIL(...) throw std::runtime_error(tfm::format("PROGRAM FAILURE in %s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__)))
-# define DBG(...) do { DEBUG_BEGIN DebugUtils::debugLog(tfm::format("%s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); DEBUG_END } while(false)
+# define FAIL(...) throw std::runtime_error(format("PROGRAM FAILURE in %s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__)))
+# define DBG(...) do { DEBUG_BEGIN debugLog(format("%s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); DEBUG_END } while(false)
 # define ASSERT(EXP, ...) do { \
     DEBUG_BEGIN \
     if (!bool(EXP)) \
-        throw std::runtime_error(tfm::format("ASSERTION FAILURE in %s:%d (" #EXP "): " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); \
+        throw std::runtime_error(format("ASSERTION FAILURE in %s:%d (" #EXP "): " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); \
     DEBUG_END \
     } while(false);
 

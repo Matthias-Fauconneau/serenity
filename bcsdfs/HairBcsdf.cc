@@ -150,11 +150,11 @@ float HairBcsdf::sampleM(float v, float sinThetaI, float cosThetaI, float xi1, f
 void HairBcsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "scale_angle", _scaleAngleDeg);
-    JsonUtils::fromJson(v, "melanin_ratio", _melaninRatio);
-    JsonUtils::fromJson(v, "melanin_concentration", _melaninConcentration);
-    _overridesSigmaA = JsonUtils::fromJson(v, "sigma_a", _sigmaA);
-    JsonUtils::fromJson(v, "roughness", _roughness);
+    ::fromJson(v, "scale_angle", _scaleAngleDeg);
+    ::fromJson(v, "melanin_ratio", _melaninRatio);
+    ::fromJson(v, "melanin_concentration", _melaninConcentration);
+    _overridesSigmaA = ::fromJson(v, "sigma_a", _sigmaA);
+    ::fromJson(v, "roughness", _roughness);
 }
 
 rapidjson::Value HairBcsdf::toJson(Allocator &allocator) const

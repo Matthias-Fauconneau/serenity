@@ -41,9 +41,9 @@ float Disk::powerToRadianceFactor() const
 void Disk::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Primitive::fromJson(v, scene);
-    JsonUtils::fromJson(v, "cone_angle", _coneAngle);
+    ::fromJson(v, "cone_angle", _coneAngle);
 
-    _bsdf = scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf"));
+    _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
 rapidjson::Value Disk::toJson(Allocator &allocator) const
@@ -145,7 +145,7 @@ void Disk::makeSamplable(const TraceableScene &/*scene*/, uint32 /*threadIndex*/
 bool Disk::samplePosition(PathSampleGenerator &sampler, PositionSample &sample) const
 {
     Vec2f xi = sampler.next2D();
-    Vec2f lQ = SampleWarp::uniformDisk(xi).xy()*_r;
+    Vec2f lQ = uniformDisk(xi).xy()*_r;
     sample.p = _center + lQ.x()*_frame.bitangent + lQ.y()*_frame.tangent;
     sample.pdf = _invArea;
     sample.uv = Vec2f(xi.x() + 0.5f, std::sqrt(xi.y()));
@@ -160,10 +160,10 @@ bool Disk::samplePosition(PathSampleGenerator &sampler, PositionSample &sample) 
 bool Disk::sampleDirection(PathSampleGenerator &sampler, const PositionSample &/*point*/, DirectionSample &sample) const
 {
     // TODO: Cone angle
-    Vec3f d = SampleWarp::cosineHemisphere(sampler.next2D());
+    Vec3f d = cosineHemisphere(sampler.next2D());
     sample.d = _frame.toGlobal(d);
     sample.weight = Vec3f(1.0f);
-    sample.pdf = SampleWarp::cosineHemispherePdf(d);
+    sample.pdf = cosineHemispherePdf(d);
 
     return true;
 }
@@ -173,7 +173,7 @@ bool Disk::sampleDirect(uint32 /*threadIndex*/, const Vec3f &p, PathSampleGenera
     if (_n.dot(p - _center) < 0.0f)
         return false;
 
-    Vec2f lQ = SampleWarp::uniformDisk(sampler.next2D()).xy()*_r;
+    Vec2f lQ = uniformDisk(sampler.next2D()).xy()*_r;
     Vec3f q = _center + lQ.x()*_frame.bitangent + lQ.y()*_frame.tangent;
     sample.d = q - p;
     float rSq = sample.d.lengthSq();

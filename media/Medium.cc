@@ -17,7 +17,7 @@ void Medium::fromJson(const rapidjson::Value &v, const Scene &scene)
     if (phase != v.MemberEnd())
         _phaseFunction = scene.fetchPhase(phase->value);
 
-    JsonUtils::fromJson(v, "max_bounces", _maxBounce);
+    ::fromJson(v, "max_bounces", _maxBounce);
 }
 
 rapidjson::Value Medium::toJson(Allocator &allocator) const

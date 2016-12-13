@@ -24,10 +24,10 @@ RoughPlasticBsdf::RoughPlasticBsdf()
 void RoughPlasticBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "distribution", _distributionName);
-    JsonUtils::fromJson(v, "thickness", _thickness);
-    JsonUtils::fromJson(v, "sigma_a", _sigmaA);
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "distribution", _distributionName);
+    ::fromJson(v, "thickness", _thickness);
+    ::fromJson(v, "sigma_a", _sigmaA);
     scene.textureFromJsonMember(v, "roughness", TexelConversion::REQUEST_AVERAGE, _roughness);
 
     // Fail early in case of invalid distribution name
@@ -74,7 +74,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
 
             Vec3f brdfSubstrate = ((1.0f - Fi)*(1.0f - Fo)*eta*eta)*(diffuseAlbedo/(1.0f - diffuseAlbedo*_diffuseFresnel))*INV_PI*event.wo.z();
             Vec3f brdfSpecular = event.weight*event.pdf;
-            float pdfSubstrate = SampleWarp::cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
+            float pdfSubstrate = cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
             float pdfSpecular = event.pdf*specularProbability;
 
             event.weight = (brdfSpecular + brdfSubstrate)/(pdfSpecular + pdfSubstrate);
@@ -82,7 +82,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
         }
         return true;
     } else {
-        Vec3f wo(SampleWarp::cosineHemisphere(event.sampler->next2D()));
+        Vec3f wo(cosineHemisphere(event.sampler->next2D()));
         float Fo = Fresnel::dielectricReflectance(eta, wo.z());
         Vec3f diffuseAlbedo = albedo(event.info);
 
@@ -91,7 +91,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
         if (_scaledSigmaA.max() > 0.0f)
             event.weight *= std::exp(_scaledSigmaA*(-1.0f/event.wo.z() - 1.0f/event.wi.z()));
 
-        event.pdf = SampleWarp::cosineHemispherePdf(event.wo);
+        event.pdf = cosineHemispherePdf(event.wo);
         if (sampleR) {
             Vec3f brdfSubstrate = event.weight*event.pdf;
             float  pdfSubstrate = event.pdf*(1.0f - specularProbability);
@@ -151,7 +151,7 @@ float RoughPlasticBsdf::pdf(const SurfaceScatterEvent &event) const
 
     float diffusePdf = 0.0f;
     if (sampleT)
-        diffusePdf = SampleWarp::cosineHemispherePdf(event.wo);
+        diffusePdf = cosineHemispherePdf(event.wo);
 
     if (sampleT && sampleR) {
         float Fi = Fresnel::dielectricReflectance(1.0f/_ior, event.wi.z());

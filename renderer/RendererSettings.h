@@ -41,23 +41,23 @@ public:
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene)
     {
-        JsonUtils::fromJson(v, "output_directory", _outputDirectory);
+        ::fromJson(v, "output_directory", _outputDirectory);
 
         _outputDirectory.freezeWorkingDirectory();
         DirectoryChange change(_outputDirectory);
 
-        JsonUtils::fromJson(v, "output_file", _outputFile);
-        JsonUtils::fromJson(v, "hdr_output_file", _hdrOutputFile);
-        JsonUtils::fromJson(v, "variance_output_file", _varianceOutputFile);
-        JsonUtils::fromJson(v, "resume_render_file", _resumeRenderFile);
-        JsonUtils::fromJson(v, "overwrite_output_files", _overwriteOutputFiles);
-        JsonUtils::fromJson(v, "adaptive_sampling", _useAdaptiveSampling);
-        JsonUtils::fromJson(v, "enable_resume_render", _enableResumeRender);
-        JsonUtils::fromJson(v, "scene_bvh", _useSceneBvh);
-        JsonUtils::fromJson(v, "spp", _spp);
-        JsonUtils::fromJson(v, "spp_step", _sppStep);
-        JsonUtils::fromJson(v, "checkpoint_interval", _checkpointInterval);
-        JsonUtils::fromJson(v, "timeout", _timeout);
+        ::fromJson(v, "output_file", _outputFile);
+        ::fromJson(v, "hdr_output_file", _hdrOutputFile);
+        ::fromJson(v, "variance_output_file", _varianceOutputFile);
+        ::fromJson(v, "resume_render_file", _resumeRenderFile);
+        ::fromJson(v, "overwrite_output_files", _overwriteOutputFiles);
+        ::fromJson(v, "adaptive_sampling", _useAdaptiveSampling);
+        ::fromJson(v, "enable_resume_render", _enableResumeRender);
+        ::fromJson(v, "scene_bvh", _useSceneBvh);
+        ::fromJson(v, "spp", _spp);
+        ::fromJson(v, "spp_step", _sppStep);
+        ::fromJson(v, "checkpoint_interval", _checkpointInterval);
+        ::fromJson(v, "timeout", _timeout);
 
         auto outputs = v.FindMember("output_buffers");
         if (outputs != v.MemberEnd() && outputs->value.IsArray()) {

@@ -1,8 +1,6 @@
 #include "MeshIO.h"
 #include "FileUtils.h"
 #include "ObjLoader.h"
-#include "IntTypes.h"
-
 #include "tinyformat.h"
 
 bool loadWo3(const Path &path, std::vector<Vertex> &verts, std::vector<TriangleI> &tris)
@@ -49,13 +47,13 @@ bool saveObj(const Path &path, const std::vector<Vertex> &verts, const std::vect
         return false;
 
     for (const Vertex &v : verts)
-        tfm::format(*stream, "v %f %f %f\n", v.pos().x(), v.pos().y(), v.pos().z());
+        format(*stream, "v %f %f %f\n", v.pos().x(), v.pos().y(), v.pos().z());
     for (const Vertex &v : verts)
-        tfm::format(*stream, "vn %f %f %f\n", v.normal().x(), v.normal().y(), v.normal().z());
+        format(*stream, "vn %f %f %f\n", v.normal().x(), v.normal().y(), v.normal().z());
     for (const Vertex &v : verts)
-        tfm::format(*stream, "vt %f %f\n", v.uv().x(), v.uv().y());
+        format(*stream, "vt %f %f\n", v.uv().x(), v.uv().y());
     for (const TriangleI &t : tris)
-        tfm::format(*stream, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
+        format(*stream, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
             t.v0 + 1, t.v0 + 1, t.v0 + 1,
             t.v1 + 1, t.v1 + 1, t.v1 + 1,
             t.v2 + 1, t.v2 + 1, t.v2 + 1);

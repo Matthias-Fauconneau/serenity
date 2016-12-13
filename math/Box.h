@@ -1,7 +1,5 @@
 #pragma once
-#include "IntTypes.h"
 #include "MathUtil.h"
-#include "sse/SimdUtils.h"
 #include <limits>
 
 template<typename TVec, typename ElementType, unsigned Size>
@@ -53,7 +51,7 @@ public:
 
     inline TVec diagonal() const
     {
-        return max(_max - _min, TVec(ElementType(0)));
+        return ::max(_max - _min, TVec(ElementType(0)));
     }
 
     inline ElementType area() const
@@ -83,14 +81,14 @@ public:
 
     void grow(const TVec &p)
     {
-        _min = min(_min, p);
-        _max = max(_max, p);
+        _min = ::min(_min, p);
+        _max = ::max(_max, p);
     }
 
     void grow(const Box &box)
     {
-        _min = min(_min, box._min);
-        _max = max(_max, box._max);
+        _min = ::min(_min, box._min);
+        _max = ::max(_max, box._max);
     }
 
     inline bool contains(const TVec &p) const
@@ -137,11 +135,10 @@ typedef Box<Vec4c, uint8, 4> Box4c;
 typedef Box<Vec3c, uint8, 3> Box3c;
 typedef Box<Vec2c, uint8, 2> Box2c;
 
-typedef Box<Vec4fp, float, 4> Box4fp;
-typedef Box<Vec3fp, float, 3> Box3fp;
-typedef Box<Vec2fp, float, 2> Box2fp;
+//typedef Box<Vec3fp, float, 3> Box3fp;
+typedef Box3f Box3fp;
 
-inline Box3fp expand(const Box3f &b)
+/*inline Box3fp expand(const Box3f &b)
 {
     return Box3fp(expand(b.min()), expand(b.max()));
 }
@@ -149,4 +146,4 @@ inline Box3fp expand(const Box3f &b)
 inline Box3f narrow(const Box3fp &b)
 {
     return Box3f(narrow(b.min()), narrow(b.max()));
-}
+}*/

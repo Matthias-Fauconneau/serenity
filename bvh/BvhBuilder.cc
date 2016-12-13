@@ -8,7 +8,6 @@
 #include "math/Box.h"
 #include "math/Vec.h"
 
-#include "IntTypes.h"
 #include "Debug.h"
 #include "Timer.h"
 

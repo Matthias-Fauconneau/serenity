@@ -15,7 +15,7 @@ Primitive::Primitive(const std::string &name)
 void Primitive::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     JsonSerializable::fromJson(v, scene);
-    JsonUtils::fromJson(v, "transform", _transform);
+    ::fromJson(v, "transform", _transform);
 
     scene.textureFromJsonMember(v, "emission", TexelConversion::REQUEST_RGB, _emission);
     scene.textureFromJsonMember(v, "power", TexelConversion::REQUEST_RGB, _power);

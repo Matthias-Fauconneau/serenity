@@ -20,9 +20,9 @@ PlasticBsdf::PlasticBsdf()
 void PlasticBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Bsdf::fromJson(v, scene);
-    JsonUtils::fromJson(v, "ior", _ior);
-    JsonUtils::fromJson(v, "thickness", _thickness);
-    JsonUtils::fromJson(v, "sigma_a", _sigmaA);
+    ::fromJson(v, "ior", _ior);
+    ::fromJson(v, "thickness", _thickness);
+    ::fromJson(v, "sigma_a", _sigmaA);
 }
 
 rapidjson::Value PlasticBsdf::toJson(Allocator &allocator) const
@@ -31,7 +31,7 @@ rapidjson::Value PlasticBsdf::toJson(Allocator &allocator) const
     v.AddMember("type", "plastic", allocator);
     v.AddMember("ior", _ior, allocator);
     v.AddMember("thickness", _thickness, allocator);
-    v.AddMember("sigma_a", JsonUtils::toJson(_sigmaA, allocator), allocator);
+    v.AddMember("sigma_a", toJson(_sigmaA, allocator), allocator);
     return std::move(v);
 }
 
@@ -64,7 +64,7 @@ bool PlasticBsdf::sample(SurfaceScatterEvent &event) const
         event.weight = Vec3f(Fi/specularProbability);
         event.sampledLobe = BsdfLobes::SpecularReflectionLobe;
     } else {
-        Vec3f wo(SampleWarp::cosineHemisphere(event.sampler->next2D()));
+        Vec3f wo(cosineHemisphere(event.sampler->next2D()));
         float Fo = Fresnel::dielectricReflectance(eta, wo.z());
         Vec3f diffuseAlbedo = albedo(event.info);
 
@@ -73,7 +73,7 @@ bool PlasticBsdf::sample(SurfaceScatterEvent &event) const
         if (_scaledSigmaA.max() > 0.0f)
             event.weight *= std::exp(_scaledSigmaA*(-1.0f/event.wo.z() - 1.0f/event.wi.z()));
 
-        event.pdf = SampleWarp::cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
+        event.pdf = cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
         event.weight /= 1.0f - specularProbability;
         event.sampledLobe = BsdfLobes::DiffuseReflectionLobe;
     }
@@ -124,9 +124,9 @@ float PlasticBsdf::pdf(const SurfaceScatterEvent &event) const
         if (checkReflectionConstraint(event.wi, event.wo))
             return specularProbability;
         else
-            return SampleWarp::cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
+            return cosineHemispherePdf(event.wo)*(1.0f - specularProbability);
     } else if (sampleT) {
-        return SampleWarp::cosineHemispherePdf(event.wo);
+        return cosineHemispherePdf(event.wo);
     } else if (sampleR) {
         return checkReflectionConstraint(event.wi, event.wo) ? 1.0f : 0.0f;
     } else {

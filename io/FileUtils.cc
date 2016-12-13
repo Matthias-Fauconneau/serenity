@@ -305,7 +305,7 @@ OutputStreamHandle FileUtils::openOutputStream(const Path &p)
     Path tmpPath(p + ".tmp");
     int index = 0;
     while (tmpPath.exists())
-        tmpPath = p + tfm::format(".tmp%03d", ++index);
+        tmpPath = p + format(".tmp%03d", ++index);
 
     OutputStreamHandle out = openFileOutputStream(tmpPath);
     if (out) {

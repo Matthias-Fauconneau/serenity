@@ -45,7 +45,7 @@ bool LambertianFiberBcsdf::sample(SurfaceScatterEvent &event) const
     float nx = h;
     float nz = trigInverse(nx);
 
-    Vec3f d = SampleWarp::cosineHemisphere(event.sampler->next2D());
+    Vec3f d = cosineHemisphere(event.sampler->next2D());
 
     event.wo = Vec3f(d.z()*nx + d.x()*nz, d.y(), d.z()*nz - d.x()*nx);
     event.pdf = lambertianCylinder(event.wo);

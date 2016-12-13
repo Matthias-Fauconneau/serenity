@@ -58,7 +58,7 @@ void Cube::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Primitive::fromJson(v, scene);
 
-    _bsdf = scene.fetchBsdf(JsonUtils::fetchMember(v, "bsdf"));
+    _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
 rapidjson::Value Cube::toJson(Allocator &allocator) const
@@ -196,10 +196,10 @@ bool Cube::samplePosition(PathSampleGenerator &sampler, PositionSample &sample) 
 
 bool Cube::sampleDirection(PathSampleGenerator &sampler, const PositionSample &point, DirectionSample &sample) const
 {
-    Vec3f d = SampleWarp::cosineHemisphere(sampler.next2D());
+    Vec3f d = cosineHemisphere(sampler.next2D());
     sample.d = TangentFrame(point.Ng).toGlobal(d);
     sample.weight = Vec3f(1.0f);
-    sample.pdf = SampleWarp::cosineHemispherePdf(d);
+    sample.pdf = cosineHemispherePdf(d);
 
     return true;
 }

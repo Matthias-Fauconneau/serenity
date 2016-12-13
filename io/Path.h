@@ -81,3 +81,14 @@ public:
 };
 
 typedef std::shared_ptr<Path> PathPtr;
+
+namespace std {
+
+template<> struct hash<Path>
+{
+    std::size_t operator()(const Path &v) const {
+        return std::hash<std::string>()(v.asString());
+    }
+};
+
+}

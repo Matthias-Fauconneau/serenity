@@ -20,7 +20,7 @@ inline float HenyeyGreensteinPhaseFunction::henyeyGreenstein(float cosTheta) con
 void HenyeyGreensteinPhaseFunction::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     PhaseFunction::fromJson(v, scene);
-    JsonUtils::fromJson(v, "g", _g);
+    ::fromJson(v, "g", _g);
 }
 
 rapidjson::Value HenyeyGreensteinPhaseFunction::toJson(Allocator &allocator) const
@@ -40,9 +40,9 @@ bool HenyeyGreensteinPhaseFunction::sample(PathSampleGenerator &sampler, const V
 {
     Vec2f xi = sampler.next2D();
     if (_g == 0.0f) {
-        sample.w = SampleWarp::uniformSphere(xi);
+        sample.w = uniformSphere(xi);
         sample.weight = Vec3f(1.0f);
-        sample.pdf = SampleWarp::uniformSpherePdf();
+        sample.pdf = uniformSpherePdf();
     } else {
         float phi = xi.x()*TWO_PI;
         float cosTheta = (1.0f + _g*_g - sqr((1.0f - _g*_g)/(1.0f + _g*(xi.y()*2.0f - 1.0f))))/(2.0f*_g);

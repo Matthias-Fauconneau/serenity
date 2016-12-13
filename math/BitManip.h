@@ -1,5 +1,5 @@
 #pragma once
-#include "IntTypes.h"
+#include "core.h"
 #include <memory>
 #include <string>
 

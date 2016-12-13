@@ -125,7 +125,7 @@ struct Render {
 
         mat4 camera = parseCamera(readFile("scene.json"));
 
-        EmbreeUtil::initDevice();
+        initDevice();
         ThreadUtils::startThreads(8);
         std::unique_ptr<Scene> scene;
         scene.reset(Scene::load(Path("scene.json")));
@@ -287,7 +287,7 @@ struct ViewApp {
 
     struct Scene : ::Scene {
         Scene() : ::Scene(Path(), std::make_shared<TextureCache>()) {
-            EmbreeUtil::initDevice();
+            initDevice();
             std::string json = FileUtils::loadText(_path = Path("scene.json"));
             rapidjson::Document document;
             document.Parse<0>(json.c_str());
@@ -315,13 +315,13 @@ struct ViewApp {
                         std::placeholders::_1, std::placeholders::_2), _primitives);
 
             if (camera != v.MemberEnd() && camera->value.IsObject()) {
-                auto result = instantiateCamera(JsonUtils::as<std::string>(camera->value, "type"), camera->value);
+                auto result = instantiateCamera(as<std::string>(camera->value, "type"), camera->value);
                 if (result)
                     _camera = std::move(result);
             }
 
             if (integrator != v.MemberEnd() && integrator->value.IsObject()) {
-                auto result = instantiateIntegrator(JsonUtils::as<std::string>(integrator->value, "type"), integrator->value);
+                auto result = instantiateIntegrator(as<std::string>(integrator->value, "type"), integrator->value);
                 if (result)
                     _integrator = std::move(result);
             }
@@ -444,7 +444,7 @@ struct ViewApp {
                 for(int bounce = 0;;bounce++) {
                     info.primitive = nullptr;
                     data.primitive = nullptr;
-                    TraceableScene::IntersectionRay eRay(EmbreeUtil::convert(ray), data, ray, flattenedScene._userGeomId);
+                    TraceableScene::IntersectionRay eRay(convert(ray), data, ray, flattenedScene._userGeomId);
                     rtcIntersect(flattenedScene._scene, eRay);
 
                     bool didHit;
@@ -603,7 +603,7 @@ struct ViewApp {
                                                 //bool didHit = flattenedScene.intersect(lightRay, data, info) && info.primitive != endCap;
                                                 info.primitive = nullptr;
                                                 data.primitive = nullptr;
-                                                TraceableScene::IntersectionRay eRay(EmbreeUtil::convert(lightRay), data, lightRay, flattenedScene._userGeomId);
+                                                TraceableScene::IntersectionRay eRay(convert(lightRay), data, lightRay, flattenedScene._userGeomId);
                                                 rtcIntersect(flattenedScene.scene, eRay);
 
                                                 bool didHit;
@@ -660,7 +660,7 @@ struct ViewApp {
                                             if(shadow != 0.0f) {
                                                 Vec3f e = shadow*light.evalDirect(data, info);
                                                 if (e != 0.0f) {
-                                                    result += f*e/sample.pdf*SampleWarp::powerHeuristic(sample.pdf, event.info->bsdf->pdf(event));
+                                                    result += f*e/sample.pdf*powerHeuristic(sample.pdf, event.info->bsdf->pdf(event));
                                                 }
                                             }
                                         }
@@ -693,7 +693,7 @@ struct ViewApp {
                                         if(shadow != 0.0f) {
                                             Vec3f e = shadow*light.evalDirect(data, info);
                                             if (e != 0.0f) {
-                                                result += e*event.weight*SampleWarp::powerHeuristic(event.pdf, light.directPdf(_threadId, data, info, event.info->p));
+                                                result += e*event.weight*powerHeuristic(event.pdf, light.directPdf(_threadId, data, info, event.info->p));
                                             }
                                         }
                                     }
@@ -744,7 +744,7 @@ struct ViewApp {
                 for(int bounce = 0;; bounce++) {
                     info.primitive = nullptr;
                     data.primitive = nullptr;
-                    TraceableScene::IntersectionRay eRay(EmbreeUtil::convert(ray), data, ray, flattenedScene._userGeomId);
+                    TraceableScene::IntersectionRay eRay(convert(ray), data, ray, flattenedScene._userGeomId);
                     rtcIntersect(flattenedScene.scene, eRay);
 
                     bool didHit;

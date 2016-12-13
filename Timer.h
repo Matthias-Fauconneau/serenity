@@ -1,5 +1,4 @@
 #pragma once
-#include "IntTypes.h"
 #include "tinyformat.h"
 #include <chrono>
 
@@ -27,7 +26,7 @@ public:
     void bench(const std::string &s)
     {
         stop();
-        std::cout << tfm::format("%s: %f s", s, elapsed()) << std::endl;
+        std::cout << format("%s: %f s", s, elapsed()) << std::endl;
     }
 
     double elapsed() const

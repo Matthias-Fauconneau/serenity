@@ -34,7 +34,6 @@ Camera::Camera(const Mat4f &transform, const Vec2u &res)
 
 void Camera::precompute()
 {
-    _tonemapOp = Tonemap::stringToType(_tonemapString);
     _ratio = _res.y()/float(_res.x());
     _pixelSize = Vec2f(1.0f/_res.x(), 1.0f/_res.y());
     _invTransform = _transform.pseudoInvert();
@@ -43,26 +42,22 @@ void Camera::precompute()
 void Camera::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     auto medium    = v.FindMember("medium");
-    auto filter    = v.FindMember("reconstruction_filter");
     auto transform = v.FindMember("transform");
 
-    JsonUtils::fromJson(v, "tonemap", _tonemapString);
-    JsonUtils::fromJson(v, "resolution", _res);
+    ::fromJson(v, "tonemap", _tonemapString);
+    ::fromJson(v, "resolution", _res);
     if (medium != v.MemberEnd())
         _medium = scene.fetchMedium(medium->value);
-    if (filter != v.MemberEnd())
-        if (filter->value.IsString())
-            _filter = ReconstructionFilter(filter->value.GetString());
 
     if (transform != v.MemberEnd()) {
-        JsonUtils::fromJson(transform->value, _transform);
+        ::fromJson(transform->value, _transform);
         _pos    = _transform.extractTranslationVec();
         _lookAt = _transform.fwd() + _pos;
         _up     = _transform.up();
 
         if (transform->value.IsObject()) {
-            JsonUtils::fromJson(transform->value, "up", _up);
-            JsonUtils::fromJson(transform->value, "look_at", _lookAt);
+            ::fromJson(transform->value, "up", _up);
+            ::fromJson(transform->value, "look_at", _lookAt);
         }
 
         _transform.setRight(-_transform.right());

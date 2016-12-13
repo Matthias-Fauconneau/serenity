@@ -1,7 +1,6 @@
 #pragma once
-#include <cmath>
+#include "math.h"
 
-constexpr float PI          = 3.1415926536f;
 constexpr float PI_HALF     = PI*0.5f;
 constexpr float TWO_PI      = PI*2.0f;
 constexpr float FOUR_PI     = PI*4.0f;

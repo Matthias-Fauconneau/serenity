@@ -58,7 +58,7 @@ void Integrator::saveRenderResumeData(Scene &scene)
     document.AddMember("current_spp", _currentSpp, document.GetAllocator());
     document.AddMember("adaptive_sampling", _scene->rendererSettings().useAdaptiveSampling(), document.GetAllocator());
 
-    FileUtils::streamWrite(out, JsonUtils::jsonToString(document));
+    FileUtils::streamWrite(out, jsonToString(document));
     uint64 jsonHash = sceneHash(scene);
     FileUtils::streamWrite(out, jsonHash);
     _scene->cam().serializeOutputBuffers(out);
@@ -78,12 +78,12 @@ bool Integrator::resumeRender(Scene &scene)
         return false;
 
     bool adaptiveSampling;
-    if (!JsonUtils::fromJson(document, "adaptive_sampling", adaptiveSampling)
+    if (!fromJson(document, "adaptive_sampling", adaptiveSampling)
             || adaptiveSampling != _scene->rendererSettings().useAdaptiveSampling())
         return false;
 
     uint32 jsonSpp;
-    if (!JsonUtils::fromJson(document, "current_spp", jsonSpp))
+    if (!fromJson(document, "current_spp", jsonSpp))
         return false;
 
     uint64 jsonHash;
