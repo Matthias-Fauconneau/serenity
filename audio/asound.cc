@@ -148,7 +148,7 @@ bool AudioOutput::start(uint rate, uint periodSize, uint sampleBits, uint channe
 void AudioOutput::stop() {
  assert_(status);
  if(status->state == Running) io<DRAIN>(int(LinuxError::Again)); // FIXME: set fd to blocking first
- else if(status->state != Prepared) log("Could not drain", status->state);
+ else if(status->state != Prepared) log("Could not drain", status->state, channels, sampleBits, rate, periodSize, bufferSize, underruns);
  unregisterPoll();
  {int state = status->state;
   buffer=0, maps[0].unmap(); status=0, maps[1].unmap(); control=0, maps[2].unmap(); // Release maps

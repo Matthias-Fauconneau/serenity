@@ -31,7 +31,7 @@ FFmpeg::FFmpeg(string path) {
    if(codec && avcodec_open2(audio, codec, 0) >= 0) {
     this->codec = Codec(ref<AVCodecID>{AV_CODEC_ID_AAC, AV_CODEC_ID_FLAC, AV_CODEC_ID_MP3}.indexOf(audio->codec_id));
     channels = audio->channels;
-    assert_(channels == 1 || channels == 2);
+    assert_(channels == 1 || channels == 2, channels);
     audioFrameRate = audio->sample_rate;
     assert_(audioStream->time_base.num == 1, audioStream->time_base.den, audioFrameRate);
     if(audioStream->duration != AV_NOPTS_VALUE) {
