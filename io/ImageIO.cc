@@ -7,7 +7,7 @@
 #include "Debug.h"
 
 #include <cstring>
-#include "core.h"
+#include "string.h"
 
 #if OPENEXR_AVAILABLE
 #include <ImfChannelList.h>
@@ -132,6 +132,8 @@ public:
 bool isHdr(const Path &path)
 {
     if (path.testExtension("pfm"))
+        return true;
+    if (path.testExtension("hdr"))
         return true;
 #if OPENEXR_AVAILABLE
     if (path.testExtension("exr"))
@@ -318,6 +320,7 @@ std::unique_ptr<float[]> loadHdr(const Path &path, TexelConversion request, int 
     else if (path.testExtension("exr"))
         return std::move(loadExr(path, request, w, h));
 #endif
+    //else return std::move(loadStbiHdr(path, request, w, h));
     error("HDR");
 }
 
@@ -425,7 +428,7 @@ DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
 }
 #endif
 
-std::unique_ptr<uint8[]> loadLdr(const Path &path, TexelConversion request, int &w, int &h, bool gammaCorrect)
+std::unique_ptr<uint8[]> loadLdr(const Path& path, TexelConversion request, int &w, int &h, bool gammaCorrect)
 {
     int channels;
     DeletablePixels img(makeVoidPixels());
@@ -436,7 +439,7 @@ std::unique_ptr<uint8[]> loadLdr(const Path &path, TexelConversion request, int 
         img = loadJpg(path, w, h, channels);
 #endif
     else
-        error("LDR");
+        error("LDR", path._path.c_str());
 
     if (!img)
         return nullptr;

@@ -10,7 +10,7 @@
 #define Type typename
 #define unused __attribute((unused))
 
-class Path;
+struct Path;
 
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name);
 

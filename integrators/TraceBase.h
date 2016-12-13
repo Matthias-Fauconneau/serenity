@@ -15,7 +15,6 @@
 #include "bsdfs/Bsdf.h"
 #include <vector>
 #include <memory>
-#include <cmath>
 
 struct TraceBase {
     const TraceableScene *_scene;

@@ -8,8 +8,7 @@ class DirectoryIterable;
 class FileIterable;
 class FileIterator;
 
-class Path
-{
+struct Path {
     std::string _workingDirectory;
     std::string _path;
 

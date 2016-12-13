@@ -1,7 +1,7 @@
 #include "media/Medium.h"
 #include "math/Ray.h"
 
-class PathSampleGenerator;
+struct PathSampleGenerator;
 
 // TODO: Modify TraceBase to primarily take/return TraceState as parameter
 struct TraceState

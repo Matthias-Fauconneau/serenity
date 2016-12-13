@@ -4,7 +4,7 @@
 
 struct Drag : virtual Widget {
     vec2 value = vec2(0, 0);
-    function<void(vec2)> setValue;
+    function<void(vec2)> valueChanged;
 
     struct {
         vec2 cursor;
@@ -18,7 +18,7 @@ struct Drag : virtual Widget {
         }
         if(event==Motion && button==LeftButton) {
             value = dragStart.value + (cursor - dragStart.cursor) / size;
-            setValue(value);
+            valueChanged(value);
             return true;
         }
         return false;

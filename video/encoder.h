@@ -1,6 +1,6 @@
 #pragma once
 #include "function.h"
-#include "core/image.h"
+#include "image.h"
 #include "audio.h" // AudioFile
 
 /// Generic video/audio encoder (using ffmpeg/x264)

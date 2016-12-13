@@ -1,6 +1,5 @@
 #pragma once
 #include "Polynomial.h"
-#include <cmath>
 // Xiaogang Zhang, John Maddock - Boost Software License
 
 static constexpr double P1[] = {

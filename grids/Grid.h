@@ -3,7 +3,7 @@
 #include "math/Box.h"
 #include "io/JsonSerializable.h"
 
-class PathSampleGenerator;
+struct PathSampleGenerator;
 
 class Grid : public JsonSerializable
 {

@@ -3,7 +3,6 @@
 #include "math/Angle.h"
 #include "math/Ray.h"
 #include "io/JsonObject.h"
-#include <cmath>
 
 PinholeCamera::PinholeCamera()
 : Camera(),

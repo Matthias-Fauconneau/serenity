@@ -1,7 +1,6 @@
 #pragma once
 #include "math/MathUtil.h"
 #include "math/Angle.h"
-#include <cmath>
 
 // Computes total reflectance from an infinitesimally thin film with refraction index eta
 // from all internal reflection/refraction events

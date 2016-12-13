@@ -15,7 +15,7 @@
 #define unused __attribute((unused))
 
 class ZipReader;
-class Path;
+struct Path;
 
 typedef std::shared_ptr<std::istream> InputStreamHandle;
 typedef std::shared_ptr<std::ostream> OutputStreamHandle;

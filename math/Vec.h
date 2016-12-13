@@ -1,9 +1,9 @@
 #pragma once
+#include "math.h"
 #include "math/BitManip.h"
 #include <type_traits>
 #include <ostream>
 #include <array>
-#include <cmath>
 #undef Type
 #undef unused
 #include <rapidjson/document.h>

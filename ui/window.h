@@ -66,7 +66,6 @@ struct Window : Poll {
  void render();
  /// Immediately renders the first pending update to target
  Update render(uint2 size, const Image& target);
- virtual Image readback() { return Image(); }
  Time swapTime;
 
  // Control

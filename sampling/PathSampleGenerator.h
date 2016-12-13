@@ -3,7 +3,7 @@
 #include "math/Vec.h"
 #include "io/FileUtils.h"
 
-class PathSampleGenerator {
+struct PathSampleGenerator {
 public:
     virtual ~PathSampleGenerator() {}
 

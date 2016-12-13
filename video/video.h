@@ -1,5 +1,5 @@
 #pragma once
-#include "core/image.h"
+#include "image.h"
 
 /// Generic video/audio decoder (using ffmpeg)
 struct Decoder {

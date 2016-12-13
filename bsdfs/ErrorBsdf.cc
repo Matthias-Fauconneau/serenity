@@ -1,4 +1,3 @@
-#pragma once
 #include "ErrorBsdf.h"
 #include "materials/ConstantTexture.h"
 

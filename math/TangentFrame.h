@@ -1,5 +1,4 @@
 #pragma once
-#include <cmath>
 #include "Mat4f.h"
 #include "Vec.h"
 

@@ -8,7 +8,6 @@
 #include "io/Scene.h"
 
 #include <iostream>
-#include <cmath>
 
 // Default to low-res 16:9
 Camera::Camera()

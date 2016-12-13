@@ -2,7 +2,7 @@
 #include "samplerecords/PhaseSample.h"
 #include "io/JsonSerializable.h"
 
-class PathSampleGenerator;
+struct PathSampleGenerator;
 
 class PhaseFunction : public JsonSerializable
 {

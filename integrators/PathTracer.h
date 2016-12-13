@@ -1,7 +1,7 @@
 #include "PathTracerSettings.h"
 #include "integrators/TraceBase.h"
 
-class PathTracer : public TraceBase
+struct PathTracer : public TraceBase
 {
     PathTracerSettings _settings;
     bool _trackOutputValues;

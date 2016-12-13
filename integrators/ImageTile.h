@@ -1,7 +1,7 @@
 #pragma once
 #include <memory>
 
-class PathSampleGenerator;
+struct PathSampleGenerator;
 
 struct ImageTile
 {

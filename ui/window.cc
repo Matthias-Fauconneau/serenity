@@ -1,5 +1,4 @@
 #include "window.h"
-#include "ui/render.h"
 #include "x.h"
 #include "time.h"
 #include <sys/shm.h>
@@ -33,8 +32,8 @@ Window::Update Window::render(uint2 size, const Image& target) {
         currentWindow = 0;
     }
     if(target) {
-        fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
-        ::render(target, update.graphics); 	// Render retained graphics
+        //fill(target, update.origin, update.size, backgroundColor, 1); // Clear framebuffer
+        //::render(target, update.graphics); 	// Render retained graphics
     }
     return update;
 }

@@ -76,9 +76,9 @@ inline v16sf operator/(v16sf a, v16sf b) { return v16sf(a.r1 / b.r1, a.r2 / b.r2
 inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return v16sf(__builtin_ia32_rcpps256(d.r1),__builtin_ia32_rcpps256(d.r2)); }
 
 //inline v16f shuffle() __builtin_shufflevector
-#define shuffle(a, b, i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15) \
+/*#define shuffle(a, b, i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15) \
  v16sf(__builtin_shufflevector(a, b, i0, i1, i2, i3, i4, i5, i6, i7), \
-       __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))
+       __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))*/
 
 inline float hsum(v4sf v) { // movshdup, addps, movhlps, addss
     v4sf t = v+__builtin_shufflevector(v,v, 1,1,3,3);

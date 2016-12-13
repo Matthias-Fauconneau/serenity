@@ -1,6 +1,5 @@
 #include "Mat4f.h"
 #include "Angle.h"
-#include <cmath>
 
 Mat4f Mat4f::toNormalMatrix() const
 {

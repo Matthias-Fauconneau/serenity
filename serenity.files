@@ -327,3 +327,5 @@ scene.cc
 test.cc
 view.cc
 core/algorithm.h
+prerender.h
+camera.h

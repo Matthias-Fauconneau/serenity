@@ -4,7 +4,7 @@
 #include "math/Vec.h"
 
 struct IntersectionInfo;
-class PathSampleGenerator;
+struct PathSampleGenerator;
 
 struct SurfaceScatterEvent
 {

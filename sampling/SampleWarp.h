@@ -4,7 +4,6 @@
 #include "math/Vec.h"
 #include "math/Box.h"
 #include <algorithm>
-#include <cmath>
 
 static inline Vec3f uniformHemisphere(const Vec2f &xi)
 {
