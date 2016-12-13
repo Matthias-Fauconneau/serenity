@@ -68,3 +68,5 @@ io/Scene.cc
 media/Medium.h
 materials/Texture.cc
 integrators/Integrator.cc
+io/ObjLoader.cc
+cameras/Camera.cc

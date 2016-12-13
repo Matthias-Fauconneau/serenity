@@ -22,7 +22,6 @@
 
 #include "materials/ConstantTexture.h"
 #include "materials/CheckerTexture.h"
-#include "materials/BladeTexture.h"
 #include "materials/DiskTexture.h"
 #include "materials/IesTexture.h"
 
@@ -252,7 +251,7 @@ std::shared_ptr<Camera> Scene::instantiateCamera(std::string type, const rapidjs
     return result;
 }
 
-std::shared_ptr<Integrator> Scene::instantiateIntegrator(std::string type, const rapidjson::Value &value) const
+std::shared_ptr<Integrator> Scene::instantiateIntegrator(std::string, const rapidjson::Value &value) const
 {
     std::shared_ptr<Integrator> result = std::make_shared<PathTraceIntegrator>();
     result->fromJson(value, *this);
@@ -270,8 +269,6 @@ std::shared_ptr<Texture> Scene::instantiateTexture(std::string type, const rapid
         result = std::make_shared<CheckerTexture>();
     else if (type == "disk")
         result = std::make_shared<DiskTexture>();
-    else if (type == "blade")
-        result = std::make_shared<BladeTexture>();
     else if (type == "ies")
         return _textureCache->fetchIesTexture(value, this);
     else {
@@ -343,7 +340,7 @@ std::shared_ptr<Bsdf> Scene::fetchBsdf(const rapidjson::Value &v) const
             std::placeholders::_1, std::placeholders::_2));
     if (!result)
         return _errorBsdf;
-    return std::move(result);
+    return result;
 }
 
 std::shared_ptr<Texture> Scene::fetchTexture(const rapidjson::Value &v, TexelConversion conversion) const
@@ -391,7 +388,7 @@ PathPtr Scene::fetchResource(const std::string &path) const
 
         _resources.insert(std::make_pair(key, resource));
 
-        return std::move(resource);
+        return resource;
     } else {
         return iter->second;
     }
