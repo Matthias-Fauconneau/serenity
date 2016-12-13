@@ -34,12 +34,12 @@ public:
     {
         float u = (AzimuthalResolution - 1)*phi*INV_TWO_PI;
         float v = (AzimuthalResolution - 1)*cosThetaD;
-        int x0 = clamp(int(u), 0, AzimuthalResolution - 2);
-        int y0 = clamp(int(v), 0, AzimuthalResolution - 2);
+        int x0 = clamp(0, int(u), AzimuthalResolution - 2);
+        int y0 = clamp(0, int(v), AzimuthalResolution - 2);
         int x1 = x0 + 1;
         int y1 = y0 + 1;
-        u = clamp(u - x0, 0.0f, 1.0f);
-        v = clamp(v - y0, 0.0f, 1.0f);
+        u = clamp(0.0f, u - x0, 1.0f);
+        v = clamp(0.0f, v - y0, 1.0f);
 
         return (_table[x0 + y0*AzimuthalResolution]*(1.0f - u) + _table[x1 + y0*AzimuthalResolution]*u)*(1.0f - v) +
                (_table[x0 + y1*AzimuthalResolution]*(1.0f - u) + _table[x1 + y1*AzimuthalResolution]*u)*v;

@@ -1,7 +1,5 @@
 #include <ft2build.h>
 #include <freetype/freetype.h> //freetype
-//include <freetype/ftlcdfil.h> //z
-
 #include "font.h"
 #include "file.h"
 #include "math.h"

@@ -17,9 +17,9 @@ RoughWireBcsdf::RoughWireBcsdf()
 
 void RoughWireBcsdf::lookupMaterial()
 {
-    if (!ComplexIorList::lookup(_materialName, _eta, _k)) {
+    if (!lookup(_materialName, _eta, _k)) {
         DBG("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
-        ComplexIorList::lookup("Cu", _eta, _k);
+        lookup("Cu", _eta, _k);
     }
 }
 
@@ -124,7 +124,7 @@ Vec3f RoughWireBcsdf::eval(const SurfaceScatterEvent &event) const
     float cosThetaO = trigInverse(sinThetaO);
     float cosPhi = event.wo.z()/std::sqrt(event.wo.x()*event.wo.x() + event.wo.z()*event.wo.z());
 
-    Vec3f attenuation = albedo(event.info)*Fresnel::conductorReflectance(_eta, _k, trigHalfAngle(event.wi.dot(event.wo)));
+    Vec3f attenuation = albedo(event.info)*conductorReflectance(_eta, _k, trigHalfAngle(event.wi.dot(event.wo)));
 
     return attenuation*N(cosPhi)*M(_v, sinThetaI, sinThetaO, cosThetaI, cosThetaO);
 }
@@ -148,7 +148,7 @@ bool RoughWireBcsdf::sample(SurfaceScatterEvent &event) const
 
     event.wo = Vec3f(sinPhi*cosThetaO, sinThetaO, cosPhi*cosThetaO);
     event.pdf = N(cosPhi)*M(_v, sinThetaI, sinThetaO, cosThetaI, cosThetaO);
-    event.weight = albedo(event.info)*Fresnel::conductorReflectance(_eta, _k, trigHalfAngle(event.wi.dot(event.wo)));
+    event.weight = albedo(event.info)*conductorReflectance(_eta, _k, trigHalfAngle(event.wi.dot(event.wo)));
     event.sampledLobe = BsdfLobes::GlossyLobe;
 
     return true;

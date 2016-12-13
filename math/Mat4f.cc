@@ -1,5 +1,4 @@
 #include "Mat4f.h"
-#include "Quaternion.h"
 #include "Angle.h"
 #include <cmath>
 

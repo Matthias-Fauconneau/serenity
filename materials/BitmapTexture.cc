@@ -226,7 +226,7 @@ rapidjson::Value BitmapTexture::toJson(Allocator &allocator) const
             result.add("file", *_path);
         return result;
     } else {
-        return toJson(*_path, allocator);
+        return ::toJson(*_path, allocator);
     }
 }
 
@@ -309,10 +309,10 @@ Vec3f BitmapTexture::operator[](const Vec2f &uv) const
         iv0 = ((iv0 % _h) + _h) % _h;
         iv1 = ((iv1 % _h) + _h) % _h;
     } else {
-        iu0 = clamp(iu0, 0, _w - 1);
-        iu1 = clamp(iu1, 0, _w - 1);
-        iv0 = clamp(iv0, 0, _h - 1);
-        iv1 = clamp(iv1, 0, _h - 1);
+        iu0 = ::clamp(0, iu0, _w - 1);
+        iu1 = ::clamp(0, iu1, _w - 1);
+        iv0 = ::clamp(0, iv0, _h - 1);
+        iv1 = ::clamp(0, iv1, _h - 1);
     }
 
     if (!linear) {

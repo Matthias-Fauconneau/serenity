@@ -23,7 +23,7 @@ inline Vec3f xyzToRgb(Vec3f xyz) {
 static inline Vec3f wavelengthToXyz(float lambda)
 {
     float x = CIE_samples*(lambda - CIE_Min)/(CIE_Max - CIE_Min);
-    int i = clamp(int(x), 0, CIE_samples - 2);
+    int i = clamp(0, int(x), CIE_samples - 2);
     float u = x - i;
     Vec3f xyz0 = Vec3f(CIE_X_entries[i + 0], CIE_Y_entries[i + 0], CIE_Z_entries[i + 0]);
     Vec3f xyz1 = Vec3f(CIE_X_entries[i + 1], CIE_Y_entries[i + 1], CIE_Z_entries[i + 1]);

@@ -1,7 +1,11 @@
 #pragma once
-#include <rapidjson/document.h>
 #include <string>
 #include "Debug.h"
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 struct Scene;
 

@@ -99,9 +99,9 @@ inline float AtmosphericMedium::densityIntegral(float h, float t0, float t1) con
 {
     float s = _effectiveFalloffScale;
     if (t1 == Ray::infinity())
-        return (SQRT_PI*0.5f/s)*std::exp((-h*h + _radius*_radius)*s*s)*Erf::erfc(s*t0);
+        return (SQRT_PI*0.5f/s)*std::exp((-h*h + _radius*_radius)*s*s)*erfc(s*t0);
     else
-        return (SQRT_PI*0.5f/s)*std::exp((-h*h + _radius*_radius)*s*s)*Erf::erfDifference(s*t0, s*t1);
+        return (SQRT_PI*0.5f/s)*std::exp((-h*h + _radius*_radius)*s*s)*erfDifference(s*t0, s*t1);
 }
 
 inline float AtmosphericMedium::inverseOpticalDepth(double h, double t0, double sigmaT, double xi) const
@@ -112,7 +112,7 @@ inline float AtmosphericMedium::inverseOpticalDepth(double h, double t0, double 
     if (inner >= 1.0)
         return Ray::infinity();
     else
-        return Erf::erfInv(inner)/s;
+        return erfInv(inner)/s;
 }
 
 bool AtmosphericMedium::sampleDistance(PathSampleGenerator &sampler, const Ray &ray,

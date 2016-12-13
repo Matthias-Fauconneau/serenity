@@ -84,13 +84,13 @@ float HairBcsdf::Phi(float gammaI, float gammaT, int p)
 // Special case for the R lobe
 float HairBcsdf::NrIntegrand(float beta, float halfWiDotWo, float phi, float h) const
 {
-    float gammaI = std::asin(clamp(h, -1.0f, 1.0f));
+    float gammaI = std::asin(clamp(-1.0f, h, 1.0f));
     float deltaPhi = phi + 2.0f*gammaI;
     deltaPhi = std::fmod(deltaPhi, TWO_PI);
     if (deltaPhi < 0.0f)
         deltaPhi += TWO_PI;
 
-    return D(beta, deltaPhi)*Fresnel::dielectricReflectance(1.0f/Eta, halfWiDotWo);
+    return D(beta, deltaPhi)*dielectricReflectance(1.0f/Eta, halfWiDotWo);
 }
 
 Vec3f HairBcsdf::NpIntegrand(float beta, float cosThetaD, float phi, int p, float h) const
@@ -99,14 +99,14 @@ Vec3f HairBcsdf::NpIntegrand(float beta, float cosThetaD, float phi, int p, floa
     float cosThetaT = std::sqrt(1.0f - (1.0f - cosThetaD*cosThetaD)*sqr(1.0f/Eta));
     Vec3f sigmaAPrime = _sigmaA/cosThetaT;
 
-    float gammaI = std::asin(clamp(h, -1.0f, 1.0f));
-    float gammaT = std::asin(clamp(h/iorPrime, -1.0f, 1.0f));
+    float gammaI = std::asin(clamp(-1.0f, h, 1.0f));
+    float gammaT = std::asin(clamp(-1.0f, h/iorPrime, 1.0f));
     // The correct internal path length (the one in d'Eon et al.'s paper
     // as well as Marschner et al.'s paper is wrong).
     // The correct factor is also mentioned in "Light Scattering from Filaments", eq. (20)
     float l = 2.0f*std::cos(gammaT);
 
-    float f = Fresnel::dielectricReflectance(1.0f/Eta, cosThetaD*trigInverse(h));
+    float f = dielectricReflectance(1.0f/Eta, cosThetaD*trigInverse(h));
     Vec3f T = std::exp(-sigmaAPrime*l);
     Vec3f Aph = (1.0f - f)*(1.0f - f)*T;
     for (int i = 1; i < p; ++i)
@@ -182,8 +182,8 @@ Vec3f HairBcsdf::eval(const SurfaceScatterEvent &event) const
     float sinThetaI = event.wi.y();
     float sinThetaO = event.wo.y();
     float cosThetaO = trigInverse(sinThetaO);
-    float thetaI = std::asin(clamp(sinThetaI, -1.0f, 1.0f));
-    float thetaO = std::asin(clamp(sinThetaO, -1.0f, 1.0f));
+    float thetaI = std::asin(clamp(-1.0f, sinThetaI, 1.0f));
+    float thetaO = std::asin(clamp(-1.0f, sinThetaO, 1.0f));
     float thetaD = (thetaO - thetaI)*0.5f;
     float cosThetaD = std::cos(thetaD);
 
@@ -219,7 +219,7 @@ bool HairBcsdf::sample(SurfaceScatterEvent &event) const
 
     float sinThetaI = event.wi.y();
     float cosThetaI = trigInverse(sinThetaI);
-    float thetaI = std::asin(clamp(sinThetaI, -1.0f, 1.0f));
+    float thetaI = std::asin(clamp(-1.0f, sinThetaI, 1.0f));
 
     float thetaIR   = thetaI - 2.0f*_scaleAngleRad;
     float thetaITT  = thetaI +      _scaleAngleRad;
@@ -253,7 +253,7 @@ bool HairBcsdf::sample(SurfaceScatterEvent &event) const
     float sinThetaO = sampleM(v, std::sin(theta), std::cos(theta), xiM.x(), xiM.y());
     float cosThetaO = trigInverse(sinThetaO);
 
-    float thetaO = std::asin(clamp(sinThetaO, -1.0f, 1.0f));
+    float thetaO = std::asin(clamp(-1.0f, sinThetaO, 1.0f));
     float thetaD = (thetaO - thetaI)*0.5f;
     float cosThetaD = std::cos(thetaD);
 
@@ -280,8 +280,8 @@ float HairBcsdf::pdf(const SurfaceScatterEvent &event) const
     float sinThetaO = event.wo.y();
     float cosThetaI = trigInverse(sinThetaI);
     float cosThetaO = trigInverse(sinThetaO);
-    float thetaI = std::asin(clamp(sinThetaI, -1.0f, 1.0f));
-    float thetaO = std::asin(clamp(sinThetaO, -1.0f, 1.0f));
+    float thetaI = std::asin(clamp(-1.0f, sinThetaI, 1.0f));
+    float thetaO = std::asin(clamp(-1.0f, sinThetaO, 1.0f));
     float thetaD = (thetaO - thetaI)*0.5f;
     float cosThetaD = std::cos(thetaD);
 
@@ -367,8 +367,8 @@ void HairBcsdf::precomputeAzimuthalDistributions()
         std::array<float, NumPoints> fresnelTerms, gammaTs;
         std::array<Vec3f, NumPoints> absorptions;
         for (int i = 0; i < NumPoints; ++i) {
-            gammaTs[i] = std::asin(clamp(points[i]/iorPrime, -1.0f, 1.0f));
-            fresnelTerms[i] = Fresnel::dielectricReflectance(1.0f/Eta, cosHalfAngle*std::cos(gammaIs[i]));
+            gammaTs[i] = std::asin(clamp(-1.0f, points[i]/iorPrime, 1.0f));
+            fresnelTerms[i] = dielectricReflectance(1.0f/Eta, cosHalfAngle*std::cos(gammaIs[i]));
             absorptions[i] = std::exp(-sigmaAPrime*2.0f*std::cos(gammaTs[i]));
         }
 

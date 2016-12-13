@@ -236,13 +236,13 @@ Path Path::absolute() const
 Path Path::normalizeSeparators() const
 {
     Path path(*this);
-    return std::move(path);
+    return path;
 }
 
 Path Path::nativeSeparators() const
 {
     Path path(*this);
-    return std::move(path);
+    return path;
 }
 
 Path Path::ensureSeparator() const
@@ -250,7 +250,7 @@ Path Path::ensureSeparator() const
     Path result(*this);
     if (!_path.empty() && !isSeparator(_path.back()))
         result._path += '/';
-    return std::move(result);
+    return result;
 }
 
 Path Path::stripSeparator() const
@@ -258,11 +258,11 @@ Path Path::stripSeparator() const
     Path result(*this);
 
     if (size() == 1 && isSeparator(_path[0]))
-        return std::move(result);
+        return (result);
     if (!empty() && isSeparator(_path.back()))
         result._path.pop_back();
 
-    return std::move(result);
+    return (result);
 }
 
 Path Path::normalize() const
@@ -370,7 +370,7 @@ Path Path::operator+(const std::string &o) const
     Path copy(*this);
     copy += o;
 
-    return std::move(copy);
+    return (copy);
 }
 
 Path Path::operator/(const char *o) const
@@ -383,7 +383,7 @@ Path Path::operator+(const char *o) const
     Path copy(*this);
     copy += o;
 
-    return std::move(copy);
+    return (copy);
 }
 
 bool Path::operator==(const Path &o) const
@@ -426,4 +426,3 @@ RecursiveIterable Path::recursive() const
     return RecursiveIterable(*this);
 }
 
-}

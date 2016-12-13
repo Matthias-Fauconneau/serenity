@@ -13,7 +13,7 @@ class BinnedSahSplitter
 
     int primitiveBin(const Primitive &prim, int dim) const
     {
-        return clamp(int(BinCount*((prim.centroid()[dim] - _centroidMin[dim])/_centroidSpan[dim])), 0, BinCount - 1);
+        return clamp(0, int(BinCount*((prim.centroid()[dim] - _centroidMin[dim])/_centroidSpan[dim])), BinCount - 1);
     }
 
     void binPrimitives(uint32 start, uint32 end, int dim, PrimVector &prims)

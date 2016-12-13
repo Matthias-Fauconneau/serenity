@@ -2,22 +2,20 @@
 #include "FileStreambuf.h"
 #include "UnicodeUtils.h"
 #include "Path.h"
-
 #include "Debug.h"
-
-#include <rapidjson/prettywriter.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <libgen.h>
-
 #include <fstream>
 #include <cstring>
 #include <cstdio>
 #include <memory>
 #include <locale>
+#undef Type
+#include <rapidjson/prettywriter.h>
 
 static Path getNativeCurrentDir();
 
@@ -144,7 +142,7 @@ OutputStreamHandle FileUtils::openFileOutputStream(const Path &p)
 
     _metaData.insert(std::make_pair(out.get(), StreamMetadata()));
 
-    return std::move(out);
+    return (out);
 }
 
 bool FileUtils::execStat(const Path &p, StatStruct &dst)
@@ -229,7 +227,7 @@ std::string FileUtils::loadText(const Path &path)
         text[i] = head[sizeof(head) - offset + i];
     in->read(&text[offset], size);
 
-    return std::move(text);
+    return (text);
 }
 
 bool FileUtils::writeJson(const rapidjson::Document &document, const Path &p)
@@ -291,7 +289,7 @@ InputStreamHandle FileUtils::openInputStream(const Path &p)
 
         if (!in->good())
             return nullptr;
-        return std::move(in);
+        return (in);
     }
 
     return nullptr;
@@ -314,7 +312,7 @@ OutputStreamHandle FileUtils::openOutputStream(const Path &p)
         iter->second.targetPath = p;
     }
 
-    return std::move(out);
+    return (out);
 }
 
 std::shared_ptr<OpenDir> FileUtils::openDirectory(const Path &p)

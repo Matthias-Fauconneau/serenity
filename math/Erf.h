@@ -173,35 +173,35 @@ static inline double erfInv(double z)
     double result = 0.0;
     if (p <= 0.5) {
         double g = p*(p + 10.0);
-        double r = Polynomial::eval<8>(p, Data::P1)/Polynomial::eval<10>(p, Data::Q1);
-        result = g*Data::Y1 + g*r;
+        double r = eval<8>(p, P1)/eval<10>(p, Q1);
+        result = g*Y1 + g*r;
     } else if (q >= 0.25) {
         double g = std::sqrt(-2.0*std::log(q));
         double xs = q - 0.25;
-        double r = Polynomial::eval<9>(xs, Data::P2)/Polynomial::eval<9>(xs, Data::Q2);
-        result = g/(Data::Y2 + r);
+        double r = eval<9>(xs, P2)/eval<9>(xs, Q2);
+        result = g/(Y2 + r);
     } else {
         double x = std::sqrt(-std::log(q));
         if (x < 3.0) {
             double xs = x - 1.125;
-            double R = Polynomial::eval<11>(xs, Data::P3)/Polynomial::eval<8>(xs, Data::Q3);
-            result = Data::Y3*x + R*x;
+            double R = eval<11>(xs, P3)/eval<8>(xs, Q3);
+            result = Y3*x + R*x;
         } else if (x < 6.0) {
             double xs = x - 3;
-            double R = Polynomial::eval<9>(xs, Data::P4)/Polynomial::eval<7>(xs, Data::Q4);
-            result = Data::Y4*x + R*x;
+            double R = eval<9>(xs, P4)/eval<7>(xs, Q4);
+            result = Y4*x + R*x;
         } else if (x < 18.0) {
             double xs = x - 6.0;
-            double R = Polynomial::eval<9>(xs, Data::P5)/Polynomial::eval<7>(xs, Data::Q5);
-            result = Data::Y5*x + R*x;
+            double R = eval<9>(xs, P5)/eval<7>(xs, Q5);
+            result = Y5*x + R*x;
         } else if (x < 44.0) {
             double xs = x - 18.0;
-            double R = Polynomial::eval<8>(xs, Data::P6)/Polynomial::eval<7>(xs, Data::Q6);
-            result = Data::Y6*x + R*x;
+            double R = eval<8>(xs, P6)/eval<7>(xs, Q6);
+            result = Y6*x + R*x;
         } else {
             double xs = x - 44.0;
-            double R = Polynomial::eval<8>(xs, Data::P7)/Polynomial::eval<7>(xs, Data::Q7);
-            result = Data::Y7*x + R*x;
+            double R = eval<8>(xs, P7)/eval<7>(xs, Q7);
+            result = Y7*x + R*x;
         }
     }
     return s*result;

@@ -30,18 +30,6 @@ struct PathTraceIntegrator : public Integrator
     std::vector<SampleRecord> _samples;
     std::vector<ImageTile> _tiles;
 
-    void diceTiles();
-
-    float errorPercentile95();
-    void dilateAdaptiveWeights();
-    void distributeAdaptiveSamples(int spp);
-    bool generateWork();
-
-    void renderTile(uint32 id, uint32 tileId);
-
-    virtual void saveState(OutputStreamHandle &out) override;
-    virtual void loadState(InputStreamHandle &in) override;
-
 public:
     PathTraceIntegrator();
 
@@ -50,10 +38,6 @@ public:
 
     virtual void prepareForRender(TraceableScene &scene, uint32 seed) override;
     virtual void teardownAfterRender() override;
-
-    virtual void startRender(std::function<void()> completionCallback) override;
-    virtual void waitForCompletion() override;
-    virtual void abortRender() override;
     
     const PathTracerSettings &settings() const
     {

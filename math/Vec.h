@@ -1,10 +1,14 @@
 #pragma once
 #include "math/BitManip.h"
-#include <rapidjson/document.h>
 #include <type_traits>
 #include <ostream>
 #include <array>
 #include <cmath>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 template<typename ElementType, unsigned Size>
 class Vec {
@@ -644,4 +648,31 @@ bool isnan(const Vec<ElementType, Size> &t)
     return false;
 }
 
+}
+
+template<typename ElementType, unsigned Size>
+Vec<ElementType, Size> min(const Vec<ElementType, Size> &a, const Vec<ElementType, Size> &b)
+{
+    Vec<ElementType, Size> result(a);
+    for (unsigned i = 0; i < Size; ++i)
+        if (b.data()[i] < a.data()[i])
+            result.data()[i] = b.data()[i];
+    return result;
+}
+
+template<typename ElementType, unsigned Size>
+Vec<ElementType, Size> max(const Vec<ElementType, Size> &a, const Vec<ElementType, Size> &b)
+{
+    Vec<ElementType, Size> result(a);
+    for (unsigned i = 0; i < Size; ++i)
+        if (b.data()[i] > a.data()[i])
+            result.data()[i] = b.data()[i];
+    return result;
+}
+
+template<typename ElementType, unsigned Size>
+Vec<ElementType, Size> clamp(const Vec<ElementType, Size>& min, const Vec<ElementType, Size>& x, const Vec<ElementType, Size>& max) {
+    Vec<ElementType, Size> result(x);
+    for (unsigned i = 0; i < Size; ++i) result.data()[i] = clamp(min.data()[i], x.data()[i], max.data()[i]);
+    return result;
 }

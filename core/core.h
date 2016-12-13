@@ -12,7 +12,7 @@
 #define unused __attribute((unused))
 #define packed __attribute((packed))
 #define Type typename
-#define generic template<Type T>
+#define generic template<typename T>
 #define abstract =0
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
 #define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
@@ -76,7 +76,8 @@ template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
 generic inline constexpr T min(T a, T b) { return a<b ? a : b; }
 generic inline constexpr T max(T a, T b) { return a>b ? a : b; }
-generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+//generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+generic  T clamp(T min, T x, T max) { return ::min(::max(min, x), max); }
 generic T abs(T x) { return x>=0 ? x : -x; }
 inline uint log2(uint v) { uint r=0; while(v >>= 1) r++; return r; }
 
@@ -211,11 +212,11 @@ template<> void __attribute((noreturn)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })
+#undef assert
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) assert_(expr, ## message)
 #else
-#undef assert
 #define assert(expr, message...) ({})
 #endif
 
@@ -236,10 +237,7 @@ generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); retur
 // -- mref
 
 /// Initializes memory using a constructor (placement new)
-#ifndef _LIBCPP_NEW
-inline void* operator new(size_t, void* p) noexcept { return p; }
-inline void operator delete(void*, void*) noexcept {}
-#endif
+#include <new>
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {

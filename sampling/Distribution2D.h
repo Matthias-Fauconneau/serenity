@@ -60,19 +60,19 @@ public:
     void warp(Vec2f &uv, int &row, int &column) const
     {
         row = int(std::distance(_marginalCdf.begin(), std::upper_bound(_marginalCdf.begin(), _marginalCdf.end(), uv.y())) - 1);
-        uv.y() = clamp((uv.y() - _marginalCdf[row])/_marginalPdf[row], 0.0f, 1.0f);
+        uv.y() = clamp(0.0f, (uv.y() - _marginalCdf[row])/_marginalPdf[row], 1.0f);
         auto rowStart = _cdf.begin() + row*(_w + 1);
         auto rowEnd = rowStart + (_w + 1);
         column = int(std::distance(rowStart, std::upper_bound(rowStart, rowEnd, uv.x())) - 1);
         int idxC = row*(_w + 1) + column;
         int idxP = row*_w + column;
-        uv.x() = clamp((uv.x() - _cdf[idxC])/_pdf[idxP], 0.0f, 1.0f);
+        uv.x() = clamp(0.0f, (uv.x() - _cdf[idxC])/_pdf[idxP], 1.0f);
     }
 
     float pdf(int row, int column) const
     {
-        row    = clamp(row,    0, _h - 1);
-        column = clamp(column, 0, _w - 1);
+        row    = clamp(   0, row, _h - 1);
+        column = clamp(0, column, _w - 1);
         return _pdf[row*_w + column]*_marginalPdf[row];
     }
 };

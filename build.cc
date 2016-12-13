@@ -48,16 +48,30 @@ int64 Build::parse(string fileName) {
     for(;;) {
         s.whileAny(" \t\r\n");
         if(s.match("//")) { s.line(); continue; }
-        String name = tryParseIncludes(s, fileName);
-        if(!name) { /*log(s.line()+"\n");*/ break; }
-        String module = find(name+".h") ? find(name+".h") : find(name+".cc");
-        assert_(module, "No such module", name, "imported from", fileName);
-
-        if(existsFile(module+".h")) {
-            assert_(String(module+".h") != fileName);
-            lastEdit = max(lastEdit, parse(module+".h"));
-        }
-        if(existsFile(module+".cc", folder) && !modules.contains(module)) units.add(::move(module));
+        if(s.match("#include \"")) { // module header
+            string name = s.until('.');
+            if(!s.match("h\"\n")) error(fileName, "Expected '"+escape("h\"\n")+"', got '"+escape(s.peek("h\"\n"_.size))+'\'', s.line());
+            String module = find(name+".h") ? find(name+".h") : find(name+".cc");
+            assert_(module, "No such module", name, "imported from", fileName);
+            if(existsFile(module+".h")) {
+                assert_(String(module+".h") != fileName);
+                lastEdit = max(lastEdit, parse(module+".h"));
+            }
+            if(existsFile(module+".cc", folder) && !modules.contains(module)) units.add(::move(module));
+        } else if(s.match("#include <")) { // library header
+            s.whileNo(">\n");
+            if(!s.match('>')) error(fileName+':'+str(s.lineIndex)+':', "Expected '>', got '"_+s.peek()+'\'');
+            s.whileAny(' ');
+            if(s.match("//")) {
+                for(;;) {
+                    s.whileAny(' ');
+                    string library=s.identifier("_-");
+                    if(!library) break;
+                    if(!libraries.contains(library)) libraries.append(copyRef(library));
+                }
+                assert_(s.wouldMatch('\n'));
+            }
+        } else break;
     }
     this->lastEdit.insert(copyRef(fileName), lastEdit);
     if(time.seconds()>0.5) log(str(fileName,time)+'\n');
@@ -72,7 +86,7 @@ bool Build::compileModule(string target) {
     if(!lastEdit) return false;
     String object = tmp+"/"+join(flags,string("-"_))+"/"+target+".o";
     if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
-        while(jobs.size>=1) { // Waits for a job to finish before launching a new unit
+        while(jobs.size>=8) { // Waits for a job to finish before launching a new unit
             int pid = wait(); // Waits for any child to terminate
             int status = wait(pid);
             Job job = jobs.take(jobs.indexOf(pid));

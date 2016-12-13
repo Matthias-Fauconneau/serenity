@@ -114,7 +114,7 @@ void VdbGrid::generateSuperGrid()
         float muMax = minMax.y();
         float muAvg = iter->x()*normalize;
         float muR = muMax - muMin;
-        float muC = clamp(muMin + muR*(std::pow(Gamma, 1.0f/(D*muR)) - 1.0f), muMin, muAvg);
+        float muC = clamp(muMin, muMin + muR*(std::pow(Gamma, 1.0f/(D*muR)) - 1.0f), muAvg);
         iter.setValue(openvdb::Vec2s(muC, 0.0f));
     }
 

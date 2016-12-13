@@ -8,10 +8,14 @@
 #include "math/Vec.h"
 #include "io/JsonSerializable.h"
 #include "io/Path.h"
-#include <rapidjson/document.h>
 #include <vector>
 #include <memory>
 #include "matrix.h"
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 class Ray;
 struct Scene;

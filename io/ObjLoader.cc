@@ -4,7 +4,6 @@
 #include "Scene.h"
 #include "primitives/TriangleMesh.h"
 #include "primitives/Sphere.h"
-#include "primitives/Curves.h"
 #include "primitives/Cube.h"
 #include "primitives/Quad.h"
 #include "primitives/Disk.h"
@@ -498,7 +497,8 @@ std::shared_ptr<Primitive> ObjLoader::finalizeMesh()
         std::vector<uint32> curveEnds;
         std::vector<Vec4f> nodeData;
         finalizeCurveData(curveEnds, nodeData);
-        prim = std::make_shared<Curves>(std::move(curveEnds), std::move(nodeData), bsdf, name);
+        //prim = std::make_shared<Curves>(std::move(curveEnds), std::move(nodeData), bsdf, name);
+        error("Curves");
     } else if (!prim) {
         prim = std::make_shared<TriangleMesh>(std::move(_verts), std::move(_tris), bsdf, name, _meshSmoothed, false);
     }

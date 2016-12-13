@@ -1,10 +1,10 @@
 #include "JsonUtils.h"
 #include "Path.h"
-
-#include <rapidjson/prettywriter.h>
 #include <sstream>
 #include <cstdlib>
 #include <cstdio>
+#undef Type
+#include <rapidjson/prettywriter.h>
 
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name)
 {

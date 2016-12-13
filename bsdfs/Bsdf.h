@@ -8,8 +8,12 @@
 #include "math/Vec.h"
 #include "io/JsonSerializable.h"
 #include "io/JsonUtils.h"
-#include <rapidjson/document.h>
 #include <memory>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 class Medium;
 

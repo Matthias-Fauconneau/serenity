@@ -58,10 +58,10 @@ bool ThinSheetBsdf::sample(SurfaceScatterEvent &event) const
 
     float cosThetaT;
     if (_enableInterference) {
-        event.weight = Fresnel::thinFilmReflectanceInterference(1.0f/_ior,
+        event.weight = thinFilmReflectanceInterference(1.0f/_ior,
                 std::abs(event.wi.z()), thickness*500.0f, cosThetaT);
     } else {
-        event.weight = Vec3f(Fresnel::thinFilmReflectance(1.0f/_ior,
+        event.weight = Vec3f(thinFilmReflectance(1.0f/_ior,
                 std::abs(event.wi.z()), cosThetaT));
     }
 
@@ -84,10 +84,10 @@ Vec3f ThinSheetBsdf::eval(const SurfaceScatterEvent &event) const
     float cosThetaT;
     Vec3f transmittance;
     if (_enableInterference) {
-        transmittance = 1.0f - Fresnel::thinFilmReflectanceInterference(1.0f/_ior,
+        transmittance = 1.0f - thinFilmReflectanceInterference(1.0f/_ior,
                 std::abs(event.wi.z()), thickness*500.0f, cosThetaT);
     } else {
-        transmittance = Vec3f(1.0f - Fresnel::thinFilmReflectance(1.0f/_ior, std::abs(event.wi.z()), cosThetaT));
+        transmittance = Vec3f(1.0f - thinFilmReflectance(1.0f/_ior, std::abs(event.wi.z()), cosThetaT));
     }
 
     if (_sigmaA != 0.0f && cosThetaT > 0.0f)

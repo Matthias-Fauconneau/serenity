@@ -117,7 +117,7 @@ void Sphere::intersectionInfo(const IntersectionTemporary &/*data*/, Intersectio
 {
     info.Ns = info.Ng = (info.p - _pos)/_radius;
     Vec3f localN = _invRot.transformVector(info.Ng);
-    info.uv = Vec2f(std::atan2(localN.y(), localN.x())*INV_TWO_PI + 0.5f, std::acos(clamp(localN.z(), -1.0f, 1.0f))*INV_PI);
+    info.uv = Vec2f(std::atan2(localN.y(), localN.x())*INV_TWO_PI + 0.5f, std::acos(clamp(-1.0f, localN.z(), 1.0f))*INV_PI);
     if (std::isnan(info.uv.x()))
         info.uv.x() = 0.0f;
     info.primitive = this;
@@ -148,7 +148,7 @@ bool Sphere::samplePosition(PathSampleGenerator &sampler, PositionSample &sample
     sample.Ng = _rot*localN;
     sample.p = sample.Ng*_radius + _pos;
     sample.pdf = _invArea;
-    sample.uv = Vec2f(xi.x() + 0.5f, std::acos(clamp(xi.y()*2.0f - 1.0f, -1.0f, 1.0f))*INV_PI);
+    sample.uv = Vec2f(xi.x() + 0.5f, std::acos(clamp(-1.0f, xi.y()*2.0f - 1.0f, 1.0f))*INV_PI);
     if (sample.uv.x() > 1.0f)
         sample.uv.x() -= 1.0f;
     sample.weight = PI*_area*(*_emission)[sample.uv];

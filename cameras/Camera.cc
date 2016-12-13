@@ -71,7 +71,6 @@ rapidjson::Value Camera::toJson(Allocator &allocator) const
     JsonObject result{JsonSerializable::toJson(allocator), allocator,
         "tonemap", _tonemapString,
         "resolution", _res,
-        "reconstruction_filter", _filter.name(),
         "transform", JsonObject{allocator,
             "position", _pos,
             "look_at", _lookAt,
@@ -129,8 +128,6 @@ void Camera::teardownAfterRender()
         _normalBuffer.reset();
         _albedoBuffer.reset();
     _visibilityBuffer.reset();
-
-    _splatBuffer.reset();
 }
 
 void Camera::requestOutputBuffers(const std::vector<OutputBufferSettings> &settings)
@@ -152,20 +149,6 @@ void Camera::requestColorBuffer()
     if (!_colorBuffer)
         _colorBuffer.reset(new OutputBufferVec3f(_res, _colorBufferSettings));
     _colorBufferWeight = 1.0;
-}
-
-void Camera::requestSplatBuffer()
-{
-    _splatBuffer.reset(new AtomicFramebuffer(_res.x(), _res.y(), _filter));
-    _splatWeight = 1.0;
-}
-
-void Camera::blitSplatBuffer()
-{
-    for (uint32 y = 0; y < _res.y(); ++y)
-        for (uint32 x = 0; x < _res.x(); ++x)
-            _colorBuffer->addSample(Vec2u(x, y), _splatBuffer->get(x, y));
-    _splatBuffer->unsafeReset();
 }
 
 void Camera::setTransform(const Vec3f &pos, const Vec3f &lookAt, const Vec3f &up)

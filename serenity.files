@@ -326,3 +326,4 @@ prerender.cc
 scene.cc
 test.cc
 view.cc
+core/algorithm.h

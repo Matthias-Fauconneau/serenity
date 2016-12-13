@@ -1,6 +1,6 @@
 #pragma once
+#include "core.h"
 #include "Path.h"
-#include <rapidjson/document.h>
 #include <unordered_map>
 #include <functional>
 #include <streambuf>
@@ -8,6 +8,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 class ZipReader;
 class Path;

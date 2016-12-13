@@ -8,6 +8,8 @@
 #include "math/Angle.h"
 #include "math/Vec.h"
 #include "io/JsonObject.h"
+#undef Type
+#undef unused
 #include <rapidjson/document.h>
 
 ConductorBsdf::ConductorBsdf()
@@ -20,9 +22,9 @@ ConductorBsdf::ConductorBsdf()
 
 void ConductorBsdf::lookupMaterial()
 {
-    if (!ComplexIorList::lookup(_materialName, _eta, _k)) {
+    if (!lookup(_materialName, _eta, _k)) {
         DBG("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
-        ComplexIorList::lookup("Cu", _eta, _k);
+        lookup("Cu", _eta, _k);
     }
 }
 
@@ -55,7 +57,7 @@ bool ConductorBsdf::sample(SurfaceScatterEvent &event) const
 
     event.wo = Vec3f(-event.wi.x(), -event.wi.y(), event.wi.z());
     event.pdf = 1.0f;
-    event.weight = albedo(event.info)*Fresnel::conductorReflectance(_eta, _k, event.wi.z());
+    event.weight = albedo(event.info)*conductorReflectance(_eta, _k, event.wi.z());
     event.sampledLobe = BsdfLobes::SpecularReflectionLobe;
     return true;
 }
@@ -64,7 +66,7 @@ Vec3f ConductorBsdf::eval(const SurfaceScatterEvent &event) const
 {
     bool evalR = event.requestedLobe.test(BsdfLobes::SpecularReflectionLobe);
     if (evalR && checkReflectionConstraint(event.wi, event.wo))
-        return albedo(event.info)*Fresnel::conductorReflectance(_eta, _k, event.wi.z());
+        return albedo(event.info)*conductorReflectance(_eta, _k, event.wi.z());
     else
         return Vec3f(0.0f);
 }

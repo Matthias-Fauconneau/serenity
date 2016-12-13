@@ -148,7 +148,7 @@ rapidjson::Value TriangleMesh::toJson(Allocator &allocator) const
 
 void TriangleMesh::loadResources()
 {
-    if (_path && !MeshIO::load(*_path, _verts, _tris))
+    if (_path && !load(*_path, _verts, _tris))
         DBG("Unable to load triangle mesh at %s", *_path);
     if (_recomputeNormals && _smoothed)
         calcSmoothVertexNormals();
@@ -162,7 +162,7 @@ void TriangleMesh::saveResources()
 
 void TriangleMesh::saveAs(const Path &path) const
 {
-    MeshIO::save(path, _verts, _tris);
+    save(path, _verts, _tris);
 }
 
 void TriangleMesh::calcSmoothVertexNormals()
@@ -511,7 +511,7 @@ void TriangleMesh::prepareForRender()
 
     for (size_t i = 0; i < _tris.size(); ++i) {
         const TriangleI &t = _tris[i];
-        _tris[i].material = clamp(_tris[i].material, 0, int(_bsdfs.size()) - 1);
+        _tris[i].material = clamp(0, _tris[i].material, int(_bsdfs.size()) - 1);
         ts[i] = Vec3u(t.v0, t.v1, t.v2);
     }
 

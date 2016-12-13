@@ -1,10 +1,15 @@
+#pragma once
 #include "ImageIO.h"
-#include <rapidjson/document.h>
 #include <functional>
 #include <utility>
 #include <memory>
 #include <string>
 #include <set>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 class BitmapTexture;
 class IesTexture;

@@ -1,5 +1,4 @@
 #pragma once
-#include <rapidjson/document.h>
 #include <unordered_set>
 #include <unordered_map>
 #include <memory>
@@ -19,6 +18,11 @@
 #include "media/Medium.h"
 #include "grids/Grid.h"
 #include "bsdfs/Bsdf.h"
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 struct Scene : public JsonSerializable {
     Path _srcDir;
@@ -47,8 +51,22 @@ struct Scene : public JsonSerializable {
     std::shared_ptr<Integrator>    instantiateIntegrator(std::string type, const rapidjson::Value &value) const;
     std::shared_ptr<Texture>       instantiateTexture   (std::string type, const rapidjson::Value &value, TexelConversion conversion) const;
 
+    /*template<typename Instantiator, typename Element>
+    void loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result);*/
+
     template<typename Instantiator, typename Element>
-    void loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result);
+    void loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result)
+    {
+        for (unsigned i = 0; i < container.Size(); ++i) {
+            if (container[i].IsObject()) {
+                auto element = instantiator(as<std::string>(container[i], "type"), container[i]);
+                if (element)
+                    result.push_back(std::move(element));
+            } else {
+                DBG("Don't know what to do with non-object in object list");
+            }
+        }
+    }
 
     template<typename T>
     std::shared_ptr<T> findObject(const std::vector<std::shared_ptr<T>> &list, std::string name) const;

@@ -3,8 +3,12 @@
 #include "Debug.h"
 #include "math/Mat4f.h"
 #include "math/Vec.h"
-#include <rapidjson/document.h>
 #include <string>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
+#define Type typename
+#define unused __attribute((unused))
 
 class Path;
 

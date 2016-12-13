@@ -48,7 +48,7 @@ bool SmoothCoatBsdf::sample(SurfaceScatterEvent &event) const
     float eta = 1.0f/_ior;
 
     float cosThetaTi;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
+    float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
 
     float substrateWeight = _avgTransmittance*(1.0f - Fi);
     float specularWeight = Fi;
@@ -77,7 +77,7 @@ bool SmoothCoatBsdf::sample(SurfaceScatterEvent &event) const
             return false;
 
         float cosThetaTo;
-        float Fo = Fresnel::dielectricReflectance(_ior, event.wo.z(), cosThetaTo);
+        float Fo = dielectricReflectance(_ior, event.wo.z(), cosThetaTo);
         if (Fo == 1.0f)
             return false;
         float cosThetaSubstrate = event.wo.z();
@@ -107,8 +107,8 @@ Vec3f SmoothCoatBsdf::eval(const SurfaceScatterEvent &event) const
     float eta = 1.0f/_ior;
 
     float cosThetaTi, cosThetaTo;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
-    float Fo = Fresnel::dielectricReflectance(eta, wo.z(), cosThetaTo);
+    float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
+    float Fo = dielectricReflectance(eta, wo.z(), cosThetaTo);
 
     if (evalR && checkReflectionConstraint(event.wi, event.wo)) {
         return Vec3f(Fi);
@@ -142,8 +142,8 @@ float SmoothCoatBsdf::pdf(const SurfaceScatterEvent &event) const
     float eta = 1.0f/_ior;
 
     float cosThetaTi, cosThetaTo;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
-    Fresnel::dielectricReflectance(eta, wo.z(), cosThetaTo);
+    float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
+    dielectricReflectance(eta, wo.z(), cosThetaTo);
 
     Vec3f wiSubstrate(wi.x()*eta, wi.y()*eta, std::copysign(cosThetaTi, wi.z()));
     Vec3f woSubstrate(wo.x()*eta, wo.y()*eta, std::copysign(cosThetaTo, wo.z()));

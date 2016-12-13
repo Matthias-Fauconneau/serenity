@@ -19,9 +19,9 @@ RoughConductorBsdf::RoughConductorBsdf()
 
 void RoughConductorBsdf::lookupMaterial()
 {
-    if (!ComplexIorList::lookup(_materialName, _eta, _k)) {
+    if (!lookup(_materialName, _eta, _k)) {
         DBG("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
-        ComplexIorList::lookup("Cu", _eta, _k);
+        lookup("Cu", _eta, _k);
     }
 }
 
@@ -79,7 +79,7 @@ bool RoughConductorBsdf::sample(SurfaceScatterEvent &event) const
     float mPdf = Microfacet::pdf(_distribution, sampleAlpha, m);
     float pdf = mPdf*0.25f/wiDotM;
     float weight = wiDotM*G*D/(event.wi.z()*mPdf);
-    Vec3f F = Fresnel::conductorReflectance(_eta, _k, wiDotM);
+    Vec3f F = conductorReflectance(_eta, _k, wiDotM);
 
     event.pdf = pdf;
     event.weight = albedo(event.info)*(F*weight);
@@ -99,7 +99,7 @@ Vec3f RoughConductorBsdf::eval(const SurfaceScatterEvent &event) const
 
     Vec3f hr = (event.wi + event.wo).normalized();
     float cosThetaM = event.wi.dot(hr);
-    Vec3f F = Fresnel::conductorReflectance(_eta, _k, cosThetaM);
+    Vec3f F = conductorReflectance(_eta, _k, cosThetaM);
     float G = Microfacet::G(_distribution, alpha, event.wi, event.wo, hr);
     float D = Microfacet::D(_distribution, alpha, hr);
     float fr = (G*D*0.25f)/event.wi.z();

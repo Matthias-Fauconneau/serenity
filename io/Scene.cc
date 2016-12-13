@@ -48,8 +48,10 @@
 #include "grids/VdbGrid.h"
 #include "io/JsonObject.h"
 #include "Debug.h"
-#include <rapidjson/document.h>
 #include <functional>
+#undef Type
+#undef unused
+#include <rapidjson/document.h>
 
 Scene::Scene()
 : _errorBsdf(std::make_shared<ErrorBsdf>()),
@@ -258,20 +260,6 @@ std::shared_ptr<Texture> Scene::instantiateTexture(std::string type, const rapid
 
     result->fromJson(value, *this);
     return result;
-}
-
-template<typename Instantiator, typename Element>
-void Scene::loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result)
-{
-    for (unsigned i = 0; i < container.Size(); ++i) {
-        if (container[i].IsObject()) {
-            auto element = instantiator(as<std::string>(container[i], "type"), container[i]);
-            if (element)
-                result.push_back(std::move(element));
-        } else {
-            DBG("Don't know what to do with non-object in object list");
-        }
-    }
 }
 
 template<typename T>

@@ -7,6 +7,8 @@
 #include "math/Angle.h"
 #include "math/Vec.h"
 #include "io/JsonUtils.h"
+#undef Type
+#undef unused
 #include <rapidjson/document.h>
 
 PlasticBsdf::PlasticBsdf()
@@ -31,8 +33,8 @@ rapidjson::Value PlasticBsdf::toJson(Allocator &allocator) const
     v.AddMember("type", "plastic", allocator);
     v.AddMember("ior", _ior, allocator);
     v.AddMember("thickness", _thickness, allocator);
-    v.AddMember("sigma_a", toJson(_sigmaA, allocator), allocator);
-    return std::move(v);
+    v.AddMember("sigma_a", ::toJson(_sigmaA, allocator), allocator);
+    return v;
 }
 
 bool PlasticBsdf::sample(SurfaceScatterEvent &event) const
@@ -45,7 +47,7 @@ bool PlasticBsdf::sample(SurfaceScatterEvent &event) const
 
     const Vec3f &wi = event.wi;
     float eta = 1.0f/_ior;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z());
+    float Fi = dielectricReflectance(eta, wi.z());
     float substrateWeight = _avgTransmittance*(1.0f - Fi);
     float specularWeight = Fi;
     float specularProbability;
@@ -65,7 +67,7 @@ bool PlasticBsdf::sample(SurfaceScatterEvent &event) const
         event.sampledLobe = BsdfLobes::SpecularReflectionLobe;
     } else {
         Vec3f wo(cosineHemisphere(event.sampler->next2D()));
-        float Fo = Fresnel::dielectricReflectance(eta, wo.z());
+        float Fo = dielectricReflectance(eta, wo.z());
         Vec3f diffuseAlbedo = albedo(event.info);
 
         event.wo = wo;
@@ -89,8 +91,8 @@ Vec3f PlasticBsdf::eval(const SurfaceScatterEvent &event) const
     bool evalT = event.requestedLobe.test(BsdfLobes::DiffuseReflectionLobe);
 
     float eta = 1.0f/_ior;
-    float Fi = Fresnel::dielectricReflectance(eta, event.wi.z());
-    float Fo = Fresnel::dielectricReflectance(eta, event.wo.z());
+    float Fi = dielectricReflectance(eta, event.wi.z());
+    float Fo = dielectricReflectance(eta, event.wo.z());
 
     if (evalR && checkReflectionConstraint(event.wi, event.wo)) {
         return Vec3f(Fi);
@@ -117,7 +119,7 @@ float PlasticBsdf::pdf(const SurfaceScatterEvent &event) const
     bool sampleT = event.requestedLobe.test(BsdfLobes::DiffuseReflectionLobe);
 
     if (sampleR && sampleT) {
-        float Fi = Fresnel::dielectricReflectance(1.0f/_ior, event.wi.z());
+        float Fi = dielectricReflectance(1.0f/_ior, event.wi.z());
         float substrateWeight = _avgTransmittance*(1.0f - Fi);
         float specularWeight = Fi;
         float specularProbability = specularWeight/(specularWeight + substrateWeight);
@@ -139,5 +141,5 @@ void PlasticBsdf::prepareForRender()
     _scaledSigmaA = _thickness*_sigmaA;
     _avgTransmittance = std::exp(-2.0f*_scaledSigmaA.avg());
 
-    _diffuseFresnel = Fresnel::computeDiffuseFresnel(_ior, 1000000);
+    _diffuseFresnel = computeDiffuseFresnel(_ior, 1000000);
 }

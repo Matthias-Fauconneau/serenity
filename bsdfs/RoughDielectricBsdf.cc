@@ -68,7 +68,7 @@ bool RoughDielectricBsdf::sampleBase(SurfaceScatterEvent &event, bool sampleR, b
 
     float wiDotM = event.wi.dot(m);
     float cosThetaT = 0.0f;
-    float F = Fresnel::dielectricReflectance(1.0f/ior, wiDotM, cosThetaT);
+    float F = dielectricReflectance(1.0f/ior, wiDotM, cosThetaT);
     float etaM = wiDotM < 0.0f ? ior : 1.0f/ior;
 
     bool reflect;
@@ -147,7 +147,7 @@ Vec3f RoughDielectricBsdf::evalBase(const SurfaceScatterEvent &event, bool sampl
         m = -(event.wi*eta + event.wo).normalized();
     float wiDotM = event.wi.dot(m);
     float woDotM = event.wo.dot(m);
-    float F = Fresnel::dielectricReflectance(1.0f/ior, wiDotM);
+    float F = dielectricReflectance(1.0f/ior, wiDotM);
     float G = Microfacet::G(distribution, alpha, event.wi, event.wo, m);
     float D = Microfacet::D(distribution, alpha, m);
 
@@ -181,7 +181,7 @@ float RoughDielectricBsdf::pdfBase(const SurfaceScatterEvent &event, bool sample
         m = -(event.wi*eta + event.wo).normalized();
     float wiDotM = event.wi.dot(m);
     float woDotM = event.wo.dot(m);
-    float F = Fresnel::dielectricReflectance(1.0f/ior, wiDotM);
+    float F = dielectricReflectance(1.0f/ior, wiDotM);
     float pm = Microfacet::pdf(distribution, sampleAlpha, m);
 
     float pdf;

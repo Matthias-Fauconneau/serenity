@@ -72,10 +72,10 @@ private:
             if (std::isnan(average(f)) || std::isinf(average(f)))
                 ldr[i] = Vec3c(255);
             else
-                ldr[i] = Vec3c(clamp(Vec3i(Vec3f(f*255.0f)), Vec3i(0), Vec3i(255)));
+                ldr[i] = Vec3c(clamp(Vec3i(0), Vec3i(Vec3f(f*255.0f)), Vec3i(255)));
         }
 
-        saveLdr(path, &ldr[0].x(), _res.x(), _res.y(), 3);
+        ::saveLdr(path, &ldr[0].x(), _res.x(), _res.y(), 3);
     }
 
 public:

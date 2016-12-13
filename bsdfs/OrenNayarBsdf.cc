@@ -38,7 +38,7 @@ bool OrenNayarBsdf::sample(SurfaceScatterEvent &event) const
         return false;
 
     float roughness = (*_roughness)[*event.info].x();
-    float ratio = clamp(roughness, 0.01f, 1.0f);
+    float ratio = clamp(0.01f, roughness, 1.0f);
     if (event.sampler->nextBoolean(ratio))
         event.wo  = uniformHemisphere(event.sampler->next2D());
     else
@@ -99,6 +99,6 @@ float OrenNayarBsdf::pdf(const SurfaceScatterEvent &event) const
         return 0.0f;
 
     float roughness = (*_roughness)[*event.info].x();
-    float ratio = clamp(roughness, 0.01f, 1.0f);
+    float ratio = clamp(0.01f, roughness, 1.0f);
     return uniformHemispherePdf(event.wo)*ratio + cosineHemispherePdf(event.wo)*(1.0f - ratio);
 }

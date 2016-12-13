@@ -59,7 +59,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
 
     const Vec3f &wi = event.wi;
     float eta = 1.0f/_ior;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z());
+    float Fi = dielectricReflectance(eta, wi.z());
     float substrateWeight = _avgTransmittance*(1.0f - Fi);
     float specularWeight = Fi;
     float specularProbability = specularWeight/(specularWeight + substrateWeight);
@@ -70,7 +70,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
             return false;
         if (sampleT) {
             Vec3f diffuseAlbedo = albedo(event.info);
-            float Fo = Fresnel::dielectricReflectance(eta, event.wo.z());
+            float Fo = dielectricReflectance(eta, event.wo.z());
 
             Vec3f brdfSubstrate = ((1.0f - Fi)*(1.0f - Fo)*eta*eta)*(diffuseAlbedo/(1.0f - diffuseAlbedo*_diffuseFresnel))*INV_PI*event.wo.z();
             Vec3f brdfSpecular = event.weight*event.pdf;
@@ -83,7 +83,7 @@ bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
         return true;
     } else {
         Vec3f wo(cosineHemisphere(event.sampler->next2D()));
-        float Fo = Fresnel::dielectricReflectance(eta, wo.z());
+        float Fo = dielectricReflectance(eta, wo.z());
         Vec3f diffuseAlbedo = albedo(event.info);
 
         event.wo = wo;
@@ -123,8 +123,8 @@ Vec3f RoughPlasticBsdf::eval(const SurfaceScatterEvent &event) const
     Vec3f diffuseR(0.0f);
     if (sampleT) {
         float eta = 1.0f/_ior;
-        float Fi = Fresnel::dielectricReflectance(eta, event.wi.z());
-        float Fo = Fresnel::dielectricReflectance(eta, event.wo.z());
+        float Fi = dielectricReflectance(eta, event.wi.z());
+        float Fo = dielectricReflectance(eta, event.wo.z());
 
         Vec3f diffuseAlbedo = albedo(event.info);
 
@@ -154,7 +154,7 @@ float RoughPlasticBsdf::pdf(const SurfaceScatterEvent &event) const
         diffusePdf = cosineHemispherePdf(event.wo);
 
     if (sampleT && sampleR) {
-        float Fi = Fresnel::dielectricReflectance(1.0f/_ior, event.wi.z());
+        float Fi = dielectricReflectance(1.0f/_ior, event.wi.z());
         float substrateWeight = _avgTransmittance*(1.0f - Fi);
         float specularWeight = Fi;
         float specularProbability = specularWeight/(specularWeight + substrateWeight);
@@ -172,5 +172,5 @@ void RoughPlasticBsdf::prepareForRender()
 
     _distribution = Microfacet::stringToType(_distributionName);
 
-    _diffuseFresnel = Fresnel::computeDiffuseFresnel(_ior, 1000000);
+    _diffuseFresnel = computeDiffuseFresnel(_ior, 1000000);
 }

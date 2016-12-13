@@ -19,11 +19,6 @@ struct Window : Poll {
  /// Current cursor
  MouseCursor cursor = MouseCursor::Arrow;
 
- // GLX/Xlib/DRI2
- struct __GLXFBConfigRec* fbConfig = 0;
- struct _XDisplay* glDisplay = 0;
- struct __GLXcontextRec* glContext = 0;
-
  /// Updates to be rendered
  struct Update {
   shared<Graphics> graphics;
@@ -110,7 +105,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
  /// Creates an initially hidden window for \a widget, use \a show to display
  /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
- XWindow(Widget* widget, Thread& thread, int2 size, bool useGL, bool useSW);
+ XWindow(Widget* widget, Thread& thread, int2 size, bool, bool useSW);
  /// Frees the graphics context and destroys the window
  ~XWindow();
 
@@ -135,9 +130,6 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  void event() override;
  void setCursor(MouseCursor cursor) override;
 
- /// Makes a new shared GL context current
- void initializeThreadGLContext();
- Image readback() override;
 
  // Control
  /// Registers global action on \a key

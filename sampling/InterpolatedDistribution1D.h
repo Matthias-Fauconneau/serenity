@@ -68,9 +68,9 @@ public:
 
     void warp(float distribution, float &u, int &x) const
     {
-        int d0 = clamp(int(distribution), 0, _numDistributions - 1);
+        int d0 = clamp(0, int(distribution), _numDistributions - 1);
         int d1 = min(d0 + 1, _numDistributions - 1);
-        float v = clamp(distribution - d0, 0.0f, 1.0f);
+        float v = clamp(0.0f, distribution - d0, 1.0f);
 
         int lower = 0, upper = _size;
         float lowerU = 0.0f, upperU = 1.0f;
@@ -88,23 +88,23 @@ public:
         }
 
         x = lower;
-        u = clamp((u - lowerU)/(upperU - lowerU), 0.0f, 1.0f);
+        u = clamp(0.0f, (u - lowerU)/(upperU - lowerU), 1.0f);
     }
 
     float pdf(float distribution, int x) const
     {
-        int d0 = clamp(int(distribution), 0, _numDistributions - 1);
+        int d0 = clamp(0, int(distribution), _numDistributions - 1);
         int d1 = min(d0 + 1, _numDistributions - 1);
-        float v = clamp(distribution - d0, 0.0f, 1.0f);
+        float v = clamp(0.0f, distribution - d0, 1.0f);
 
         return pdfs(x, d0)*(1.0f - v) + pdfs(x, d1)*v;
     }
 
     float sum(float distribution) const
     {
-        int d0 = clamp(int(distribution), 0, _numDistributions - 1);
+        int d0 = clamp(0, int(distribution), _numDistributions - 1);
         int d1 = min(d0 + 1, _numDistributions - 1);
-        float v = clamp(distribution - d0, 0.0f, 1.0f);
+        float v = clamp(0.0f, distribution - d0, 1.0f);
 
         return _sums[d0]*(1.0f - v) + _sums[d1]*v;
     }

@@ -13,26 +13,6 @@ T max(const T &a, const T &b, const Ts &... ts)
     return max(max(a, b), ts...);
 }
 
-template<typename ElementType, unsigned Size>
-Vec<ElementType, Size> min(const Vec<ElementType, Size> &a, const Vec<ElementType, Size> &b)
-{
-    Vec<ElementType, Size> result(a);
-    for (unsigned i = 0; i < Size; ++i)
-        if (b.data()[i] < a.data()[i])
-            result.data()[i] = b.data()[i];
-    return result;
-}
-
-template<typename ElementType, unsigned Size>
-Vec<ElementType, Size> max(const Vec<ElementType, Size> &a, const Vec<ElementType, Size> &b)
-{
-    Vec<ElementType, Size> result(a);
-    for (unsigned i = 0; i < Size; ++i)
-        if (b.data()[i] > a.data()[i])
-            result.data()[i] = b.data()[i];
-    return result;
-}
-
 template<typename T>
 T sqr(T val)
 {
@@ -64,7 +44,7 @@ Vec<ElementType, Size> lerp(const Vec<ElementType, Size> &a, const Vec<ElementTy
 
 template<typename T>
 T smoothStep(T edge0, T edge1, T x) {
-    x = clamp((x - edge0)/(edge1 - edge0), T(0), T(1));
+    x = clamp(T(0), (x - edge0)/(edge1 - edge0), T(1));
 
     return x*x*(T(3) - T(2)*x);
 }
@@ -80,7 +60,7 @@ static inline float trigInverse(float x)
 
 static inline float trigDoubleAngle(float x)
 {
-    return clamp(2.0f*x*x - 1.0f, -1.0f, 1.0f);
+    return clamp(-1.0f, 2.0f*x*x - 1.0f, 1.0f);
 }
 
 static inline float trigHalfAngle(float x)

@@ -7,6 +7,8 @@
 #include "math/Angle.h"
 #include "math/Vec.h"
 #include "io/JsonObject.h"
+#undef Type
+#undef unused
 #include <rapidjson/document.h>
 
 DielectricBsdf::DielectricBsdf()
@@ -47,7 +49,7 @@ bool DielectricBsdf::sample(SurfaceScatterEvent &event) const
     float eta = event.wi.z() < 0.0f ? _ior : _invIor;
 
     float cosThetaT = 0.0f;
-    float F = Fresnel::dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
+    float F = dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
 
     float reflectionProbability;
     if (sampleR && sampleT)
@@ -85,7 +87,7 @@ Vec3f DielectricBsdf::eval(const SurfaceScatterEvent &event) const
 
     float eta = event.wi.z() < 0.0f ? _ior : _invIor;
     float cosThetaT = 0.0f;
-    float F = Fresnel::dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
+    float F = dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
 
     if (event.wi.z()*event.wo.z() >= 0.0f) {
         if (evalR && checkReflectionConstraint(event.wi, event.wo))
@@ -107,7 +109,7 @@ float DielectricBsdf::pdf(const SurfaceScatterEvent &event) const
 
     float eta = event.wi.z() < 0.0f ? _ior : _invIor;
     float cosThetaT = 0.0f;
-    float F = Fresnel::dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
+    float F = dielectricReflectance(eta, std::abs(event.wi.z()), cosThetaT);
 
     if (event.wi.z()*event.wo.z() >= 0.0f) {
         if (sampleR && checkReflectionConstraint(event.wi, event.wo))

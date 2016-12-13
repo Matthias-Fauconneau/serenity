@@ -51,7 +51,7 @@ void RoughCoatBsdf::substrateEvalAndPdf(const SurfaceScatterEvent &event, float 
     const Vec3f &wo = event.wo;
 
     float cosThetaTo;
-    float Fo = Fresnel::dielectricReflectance(eta, wo.z(), cosThetaTo);
+    float Fo = dielectricReflectance(eta, wo.z(), cosThetaTo);
 
     if (Fi == 1.0f || Fo == 1.0f) {
         pdf = 0.0f;
@@ -90,7 +90,7 @@ bool RoughCoatBsdf::sample(SurfaceScatterEvent &event) const
     float eta = 1.0f/_ior;
 
     float cosThetaTi;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
+    float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
 
     float substrateWeight = _avgTransmittance*(1.0f - Fi);
     float specularWeight = Fi;
@@ -120,7 +120,7 @@ bool RoughCoatBsdf::sample(SurfaceScatterEvent &event) const
             return false;
 
         float cosThetaTo;
-        float Fo = Fresnel::dielectricReflectance(_ior, event.wo.z(), cosThetaTo);
+        float Fo = dielectricReflectance(_ior, event.wo.z(), cosThetaTo);
         if (Fo == 1.0f)
             return false;
         float cosThetaSubstrate = event.wo.z();
@@ -169,8 +169,8 @@ Vec3f RoughCoatBsdf::eval(const SurfaceScatterEvent &event) const
         float eta = 1.0f/_ior;
 
         float cosThetaTi, cosThetaTo;
-        float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
-        float Fo = Fresnel::dielectricReflectance(eta, wo.z(), cosThetaTo);
+        float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
+        float Fo = dielectricReflectance(eta, wo.z(), cosThetaTo);
 
         if (Fi == 1.0f || Fo == 1.0f)
             return glossyR;
@@ -206,8 +206,8 @@ float RoughCoatBsdf::pdf(const SurfaceScatterEvent &event) const
     float eta = 1.0f/_ior;
 
     float cosThetaTi, cosThetaTo;
-    float Fi = Fresnel::dielectricReflectance(eta, wi.z(), cosThetaTi);
-    float Fo = Fresnel::dielectricReflectance(eta, wo.z(), cosThetaTo);
+    float Fi = dielectricReflectance(eta, wi.z(), cosThetaTi);
+    float Fo = dielectricReflectance(eta, wo.z(), cosThetaTo);
 
     float specularProbability;
     if (sampleR && sampleT) {

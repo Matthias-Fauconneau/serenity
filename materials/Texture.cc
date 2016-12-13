@@ -15,7 +15,7 @@ bool Texture::scalarOrVecFromJson(const rapidjson::Value &v, const char *field, 
 rapidjson::Value Texture::scalarOrVecToJson(const Vec3f &src, Allocator &allocator)
 {
     if (src.x() == src.y() && src.y() == src.z())
-        return std::move(toJson(src.x(), allocator));
+        return (::toJson(src.x(), allocator));
     else
-        return std::move(toJson(src, allocator));
+        return (::toJson(src, allocator));
 }
