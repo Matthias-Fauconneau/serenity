@@ -80,15 +80,15 @@ struct ViewApp : ViewControl {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
                     const vec3 O = camera * vec3(s, t, 0);
-                    const vec3 P = camera * vec3((2.f*x/float(target.size.x-1)-1), -((2.f*y/float(target.size.y-1)-1)), 1);
+                    const vec3 P = camera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1);
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
                     const uint r = 0xFFF*::min(1.f, emission[0]);
                     const uint g = 0xFFF*::min(1.f, emission[1]);
                     const uint b = 0xFFF*::min(1.f, emission[2]);
                     extern uint8 sRGB_forward[0x1000];
-                    target[y*target.stride+x] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
-                    Z[y*target.size.x+x] = hitDistance;
+                    target[(target.size.y-1-y)*target.stride+x] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
+                    Z[y*target.size.x+x] = hitDistance / ::length(P-O);
                 }
             });
         }
@@ -131,8 +131,6 @@ struct ViewApp : ViewControl {
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
                 for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
                     size_t targetIndex = (target.size.y-1-targetY)*target.stride + targetX;
-                    const vec3 o = camera * vec3(s, t, 0);
-                    const vec3 p = camera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
                     const vec3 O = camera.inverse() * camera * vec3(s, t, 0);
                     const vec3 P = camera.inverse() * camera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
                     const vec3 d = normalize(P-O);
@@ -157,7 +155,7 @@ struct ViewApp : ViewControl {
 #if 1
                     if(1) {
                         const float z = Z(targetX, targetY);
-                        const float z_ = z==inff ? 1 : (z-dot(normalize(p-o), p))/z;
+                        const float z_ = z==inff ? 1 : (z-1)/z;
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -178,7 +176,7 @@ struct ViewApp : ViewControl {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                            //const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
                             const v4sf w01uv = and( /*abs(Z - float4(z)) < float4(0x1p-5)*/~0, // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                     __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU

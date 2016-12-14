@@ -55,7 +55,7 @@ struct Render {
                     const vec3 P = camera * vec3((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 1);
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
-                    targetZ[y*size.x+x] = hitDistance;
+                    targetZ[y*size.x+x] = hitDistance / ::length(P-O);
                     targetB[y*size.x+x] = emission[2];
                     targetG[y*size.x+x] = emission[1];
                     targetR[y*size.x+x] = emission[0];
