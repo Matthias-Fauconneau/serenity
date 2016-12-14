@@ -11,6 +11,8 @@
 #include "window.h"
 #include "png.h"
 
+static String destinationFile = readFile("destinations");
+
 struct Room {
     URL url;
     String postDate;
@@ -29,7 +31,7 @@ struct Room {
     float altScore = 0;
     String reason;
 
-    bool evaluate(const float threshold = 728) {
+    bool evaluate(const float threshold, const float c) {
      /*if(0 && url.host && existsFile(cacheFile(url)) && 1) { // Get address for debugging (only when cached and recent enough)
       const Map data = getURL(copy(url));
       const Element root = parseHTML(data);
@@ -51,10 +53,10 @@ struct Room {
         //if(negative /*&& threshold<inf*/) {reason="filter"__+url.path; return false;}
 
         // Filters based on data available directly in index to reduce room detail requests
-        if(postDate && parseDate(postDate) <= Date(currentTime()-31*24*60*60)) {/*assert_(!negative,"date", address);*/ reason=str("post",postDate); return false;}
-        if(startDate && parseDate(startDate) <= Date(currentTime()-2*24*60*60)) {/*assert(!negative,"start",startDate,parseDate(startDate));*/ reason="start"__; return false;}
+        if(postDate && parseDate(postDate) <= Date(currentTime()-29*24*60*60)) {/*assert_(!negative,"date", address);*/ reason=str("post",postDate); return false;}
+        //if(startDate && parseDate(startDate) <= Date(currentTime()-2*24*60*60)) {/*assert(!negative,"start",startDate,parseDate(startDate));*/ reason="start"__; return false;}
         //if(startDate && parseDate(startDate) > Date(currentTime()+31*24*60*60)) {assert(!negative,"start",startDate,parseDate(startDate)); reason="start"__; return false;}
-        Date until;
+        /*Date until;
         if(untilDate && untilDate!="Nach Vereinbarung" && !startsWith(untilDate,"ein Jahr")) {
          TextData s (untilDate);
          until = parseDate(s);
@@ -84,12 +86,12 @@ struct Room {
          }
          assert_(!s, s.data, s.index);
         }
-        if(until && until < Date(currentTime()+100*24*60*60)) {assert_(!negative,"until",until); reason=str("until",until); return false;}
-        if((score=price) > 550/*500~465*/) {/*assert_(!negative,"price",price);*/ reason="price"__; return false;}
+        if(until && until < Date(currentTime()+60*24*60*60)) {assert_(!negative,"until",until, url.path); reason=str("until",until); return false;}*/
+        if((score=price) > threshold) {/*assert_(!negative,"price",price);*/ reason="price"__; return false;}
 
         // Room detail request
         if(url.host) {
-         const Map data = getURL(copy(url), {}, 14*24);
+         const Map data = getURL(copy(url), {}, 31*24);
             const Element root = parseHTML(data);
             const Element& content = root("html")("body")("#main")("#container")("#content");
             assert_(content.contains(".result"), content);
@@ -118,77 +120,105 @@ struct Room {
             profile = copyRef( details(".room-content")("p").content );
             mates = copyRef( details(".person-content")("p").content );
             location = ::location(address+",+Zürich");
+            //assert(location, "A", address);
             {TextData s (details(".mate-contact")("p")("a").attribute("onclick"));
                 s.skip("Javascript:showContactDetail('");
                 string id = s.until('\'');
-                auto data = getURL(url.relative(URL("/show-contact/search-mate-contact?uuid="+id)));
+                auto data = getURL(url.relative(URL("/show-contact/search-mate-contact?uuid="+id)), {}, 31*24);
                 const Element root = parseHTML(data);
                 if(root.children.size>=2)
                     contact = root.children[0]->content+" <"+root.children[1]->child("a").content+">";
             }
         }
+        if(!location) { reason="Unknown location "+address; return false; }
         if(negative /*&& threshold<inf*/) {reason="filter "__+url.path; return false;}
 
-        if((find(description,"WOKO") || find(profile,"WOKO")) && !untilDate) {
+        /*if((find(description,"WOKO") || find(profile,"WOKO")) && !untilDate) {
          assert_(price <= 870, price, url);
          price += 100 - 70; //+PhD - Utilities included
-        }
+        }*/
 
         if((find(profile,"JUWO")||find(profile,"Juwo")) && price<=620) {assert_(!negative); reason="JUWO"__; return false;}
 
-        static String destinationFile = readFile("destinations");
-        static buffer<string> destinations = split(destinationFile,"\n");
-        static buffer<vec2> locations;
+        static array<string> destinations = split(section(destinationFile,'\n',1,-1),"\n");
+        static buffer<array<vec2>> locations;
         if(!locations) {
-            locations = buffer<vec2>(destinations.size);
+            locations = buffer<array<vec2>>(destinations.size, 0);
             for(size_t destinationIndex: range(destinations.size)) {
                 TextData s (destinations[destinationIndex]);
-                string destination = s.until(':');
-                locations[destinationIndex] = destination.contains('|') ? 0 : ::location(destination+", Zürich");
+                array<vec2> l;
+                for(;;) {
+                 string destination = s.whileNo("|:");
+                 l.append(::location(destination+", Zürich"));
+                 if(s.match('|')) continue;
+                 if(s.match(':')) break;
+                 error("");
+                }
+                locations.append(::move(l));
             }
         }
         durations = buffer<float>(destinations.size);
-        const int maxAccuracy = 2;
+        durations.clear(0);
+        const int maxAccuracy = 3;
         // 0: no routing
         // 1: only route for work
         // 2: route all
         // 3: with schedules
-        for(uint accuracy: range(maxAccuracy+1)) {
-            const float c = 3600./*Fr/month*//(40*60)/*minutes/week*/; // 1.5 (Fr week)/(min month)
+        for(uint accuracy: /*range(maxAccuracy+1)*/{3}) {
+            //const float c = 3; //28.2/*Fr/hour*/ * 4.34524 /*week/month*/ / 60 /*minute/hour*/; // 2 (Fr week)/(min month)
             score = price; altScore = price;
             for(size_t destinationIndex: range(destinations.size)) {
                 TextData s (destinations[destinationIndex]);
                 if(s.match('#')) { durations[destinationIndex]=0; continue;}
-                string dest = s.until(':');
-                if(dest.contains('|') && !accuracy) continue;
-                assert_(location);
-                String destination = dest.contains('|') ? ::nearby(location, dest) : dest+", Zürich";
+                array<String> dests;
+                for(;;) {
+                 string d = s.whileNo("|:");
+                 dests.append(d+", Zürich");
+                 if(s.match('|')) continue;
+                 if(s.match(':')) break;
+                 error("");
+                }
+                //if(dest.contains('|') && !accuracy) continue;
+                assert_(location, "B");
+                //String destination = dest.contains('|') ? ::nearby(location, dest) : dest+", Zürich";
                 String origin = address+", Zürich";
                 float durationSum = 0, tripCount = 0;
                 // Estimate duration from straight distance between locations (without routing)
                 if(accuracy<=1 && destinationIndex >= accuracy) {
-                    while(s) { s.whileAny(' '); s.whileNot(' '); tripCount++; }
-                    durationSum = tripCount * distance(location, locations[destinationIndex])/1000/*m/km*//(maxAccuracy?45/*35*/:20)/*km/h*/*60/*min/h*/;
+                    while(s) { s.whileAny(' '); if(s.match('#')) break; s.whileNot(' '); tripCount++; }
+                    float distance = inf;
+                    for(auto l: locations[destinationIndex]) distance = ::min(distance, ::distance(location, l));
+                    durationSum = tripCount * distance/1000/*m/km*//(maxAccuracy?45/*35*/:20)/*km/h*/*60/*min/h*/;
+                    assert_(durationSum < 60);
                     score += durationSum*c;
                 }
                 //  route: Requests route to destinations for accurate evaluation of transit time per week
                 else {
                     for(size_t tripIndex=0; s && tripIndex<2+2*accuracy; tripIndex++) {
                         s.whileAny(' ');
+                        if(s.match('#')) break;
                         bool outbound = false;
                         if(s.match('-')) outbound = true;
-                        static Date day = parseDate("13/08");
-                        Date date = parseDate(s.whileNo(" -"_));
+                        static Date day = parseDate("19/12");
+                        Date date = parseDate(s.whileNo(" -\n"_));
                         date.year = day.year, date.month = day.month, date.day = day.day;
                         int64 time = date;
-                        string A = origin, B = destination;
+                        double duration = inf;
                         if(outbound) time=-time;
-                        else { s.skip('-'); swap(A, B); }
-                        float duration = ::duration(A, B, time)/60.;
-                        if(destinationIndex==0 && (
-                                0)) {assert(!negative, duration, A, B, address, url.path); reason="far"__; return false;}
+                        else { s.skip('-'); }
+                        for(string B: dests) {
+                         string A = origin;
+                         if(!outbound) swap(A, B);
+                         duration = ::min(duration, ::duration(A, B, time)/60.);
+                         assert_(duration < 80, duration, A, B, duration);
+                        }
+                        //if(destinationIndex==0) {assert(!negative, duration, A, B, address, url.path); reason="far"__; return false;}
                         //if(route) log(A, B, duration);
-                        assert_(duration < 102, duration, A, B, duration);
+                        /*if(destinationIndex==0 && find(address, "Lerchen")) { // ETH Link
+                         //log("Lerchen", address);
+                         assert_(duration > 19 && duration < 21.5, duration, address);
+                         duration = 19;
+                        }*/
                         durationSum += duration; tripCount+=1;
                         /*if(destinationIndex!=0) altScore += duration*c;
                         if(destinationIndex!=1)*/ score += duration*c;
@@ -204,6 +234,7 @@ struct Room {
                 }
                 float perTrip = durationSum/tripCount;
                 //if(accuracy) assert_(durations[destinationIndex] <= perTrip, perTrip, durations[destinationIndex], accuracy); // Conservative estimate
+                assert_(perTrip < 90, perTrip);
                 durations[destinationIndex] = perTrip;
                 if(score > threshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
                 //if(altScore > altThreshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
@@ -238,6 +269,13 @@ struct WG {
         url.post = "query=&priceMin=101&priceMax=600&state=zurich-stadt&permanent=all&student=none"
                    "&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending"
                    "&startSearchMate=true&wgStartSearch=true"__;
+        TextData s (destinationFile);
+        static float threshold = s.decimal();
+        s.skip(' ');
+        static float c = s.decimal();
+        s.skip(' ');
+        veloFactor = s.decimal();
+        s.skip('\n');
         if(arguments().size == 1) {
             const Map data = getURL(copy(url), {}, 1);
             const Element root = parseHTML(data);
@@ -263,7 +301,7 @@ struct WG {
                     if(room.price <= 200) continue;
                 }
 
-                if(room.evaluate()) rooms.insertSorted(move(room));
+                if(room.evaluate(threshold, c)) rooms.insertSorted(move(room));
                 else {
                     bool negative;
                     {static String negativeFile = readFile("-");
@@ -293,13 +331,14 @@ struct WG {
             }
         } else {
             Room room;
+            assert_(arguments());
             string id = arguments()[1];
             room.url = url.relative(URL("/search/mate/ch/zurich-stadt/"+id));
             room.startDate = copyRef(section(id,'-',0,3));
             room.untilDate = copyRef(section(id,'-',3,4));
             room.price = parseInteger(copyRef(section(id,'-',4,5)));
             if(room.price <= 240) room.price = room.price*10/3;
-            room.evaluate();
+            room.evaluate(threshold, c);
             rooms.append(move(room));
         }
         if(existsFile("reference")) {
@@ -310,10 +349,10 @@ struct WG {
                 Room room;
                 room.price = s.integer();
                 s.skip(' ');
-                room.address = copyRef(s.untilEnd());
+                room.address = copyRef(s.until('#'));
                 room.location = ::location(room.address);
                 room.url = room.address;
-                assert_(room.evaluate(inf), room.address, room.reason, room.score);
+                assert_(room.evaluate(inf, c), room.address, room.reason, room.score);
                 rooms.insertSorted(move(room));
             }
         }
@@ -330,7 +369,7 @@ struct WG {
           positive = find(positiveFile, room.url.path);
          //if(!positive)
           log(round(room.score), round(room.altScore), str(apply(room.durations,[](float v){return round(v);})),
-              str(round(room.score-room.price)), str(round(room.altScore-room.price)), str(room.price), room.address,
+              str(round(room.score-room.price)), /*str(round(room.altScore-room.price)),*/ str(room.price), room.address,
              room.postDate, room.startDate, room.untilDate, room.contact, room.url ? section(section(room.url.path,'/',-2,-1),'.') : ""_);
          if(!positive || 0) newRooms.append(move(room));
         }

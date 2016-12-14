@@ -18,7 +18,7 @@ float distance(vec2 A, vec2 B) {
 static string key = arguments()[0];
 
 vec2 location(string address) {
- Map data = getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&address="+replace(replace(address," ","+"),"#","")));
+ Map data = getURL(URL("https://maps.googleapis.com/maps/api/geocode/xml?key="_+key+"&address="+replace(replace(address," ","+"),"#","")), {}, 31*24);
  Element root = parseXML(data);
  string status = root("GeocodeResponse")("status").content;
  if(status == "ZERO_RESULTS"_) return 0;
@@ -30,7 +30,7 @@ vec2 location(string address) {
 String nearby(vec2 location, string types) {
  auto data = getURL(URL("https://maps.googleapis.com/maps/api/place/nearbysearch/xml?key="_+key+
                         "&location="+str(location.x)+","+str(location.y)+"&types="+types+
-                        "&rankby=distance"));
+                        "&rankby=distance"), {}, 31*24);
  Element root = parseXML(data);
  for(const Element& result : root("PlaceSearchResponse").children) {
   if(result.name!="result") continue;
@@ -43,6 +43,7 @@ String nearby(vec2 location, string types) {
 }
 
 static int queryLimit = 1;
+static float veloFactor = 2;
 
 uint duration(string origin, string destination, int64 unused time=0) {
  if(origin == destination) return 0;
@@ -55,7 +56,7 @@ uint duration(string origin, string destination, int64 unused time=0) {
    if(queryLimit>500) queryLimit--;
    extern int queryCount;
    assert_(queryCount < 512);
-   Map data = getURL(copy(url));
+   Map data = getURL(copy(url), {}, 31*24);
    Element root = parseXML(data);
    string status = root("DirectionsResponse")("status").content;
    if(status=="OK") {
@@ -73,7 +74,7 @@ uint duration(string origin, string destination, int64 unused time=0) {
   }
  };
 
- uint bicycling = getDuration(URL(url+"bicycling"));
+ uint bicycling = getDuration(URL(url+"bicycling"))*veloFactor;
  if(!bicycling) log("bicycling", origin, destination);
  assert(bicycling, origin, destination);
 #if 1
@@ -81,7 +82,8 @@ uint duration(string origin, string destination, int64 unused time=0) {
  if(time>0) url= url+"&departure_time="+str(time);
  if(time<0) url= url+"&arrival_time="+str(-time);
  uint transit = getDuration(url);
- if(!transit) return bicycling;
+ assert_(transit < 4900, origin, destination, transit);
+ if(!transit) { log("no transit", time); return bicycling ?: 99; }
  return ::min(bicycling, transit);
 #else
  return bicycling;
