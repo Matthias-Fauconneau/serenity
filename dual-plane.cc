@@ -24,7 +24,7 @@ struct ViewApp : ViewControl {
 
     bool orthographic = false;
 
-    //ViewWidget view {uint2(512), {this, &ViewApp::render}};
+    //ViewWidget view {uint2(256), {this, &ViewApp::render}};
     unique<Window> window = nullptr;
 
     TraceableScene scene;
@@ -66,27 +66,21 @@ struct ViewApp : ViewControl {
             window->setTitle(name);
         }
     }
-    virtual vec2 sizeHint(vec2) override { return vec2(2*512, 512); }
+    virtual vec2 sizeHint(vec2) override { return vec2(2*256, 256); }
     virtual shared<Graphics> graphics(vec2) override { render(angles); return shared<Graphics>(); }
     void render(vec2 angles) {
         const Image& window = ((XWindow*)this->window.pointer)->target;
-        const Image target = cropShare(window, int2(0), uint2(512));
-        ImageH Z(uint2(512));
+        const Image target = cropShare(window, int2(0), uint2(256));
+        ImageH Z(uint2(256));
+        const mat4 camera = parseCamera(readFile("scene.json"));
+        const float s = angles.x/(PI/3), t = angles.y/(PI/3);
 #if 1
         {
-            const mat4 camera = parseCamera(readFile("scene.json"));
-            //const float s = (angles.x+::PI/3)/(2*::PI/3), t = (angles.y+::PI/3)/(2*::PI/3);
-            const float s = angles.x/(PI/3), t = angles.y/(PI/3);
-            log(s, t);
-            //const mat4 M = shearedPerspective(s, t) * camera;*/
-            const float scale = 16;
-            parallel_chunk(target.size.y, [this, &target, camera,/*M,*/ &Z, s, t, scale](uint _threadId, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, &target, camera,/*M,*/ &Z, s, t](uint _threadId, uint start, uint sizeI) {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
-                    /*const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), -1);
-                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), +1);*/
-                    const vec3 O = camera * vec3(scale*s, scale*t, 0);
-                    const vec3 P = camera.normalMatrix() * vec3(scale*(2.f*x/float(target.size.x-1)-1), -(scale*(2.f*y/float(target.size.y-1)-1)), 0);
+                    const vec3 O = camera * vec3(s, t, 0);
+                    const vec3 P = camera * vec3((2.f*x/float(target.size.x-1)-1), -((2.f*y/float(target.size.y-1)-1)), 1);
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
                     const uint r = 0xFFF*::min(1.f, emission[0]);
@@ -101,8 +95,8 @@ struct ViewApp : ViewControl {
 #endif
 #if 1
         {
-            const Image target = cropShare(window, int2(512,0), uint2(512,512));
-            mat4 M;
+            const Image target = cropShare(window, int2(256,0), uint2(256,256));
+            /*mat4 M;
             if(orthographic) {
                 M.rotateX(angles.y); // Pitch
                 M.rotateY(angles.x); // Yaw
@@ -110,9 +104,9 @@ struct ViewApp : ViewControl {
             } else {
                 const float s = (angles.x+PI/3)/(2*PI/3), t = (angles.y+PI/3)/(2*PI/3);
                 M = shearedPerspective(s, t);
-            }
+            }*/
             assert_(imageCount.x == imageCount.y);
-            parallel_chunk(target.size.y, [this, &target, M, &Z](uint, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, &target, camera, s, t, &Z](uint, uint start, uint sizeI) {
                 const uint size1 = imageSize.x *1;
                 const uint size2 = imageSize.y *size1;
                 const uint size3 = imageCount.x*size2;
@@ -127,27 +121,29 @@ struct ViewApp : ViewControl {
                         return operator[](index);
                     }
                 } fieldZ {imageCount, imageSize, field.slice(0*size4, size4)},
-                         fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
-                                fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
-                                       fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
+                  fieldB {imageCount, imageSize, field.slice(1*size4, size4)},
+                  fieldG {imageCount, imageSize, field.slice(2*size4, size4)},
+                  fieldR {imageCount, imageSize, field.slice(3*size4, size4)};
                 assert_(imageSize.x%2==0); // Gather 32bit / half
                 const unused v2ui sample2D = {    0,           size1/2};
                 const v8ui sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                            size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
                 const float scale = (float) imageSize.x / imageCount.x; // st -> uv
                 for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
-                    size_t targetIndex = targetY*target.stride + targetX;
-                    const vec3 O = M.inverse() * vec3(2.f*targetX/float(target.size.x-1)-1, 2.f*targetY/float(target.size.y-1)-1, -1);
-                    const vec3 P = M.inverse() * vec3(2.f*targetX/float(target.size.x-1)-1, 2.f*targetY/float(target.size.y-1)-1, +1);
+                    size_t targetIndex = (target.size.y-1-targetY)*target.stride + targetX;
+                    const vec3 o = camera * vec3(s, t, 0);
+                    const vec3 p = camera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
+                    const vec3 O = camera.inverse() * camera * vec3(s, t, 0);
+                    const vec3 P = camera.inverse() * camera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
                     const vec3 d = normalize(P-O);
 
-                    const vec3 n (0,0,1);
+                    const vec3 n (0,0,-1);
                     const float nd = dot(n, d);
                     const vec3 n_nd = n / nd;
 
-                    const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
+                    const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
                     const vec2 ST = (Pst+vec2(1))/2.f;
-                    const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
+                    const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
                     const vec2 UV = (Puv+vec2(1))/2.f;
 
                     const vec2 st = vec2(0x1p-16) + vec2(1-0x1p-16) * ST * vec2(imageCount-uint2(1));
@@ -161,9 +157,7 @@ struct ViewApp : ViewControl {
 #if 1
                     if(1) {
                         const float z = Z(targetX, targetY);
-                        if(z <= 1) continue; // FIXME
-                        //const float z_ = z-1.f/2;
-                        const float z_ = z==inff ? 1 : (z-2)/(z-1);
+                        const float z_ = z==inff ? 1 : (z-dot(normalize(p-o), p))/z;
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -174,7 +168,7 @@ struct ViewApp : ViewControl {
 
                         v4sf B, G, R;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
-                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * z_; //(z-2)/(z-1); //(-z_) / (z_+2);
+                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * -z_;
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             int uIndex = uv_[0], vIndex = uv_[1];
                             if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
@@ -185,7 +179,7 @@ struct ViewApp : ViewControl {
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                             const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                            const v4sf w01uv = and( abs(Z - float4(z)) < float4(0x1p-5), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                            const v4sf w01uv = and( /*abs(Z - float4(z)) < float4(0x1p-5)*/~0, // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                     __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
                             float sum = ::hsum(w01uv);
