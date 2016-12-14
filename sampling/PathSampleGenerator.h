@@ -7,11 +7,6 @@ struct PathSampleGenerator {
 public:
     virtual ~PathSampleGenerator() {}
 
-    virtual void startPath(uint32 pixelId, uint32 sample) = 0;
-
-    virtual void saveState(OutputStreamHandle &out) = 0;
-    virtual void loadState(InputStreamHandle &in) = 0;
-
     virtual bool nextBoolean(float pTrue) = 0;
     virtual int nextDiscrete(int numChoices) = 0;
     virtual float next1D() = 0;

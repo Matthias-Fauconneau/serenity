@@ -16,18 +16,6 @@ public:
     {
     }
 
-    virtual void startPath(uint32 /*pixelId*/, uint32 /*sample*/) override
-    {
-    }
-
-    virtual void saveState(OutputStreamHandle &out) override
-    {
-        _sampler.saveState(out);
-    }
-    virtual void loadState(InputStreamHandle &in) override
-    {
-        _sampler.loadState(in);
-    }
 
     virtual bool nextBoolean(float pTrue) override final
     {
