@@ -45,10 +45,10 @@ inline Variant parseJSON(TextData& s) {
     }
 }
 
-const vec2 Vec2(ref<Variant> v) { return vec2((float)v[0],(float)v[1]); }
-const vec3 Vec3(ref<Variant> v) { return vec3((float)v[0],(float)v[1],(float)v[2]); }
+inline const vec2 Vec2(ref<Variant> v) { return vec2((float)v[0],(float)v[1]); }
+inline const vec3 Vec3(ref<Variant> v) { return vec3((float)v[0],(float)v[1],(float)v[2]); }
 
-const mat4 transform(const Dict& object) {
+static const mat4 transform(const Dict& object) {
     const Dict& t = object.at("transform");
     mat4 transform;
     const vec3 look_at = Vec3(t.at("look_at"));
@@ -63,7 +63,7 @@ const mat4 transform(const Dict& object) {
     return transform;
 }
 
-mat4 parseCamera(ref<byte> file) {
+static inline mat4 parseCamera(ref<byte> file) {
     TextData s (file);
     Variant root = parseJSON(s);
     const Dict& camera = root.dict.at("camera");

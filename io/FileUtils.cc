@@ -14,7 +14,7 @@
 #include <memory>
 #include <locale>
 #undef Type
-#define RAPIDJSON_ASSERT assert
+#define RAPIDJSON_ASSERT(x) assert(x)
 #include <rapidjson/prettywriter.h>
 
 static Path getNativeCurrentDir();

@@ -47,6 +47,8 @@ struct TraceableScene : Scene
 
 public:
     TraceableScene() {
+        initDevice();
+
         _camera->prepareForRender();
 
         for (std::shared_ptr<Medium> &m : _media)

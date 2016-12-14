@@ -1,16 +1,17 @@
+#include "string.h"
 #include "JsonUtils.h"
 #include "Path.h"
 #include <sstream>
 #include <cstdlib>
 #include <cstdio>
 #undef Type
-#define RAPIDJSON_ASSERT assert
+#define RAPIDJSON_ASSERT(x) assert(x)
 #include <rapidjson/prettywriter.h>
 
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name)
 {
     auto member = v.FindMember(name);
-    assert(member != v.MemberEnd(), "Json value is missing mandatory member '%s'", name);
+    assert(member != v.MemberEnd(), "Json value is missing mandatory member '%s'"_, name);
     return member->value;
 }
 
@@ -106,65 +107,10 @@ static void gramSchmidt(Vec3f &a, Vec3f &b, Vec3f &c)
         c.normalize();
 }
 
-// If the float falls within 10^-6 of a prettier number, we round it to that
-// Here, a "pretty number" is one with less than three places after the decimal point
-// Also takes care of -0
-static float prettifyFloat(float f)
-{
-    if (std::abs(int(f*100.0f) - f*100.0f) < 10e-4f)
-        f = int(f*100.0f)*0.01f;
-    // Get rid of negative zero
-    if (f == 0.0f)
-        f = 0.0f;
-    return f;
-}
-
-// Ok so this is super evil
-//
-// The basic problem is that rapidjson doesn't have a float type, only double.
-// However, internally Tungsten uses mostly floats.
-// Although not immediately obvious, this is a usability problem.
-//
-// Imagine the user specifies a value of 0.1 in the JSON file. Tungsten will internally
-// convert this into a float representation that's very close to this value
-// (because 0.1 cannot be represented exactly in binary)
-// When you print the float, this would give you back a string representation corresponding to 0.1
-// (which is what the user entered)
-// However, if you convert the float representation of 0.1 to double first and then print it, you will
-// get a different string representation (namely 0.09999999776482582). This is because doubles
-// are printed with higher precision.
-//
-// This is a problem, because if a user specifies 0.1 in the JSON, and tungsten writes the JSON
-// back out, the value will now read 0.09999999776482582. This is because it converts to float
-// internally on load and then converts back to double when passing it to rapidjson on save.
-// This is terrible!
-//
-// So instead of converting float to double using the native conversion, we instead use a conversion
-// that preserves the same string representation - in other words, we print the float to a string,
-// and convert that string to a double. This ensures the user gets back exactly what they entered.
-//
-// This is really really bad from a performance perspective, so if this becomes a bottleneck,
-// we need a better way of doing this.
-static double prettifyFloatToDouble(float f)
-{
-    char tmp[1024];
-    std::sprintf(tmp, "%f", f);
-    return std::atof(tmp);
-}
-
-static Vec3f prettifyVector(const Vec3f &p)
-{
-    return Vec3f(
-        prettifyFloat(p.x()),
-        prettifyFloat(p.y()),
-        prettifyFloat(p.z())
-    );
-}
-
 bool fromJson(const rapidjson::Value &v, Mat4f &dst)
 {
     if (v.IsArray()) {
-        assert(v.Size() == 16, "Cannot convert Json Array to 4x4 Matrix: Invalid size");
+        assert(v.Size() == 16, "Cannot convert Json Array to 4x4 Matrix: Invalid size"_);
 
         for (unsigned i = 0; i < 16; ++i)
             dst[i] = as<float>(v[i]);

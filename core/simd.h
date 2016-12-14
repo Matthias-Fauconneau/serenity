@@ -40,6 +40,7 @@ inline v8sf float8(v4sf a, v4sf b) { return __builtin_shufflevector(a, b, 0,1,2,
 static constexpr v4sf _1100f = {1,1,0,0};
 static constexpr v8sf _00001111f = {0,0,0,0,1,1,1,1};
 
+static inline v2sf gather(const float* P, v2ui i) { return {P[i[0]], P[i[1]]}; }
 static inline v2sf gather(const float* P, v2si i) { return {P[i[0]], P[i[1]]}; }
 static inline v8sf gather(const float* P, v8ui i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
 static inline v8sf gather(const float* P, v8si i) { return __builtin_ia32_gatherd_ps256(_0i, P, i, _1i, sizeof(float)); }
@@ -76,9 +77,9 @@ inline v16sf operator/(v16sf a, v16sf b) { return v16sf(a.r1 / b.r1, a.r2 / b.r2
 inline v16sf operator /(const int one unused, v16sf d) { assert(one==1); return v16sf(__builtin_ia32_rcpps256(d.r1),__builtin_ia32_rcpps256(d.r2)); }
 
 //inline v16f shuffle() __builtin_shufflevector
-/*#define shuffle(a, b, i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15) \
+#define shuffle(a, b, i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15) \
  v16sf(__builtin_shufflevector(a, b, i0, i1, i2, i3, i4, i5, i6, i7), \
-       __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))*/
+       __builtin_shufflevector(a, b, i8, i9, i10, i11, i12, i13, i14, i15))
 
 inline float hsum(v4sf v) { // movshdup, addps, movhlps, addss
     v4sf t = v+__builtin_shufflevector(v,v, 1,1,3,3);
@@ -128,11 +129,13 @@ static const unused v8si selectMask {1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1
 inline v8si mask(const mask8 mask) { return (intX(mask) & selectMask) != _0i; }
 inline v16si mask(const mask16 m) { return {mask(mask8(m)), mask(mask8(m>>8))}; }
 
-inline v8sf and(v8si k, v8sf x) { return (v8sf)(k & (v8si)x); }
-inline v8sf xor(v8si k, v8sf x) { return (v8sf)(k ^ (v8si)x); }
 inline v16si operator &(v16si a, v16si b) { return {a.r1 & b.r1, a.r2 & b.r2}; }
-//inline v16sf operator &(v16sf a, v16si b) { return v16sf(and(a.r1, b.r1), and(a.r2,b.r2)); }
+
+inline v4sf and(v4si k, v4sf x) { return (v4sf)(k & (v4si)x); }
+inline v8sf and(v8si k, v8sf x) { return (v8sf)(k & (v8si)x); }
 inline v16sf and(v16si k, v16sf x) { return v16sf(and(k.r1, x.r1), and(k.r2,x.r2)); }
+
+inline v8sf xor(v8si k, v8sf x) { return (v8sf)(k ^ (v8si)x); }
 
 inline v8si blend(v8si A, v8si B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }
 inline v8ui blend(v8ui A, v8ui B, v8si mask) { return __builtin_ia32_blendvps256(A, B, mask); }

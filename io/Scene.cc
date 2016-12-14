@@ -46,7 +46,7 @@
 #include <functional>
 #undef Type
 #undef unused
-#define RAPIDJSON_ASSERT assert
+#define RAPIDJSON_ASSERT(x) assert(x)
 #include <rapidjson/document.h>
 #include "primitives/EmbreeUtil.h"
 
@@ -56,11 +56,9 @@ Scene::Scene()
   _textureCache(std::make_shared<TextureCache>()),
   _camera(std::make_shared<PinholeCamera>())
 {
-    initDevice();
     std::string json = FileUtils::loadText(_path = Path("scene.json"));
     rapidjson::Document document;
     document.Parse<0>(json.c_str());
-     //fromJson(document, *this);
     const rapidjson::Value& v = document;
     JsonSerializable::fromJson(v, (Scene&)*this);
 

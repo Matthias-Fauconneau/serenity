@@ -20,7 +20,7 @@
 #include "bsdfs/Bsdf.h"
 #undef Type
 #undef unused
-#define RAPIDJSON_ASSERT assert
+#define RAPIDJSON_ASSERT(x) assert(x)
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))

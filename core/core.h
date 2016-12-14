@@ -211,7 +211,7 @@ template<Type... Args> void  __attribute((noreturn)) error(const Args&... args);
 template<> void __attribute((noreturn)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
-#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })
+#define assert_(expr, message...) ({ if(!(expr)) ::error(#expr ""_, ## message); })
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) assert_(expr, ## message)
