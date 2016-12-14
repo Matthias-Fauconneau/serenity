@@ -10,6 +10,7 @@
 #include "io/JsonObject.h"
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 
 ConductorBsdf::ConductorBsdf()
@@ -23,7 +24,7 @@ ConductorBsdf::ConductorBsdf()
 void ConductorBsdf::lookupMaterial()
 {
     if (!lookup(_materialName, _eta, _k)) {
-        DBG("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
+        log("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
         lookup("Cu", _eta, _k);
     }
 }
@@ -35,19 +36,6 @@ void ConductorBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
         _materialName.clear();
     if (::fromJson(v, "material", _materialName))
         lookupMaterial();
-}
-
-rapidjson::Value ConductorBsdf::toJson(Allocator &allocator) const
-{
-    JsonObject result{Bsdf::toJson(allocator), allocator,
-        "type", "conductor"
-    };
-    if (_materialName.empty())
-        result.add("eta", _eta, "k", _k);
-    else
-        result.add("material", _materialName);
-
-    return result;
 }
 
 bool ConductorBsdf::sample(SurfaceScatterEvent &event) const

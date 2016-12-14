@@ -21,15 +21,6 @@ void PhongBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "diffuse_ratio", _diffuseRatio);
 }
 
-rapidjson::Value PhongBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "phong",
-        "exponent", _exponent,
-        "diffuse_ratio", _diffuseRatio
-    };
-}
-
 bool PhongBsdf::sample(SurfaceScatterEvent &event) const
 {
     bool evalGlossy  = event.requestedLobe.test(BsdfLobes::GlossyReflectionLobe);

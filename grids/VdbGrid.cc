@@ -45,7 +45,7 @@ VdbGrid::SampleMethod VdbGrid::stringToSampleMethod(const std::string &name)
         return SampleMethod::ExactLinear;
     else if (name == "raymarching")
         return SampleMethod::Raymarching;
-    FAIL("Invalid sample method: '%s'", name);
+    error("Invalid sample method: '%s'", name);
 }
 
 VdbGrid::IntegrationMethod VdbGrid::stringToIntegrationMethod(const std::string &name)
@@ -58,7 +58,7 @@ VdbGrid::IntegrationMethod VdbGrid::stringToIntegrationMethod(const std::string 
         return IntegrationMethod::Raymarching;
     else if (name == "residual_ratio")
         return IntegrationMethod::ResidualRatio;
-    FAIL("Invalid integration method: '%s'", name);
+    error("Invalid integration method: '%s'", name);
 }
 
 VdbGrid::VdbGrid()
@@ -164,18 +164,18 @@ void VdbGrid::loadResources()
     try {
         file.open();
     } catch(const openvdb::IoError &e) {
-        FAIL("Failed to open vdb file at '%s': %s", *_path, e.what());
+        error("Failed to open vdb file at '%s': %s", *_path, e.what());
     }
 
     openvdb::GridBase::Ptr ptr = file.readGrid(_gridName);
     if (!ptr)
-        FAIL("Failed to read grid '%s' from vdb file '%s'", _gridName, *_path);
+        error("Failed to read grid '%s' from vdb file '%s'", _gridName, *_path);
 
     file.close();
 
     _grid = openvdb::gridPtrCast<openvdb::FloatGrid>(ptr);
     if (!_grid)
-        FAIL("Failed to read grid '%s' from vdb file '%s': Grid is not a FloatGrid", _gridName, *_path);
+        error("Failed to read grid '%s' from vdb file '%s': Grid is not a FloatGrid", _gridName, *_path);
 
     openvdb::CoordBBox bbox = _grid->evalActiveVoxelBoundingBox();
     Vec3i minP = Vec3i(bbox.min().x(), bbox.min().y(), bbox.min().z());

@@ -28,17 +28,6 @@ void ThinSheetBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     scene.textureFromJsonMember(v, "thickness", TexelConversion::REQUEST_AVERAGE, _thickness);
 }
 
-rapidjson::Value ThinSheetBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "thinsheet",
-        "ior", _ior,
-        "enable_interference", _enableInterference,
-        "thickness", *_thickness,
-        "sigma_a", _sigmaA
-    };
-}
-
 bool ThinSheetBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (!event.requestedLobe.test(BsdfLobes::SpecularReflectionLobe))

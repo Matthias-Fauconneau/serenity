@@ -10,6 +10,7 @@
 #include <vector>
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))
@@ -70,7 +71,6 @@ class FileUtils
     static Path _currentDir;
 
     static void finalizeStream(std::ios *stream);
-    static OutputStreamHandle openFileOutputStream(const Path &p);
 
     static bool execStat(const Path &p, StatStruct &dst);
 
@@ -92,7 +92,6 @@ public:
     static bool deleteFile(const Path &path);
 
     static InputStreamHandle openInputStream(const Path &p);
-    static OutputStreamHandle openOutputStream(const Path &p);
     static std::shared_ptr<OpenDir> openDirectory(const Path &p);
 
     static bool exists(const Path &p);

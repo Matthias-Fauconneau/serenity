@@ -16,13 +16,6 @@ MirrorBsdf::MirrorBsdf()
     _lobes = BsdfLobes(BsdfLobes::SpecularReflectionLobe);
 }
 
-rapidjson::Value MirrorBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "mirror"
-    };
-}
-
 bool MirrorBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (!event.requestedLobe.test(BsdfLobes::SpecularReflectionLobe))

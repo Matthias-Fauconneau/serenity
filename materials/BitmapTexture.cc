@@ -211,25 +211,6 @@ void BitmapTexture::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "scale", _scale);
 }
 
-rapidjson::Value BitmapTexture::toJson(Allocator &allocator) const
-{
-    bool writeFullStruct = !_gammaCorrect || !_linear || _clamp || _scale != 1.0f;
-    if (writeFullStruct) {
-        JsonObject result{Texture::toJson(allocator), allocator,
-            "type", "bitmap",
-            "gamma_correct", _gammaCorrect,
-            "interpolate", _linear,
-            "clamp", _clamp,
-            "scale", _scale
-        };
-        if (_path)
-            result.add("file", *_path);
-        return result;
-    } else {
-        return ::toJson(*_path, allocator);
-    }
-}
-
 void BitmapTexture::loadResources()
 {
     if (_texels)
@@ -260,7 +241,7 @@ void BitmapTexture::loadResources()
         isHdr = false;
 
         if (_path && !_path->empty())
-            DBG("Unable to load texture at '%s'", *_path);
+            log("Unable to load texture at '%s'", _path->asString().c_str());
     } else {
         _valid = true;
     }

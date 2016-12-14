@@ -4,12 +4,13 @@
 #include <cstdlib>
 #include <cstdio>
 #undef Type
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/prettywriter.h>
 
 const rapidjson::Value &fetchMember(const rapidjson::Value &v, const char *name)
 {
     auto member = v.FindMember(name);
-    ASSERT(member != v.MemberEnd(), "Json value is missing mandatory member '%s'", name);
+    assert(member != v.MemberEnd(), "Json value is missing mandatory member '%s'", name);
     return member->value;
 }
 
@@ -163,7 +164,7 @@ static Vec3f prettifyVector(const Vec3f &p)
 bool fromJson(const rapidjson::Value &v, Mat4f &dst)
 {
     if (v.IsArray()) {
-        ASSERT(v.Size() == 16, "Cannot convert Json Array to 4x4 Matrix: Invalid size");
+        assert(v.Size() == 16, "Cannot convert Json Array to 4x4 Matrix: Invalid size");
 
         for (unsigned i = 0; i < 16; ++i)
             dst[i] = as<float>(v[i]);
@@ -250,96 +251,6 @@ bool fromJson(const rapidjson::Value &v, Path &dst)
     dst.freezeWorkingDirectory();
 
     return result;
-}
-
-rapidjson::Value toJson(rapidjson::Value v, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return v;
-}
-
-rapidjson::Value toJson(const JsonSerializable &o, rapidjson::Document::AllocatorType &allocator)
-{
-    return o.unnamed() ? o.toJson(allocator) : toJson(o.name(), allocator);
-}
-
-rapidjson::Value toJson(const std::string &value, rapidjson::Document::AllocatorType &allocator)
-{
-    rapidjson::Value result;
-    result.SetString(value.c_str(), value.size(), allocator);
-    return result;
-}
-
-rapidjson::Value toJson(const char *value, rapidjson::Document::AllocatorType &allocator)
-{
-    rapidjson::Value result;
-    result.SetString(value, allocator);
-    return result;
-}
-
-rapidjson::Value toJson(const Path &value, rapidjson::Document::AllocatorType &allocator)
-{
-    return toJson(value.asString(), allocator);
-}
-
-rapidjson::Value toJson(bool value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(value);
-}
-
-rapidjson::Value toJson(uint32 value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(value);
-}
-
-rapidjson::Value toJson(int32 value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(value);
-}
-
-rapidjson::Value toJson(uint64_t value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(value);
-}
-
-rapidjson::Value toJson(float value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(prettifyFloatToDouble(value));
-}
-
-rapidjson::Value toJson(double value, rapidjson::Document::AllocatorType &/*allocator*/)
-{
-    return rapidjson::Value(value);
-}
-
-rapidjson::Value toJson(const Mat4f &value, rapidjson::Document::AllocatorType &allocator)
-{
-    Vec3f   rot = prettifyVector(value.extractRotationVec());
-    Vec3f scale = prettifyVector(value.extractScaleVec());
-    Vec3f   pos = prettifyVector(value.extractTranslationVec());
-
-    if (value.right().cross(value.up()).dot(value.fwd()) < 0.0f) {
-        rot = prettifyVector((value*Mat4f::scale(Vec3f(1.0f, 1.0f, -1.0f))).extractRotationVec());
-        scale.z() *= -1.0f;
-    }
-
-    rapidjson::Value a(rapidjson::kObjectType);
-    if (pos != 0.0f)
-        a.AddMember("position", toJson(pos, allocator), allocator);
-    if (scale != 1.0f)
-        a.AddMember("scale", toJson(scale, allocator), allocator);
-    if (rot != 0.0f)
-        a.AddMember("rotation", toJson(rot, allocator), allocator);
-
-    return a;
-}
-
-void addObjectMember(rapidjson::Value &v, const char *name, const JsonSerializable &o,
-        rapidjson::Document::AllocatorType &allocator)
-{
-    if (o.unnamed())
-        v.AddMember(rapidjson::StringRef(name), o.toJson(allocator), allocator);
-    else
-        v.AddMember(rapidjson::StringRef(name), toJson(o.name(), allocator), allocator);
 }
 
 struct JsonStringWriter {

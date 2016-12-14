@@ -34,18 +34,6 @@ void RoughPlasticBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     prepareForRender();
 }
 
-rapidjson::Value RoughPlasticBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "rough_plastic",
-        "ior", _ior,
-        "thickness", _thickness,
-        "sigma_a", _sigmaA,
-        "distribution", _distributionName,
-        "roughness", *_roughness
-    };
-}
-
 bool RoughPlasticBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (event.wi.z() <= 0.0f)

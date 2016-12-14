@@ -29,19 +29,6 @@ void ExponentialMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "falloff_direction", _falloffDirection);
 }
 
-rapidjson::Value ExponentialMedium::toJson(Allocator &allocator) const
-{
-    return JsonObject{Medium::toJson(allocator), allocator,
-        "type", "exponential",
-        "sigma_a", _materialSigmaA,
-        "sigma_s", _materialSigmaS,
-        "density", _density,
-        "falloff_scale", _falloffScale,
-        "unit_point", _unitPoint,
-        "falloff_direction", _falloffDirection
-    };
-}
-
 bool ExponentialMedium::isHomogeneous() const
 {
     return false;

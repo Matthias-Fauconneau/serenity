@@ -11,13 +11,6 @@ LambertBsdf::LambertBsdf()
     _lobes = BsdfLobes(BsdfLobes::DiffuseReflectionLobe);
 }
 
-rapidjson::Value LambertBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "lambert"
-    };
-}
-
 bool LambertBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (!event.requestedLobe.test(BsdfLobes::DiffuseReflectionLobe))

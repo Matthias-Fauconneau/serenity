@@ -13,7 +13,6 @@ public:
     ConstantTexture(const Vec3f &value);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool isConstant() const override;
 

@@ -54,14 +54,6 @@ void Sphere::fromJson(const rapidjson::Value &v, const Scene &scene)
     _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
-rapidjson::Value Sphere::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "sphere",
-        "bsdf", *_bsdf
-    };
-}
-
 bool Sphere::intersect(Ray &ray, IntersectionTemporary &data) const
 {
     Vec3f p = ray.pos() - _pos;

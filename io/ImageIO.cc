@@ -1,11 +1,6 @@
 #include "ImageIO.h"
-
 #include "FileUtils.h"
-
 #include "io/FileUtils.h"
-
-#include "Debug.h"
-
 #include <cstring>
 #include "string.h"
 
@@ -461,85 +456,4 @@ std::unique_ptr<uint8[]> loadLdr(const Path& path, TexelConversion request, int 
     }
 
     return texels;
-}
-
-bool savePfm(const Path &path, const float *img, int w, int h, int channels)
-{
-    if (channels != 1 && channels != 3)
-        return false;
-
-    OutputStreamHandle out = FileUtils::openOutputStream(path);
-    if (!out)
-        return false;
-
-    *out << ((channels == 1) ? "Pf" : "PF") << '\n';
-    *out << w << " " << h << '\n';
-    *out << -1.0 << '\n';
-    for (int y = 0; y < h; ++y)
-        out->write(reinterpret_cast<const char *>(img + (h - y - 1)*w*channels), w*channels*sizeof(float));
-
-    return true;
-}
-
-#if OPENEXR_AVAILABLE
-bool saveExr(const Path &path, const float *img, int w, int h, int channels)
-{
-    if (channels <= 0 || channels > 4)
-        return false;
-
-    OutputStreamHandle outputStream = FileUtils::openOutputStream(path);
-    if (!outputStream)
-        return false;
-
-    try {
-
-    Imf::Header header(w, h, 1.0f, Imath::V2f(0, 0), 1.0f, Imf::INCREASING_Y, Imf::PIZ_COMPRESSION);
-    Imf::FrameBuffer frameBuffer;
-
-    std::unique_ptr<half[]> data(new half[w*h*channels]);
-    for (int i = 0; i < w*h*channels; ++i)
-        data[i] = half(img[i]);
-
-    const char *channelNames[] = {"R", "G", "B", "A"};
-    for (int i = 0; i < channels; ++i) {
-        const char *channelName = (channels == 1) ? "Y" : channelNames[i];
-        header.channels().insert(channelName, Imf::Channel(Imf::HALF));
-        frameBuffer.insert(channelName, Imf::Slice(Imf::HALF, reinterpret_cast<char *>(data.get() + i),
-                sizeof(half)*channels, sizeof(half)*channels*w));
-    }
-
-    ExrOStream out(std::move(outputStream));
-    Imf::OutputFile file(out, header);
-    file.setFrameBuffer(frameBuffer);
-    file.writePixels(h);
-
-    return true;
-
-    } catch(const std::exception &e) {
-        std::cout << "OpenEXR writer failed: " << e.what() << std::endl;
-        return false;
-    }
-}
-#endif
-
-bool savePng(const Path&, const uint8*, int, int, int) { error("PNG"); }
-
-bool saveHdr(const Path &path, const float *img, int w, int h, int channels)
-{
-    if (path.testExtension("pfm"))
-        return savePfm(path, img, w, h, channels);
-#if OPENEXR_AVAILABLE
-    else if (path.testExtension("exr"))
-        return saveExr(path, img, w, h, channels);
-#endif
-
-    return false;
-}
-
-bool saveLdr(const Path &path, const uint8 *img, int w, int h, int channels)
-{
-    if (path.testExtension("png"))
-        return savePng(path, img, w, h, channels);
-
-    return false;
 }

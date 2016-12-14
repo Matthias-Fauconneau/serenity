@@ -17,7 +17,6 @@ public:
     PinholeCamera(const Mat4f &transform, const Vec2u &res, float fov);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool samplePosition(PathSampleGenerator &sampler, PositionSample &sample, Vec2u pixel) const override final;
     virtual float directionPdf(const PositionSample &point, const DirectionSample &direction) const override final;

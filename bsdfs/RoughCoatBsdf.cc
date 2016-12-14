@@ -31,19 +31,6 @@ void RoughCoatBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     prepareForRender();
 }
 
-rapidjson::Value RoughCoatBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "rough_coat",
-        "ior", _ior,
-        "thickness", _thickness,
-        "sigma_a", _sigmaA,
-        "substrate", *_substrate,
-        "distribution", _distributionName,
-        "roughness", *_roughness
-    };
-}
-
 void RoughCoatBsdf::substrateEvalAndPdf(const SurfaceScatterEvent &event, float eta,
         float Fi, float cosThetaTi, float &pdf, Vec3f &brdf) const
 {

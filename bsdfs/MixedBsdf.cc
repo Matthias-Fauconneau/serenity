@@ -45,21 +45,11 @@ void MixedBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     _bsdf0 = scene.fetchBsdf(fetchMember(v, "bsdf0"));
     _bsdf1 = scene.fetchBsdf(fetchMember(v, "bsdf1"));
     if (_bsdf0.get() == this || _bsdf1.get() == this) {
-        DBG("Warning: Recursive mixed BSDF not supported");
+        log("Warning: Recursive mixed BSDF not supported");
         _bsdf0 = scene.errorBsdf();
         _bsdf1 = scene.errorBsdf();
     }
     scene.textureFromJsonMember(v, "ratio", TexelConversion::REQUEST_AVERAGE, _ratio);
-}
-
-rapidjson::Value MixedBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "mixed",
-        "bsdf0", *_bsdf0,
-        "bsdf1", *_bsdf1,
-        "ratio", *_ratio
-    };
 }
 
 bool MixedBsdf::sample(SurfaceScatterEvent &event) const

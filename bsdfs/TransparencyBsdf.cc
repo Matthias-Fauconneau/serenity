@@ -28,15 +28,6 @@ void TransparencyBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     scene.textureFromJsonMember(v, "alpha", TexelConversion::REQUEST_AUTO, _opacity);
 }
 
-rapidjson::Value TransparencyBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "transparency",
-        "base", *_base,
-        "alpha", *_opacity
-    };
-}
-
 bool TransparencyBsdf::sample(SurfaceScatterEvent &event) const
 {
     return _base->sample(event);

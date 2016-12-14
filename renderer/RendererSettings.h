@@ -1,5 +1,4 @@
 #pragma once
-#include "cameras/OutputBufferSettings.h"
 #include "io/JsonSerializable.h"
 #include "io/DirectoryChange.h"
 #include "io/JsonObject.h"
@@ -22,7 +21,6 @@ class RendererSettings : public JsonSerializable
     uint32 _sppStep;
     std::string _checkpointInterval;
     std::string _timeout;
-    std::vector<OutputBufferSettings> _outputs;
 
 public:
     RendererSettings()
@@ -39,7 +37,7 @@ public:
     {
     }
 
-    virtual void fromJson(const rapidjson::Value &v, const Scene &scene)
+    virtual void fromJson(const rapidjson::Value &v, const Scene&)
     {
         ::fromJson(v, "output_directory", _outputDirectory);
 
@@ -58,44 +56,6 @@ public:
         ::fromJson(v, "spp_step", _sppStep);
         ::fromJson(v, "checkpoint_interval", _checkpointInterval);
         ::fromJson(v, "timeout", _timeout);
-
-        auto outputs = v.FindMember("output_buffers");
-        if (outputs != v.MemberEnd() && outputs->value.IsArray()) {
-            for (rapidjson::SizeType i = 0; i < outputs->value.Size(); ++i) {
-                _outputs.emplace_back();
-                _outputs.back().fromJson(outputs->value[i], scene);
-            }
-        }
-    }
-
-    virtual rapidjson::Value toJson(Allocator &allocator) const
-    {
-        JsonObject result{JsonSerializable::toJson(allocator), allocator,
-            "overwrite_output_files", _overwriteOutputFiles,
-            "adaptive_sampling", _useAdaptiveSampling,
-            "enable_resume_render", _enableResumeRender,
-            "scene_bvh", _useSceneBvh,
-            "spp", _spp,
-            "spp_step", _sppStep,
-            "checkpoint_interval", _checkpointInterval,
-            "timeout", _timeout
-        };
-        if (!_outputFile.empty())
-            result.add("output_file", _outputFile);
-        if (!_hdrOutputFile.empty())
-            result.add("hdr_output_file", _hdrOutputFile);
-        if (!_varianceOutputFile.empty())
-            result.add("variance_output_file", _varianceOutputFile);
-        if (!_resumeRenderFile.empty())
-            result.add("resume_render_file", _resumeRenderFile);
-        if (!_outputs.empty()) {
-            rapidjson::Value outputs(rapidjson::kArrayType);
-            for (const auto &b : _outputs)
-                outputs.PushBack(b.toJson(allocator), allocator);
-            result.add("output_buffers", std::move(outputs));
-        }
-
-        return result;
     }
 
     const Path &outputDirectory() const
@@ -111,9 +71,6 @@ public:
         _hdrOutputFile     .setWorkingDirectory(_outputDirectory);
         _varianceOutputFile.setWorkingDirectory(_outputDirectory);
         _resumeRenderFile  .setWorkingDirectory(_outputDirectory);
-
-        for (auto &b : _outputs)
-            b.setOutputDirectory(_outputDirectory);
     }
 
     const Path &outputFile() const
@@ -184,11 +141,6 @@ public:
     std::string timeout() const
     {
         return _timeout;
-    }
-
-    const std::vector<OutputBufferSettings> &renderOutputs() const
-    {
-        return _outputs;
     }
 
     void setUseSceneBvh(bool value)

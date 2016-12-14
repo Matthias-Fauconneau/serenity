@@ -19,7 +19,6 @@ public:
     RoughCoatBsdf();
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     void substrateEvalAndPdf(const SurfaceScatterEvent &event, float eta,
             float Fi, float cosThetaTi, float &pdf, Vec3f &brdf) const;

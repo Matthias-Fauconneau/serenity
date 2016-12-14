@@ -1,6 +1,5 @@
 #include "CliParser.h"
 #include "Platform.h"
-#include "Debug.h"
 #include "math/MathUtil.h"
 
 CliParser::CliParser(const std::string &programName, const std::string &usage)
@@ -84,11 +83,11 @@ void CliParser::addOption(char shortOpt, const std::string &longOpt,
         const std::string &description, bool hasParam, int token)
 {
     if (_tokenToOption.find(token) != _tokenToOption.end())
-        FAIL("Duplicate token %i", token);
+        error("Duplicate token %i", token);
     if (shortOpt != '\0' && _shortOpts.find(shortOpt) != _shortOpts.end())
-        FAIL("Duplicate short option %s", shortOpt);
+        error("Duplicate short option %s", shortOpt);
     if (!longOpt.empty() && _longOpts.find(longOpt) != _longOpts.end())
-        FAIL("Duplicate long option %s", longOpt);
+        error("Duplicate long option %s", longOpt);
 
     _tokenToOption.insert(std::make_pair(token, int(_options.size())));
     if (shortOpt != '\0')
@@ -105,7 +104,7 @@ bool CliParser::isPresent(int token) const
 {
     auto iter = _tokenToOption.find(token);
     if (iter == _tokenToOption.end())
-        FAIL("Could not find option corresponding to token %i", token);
+        error("Could not find option corresponding to token %i", token);
 
     return _options[iter->second].isPresent;
 }
@@ -114,7 +113,7 @@ const std::string &CliParser::param(int token) const
 {
     auto iter = _tokenToOption.find(token);
     if (iter == _tokenToOption.end())
-        FAIL("Could not find option corresponding to token %i", token);
+        error("Could not find option corresponding to token %i", token);
 
     return _options[iter->second].param;
 }

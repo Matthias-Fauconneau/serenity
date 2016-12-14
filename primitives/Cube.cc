@@ -61,14 +61,6 @@ void Cube::fromJson(const rapidjson::Value &v, const Scene &scene)
     _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
-rapidjson::Value Cube::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "cube",
-        "bsdf", *_bsdf
-    };
-}
-
 bool Cube::intersect(Ray &ray, IntersectionTemporary &data) const
 {
     Vec3f p = _invRot*(ray.pos() - _pos);

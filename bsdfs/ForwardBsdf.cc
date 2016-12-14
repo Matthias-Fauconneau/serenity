@@ -7,13 +7,6 @@ ForwardBsdf::ForwardBsdf()
     _lobes = BsdfLobes::ForwardLobe;
 }
 
-rapidjson::Value ForwardBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "forward"
-    };
-}
-
 bool ForwardBsdf::sample(SurfaceScatterEvent &/*event*/) const
 {
     return false;

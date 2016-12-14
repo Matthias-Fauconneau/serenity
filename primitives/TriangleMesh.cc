@@ -116,7 +116,7 @@ void TriangleMesh::fromJson(const rapidjson::Value &v, const Scene &scene)
     auto bsdf = v.FindMember("bsdf");
     if (bsdf != v.MemberEnd() && bsdf->value.IsArray()) {
         if (bsdf->value.Size() == 0)
-            FAIL("Empty BSDF array for triangle mesh");
+            error("Empty BSDF array for triangle mesh");
         for (int i = 0; i < int(bsdf->value.Size()); ++i)
             _bsdfs.emplace_back(scene.fetchBsdf(bsdf->value[i]));
     } else {
@@ -124,45 +124,12 @@ void TriangleMesh::fromJson(const rapidjson::Value &v, const Scene &scene)
     }
 }
 
-rapidjson::Value TriangleMesh::toJson(Allocator &allocator) const
-{
-    JsonObject result{Primitive::toJson(allocator), allocator,
-        "type", "mesh",
-        "smooth", _smoothed,
-        "backface_culling", _backfaceCulling,
-        "recompute_normals", _recomputeNormals
-    };
-    if (_path)
-        result.add("file", *_path);
-    if (_bsdfs.size() == 1) {
-        result.add("bsdf", *_bsdfs[0]);
-    } else {
-        rapidjson::Value a(rapidjson::kArrayType);
-        for (const auto &bsdf : _bsdfs)
-            a.PushBack(bsdf->toJson(allocator), allocator);
-        result.add("bsdf", std::move(a));
-    }
-
-    return result;
-}
-
 void TriangleMesh::loadResources()
 {
     if (_path && !load(*_path, _verts, _tris))
-        DBG("Unable to load triangle mesh at %s", *_path);
+        log("Unable to load triangle mesh at %s", _path->asString().c_str());
     if (_recomputeNormals && _smoothed)
         calcSmoothVertexNormals();
-}
-
-void TriangleMesh::saveResources()
-{
-    if (_path)
-        saveAs(*_path);
-}
-
-void TriangleMesh::saveAs(const Path &path) const
-{
-    save(path, _verts, _tris);
 }
 
 void TriangleMesh::calcSmoothVertexNormals()

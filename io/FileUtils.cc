@@ -2,7 +2,6 @@
 #include "FileStreambuf.h"
 #include "UnicodeUtils.h"
 #include "Path.h"
-#include "Debug.h"
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -15,6 +14,7 @@
 #include <memory>
 #include <locale>
 #undef Type
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/prettywriter.h>
 
 static Path getNativeCurrentDir();
@@ -131,20 +131,6 @@ void FileUtils::finalizeStream(std::ios *stream)
     }
 }
 
-OutputStreamHandle FileUtils::openFileOutputStream(const Path &p)
-{
-    std::shared_ptr<std::ostream> out(new std::ofstream(p.absolute().asString(),
-            std::ios_base::out | std::ios_base::binary),
-            [](std::ostream *stream){ finalizeStream(stream); });
-
-    if (!out->good())
-        return nullptr;
-
-    _metaData.insert(std::make_pair(out.get(), StreamMetadata()));
-
-    return (out);
-}
-
 bool FileUtils::execStat(const Path &p, StatStruct &dst)
 {
     NativeStatStruct stat;
@@ -230,37 +216,6 @@ std::string FileUtils::loadText(const Path &path)
     return (text);
 }
 
-bool FileUtils::writeJson(const rapidjson::Document &document, const Path &p)
-{
-    OutputStreamHandle stream = openOutputStream(p);
-    if (!stream)
-        return false;
-
-    JsonOstreamWriter out(stream);
-    rapidjson::PrettyWriter<JsonOstreamWriter> writer(out);
-    document.Accept(writer);
-
-    return true;
-}
-
-bool FileUtils::copyFile(const Path &src, const Path &dst, bool createDstDir)
-{
-    if (createDstDir) {
-        Path parent(dst.parent());
-        if (!parent.empty() && !createDirectory(parent))
-            return false;
-    }
-    InputStreamHandle srcStream = openInputStream(src);
-    if (!srcStream) {
-        OutputStreamHandle dstStream = openOutputStream(dst);
-        if (dstStream) {
-            *dstStream << srcStream->rdbuf();
-            return true;
-        }
-    }
-    return false;
-}
-
 bool FileUtils::moveFile(const Path &src, const Path &dst, bool deleteDst)
 {
     if (dst.exists()) {
@@ -293,26 +248,6 @@ InputStreamHandle FileUtils::openInputStream(const Path &p)
     }
 
     return nullptr;
-}
-
-OutputStreamHandle FileUtils::openOutputStream(const Path &p)
-{
-    if (!p.exists())
-        return openFileOutputStream(p);
-
-    Path tmpPath(p + ".tmp");
-    int index = 0;
-    while (tmpPath.exists())
-        tmpPath = p + format(".tmp%03d", ++index);
-
-    OutputStreamHandle out = openFileOutputStream(tmpPath);
-    if (out) {
-        auto iter = _metaData.find(out.get());
-        iter->second.srcPath = tmpPath;
-        iter->second.targetPath = p;
-    }
-
-    return (out);
 }
 
 std::shared_ptr<OpenDir> FileUtils::openDirectory(const Path &p)

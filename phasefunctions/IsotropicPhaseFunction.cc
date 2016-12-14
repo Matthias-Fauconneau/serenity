@@ -3,13 +3,6 @@
 #include "sampling/SampleWarp.h"
 #include "io/JsonObject.h"
 
-rapidjson::Value IsotropicPhaseFunction::toJson(Allocator &allocator) const
-{
-    return JsonObject{PhaseFunction::toJson(allocator), allocator,
-        "type", "isotropic"
-    };
-}
-
 Vec3f IsotropicPhaseFunction::eval(const Vec3f &/*wi*/, const Vec3f &/*wo*/) const
 {
     return Vec3f(INV_FOUR_PI);

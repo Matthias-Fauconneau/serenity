@@ -19,16 +19,6 @@ void HomogeneousMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "density", _density);
 }
 
-rapidjson::Value HomogeneousMedium::toJson(Allocator &allocator) const
-{
-    return JsonObject{Medium::toJson(allocator), allocator,
-        "type", "homogeneous",
-        "sigma_a", _materialSigmaA,
-        "sigma_s", _materialSigmaS,
-        "density", _density
-    };
-}
-
 bool HomogeneousMedium::isHomogeneous() const
 {
     return true;

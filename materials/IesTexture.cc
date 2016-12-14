@@ -3,8 +3,8 @@
 #include "math/Angle.h"
 #include "io/JsonObject.h"
 #include "io/Scene.h"
-#include "Debug.h"
-#include <iostream>
+#include <sstream>
+#include <istream>
 
 IesTexture::IesTexture()
 : _path(std::make_shared<Path>("")),
@@ -22,17 +22,6 @@ void IesTexture::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     _path = scene.fetchResource(v, "file");
     ::fromJson(v, "resolution", _resolution);
-}
-
-rapidjson::Value IesTexture::toJson(Allocator &allocator) const
-{
-    JsonObject result{Texture::toJson(allocator), allocator,
-        "type", "ies",
-        "resolution", _resolution
-    };
-    if (_path)
-        result.add("file", *_path);
-    return result;
 }
 
 void wrapHorzAngles(int type, std::vector<float> &angles, std::vector<int> &indices)
@@ -133,7 +122,7 @@ void IesTexture::loadResources()
 
     if (horzAngles.empty() || vertAngles.empty()) {
         if (_path && !_path->empty())
-            DBG("Unable to load IES profile at '%s'", *_path);
+            log("Unable to load IES profile at '%s'", _path->asString().c_str());
 
         for (int i = 0; i < _resolution*_resolution*2; ++i)
             texels[i] = INV_TWO_PI;

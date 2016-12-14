@@ -1,16 +1,10 @@
 #include "BvhBuilder.h"
-
 #include "BinnedSahSplitter.h"
 #include "MidpointSplitter.h"
 #include "FullSahSplitter.h"
-
 #include "math/MathUtil.h"
 #include "math/Box.h"
 #include "math/Vec.h"
-
-#include "Debug.h"
-#include "Timer.h"
-
 #include <algorithm>
 
 struct BuildResult
@@ -179,7 +173,7 @@ void BvhBuilder::integrityCheck(const NaiveBvhNode &node, int depth) const
         return;
     for (unsigned i = 0; i < _branchFactor && node.child(i); ++i) {
         integrityCheck(*node.child(i), depth + 1);
-        ASSERT(node.bbox().contains(node.child(i)->bbox()),
+        assert(node.bbox().contains(node.child(i)->bbox()),
                 "Child box not contained! %s c/ %s at %d",
                 node.child(i)->bbox(), node.bbox(), depth);
     }

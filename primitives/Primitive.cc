@@ -29,23 +29,6 @@ void Primitive::fromJson(const rapidjson::Value &v, const Scene &scene)
         _extMedium = scene.fetchMedium(extMedium->value);
 }
 
-rapidjson::Value Primitive::toJson(Allocator &allocator) const
-{
-    JsonObject result{JsonSerializable::toJson(allocator), allocator,
-        "transform", _transform
-    };
-    if (_power)
-        result.add("power", *_power);
-    else if (_emission)
-        result.add("emission", *_emission);
-    if (_intMedium)
-        result.add("int_medium", *_intMedium);
-    if (_extMedium)
-        result.add("ext_medium", *_extMedium);
-
-    return result;
-}
-
 bool Primitive::samplePosition(PathSampleGenerator &/*sampler*/, PositionSample &/*sample*/) const
 {
     return false;

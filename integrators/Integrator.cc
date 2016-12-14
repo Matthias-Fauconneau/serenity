@@ -4,10 +4,10 @@
 #include "io/FileUtils.h"
 #include "io/ImageIO.h"
 #include "io/Scene.h"
-#include "Timer.h"
 #include <algorithm>
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>

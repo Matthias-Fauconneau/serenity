@@ -11,6 +11,7 @@
 #include <memory>
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))
@@ -52,7 +53,6 @@ public:
     Bsdf();
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual Vec3f eval(const SurfaceScatterEvent &event) const = 0;
     virtual bool sample(SurfaceScatterEvent &event) const = 0;

@@ -35,14 +35,6 @@ void PinholeCamera::fromJson(const rapidjson::Value &v, const Scene &scene)
     precompute();
 }
 
-rapidjson::Value PinholeCamera::toJson(Allocator &allocator) const
-{
-    return JsonObject{Camera::toJson(allocator), allocator,
-        "type", "pinhole",
-        "fov", _fovDeg
-    };
-}
-
 bool PinholeCamera::samplePosition(PathSampleGenerator &/*sampler*/, PositionSample &sample, Vec2u pixel) const
 {
     //sample.p = 0; //_pos;

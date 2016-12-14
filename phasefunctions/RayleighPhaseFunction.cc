@@ -10,13 +10,6 @@ inline float RayleighPhaseFunction::rayleigh(float cosTheta)
     return (3.0f/(16.0f*PI))*(1.0f + cosTheta*cosTheta);
 }
 
-rapidjson::Value RayleighPhaseFunction::toJson(Allocator &allocator) const
-{
-    return JsonObject{PhaseFunction::toJson(allocator), allocator,
-        "type", "rayleigh"
-    };
-}
-
 Vec3f RayleighPhaseFunction::eval(const Vec3f &wi, const Vec3f &wo) const
 {
     return Vec3f(rayleigh(wi.dot(wo)));

@@ -30,24 +30,6 @@ void AtmosphericMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "center", _center);
 }
 
-rapidjson::Value AtmosphericMedium::toJson(Allocator &allocator) const
-{
-    JsonObject result{Medium::toJson(allocator), allocator,
-        "type", "atmosphere",
-        "sigma_a", _materialSigmaA,
-        "sigma_s", _materialSigmaS,
-        "density", _density,
-        "falloff_scale", _falloffScale,
-        "radius", _radius
-    };
-    if (!_primName.empty())
-        result.add("pivot", _primName);
-    else
-        result.add("center", _center);
-
-    return result;
-}
-
 bool AtmosphericMedium::isHomogeneous() const
 {
     return false;
@@ -58,7 +40,7 @@ void AtmosphericMedium::prepareForRender()
     if (!_primName.empty()) {
         const Primitive *prim = _scene->findPrimitive(_primName);
         if (!prim)
-            DBG("Note: unable to find pivot object '%s' for atmospheric medium", _primName.c_str());
+            log("Note: unable to find pivot object '%s' for atmospheric medium", _primName.c_str());
         else
             _center = prim->transform()*Vec3f(0.0f);
     }

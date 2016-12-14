@@ -7,13 +7,6 @@ NullBsdf::NullBsdf()
     _lobes = BsdfLobes::NullLobe;
 }
 
-rapidjson::Value NullBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "null"
-    };
-}
-
 bool NullBsdf::sample(SurfaceScatterEvent &/*event*/) const
 {
     return false;

@@ -14,7 +14,6 @@ public:
     DielectricBsdf(float ior);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool sample(SurfaceScatterEvent &event) const override;
     virtual Vec3f eval(const SurfaceScatterEvent &event) const override;

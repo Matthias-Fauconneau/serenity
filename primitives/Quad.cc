@@ -50,14 +50,6 @@ void Quad::fromJson(const rapidjson::Value &v, const Scene &scene)
     _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
-rapidjson::Value Quad::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "quad",
-        "bsdf", *_bsdf
-    };
-}
-
 bool Quad::intersect(Ray &ray, IntersectionTemporary &data) const
 {
     float nDotW = ray.dir().dot(_frame.normal);

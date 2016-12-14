@@ -7,6 +7,7 @@
 #include <set>
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))

@@ -1,11 +1,11 @@
 #pragma once
+#include "core.h"
 #include "JsonSerializable.h"
-#include "Debug.h"
 #include "math/Mat4f.h"
 #include "math/Vec.h"
-#include <string>
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))
@@ -33,7 +33,7 @@ T as(const rapidjson::Value &v)
 {
     T result;
     if (!fromJson(v, result)) {
-        FAIL("Conversion from JSON datatype failed");
+        error("Conversion from JSON datatype failed");
         return T();
     }
     return result;
@@ -52,7 +52,7 @@ bool fromJson(const rapidjson::Value &v, Vec<ElementType, Size> &dst)
         dst = Vec<ElementType, Size>(as<ElementType>(v));
         return true;
     }
-    ASSERT(v.Size() == 1 || v.Size() == Size,
+    assert(v.Size() == 1 || v.Size() == Size,
         "Cannot convert Json Array to vector: Invalid size. Expected 1 or %d, received %d", Size, v.Size());
 
     if (v.Size() == 1)

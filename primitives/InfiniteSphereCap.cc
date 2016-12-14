@@ -40,16 +40,6 @@ void InfiniteSphereCap::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "sample", _doSample);
     ::fromJson(v, "cap_angle", _capAngleDeg);
 }
-rapidjson::Value InfiniteSphereCap::toJson(Allocator &allocator) const
-{
-    JsonObject result{Primitive::toJson(allocator), allocator,
-        "type", "infinite_sphere_cap",
-        "sample", _doSample,
-        "cap_angle", _capAngleDeg
-    };
-
-    return result;
-}
 
 bool InfiniteSphereCap::intersect(Ray &ray, IntersectionTemporary &data) const
 {
@@ -203,7 +193,7 @@ void InfiniteSphereCap::prepareForRender()
     if (!_domeName.empty()) {
         const Primitive *prim = _scene->findPrimitive(_domeName);
         if (!prim)
-            DBG("Note: unable to find pivot object '%s' for infinity sphere cap", _domeName.c_str());
+            log("Note: unable to find pivot object '%s' for infinity sphere cap", _domeName.c_str());
         else
             tform = prim->transform();
     }
@@ -223,7 +213,7 @@ int InfiniteSphereCap::numBsdfs() const
 
 std::shared_ptr<Bsdf> &InfiniteSphereCap::bsdf(int /*index*/)
 {
-    FAIL("InfiniteSphereCap::bsdf should not be called");
+    error("InfiniteSphereCap::bsdf should not be called");
 }
 
 void InfiniteSphereCap::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)

@@ -13,7 +13,6 @@ public:
     IesTexture(PathPtr path, int resolution);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual void loadResources() override;
 

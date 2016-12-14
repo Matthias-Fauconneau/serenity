@@ -11,11 +11,3 @@ bool Texture::scalarOrVecFromJson(const rapidjson::Value &v, const char *field, 
         return ::fromJson(v, field, dst);
     }
 }
-
-rapidjson::Value Texture::scalarOrVecToJson(const Vec3f &src, Allocator &allocator)
-{
-    if (src.x() == src.y() && src.y() == src.z())
-        return (::toJson(src.x(), allocator));
-    else
-        return (::toJson(src, allocator));
-}

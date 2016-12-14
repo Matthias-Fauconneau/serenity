@@ -1,9 +1,9 @@
+#include "core.h"
 #include "Point.h"
 #include "TriangleMesh.h"
 #include "sampling/PathSampleGenerator.h"
 #include "sampling/SampleWarp.h"
 #include "io/JsonObject.h"
-#include "Debug.h"
 
 Point::Point(Mat4f &transform)
 {
@@ -24,13 +24,6 @@ float Point::powerToRadianceFactor() const
 void Point::fromJson(const rapidjson::Value &v, const Scene &scene)
 {
     Primitive::fromJson(v, scene);
-}
-
-rapidjson::Value Point::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "point"
-    };
 }
 
 bool Point::intersect(Ray &/*ray*/, IntersectionTemporary &/*data*/) const
@@ -177,12 +170,12 @@ int Point::numBsdfs() const
 
 std::shared_ptr<Bsdf> &Point::bsdf(int /*index*/)
 {
-    FAIL("Point::bsdf should never be called");
+    error("Point::bsdf should never be called");
 }
 
 void Point::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)
 {
-    FAIL("Point::setBsdf should never be called");
+    error("Point::setBsdf should never be called"_);
 }
 
 Primitive *Point::clone()

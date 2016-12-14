@@ -22,17 +22,6 @@ void SmoothCoatBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     _substrate = scene.fetchBsdf(fetchMember(v, "substrate"));
 }
 
-rapidjson::Value SmoothCoatBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "smooth_coat",
-        "ior", _ior,
-        "thickness", _thickness,
-        "sigma_a", _sigmaA,
-        "substrate", *_substrate
-    };
-}
-
 bool SmoothCoatBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (event.wi.z() <= 0.0f)

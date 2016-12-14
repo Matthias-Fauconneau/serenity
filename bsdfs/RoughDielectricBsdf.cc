@@ -38,17 +38,6 @@ void RoughDielectricBsdf::fromJson(const rapidjson::Value &v, const Scene &scene
     prepareForRender();
 }
 
-rapidjson::Value RoughDielectricBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "rough_dielectric",
-        "ior", _ior,
-        "distribution", _distributionName,
-        "enable_refraction", _enableT,
-        "roughness", *_roughness
-    };
-}
-
 bool RoughDielectricBsdf::sampleBase(SurfaceScatterEvent &event, bool sampleR, bool sampleT,
         float roughness, float ior, Microfacet::Distribution distribution)
 {

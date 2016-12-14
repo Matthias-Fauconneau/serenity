@@ -20,11 +20,6 @@ void ConstantTexture::fromJson(const rapidjson::Value &v, const Scene &/*scene*/
     scalarOrVecFromJson(v, "value", _value);
 }
 
-rapidjson::Value ConstantTexture::toJson(Allocator &allocator) const
-{
-    return scalarOrVecToJson(_value, allocator);
-}
-
 bool ConstantTexture::isConstant() const
 {
     return true;

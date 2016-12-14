@@ -15,7 +15,6 @@ public:
     SmoothCoatBsdf();
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     //TODO transmissive substrate
     virtual bool sample(SurfaceScatterEvent &event) const override;

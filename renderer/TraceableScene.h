@@ -48,7 +48,6 @@ struct TraceableScene : Scene
 public:
     TraceableScene() {
         _camera->prepareForRender();
-        _camera->requestOutputBuffers(_settings.renderOutputs());
 
         for (std::shared_ptr<Medium> &m : _media)
             m->prepareForRender();
@@ -113,15 +112,10 @@ public:
 
             rtcCommit(_scene);
         }
-
-        _integrator->prepareForRender(*this, 0);
     }
 
     ~TraceableScene()
     {
-        _integrator->teardownAfterRender();
-        _camera->teardownAfterRender();
-
         for (std::shared_ptr<Medium> &m : _media)
             m->teardownAfterRender();
 

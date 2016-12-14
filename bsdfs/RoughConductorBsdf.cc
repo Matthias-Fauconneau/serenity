@@ -20,7 +20,7 @@ RoughConductorBsdf::RoughConductorBsdf()
 void RoughConductorBsdf::lookupMaterial()
 {
     if (!lookup(_materialName, _eta, _k)) {
-        DBG("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
+        log("Warning: Unable to find material with name '%s'. Using default", _materialName.c_str());
         lookup("Cu", _eta, _k);
     }
 }
@@ -38,21 +38,6 @@ void RoughConductorBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
 
     // Fail early in case of invalid distribution name
     prepareForRender();
-}
-
-rapidjson::Value RoughConductorBsdf::toJson(Allocator &allocator) const
-{
-    JsonObject result{Bsdf::toJson(allocator), allocator,
-        "type", "rough_conductor",
-        "distribution", _distributionName,
-        "roughness", *_roughness
-    };
-    if (_materialName.empty())
-        result.add("eta", _eta, "k", _k);
-    else
-        result.add("material", _materialName);
-
-    return result;
 }
 
 bool RoughConductorBsdf::sample(SurfaceScatterEvent &event) const

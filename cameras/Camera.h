@@ -1,5 +1,4 @@
 #pragma once
-#include "OutputBuffer.h"
 #include "samplerecords/DirectionSample.h"
 #include "samplerecords/PositionSample.h"
 #include "samplerecords/LensSample.h"
@@ -13,6 +12,7 @@
 #include "matrix.h"
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))
@@ -41,15 +41,6 @@ struct Camera : public JsonSerializable
 
     std::shared_ptr<Medium> _medium;
 
-    OutputBufferSettings _colorBufferSettings;
-
-public: std::unique_ptr<OutputBufferVec3f> _colorBuffer;
-protected:
-    std::unique_ptr<OutputBufferF>     _depthBuffer;
-    std::unique_ptr<OutputBufferVec3f> _normalBuffer;
-    std::unique_ptr<OutputBufferVec3f> _albedoBuffer;
-    std::unique_ptr<OutputBufferF> _visibilityBuffer;
-
     double _colorBufferWeight;
 
     double _splatWeight;
@@ -62,7 +53,6 @@ public:
     Camera(const Mat4f &transform, const Vec2u &res);
 
     void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool samplePosition(PathSampleGenerator &sampler, PositionSample &sample, Vec2u pixel) const;
     virtual bool sampleDirection(PathSampleGenerator &sampler, const PositionSample &point, DirectionSample &sample) const;
@@ -78,9 +68,7 @@ public:
     virtual float approximateFov() const = 0;
 
     virtual void prepareForRender();
-    virtual void teardownAfterRender();
 
-    void requestOutputBuffers(const std::vector<OutputBufferSettings> &settings);
     void requestColorBuffer();
     void requestSplatBuffer();
     void blitSplatBuffer();
@@ -89,79 +77,6 @@ public:
     void setPos(const Vec3f &pos);
     void setLookAt(const Vec3f &lookAt);
     void setUp(const Vec3f &up);
-
-    void saveOutputBuffers() const;
-    void serializeOutputBuffers(OutputStreamHandle &out) const;
-    void deserializeOutputBuffers(InputStreamHandle &in);
-
-    OutputBufferVec3f *colorBuffer()
-    {
-        return _colorBuffer.get();
-    }
-
-    OutputBufferF *depthBuffer()
-    {
-        return _depthBuffer.get();
-    }
-
-    OutputBufferVec3f *normalBuffer()
-    {
-        return _normalBuffer.get();
-    }
-
-    OutputBufferVec3f *albedoBuffer()
-    {
-        return _albedoBuffer.get();
-    }
-
-    OutputBufferF *visibilityBuffer()
-    {
-        return _visibilityBuffer.get();
-    }
-
-    const OutputBufferVec3f *colorBuffer() const
-    {
-        return _colorBuffer.get();
-    }
-
-    const OutputBufferF *depthBuffer() const
-    {
-        return _depthBuffer.get();
-    }
-
-    const OutputBufferVec3f *normalBuffer() const
-    {
-        return _normalBuffer.get();
-    }
-
-    const OutputBufferVec3f *albedoBuffer() const
-    {
-        return _albedoBuffer.get();
-    }
-
-    const OutputBufferF *visibilityBuffer() const
-    {
-        return _visibilityBuffer.get();
-    }
-
-    inline Vec3f getLinear(int x, int y) const
-    {
-        int idx = x + y*_res.x();
-        Vec3f result(0.0f);
-        if (_colorBuffer)
-            result += (*_colorBuffer)[idx]*_colorBufferWeight;
-        return result;
-    }
-
-    void setColorBufferWeight(double weight)
-    {
-        _colorBufferWeight = weight;
-    }
-
-    void setSplatWeight(double weight)
-    {
-        _splatWeight = weight;
-    }
 
     const Mat4f &transform() const
     {

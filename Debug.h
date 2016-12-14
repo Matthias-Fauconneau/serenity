@@ -8,7 +8,7 @@ void debugLog(const std::string &message);
 #define DEBUG_END
 
 # define FAIL(...) throw std::runtime_error(format("PROGRAM FAILURE in %s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__)))
-# define DBG(...) do { DEBUG_BEGIN debugLog(format("%s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); DEBUG_END } while(false)
+# define log(...) do { DEBUG_BEGIN debugLog(format("%s:%d: " FIRST(__VA_ARGS__), __FILE__, __LINE__ REST(__VA_ARGS__))); DEBUG_END } while(false)
 # define ASSERT(EXP, ...) do { \
     DEBUG_BEGIN \
     if (!bool(EXP)) \

@@ -9,6 +9,7 @@
 #include "io/JsonObject.h"
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 
 DielectricBsdf::DielectricBsdf()
@@ -30,15 +31,6 @@ void DielectricBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     Bsdf::fromJson(v, scene);
     ::fromJson(v, "ior", _ior);
     ::fromJson(v, "enable_refraction", _enableT);
-}
-
-rapidjson::Value DielectricBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "dielectric",
-        "ior", _ior,
-        "enable_refraction", _enableT
-    };
 }
 
 bool DielectricBsdf::sample(SurfaceScatterEvent &event) const

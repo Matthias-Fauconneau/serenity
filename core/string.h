@@ -188,3 +188,6 @@ generic auto str(const handle<T>& t) -> decltype(str(t.pointer)) { return str(t.
 generic auto str(const unique<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
 /// Forwards shared
 generic auto str(const shared<T>& t) -> decltype(str(*t.pointer)) { return str(*t.pointer); }
+
+#include <string>
+template<> inline String str(const std::string& s) { return unsafeRef(string(s.data(), s.size())); }

@@ -46,15 +46,6 @@ void Disk::fromJson(const rapidjson::Value &v, const Scene &scene)
     _bsdf = scene.fetchBsdf(fetchMember(v, "bsdf"));
 }
 
-rapidjson::Value Disk::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "disk",
-        "cone_angle", _coneAngle,
-        "bsdf", *_bsdf
-    };
-}
-
 bool Disk::intersect(Ray &ray, IntersectionTemporary &data) const
 {
     float nDotW = ray.dir().dot(_n);

@@ -23,14 +23,6 @@ void HenyeyGreensteinPhaseFunction::fromJson(const rapidjson::Value &v, const Sc
     ::fromJson(v, "g", _g);
 }
 
-rapidjson::Value HenyeyGreensteinPhaseFunction::toJson(Allocator &allocator) const
-{
-    return JsonObject{PhaseFunction::toJson(allocator), allocator,
-        "type", "henyey_greenstein",
-        "g", _g
-    };
-}
-
 Vec3f HenyeyGreensteinPhaseFunction::eval(const Vec3f &wi, const Vec3f &wo) const
 {
     return Vec3f(henyeyGreenstein(wi.dot(wo)));

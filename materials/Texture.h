@@ -10,13 +10,10 @@ enum TextureMapJacobian {
     MAP_JACOBIAN_COUNT,
 };
 
-class Texture : public JsonSerializable
+struct Texture : public JsonSerializable
 {
-protected:
     static bool scalarOrVecFromJson(const rapidjson::Value &v, const char *field, Vec3f &dst);
-    static rapidjson::Value scalarOrVecToJson(const Vec3f &src, Allocator &allocator);
 
-public:
     virtual ~Texture() {}
 
     virtual bool isConstant() const = 0;

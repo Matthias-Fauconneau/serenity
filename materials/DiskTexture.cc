@@ -14,14 +14,6 @@ void DiskTexture::fromJson(const rapidjson::Value &v, const Scene &/*scene*/)
     scalarOrVecFromJson(v, "value", _value);
 }
 
-rapidjson::Value DiskTexture::toJson(Allocator &allocator) const
-{
-    return JsonObject{Texture::toJson(allocator), allocator,
-        "type", "disk",
-        "value",  scalarOrVecToJson( _value, allocator)
-    };
-}
-
 bool DiskTexture::isConstant() const
 {
     return false;

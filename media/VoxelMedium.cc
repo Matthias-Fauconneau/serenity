@@ -19,16 +19,6 @@ void VoxelMedium::fromJson(const rapidjson::Value &v, const Scene &scene)
     _grid = scene.fetchGrid(fetchMember(v, "grid"));
 }
 
-rapidjson::Value VoxelMedium::toJson(Allocator &allocator) const
-{
-    return JsonObject{Medium::toJson(allocator), allocator,
-        "type", "voxel",
-        "sigma_a", _sigmaA,
-        "sigma_s", _sigmaS,
-        "grid", *_grid
-    };
-}
-
 void VoxelMedium::loadResources()
 {
     _grid->loadResources();

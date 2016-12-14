@@ -9,6 +9,7 @@
 #include "io/JsonUtils.h"
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 
 PlasticBsdf::PlasticBsdf()
@@ -25,16 +26,6 @@ void PlasticBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "ior", _ior);
     ::fromJson(v, "thickness", _thickness);
     ::fromJson(v, "sigma_a", _sigmaA);
-}
-
-rapidjson::Value PlasticBsdf::toJson(Allocator &allocator) const
-{
-    rapidjson::Value v = Bsdf::toJson(allocator);
-    v.AddMember("type", "plastic", allocator);
-    v.AddMember("ior", _ior, allocator);
-    v.AddMember("thickness", _thickness, allocator);
-    v.AddMember("sigma_a", ::toJson(_sigmaA, allocator), allocator);
-    return v;
 }
 
 bool PlasticBsdf::sample(SurfaceScatterEvent &event) const

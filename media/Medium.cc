@@ -20,14 +20,6 @@ void Medium::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "max_bounces", _maxBounce);
 }
 
-rapidjson::Value Medium::toJson(Allocator &allocator) const
-{
-    return JsonObject{JsonSerializable::toJson(allocator), allocator,
-        "phase_function", *_phaseFunction,
-        "max_bounces", _maxBounce
-    };
-}
-
 Vec3f Medium::transmittanceAndPdfs(PathSampleGenerator &sampler, const Ray &ray, bool startOnSurface,
         bool endOnSurface, float &pdfForward, float &pdfBackward) const
 {

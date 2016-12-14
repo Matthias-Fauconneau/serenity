@@ -50,7 +50,6 @@ public:
     Primitive(const std::string &name);
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool intersect(Ray &ray, IntersectionTemporary &data) const = 0;
     virtual bool occluded(const Ray &ray) const = 0;

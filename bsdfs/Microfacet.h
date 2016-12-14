@@ -2,7 +2,6 @@
 #include "math/MathUtil.h"
 #include "math/Angle.h"
 #include "math/Vec.h"
-#include "Debug.h"
 
 class Microfacet
 {
@@ -22,7 +21,7 @@ public:
             return Phong;
         else if (name == "ggx")
             return GGX;
-        FAIL("Invalid microfacet distribution: '%s'", name.c_str());
+        error("Invalid microfacet distribution: '%s'", name.c_str());
         return Beckmann;
     }
 

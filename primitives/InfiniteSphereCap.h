@@ -27,7 +27,6 @@ public:
     InfiniteSphereCap();
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
     virtual bool intersect(Ray &ray, IntersectionTemporary &data) const override;
     virtual bool occluded(const Ray &ray) const override;

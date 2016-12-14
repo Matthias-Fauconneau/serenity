@@ -24,17 +24,6 @@ void CheckerTexture::fromJson(const rapidjson::Value &v, const Scene &scene)
     ::fromJson(v, "res_v", _resV);
 }
 
-rapidjson::Value CheckerTexture::toJson(Allocator &allocator) const
-{
-    return JsonObject{Texture::toJson(allocator), allocator,
-        "type", "checker",
-        "on_color",  scalarOrVecToJson( _onColor, allocator),
-        "off_color", scalarOrVecToJson(_offColor, allocator),
-        "res_u", _resU,
-        "res_v", _resV
-    };
-}
-
 bool CheckerTexture::isConstant() const
 {
     return false;

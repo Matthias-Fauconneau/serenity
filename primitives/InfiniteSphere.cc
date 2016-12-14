@@ -64,13 +64,6 @@ void InfiniteSphere::fromJson(const rapidjson::Value &v, const Scene &scene)
     Primitive::fromJson(v, scene);
     ::fromJson(v, "sample", _doSample);
 }
-rapidjson::Value InfiniteSphere::toJson(Allocator &allocator) const
-{
-    return JsonObject{Primitive::toJson(allocator), allocator,
-        "type", "infinite_sphere",
-        "sample", _doSample
-    };
-}
 
 bool InfiniteSphere::intersect(Ray &ray, IntersectionTemporary &data) const
 {
@@ -267,7 +260,7 @@ int InfiniteSphere::numBsdfs() const
 
 std::shared_ptr<Bsdf> &InfiniteSphere::bsdf(int /*index*/)
 {
-    FAIL("InfiniteSphere::bsdf should not be called");
+    error("InfiniteSphere::bsdf should not be called");
 }
 
 void InfiniteSphere::setBsdf(int /*index*/, std::shared_ptr<Bsdf> &/*bsdf*/)

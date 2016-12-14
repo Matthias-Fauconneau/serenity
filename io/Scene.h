@@ -1,4 +1,5 @@
 #pragma once
+#include "core.h"
 #include <unordered_set>
 #include <unordered_map>
 #include <memory>
@@ -19,6 +20,7 @@
 #include "bsdfs/Bsdf.h"
 #undef Type
 #undef unused
+#define RAPIDJSON_ASSERT assert
 #include <rapidjson/document.h>
 #define Type typename
 #define unused __attribute((unused))
@@ -34,7 +36,6 @@ struct Scene : public JsonSerializable {
     std::shared_ptr<Texture> _errorTexture;
     std::shared_ptr<TextureCache> _textureCache;
     std::shared_ptr<Camera> _camera;
-    std::shared_ptr<Integrator> _integrator;
 
     std::unordered_set<const Primitive *> _helperPrimitives;
     mutable std::unordered_map<Path, PathPtr> _resources;
@@ -47,11 +48,7 @@ struct Scene : public JsonSerializable {
     std::shared_ptr<Bsdf>          instantiateBsdf      (std::string type, const rapidjson::Value &value) const;
     std::shared_ptr<Primitive>     instantiatePrimitive (std::string type, const rapidjson::Value &value) const;
     std::shared_ptr<Camera>        instantiateCamera    (std::string type, const rapidjson::Value &value) const;
-    std::shared_ptr<Integrator>    instantiateIntegrator(std::string type, const rapidjson::Value &value) const;
     std::shared_ptr<Texture>       instantiateTexture   (std::string type, const rapidjson::Value &value, TexelConversion conversion) const;
-
-    /*template<typename Instantiator, typename Element>
-    void loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result);*/
 
     template<typename Instantiator, typename Element>
     void loadObjectList(const rapidjson::Value &container, Instantiator instantiator, std::vector<std::shared_ptr<Element>> &result)
@@ -62,7 +59,7 @@ struct Scene : public JsonSerializable {
                 if (element)
                     result.push_back(std::move(element));
             } else {
-                DBG("Don't know what to do with non-object in object list");
+                log("Don't know what to do with non-object in object list");
             }
         }
     }
@@ -80,10 +77,7 @@ public:
     Scene();
 
     virtual void fromJson(const rapidjson::Value &v, const Scene &scene) override;
-    virtual rapidjson::Value toJson(Allocator &allocator) const override;
-
     virtual void loadResources() override;
-    virtual void saveResources() override;
 
     std::shared_ptr<PhaseFunction> fetchPhase(const rapidjson::Value &v) const;
     std::shared_ptr<Medium> fetchMedium(const rapidjson::Value &v) const;
@@ -170,11 +164,6 @@ public:
     RendererSettings &rendererSettings()
     {
         return _rendererSettings;
-    }
-    
-    Integrator *integrator()
-    {
-        return _integrator.get();
     }
 
     std::unordered_map<Path, PathPtr> &resources()

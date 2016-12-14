@@ -18,9 +18,9 @@
 #include "bsdfs/MirrorBsdf.h"
 #include "bsdfs/PhongBsdf.h"
 #include "bsdfs/ErrorBsdf.h"
-#include "tinyformat.h"
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 template<unsigned Size>
 Vec<float, Size> ObjLoader::loadVector(const char *s)
@@ -171,7 +171,7 @@ void ObjLoader::loadMaterialLibrary(const char *path)
                 std::string name = extractString(line + 7);
                 _materialToIndex.insert(std::make_pair(name, matIndex));
                 _materials.push_back(ObjMaterial(name));
-                DBG("Loaded material %s", name);
+                log("Loaded material %s", name.c_str());
             } else if (hasPrefix(line, "Kd")) {
                 _materials[matIndex].diffuse = loadVector<3>(line + 3);
             } else if (hasPrefix(line, "Ks")) {
@@ -196,7 +196,7 @@ void ObjLoader::loadMaterialLibrary(const char *path)
         for (size_t i = previousTop; i < _materials.size(); ++i)
             _convertedMaterials.emplace_back(convertObjMaterial(_materials[i]));
     } else {
-        DBG("Unable to load material library at '%s'", mtlPath);
+        log("Unable to load material library at '%s'", mtlPath);
     }
 }
 
@@ -234,7 +234,7 @@ void ObjLoader::loadLine(const char *line)
         if (iter != _materialToIndex.end())
             _currentMaterial = iter->second;
         else {
-            DBG("Could not load material %s", mtlName);
+            log("Could not load material %s", mtlName);
             _currentMaterial = -1;
         }
     } else if (hasPrefix(line, "g") || hasPrefix(line, "o")) {
@@ -308,7 +308,8 @@ std::shared_ptr<Bsdf> ObjLoader::convertObjMaterial(const ObjMaterial &mat)
 
 std::string ObjLoader::generateDummyName() const
 {
-    return format("Mesh%d", _meshes.size() + 1);
+    error("");
+    //return format("Mesh%d", _meshes.size() + 1);
 }
 
 void ObjLoader::clearPerMeshData()
@@ -376,7 +377,7 @@ std::shared_ptr<Primitive> ObjLoader::tryInstantiateSphere(const std::string &na
 std::shared_ptr<Primitive> ObjLoader::tryInstantiateQuad(const std::string &name, std::shared_ptr<Bsdf> &bsdf)
 {
     if (_tris.size() != 2) {
-        DBG("AnalyticQuad must have exactly 2 triangles. Mesh '%s' has %d instead", _meshName.c_str(), _tris.size());
+        log("AnalyticQuad must have exactly 2 triangles. Mesh '%s' has %d instead", _meshName.c_str(), _tris.size());
         return nullptr;
     }
 
@@ -401,7 +402,7 @@ std::shared_ptr<Primitive> ObjLoader::tryInstantiateQuad(const std::string &name
 std::shared_ptr<Primitive> ObjLoader::tryInstantiateCube(const std::string &name, std::shared_ptr<Bsdf> &bsdf)
 {
     if (_tris.size() != 12) {
-        DBG("AnalyticCube must have exactly 12 triangles. Mesh '%s' has %d instead", _meshName.c_str(), _tris.size());
+        log("AnalyticCube must have exactly 12 triangles. Mesh '%s' has %d instead", _meshName.c_str(), _tris.size());
         return nullptr;
     }
 

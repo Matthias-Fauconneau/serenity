@@ -21,15 +21,6 @@ void OrenNayarBsdf::fromJson(const rapidjson::Value &v, const Scene &scene)
     scene.textureFromJsonMember(v, "roughness", TexelConversion::REQUEST_AVERAGE, _roughness);
 }
 
-rapidjson::Value OrenNayarBsdf::toJson(Allocator &allocator) const
-{
-    return JsonObject{Bsdf::toJson(allocator), allocator,
-        "type", "oren_nayar",
-        "roughness", *_roughness
-    };
-}
-
-
 bool OrenNayarBsdf::sample(SurfaceScatterEvent &event) const
 {
     if (!event.requestedLobe.test(BsdfLobes::DiffuseReflectionLobe))
