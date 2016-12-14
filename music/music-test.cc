@@ -451,6 +451,7 @@ skip:;
      }
      if(done) { log("Audio track end"); break; }
      Image target (encoder.size);
+     target.clear(0xFF);
      while((int64)encoder.videoTime*encoder.audioFrameRate*encoder.videoFrameRateDen <= (int64)encoder.audioTime*encoder.videoFrameRateNum) {
       follow(videoTime*encoder.videoFrameRateDen, encoder.videoFrameRateNum, vec2(encoder.size));
       renderTime.start();
@@ -458,7 +459,7 @@ skip:;
       const int width = ::min((image.size.x-(int)(-scroll.offset.x))/2, encoder.size.x);
       const int height = ::min(target.size.y-image.size.y/2, 240);
       const int y0 = (target.size.y-height-image.size.y/2)/2;
-      const int y1 = y0+image.size.y/2, y2=target.size.y;
+      //const int y1 = y0+image.size.y/2, y2=target.size.y;
       resampleTime.start();
       const Image8 source = cropRef(imageLo, int2(-scroll.offset.x/2, 0), int2(width, image.size.y/2));
       const Image subTarget = cropRef(target, int2(0, y0),  int2(width, image.size.y/2));
@@ -469,7 +470,7 @@ skip:;
           for(size_t x: range(source.size.x)) targetLine[x] = sourceLine[x];
       }
       resampleTime.stop();
-      fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
+      //fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
       for(OCRNote note: highlight) {
        const int x = scroll.offset.x+note.position.x;
        const int y = scroll.offset.y+note.position.y;
@@ -479,7 +480,7 @@ skip:;
         blend(target, x/2+dx, y0+y/2+dy, note.color, a/255.f);
        }
       }
-      fill(target, int2(0, y1), int2(target.size.x, (y2-height)-y1), white);
+      //fill(target, int2(0, y1), int2(target.size.x, (y2-height)-y1), white);
       keyboard.render(cropRef(target, int2(0, target.size.y-height), int2(target.size.x, height)));
       renderTime.stop();
       videoEncodeTime.start();
@@ -643,12 +644,16 @@ skip:;
      int width = ::min(image.size.x-(int)(-scroll.offset.x), (int)(uint64)target.size.x*2);
      const int y1 = image.size.y/2, y2=target.size.y;
      const int height = ::min(y2-y1, 240);
+     const int y0 = (target.size.y-height-image.size.y/2)/2;
+     assert_(y0 >= 0);
      resampleTime.start(); // FIXME: single pass downsample and toImage
-     const Image targetArea = cropRef(target, int2(0, (target.size.y-height-image.size.y)/2), int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2));
-     const Image8 source = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
-     bilinear(targetArea, toImage(source));
+     const Image targetArea = cropRef(target, int2(0, y0), int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2));
+     //const Image8 source = cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y));
+     //bilinear(targetArea, toImage(source));
      /*bilinear(cropRef(target, int2(0, (target.size.y-height-image.size.y)/2), int2(::min(target.size.x, (int)(uint64)width/2), image.size.y/2)),
               toImage(cropRef(image, int2(-scroll.offset.x, 0), int2(width, image.size.y)))); // FIXME: bilinear8*/
+     const Image8 source = cropRef(imageLo, int2(-scroll.offset.x/2, 0), int2(width/2, image.size.y/2));
+     for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) targetArea(x, y) = byte4(byte3(source(x, y)),0xFF);
      resampleTime.stop();
      fill(target, int2(width, 0), int2(target.size.x-width, target.size.y), white, 1);
      for(OCRNote note: highlight) {
