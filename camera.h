@@ -1,4 +1,6 @@
 #pragma once
+#include "matrix.h"
+#include "variant.h"
 
 inline Variant parseJSON(TextData& s) {
     s.whileAny(" \t\n\r"_);
@@ -60,6 +62,7 @@ static const mat4 transform(const Dict& object) {
     transform[0] = vec4(x, 0);
     transform[1] = vec4(y, 0);
     transform[2] = vec4(z, 0);
+    transform[3].xyz() = position;
     return transform;
 }
 
@@ -67,11 +70,12 @@ static inline mat4 parseCamera(ref<byte> file) {
     TextData s (file);
     Variant root = parseJSON(s);
     const Dict& camera = root.dict.at("camera");
-    mat4 modelView = ::transform( camera ).inverse();
-    modelView = /*mat4().translate(vec3(0,0,-1./2)) **/ mat4().scale(1./16) * modelView;
+    /*mat4 modelView = ::transform( camera ).inverse();
+    modelView = mat4().scale(1./16) * modelView;
     modelView.rotateZ(PI); // -Z (FIXME)
     modelView = mat4().rotateZ(PI) * modelView;
-    return modelView;
+    return modelView;*/
+    return ::transform( camera );
 }
 
 static mat4 shearedPerspective(const float s, const float t) { // Sheared perspective (rectification)

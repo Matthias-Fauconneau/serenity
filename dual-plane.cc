@@ -75,13 +75,18 @@ struct ViewApp : ViewControl {
 #if 1
         {
             const mat4 camera = parseCamera(readFile("scene.json"));
-            const float s = (angles.x+::PI/3)/(2*::PI/3), t = (angles.y+::PI/3)/(2*::PI/3);
-            const mat4 M = shearedPerspective(s, t) * camera;
-            parallel_chunk(target.size.y, [this, &target, M, &Z](uint _threadId, uint start, uint sizeI) {
+            //const float s = (angles.x+::PI/3)/(2*::PI/3), t = (angles.y+::PI/3)/(2*::PI/3);
+            const float s = angles.x/(PI/3), t = angles.y/(PI/3);
+            log(s, t);
+            //const mat4 M = shearedPerspective(s, t) * camera;*/
+            const float scale = 16;
+            parallel_chunk(target.size.y, [this, &target, camera,/*M,*/ &Z, s, t, scale](uint _threadId, uint start, uint sizeI) {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
-                    const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), -1);
-                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), +1);
+                    /*const vec3 O = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), -1);
+                    const vec3 P = M.inverse() * vec3(2.f*x/float(target.size.x-1)-1, -(2.f*y/float(target.size.y-1)-1), +1);*/
+                    const vec3 O = camera * vec3(scale*s, scale*t, 0);
+                    const vec3 P = camera.normalMatrix() * vec3(scale*(2.f*x/float(target.size.x-1)-1), -(scale*(2.f*y/float(target.size.y-1)-1)), 0);
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
                     const uint r = 0xFFF*::min(1.f, emission[0]);
