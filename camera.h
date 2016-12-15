@@ -62,8 +62,8 @@ static const mat4 transform(const Dict& object) {
     transform[0] = vec4(x, 0);
     transform[1] = vec4(y, 0);
     transform[2] = vec4(z, 0);
-    transform[3].xyz() = position;
-    transform.scale(16);
+    transform[3].xyz() = position/2.f;
+    transform.scale(8);
     return transform;
 }
 

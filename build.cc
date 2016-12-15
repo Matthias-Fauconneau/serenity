@@ -83,6 +83,7 @@ bool Build::compileModule(string target) {
     modules.append(copyRef(target));
     String fileName = target+".cc";
     int64 lastEdit = parse(fileName);
+    while(units) compileModule( units.take(0) ); // Always compile dependencies before to preserve static constructor order
     if(!lastEdit) return false;
     String object = tmp+"/"+join(flags,string("-"_))+"/"+target+".o";
     if(!existsFile(object, folder) || lastEdit >= File(object).modifiedTime()) {
@@ -171,7 +172,6 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
     // Compiles
     if(flags.contains("profile")) if(!compileModule(find("core/profile.cc"))) { log("Failed to compile\n"); return; }
     if(!compileModule( find(target+".cc") )) { log("Failed to compile\n"); return; }
-    while(units) compileModule( units.take(0) );
 
     // Links
     binary = tmp+"/"_+join(flags, "-"_)+"/"_+target;

@@ -24,7 +24,6 @@ struct ViewApp : ViewControl {
 
     bool orthographic = false;
 
-    //ViewWidget view {uint2(256), {this, &ViewApp::render}};
     unique<Window> window = nullptr;
 
     TraceableScene scene;
@@ -66,12 +65,12 @@ struct ViewApp : ViewControl {
             window->setTitle(name);
         }
     }
-    virtual vec2 sizeHint(vec2) override { return vec2(2*256, 256); }
+    virtual vec2 sizeHint(vec2) override { return vec2(2*imageSize.x, imageSize.y); }
     virtual shared<Graphics> graphics(vec2) override { render(angles); return shared<Graphics>(); }
     void render(vec2 angles) {
         const Image& window = ((XWindow*)this->window.pointer)->target;
-        const Image target = cropShare(window, int2(0), uint2(256));
-        ImageH Z(uint2(256));
+        const Image target = cropShare(window, int2(0), imageSize);
+        ImageH Z(imageSize);
         const mat4 camera = parseCamera(readFile("scene.json"));
         const float s = angles.x/(PI/3), t = angles.y/(PI/3);
 #if 1
@@ -95,7 +94,7 @@ struct ViewApp : ViewControl {
 #endif
 #if 1
         {
-            const Image target = cropShare(window, int2(256,0), uint2(256,256));
+            const Image target = cropShare(window, int2(imageSize.x,0), imageSize);
             /*mat4 M;
             if(orthographic) {
                 M.rotateX(angles.y); // Pitch
@@ -176,10 +175,15 @@ struct ViewApp : ViewControl {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                            //const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                            const v4sf w01uv = and( /*abs(Z - float4(z)) < float4(0x1p-5)*/~0, // Discards far samples (tradeoff between edge and anisotropic accuracy)
+#if 0
+                            const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
+                                             * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
+#else
+                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                            const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ || abs(Z - float4(z)) < float4(1/*0x1p-5*/), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                     __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
+#endif
                             float sum = ::hsum(w01uv);
                             const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
                             w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation

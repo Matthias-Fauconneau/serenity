@@ -16,8 +16,8 @@ struct Render {
         Folder cacheFolder {"teapot", tmp, true};
         for(string file: cacheFolder.list(Files)) remove(file, cacheFolder);
 
-        const int N = 9;
-        uint2 size (256);
+        const int N = 17;
+        uint2 size (960);
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), cacheFolder, Flags(ReadWrite|Create));
         size_t byteSize = 4ull*N*N*size.y*size.x*sizeof(half);
