@@ -16,8 +16,9 @@ struct Render {
         Folder cacheFolder {"teapot", tmp, true};
         for(string file: cacheFolder.list(Files)) remove(file, cacheFolder);
 
-        const int N = 17;
+        const int N = 3;
         uint2 size (960);
+        const int spp = 16;
 
         File file(str(N)+'x'+str(N)+'x'+strx(size), cacheFolder, Flags(ReadWrite|Create));
         size_t byteSize = 4ull*N*N*size.y*size.x*sizeof(half);
@@ -54,11 +55,12 @@ struct Render {
                 for(int y: range(start, start+sizeI)) for(uint x: range(size.x)) {
                     const vec3 P = camera * vec3((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 1);
                     float hitDistance;
-                    Vec3f emission = tracer.trace(O, P, hitDistance);
+                    Vec3f emission (0.f);
+                    for(int unused i : range(spp)) emission += tracer.trace(O, P, hitDistance);
                     targetZ[y*size.x+x] = hitDistance / ::length(P-O);
-                    targetB[y*size.x+x] = emission[2];
-                    targetG[y*size.x+x] = emission[1];
-                    targetR[y*size.x+x] = emission[0];
+                    targetB[y*size.x+x] = emission[2] / spp;
+                    targetG[y*size.x+x] = emission[1] / spp;
+                    targetR[y*size.x+x] = emission[0] / spp;
                 }
             });
         }

@@ -12,7 +12,7 @@
 #include "renderer/TraceableScene.h"
 #include "integrators/TraceBase.h"
 #include "sampling/UniformPathSampler.h"
-//#include "prerender.h"
+#include "prerender.h"
 
 struct ViewApp : ViewControl {
     string name;
@@ -31,7 +31,6 @@ struct ViewApp : ViewControl {
     ImageF sumB, sumG, sumR;
     uint count = 0; // Iteration count (Resets on view angle change)
     vec2 angles = 0;
-
 
     ViewApp() {
         assert_(arguments());
@@ -71,7 +70,7 @@ struct ViewApp : ViewControl {
         }
     }
     virtual vec2 sizeHint(vec2) override { return vec2(2*imageSize.x, imageSize.y); }
-    virtual shared<Graphics> graphics(vec2) override { render(angles); return shared<Graphics>(); }
+    virtual shared<Graphics> graphics(vec2) override { render(ViewControl::angles); return shared<Graphics>(); }
     void render(vec2 angles) {
         const Image& window = ((XWindow*)this->window.pointer)->target;
         const Image target = cropShare(window, int2(0), imageSize);
@@ -149,11 +148,11 @@ struct ViewApp : ViewControl {
                 const unused v2ui sample2D = {    0,           size1/2};
                 const v8ui sample4D = {    0,           size1/2,         size2/2,       (size2+size1)/2,
                                            size3/2, (size3+size1)/2, (size3+size2)/2, (size3+size2+size1)/2};
-                const float scale = (float) imageSize.x / imageCount.x; // st -> uv
+                const float scale = (float)(imageSize.x-1) / (imageCount.x-1); // st -> uv
                 for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
                     size_t targetIndex = (target.size.y-1-targetY)*target.stride + targetX;
-                    const vec3 O = camera.inverse() * camera * vec3(s, t, 0);
-                    const vec3 P = camera.inverse() * camera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
+                    const vec3 O = /*camera.inverse() * camera **/ vec3(s, t, 0);
+                    const vec3 P = /*camera.inverse() * camera **/ vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
                     const vec3 d = normalize(P-O);
 
                     const vec3 n (0,0,-1);
@@ -187,7 +186,7 @@ struct ViewApp : ViewControl {
 
                         v4sf B, G, R;
                         for(int dt: {0,1}) for(int ds: {0,1}) {
-                            vec2 uv_ = uv_uncorrected + scale * (fract(st) - vec2(ds, dt)) * -z_;
+                            vec2 uv_ = uv_uncorrected - scale * (fract(st) - vec2(ds, dt)) * z_;
                             if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
                             int uIndex = uv_[0], vIndex = uv_[1];
                             if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
@@ -197,9 +196,9 @@ struct ViewApp : ViewControl {
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-#if 0
+#if 1
                             const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
-                                             * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
+                                             * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
 #else
                             const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
                             const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ || abs(Z - float4(z)) < float4(1/*0x1p-5*/), // Discards far samples (tradeoff between edge and anisotropic accuracy)
