@@ -28,6 +28,11 @@ struct ViewApp : ViewControl {
 
     TraceableScene scene;
 
+    ImageF sumB, sumG, sumR;
+    uint count = 0; // Iteration count (Resets on view angle change)
+    vec2 angles = 0;
+
+
     ViewApp() {
         assert_(arguments());
         load(arguments()[0]);
@@ -75,6 +80,17 @@ struct ViewApp : ViewControl {
         const float s = angles.x/(PI/3), t = angles.y/(PI/3);
 #if 1
         {
+            if(this->angles != angles || sumB.size != target.size) {
+                this->angles = angles;
+                count = 0; // Resets accumulation
+            }
+            if(count == 0) {
+                if(sumB.size != target.size) sumB = ImageF(target.size); sumB.clear(0);
+                if(sumG.size != target.size) sumG = ImageF(target.size); sumG.clear(0);
+                if(sumR.size != target.size) sumR = ImageF(target.size); sumR.clear(0);
+            }
+            count++;
+
             parallel_chunk(target.size.y, [this, &target, camera,/*M,*/ &Z, s, t](uint _threadId, uint start, uint sizeI) {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
@@ -82,14 +98,20 @@ struct ViewApp : ViewControl {
                     const vec3 P = camera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1);
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
-                    const uint r = 0xFFF*::min(1.f, emission[0]);
-                    const uint g = 0xFFF*::min(1.f, emission[1]);
-                    const uint b = 0xFFF*::min(1.f, emission[2]);
+                    size_t i = y*target.size.x+x;
+                    sumR[i] += emission[0];
+                    sumG[i] += emission[1];
+                    sumB[i] += emission[2];
+
+                    const uint r = 0xFFF*::min(1.f, sumR[i]/count);
+                    const uint g = 0xFFF*::min(1.f, sumG[i]/count);
+                    const uint b = 0xFFF*::min(1.f, sumB[i]/count);
                     extern uint8 sRGB_forward[0x1000];
                     target[(target.size.y-1-y)*target.stride+x] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
-                    Z[y*target.size.x+x] = hitDistance / ::length(P-O);
+                    Z[i] = hitDistance / ::length(P-O);
                 }
             });
+            if(count < 1024) this->window->render();
         }
 #endif
 #if 1
@@ -223,7 +245,6 @@ struct ViewApp : ViewControl {
                     const uint r = ::min(0xFFFu, uint(0xFFF*S.r));
                     extern uint8 sRGB_forward[0x1000];
                     target[targetIndex] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
-                    //target[targetIndex] = byte4(byte3(float(0xFF)*S), 0xFF);
                 }
             });
         }
