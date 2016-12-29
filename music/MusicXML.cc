@@ -259,8 +259,8 @@ MusicXML::MusicXML(string document, string) {
                                                 }}}}}};
                             const Element* tremolo = ornaments && ornaments->contains("tremolo"_) ? ornaments->child("tremolo"_) : 0;
                             if(tremolo && parseInteger(tremolo->text()) != 1) { // FIXME: single note tremolo
-                             if(parseInteger(tremolo->text()) != 3) log("parseInteger(tremolo->text()) == 3", tremolo->text());
-                             assert_(parseInteger(tremolo->text()) == 3, tremolo->text());
+                             if(parseInteger(tremolo->text()) != 3 && parseInteger(tremolo->text()) != 2) log("parseInteger(tremolo->text()) == 3", tremolo->text());
+                             assert_(parseInteger(tremolo->text()) == 2 || parseInteger(tremolo->text()) == 3, tremolo->text());
                              auto type = tremolo->attribute("type"_);
                              if(type=="start"_) sign.note.tremolo = Note::Tremolo::Start;
                              else if(type=="stop"_) sign.note.tremolo = Note::Tremolo::Stop;

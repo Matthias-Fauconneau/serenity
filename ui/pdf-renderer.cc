@@ -38,7 +38,7 @@ static Image trimWhite(const Image& image) {
   if(sum < image.height*255) break;
   x1 = x;
  }
- return copy(cropShare(image, int2(x0, y0), int2(x1-x0, y1-y0)));
+ return copy(cropRef(image, int2(x0, y0), int2(x1-x0, y1-y0)));
 }
 
 static Variant parseVariant(TextData& s) {
@@ -77,7 +77,7 @@ dictionaryEnd: s.whileAny(" \t\r\n");
    if(v.dict.contains("Filter"_)) {
     string filter = v.dict.at("Filter"_).list?v.dict.at("Filter"_).list[0].data:v.dict.at("Filter"_).data;
     if(filter=="FlateDecode"_) stream = inflate(stream, true);
-    else if(filter=="RunLengthDecode"_) stream = decodeRunLength(stream);
+    else if(filter=="RunLengthDecode"_) stream = decodeRunLengthPDF(stream);
     else { log("Unsupported filter",v.dict); return ""_; }
    }
    if(v.dict.contains("DecodeParms"_)) {

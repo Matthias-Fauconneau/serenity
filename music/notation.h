@@ -206,7 +206,7 @@ inline bool operator ==(const Note& a, const Note& b) {
 }
 inline bool operator ==(const Sign& a, const Sign& b) {
  assert_(a.type==Sign::Note && b.type==Sign::Note);
- return a.note == b.note;
+ return a.staff == b.staff && a.note == b.note;
 }
 inline bool operator <(const Sign& a, const Sign& b) {
     if(a.time==b.time) {

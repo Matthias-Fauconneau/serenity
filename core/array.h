@@ -46,7 +46,7 @@ generic struct array : buffer<T> {
     /// Removes all elements
     void clear() { if(size) shrink(0); }
     /// Grows the array to \a size without initializing new elements
-    void grow(size_t size) { reserve(size); this->size=size; }
+    size_t grow(size_t size) { reserve(size); return this->size=size; }
 
     // - Append
     /// Appends a default element

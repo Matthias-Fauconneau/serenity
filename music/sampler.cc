@@ -124,8 +124,8 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
  //assert_(noteToMIDI("c4")==72, noteToMIDI("c4"));
  sampler = this; // DEBUG
  // Parses sfz and map samples
- TextData s = readFile(path);
- Folder folder = section(path,'/',0,-2);
+ TextData s = readFile(path, home());
+ Folder folder (section(path,'/',0,-2), home());
  Sample group, region; Sample* sample=&group;
  auto add = [&]() {
   if(sample==&region) {
@@ -215,7 +215,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
   }
   //log(s.decayTime, s.flac.duration);
 
-  //s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
+  s.flac.decodeFrame(); // Decodes first frame of all samples to start mixing without latency
   s.data.lock(); // Locks compressed samples in memory
   s.flac.seek(s.offset/8*8); // Skips offset to trim silent leads
 
@@ -228,7 +228,6 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
     Layer layer;
     layer.shift = shift;
     layer.notes.reserve(64);
-    //assert_(rate == outputRate);
     if(shift /*|| rate!=outputRate*/) {
      const uint size = 2048; // Accurate frequency resolution while keeping reasonnable filter bank size
      layer.resampler = Resampler(2, size, round(size*exp2((-shift)/12.0)/**outputRate/rate*/),
@@ -258,7 +257,7 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
   if(note.releaseTime) { // Releases fades out current note
    float step = pow(0x1p-8, 2./*2 frames/step*//(rate*note.releaseTime)); // Fades out to 2^-16 in releaseTime
    //Locker lock(note.lock); // Locks mixer (no mid mix parameter change) (unecessary as notes specialize loop on step anyway, and parameters should get copied in registers)
-   note.step = (v4sf){step,step,step,step};
+   note.step = step;
    note.level[2] = note.level[3] = note.level[0] * step; // Steps level of second frame
   }
  }
@@ -292,7 +291,7 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
    //note.decayTime = s.decayTime;
    if(!released) { // Press
     note.key = key, note.velocity = velocity;
-    note.level = float4(s.volume * float(velocity) / 127); // E ~ A^2 ~ v^2 => A ~ v
+    note.level = s.volume * float(velocity) / 127; // E ~ A^2 ~ v^2 => A ~ v
     //note.level = float4(sqrt(s.volume) * float(velocity) / 127); // E ~ A^2 ~ v^2 => A ~ v
     //note.level = float4(s.volume * sq(float(velocity) / 127)); // A ~ F ~ v^2 ?
     //note.level = float4(s.volume * (float(velocity) / 127)); // A ~ F ~ v^2 ?
@@ -306,7 +305,7 @@ void Sampler::noteEvent(uint key, uint velocity/*, float2 gain*/) {
    } else {
     note.level = {level[0], level[1], level[0], level[1]};
    }
-   note.step=(v4sf){1,1,1,1};
+   note.step = 1;
    note.releaseTime=s.releaseTime;
    //note.envelope=s.envelope;
    //if(note.flac.sampleSize==16) note.level *= float4(0x1p8f);
@@ -410,8 +409,8 @@ size_t Sampler::read16(mref<short2> output) {
  assert_(size==output.size);
  for(size_t i: range(size)) for(size_t c: range(channels)) {
   float u = buffer[i][c];
-  if(u<minValue) { minValue=u; log("<min", minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
-  if(u>maxValue) { maxValue=u; log(">max", minValue, maxValue, pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u<minValue) { minValue=u; log("<min", (int)(minValue-1), (int)(maxValue+1), pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
+  if(u>maxValue) { maxValue=u; log(">max", (int)(minValue-1), (int)(maxValue+1), pow(2,ceil(log2(-minValue))), pow(2,ceil(maxValue))); }
   float v = (u-minValue) / (maxValue-minValue); // Normalizes range to [0-1] //((u-minValue) / (maxValue-minValue)) * 2 - 1; // Normalizes range to [-1-1]
   int w = v*0x1p16 - 0x1p15; // Converts floating point to two-complement signed 16 bit integer
   output[i][c] = w;

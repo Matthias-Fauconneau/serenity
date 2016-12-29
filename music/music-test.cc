@@ -135,7 +135,7 @@ struct Music : Widget {
 
   Image target;
   if(!existsFile("OCRNotes",name) || 0) {
-   buffer<Image8> negatives = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
+   buffer<Image8> negatives = apply(0/*3*/, [name](int i){ return toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name))));});
 
    if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
    uint sumX[image.size.y]; // Σ[x-Tx,x]
@@ -149,7 +149,8 @@ struct Music : Widget {
     if(lastReport.seconds()>1) { lastReport.reset(); log(strD(x, target.size.x)); };
     {
      uint sumY=0; // Σ[y-Ty,y]
-     const int y0=256-Ty, y1=image.size.y-128;
+     const int top = 192, bottom = 64;
+     const int y0=top-Ty, y1=image.size.y-bottom;
      for(uint y: range(y0, y0+Ty)) {
       sumX[y] += image(x,y) - image(x-Tx,y);
       sumY += sumX[y];
@@ -164,13 +165,14 @@ struct Music : Widget {
        const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){96,96,104}[t]);
        int corr = 0;
        const int x0 = x-Tx+1, y0 = y-Ty+1;
+       const int half = 128;
        for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
-        corr += (int(image(x0+dx,y0+dy))-128) * (int(templates[t](dx, dy))-128);
+        corr += (int(image(x0+dx,y0+dy))-half) * (int(templates[t](dx, dy))-half);
        }
        if(corr < correlationThreshold) continue;
        int ncorr = 0;
-       if(t==0 || t==2) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
-        ncorr += (int(image(x0+dx,y0+dy))-128) * (int(negatives[t](dx, dy))-128);
+       if(0 && (t==0 || t==2)) for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
+        ncorr += (int(image(x0+dx,y0+dy))-half) * (int(negatives[t](dx, dy))-half);
        }
        if(corr*2 > ncorr*3) {
         corr /= 512;
@@ -221,6 +223,7 @@ skip:;
    writeFile("OCRNotes", cast<byte>(OCRNotes), name, true);
   } else if(0) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
   measureX = cast<uint>(readFile("measureX", name));
+  if(target) for(uint i: range(measureX.size)) render(target, Text(str(1+i),64).graphics(0), vec2(measureX[i], 64));
   OCRNotes = cast<OCRNote>(readFile("OCRNotes", name));
 
   signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
@@ -232,9 +235,9 @@ skip:;
    if(sign.type == Sign::Note) {
     Note& note = sign.note;
     note.signIndex = signIndex;
-    allNotes.sorted(sign.time).append( sign );
+    allNotes.sorted(sign.time).add( sign );
     if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
-     notes.sorted(sign.time).append( sign );
+     notes.sorted(sign.time).add( sign );
     }
    }
   }
@@ -255,6 +258,7 @@ skip:;
 
 
   uint glyphIndex = 0; // X (Time), Top to Bottom
+  //array<char> strNotes;
   for(ref<Sign> chord: allNotes.values) {
    for(Sign note: chord.reverse()) { // Top to Bottom
     // Transfers to notes
@@ -262,13 +266,15 @@ skip:;
      if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
      if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) o.note.glyphIndex[1] = glyphIndex; // Also highlights tied notes
     }
-    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-4,note.note.key()),64).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
+    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-1,note.note.key()),64,red).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
+    //strNotes.append(strKey(-1,note.note.key())+" ");
    }
   }
+  //log(strNotes);
 
   if(glyphIndex != OCRNotes.size) log(glyphIndex, OCRNotes.size);
-  if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
+  //if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
 
   assert_(glyphIndex <= OCRNotes.size, glyphIndex, OCRNotes.size);
   //assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
@@ -284,50 +290,69 @@ skip:;
 
   array<array<uint>> S;
   array<array<uint>> Si; // Maps sorted index to original
-  for(ref<Sign> chord: notes.values) {
+  uint64 minT=-1; {
+   uint lastTime = 0;
    array<uint> bin;
    array<uint> binI;
-   for(Sign note: chord) bin.add(note.note.key());
-   array<uint> binS = copyRef(bin);
-   sort(binS); // FIXME: already sorted ?
-   for(size_t key: binS) binI.append(bin.indexOf(key));
-   S.append(move(binS));
-   Si.append(move(binI));
+   for(ref<Sign> chord: notes.values) {
+    for(Sign note: chord) {
+     //log(note.time-lastTime);
+     if(note.time-lastTime > 0/*84*/) {
+      minT = ::min(minT, note.time-lastTime);
+      array<uint> binS = copyRef(bin);
+      sort(binS); // FIXME: already sorted ?
+      for(size_t key: binS) binI.append(bin.indexOf(key));
+      bin.clear();
+      S.append(move(binS));
+      Si.append(move(binI));
+     }
+     lastTime = note.time;
+     bin.add(note.note.key());
+    }
+   }
+   //log(minT);
   }
   /// Bins MIDI notes (TODO: cluster)
   array<array<uint>> M;
   array<array<uint>> Mi; // Maps original index to sorted
   for(size_t index = 0; index < midiNotes.size;) {
    array<uint> bin;
+   array<uint> binT;
    array<uint> binI;
    int64 time = midiNotes[index].time;
-   while(index < midiNotes.size && (int64(midiNotes[index].time) < time+2000 ||
-                                   (int64(midiNotes[index].time) <= time+/*2137*//*3091*//*6455*//*9637*//*10091*//*10818*//*12273*//*12999*//*13681*/16985 && S[min(M.size, S.size-1)].contains(midiNotes[index].key)
-                                     && bin.size < S[min(M.size, S.size-1)].size)) ) { //FIXME: merge bins at sync time
-    if(0) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
-    bin.add(midiNotes[index].key);
+   while(index < midiNotes.size && (int64(midiNotes[index].time) < time+993/*1779*/ ||
+                                   (int64(midiNotes[index].time) <= time+16985 && S[::min(M.size, S.size-1)].contains(midiNotes[index].key)
+                                     && bin.size < S[::min(M.size, S.size-1)].size)) ) { //FIXME: merge bins at sync time
+    if(0) log(int64(midiNotes[index].time) - time, strKey(-1, midiNotes[index].key));
+    bin.append(midiNotes[index].key); // add
+    binT.append(midiNotes[index].time);
     index++;
    }
-   if(0) if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
+   if(0) if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-1, midiNotes[index].key));
    array<uint> binS = copyRef(bin);
    sort(binS);
-   if(0) log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
-   if(S[min(M.size, S.size-1)] != binS) {
+   for(size_t key: bin) binI.append(binS.indexOf(key));
+   if(0) log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-1, key);}),"=", apply(binS, [](uint key){return strKey(-1, key);}));
+   if(1 && S[min(M.size, S.size-1)] != binS) {
        log("≠");
-       if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-4, midiNotes[index].key));
-       log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-4, key);}),":", apply(binS, [](uint key){return strKey(-4, key);}));
+       if(index < midiNotes.size) log(int64(midiNotes[index].time) - time, strKey(-1, midiNotes[index].key));
+       log(apply(S[min(M.size, S.size-1)], [](uint key){return strKey(-1, key);}),":", apply(binS, [](uint key){return strKey(-1, key);}),
+           apply(binI, [&](uint i){return int(binT[binI[i]]-binT[binI[0]]);}));
        log("≠");
+       //error(minT);
    }
    //assert_(S[min(M.size, S.size-1)] == binS, "≠");
-   for(size_t key: bin) binI.append(binS.indexOf(key));
-   Mi.append(move(binI));
-   if(M.size < S.size && S[min(M.size, S.size-1)] != binS && S[min(M.size, S.size-1)].size == 1 && binS.size == 1) { // FIXME: let sync handle missing MIDI notes
-       M.append(); // Missing in MIDI
-       index--; // Rewind to match next time
-       continue;
+   if(0 && M.size < S.size && S[min(M.size, S.size-1)] != binS && S[min(M.size, S.size-1)].size == 1 && binS.size == 1) { // FIXME: let sync handle missing MIDI notes
+    log("M");
+    Mi.append();
+    M.append(); // Missing in MIDI
+    index--; // Rewind to match next time
+    continue;
    }
+   Mi.append(move(binI));
    M.append(move(binS));
   }
+  //error("OK");
 
   /// Synchronizes MIDI and score using dynamic time warping
   size_t m = S.size, n = M.size;
@@ -356,22 +381,31 @@ skip:;
   size_t i = 0, j = 0; // Score and MIDI bins indices
   size_t signIndex = 0;
   measureT.append(0);
+  //size_t errors = 0;
   if(0) log("|", measureT.last(), measureX[measureT.size-1]);
   while(i<m && j<n) {
-   /**/ if(i+1<m && D(i,j) == D(i+1,j)) {
-    error("S", apply(S[i], [](uint key){return strKey(-4, key);}));
-    if(1) log("S", apply(S[i], [](uint key){return strKey(-4, key);}));
+   /**/ if(i+1<m && D(i,j) == D(i+1,j)) { // in Score not in MID
+    //error("S", apply(S[i], [](uint key){return strKey(-1, key);}));
+    if(1) log("S", apply(S[i], [](uint key){return strKey(-1, key);}));
     i++;
    }
    else if(j+1<n && D(i,j) == D(i,j+1)) {
     for(size_t unused k: range(M[j].size)) midiToSign.append(Sign{});
-    if(0) log("M", apply(M[j], [](uint key){return strKey(-4, key);})); // Trills, tremolos
+    if(1) log("M", apply(M[j], [](uint key){return strKey(-1, key);})); // Trills, tremolos
     j++;
    } else {
+    array<uint> midiKeys;
     for(size_t k: range(M[j].size)) {
-     Sign sign{};
-     if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Map original MIDI index to sorted to original note index
      size_t midiIndex = midiToSign.size;
+
+     Sign sign{};
+     if(Mi[j][k]<notes.values[i].size) sign = notes.values[i][Si[i][Mi[j][k]]]; // Maps original MIDI index to sorted to original note index
+     else log("Missing note", strKey(-1, midiNotes[midiIndex].key));
+     /*log(strKey(-1,sign.note.key()), strKey(-1, this->notes[midiToSign.size].key));
+     if(sign.note.key()%12 != this->notes[midiToSign.size].key%12) {
+      log("!", errors++);
+     }*/
+     midiKeys.append(midiNotes[midiIndex].key);
      midiToSign.append( sign );
      if(sign.note.signIndex != invalid) {
       size_t nextSignIndex = sign.note.signIndex;
@@ -379,12 +413,13 @@ skip:;
        Sign sign = signs[signIndex];
        if(sign.type == Sign::Measure) {
         measureT.append(midiNotes[midiIndex].time);
-        if(0) log("|", measureT.last(), measureX[measureT.size-1]);
+        if(1) log("|", measureT.size);
        }
       }
      }
     }
-    if(0) log(apply(S[i], [](uint key){return strKey(-4, key);}), "=", apply(M[j], [](uint key){return strKey(-4, key);}));
+    if(0) log(apply(S[i], [](uint key){return strKey(-1, key);}), "=", apply(M[j], [](uint key){return strKey(-1, key);}));
+    if(0) log(apply(S[i], [](uint key){return strKey(-1, key);}), "=", apply(M[j], [](uint key){return strKey(-1, key);}), "=", apply(midiKeys, [](uint key){return strKey(-1, key);}));
     i++; j++;
    }
   }
@@ -400,7 +435,7 @@ skip:;
   measureT.append(this->notes.last().time);
   if(midiToSign.size != midiNotes.size) log(midiNotes.size, midiToSign.size);
   //assert_(midiToSign.size == midiNotes.size, midiNotes.size, midiToSign.size);
-  assert_(measureT.size == measureX.size, measureT.size, measureX.size);
+  //assert_(measureT.size == measureX.size, measureT.size, measureX.size);
   // Removes skipped measure explicitly (so that scroll smoothes over, instead of jumping)
   if(1) for(uint i=0; i<measureT.size-1;) {
    if(measureT[i] == measureT[i+1]) {
@@ -413,6 +448,23 @@ skip:;
   //scroll.image = unsafeRef(image);
   scroll.horizontal=true, scroll.vertical=false, scroll.scrollbar = true;
   imageLo = downsample(image);
+
+  if(0 || target) {
+   for(;midiIndex < this->notes.size /*&& (int64)notes[midiIndex].time*timeDen <= timeNum*(int64)notes.ticksPerSeconds*/; midiIndex++) {
+    const MidiNote note = this->notes[midiIndex];
+    if(note.velocity) {
+     //assert_(noteIndex < sheet.midiToSign.size, noteIndex, sheet.midiToSign.size);
+     const Sign sign = midiToSign[noteIndex];
+     const size_t glyphIndex = sign.note.glyphIndex[0];
+     //log(note.key, sign.note.key());
+     //assert_(note.key == sign.note.key());
+     if(target && glyphIndex < OCRNotes.size)
+      render(target, Text(strKey(-1,note.key),64).graphics(0), vec2(OCRNotes[glyphIndex].position));
+     noteIndex++;
+    }
+   }
+  }
+  if(target) { writeFile("debug.png", encodePNG(target), home(), true); return; }
 
   if(encode) { // Encode
    Encoder encoder {name+".tutorial.mp4"_};
@@ -660,6 +712,7 @@ skip:;
              blend(target, x0/2+dx, y0/2+dy, note.color, a/255.f);
          }
      }
+     if(1) for(uint i: range(measureX.size)) render(target, Text(str(1+i),32).graphics(0), vec2((scroll.offset.x+measureX[i])/2, 32));
      keyboard.render(cropRef(target, int2(0, /*image.size.y/2*/target.size.y-height), int2(target.size.x, /*target.size.y-image.size.y/2*/height)));
      renderTime.stop();
      log(strD(resampleTime, totalTime), strD(renderTime, totalTime));

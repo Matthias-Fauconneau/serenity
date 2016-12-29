@@ -171,7 +171,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
      insertSign({Sign::KeySignature, trackTimeUS, .keySignature=keySignature});
     }
    }
-   else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
+   else if(MIDI(key)==MIDI::TrackName || MIDI(key)==MIDI::InstrumentName || MIDI(key)==MIDI::Marker || MIDI(key)==MIDI::Text || MIDI(key)==MIDI::Copyright) {}
    else if(MIDI(key)==MIDI::EndOfTrack) {}
    else error("Meta", hex(key));
   }
@@ -181,8 +181,8 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
   if(type==NoteOn) {
    MidiNote note{trackTimeUS, key, vel};
    if(note.velocity) {
-    if(notes && notes.last().velocity && notes.last().time <= note.time)
-     assert_(notes.last().key != key, notes.last(), note, notes.last().velocity, note.velocity, notes.last().time, note.time);
+    if(0 && notes && notes.last().velocity && notes.last().time <= note.time)
+     assert_(notes.last().key != key, "Duplicate", notes.last(), note, notes.last().velocity, note.velocity, notes.last().time, note.time);
     for(MidiNote o: notes) if(o.velocity) {
      if(o.key == key && note.time == o.time) goto continue2_;
      assert_(o.key != key || abs(o.time-note.time), o, note, int(note.time-o.time), o.velocity, note.velocity);

@@ -13,14 +13,17 @@ Device getMIDIDevice() {
 }
 
 MidiInput::MidiInput(Thread& thread) : Device(getMIDIDevice()), Poll(Device::fd,POLLIN,thread),
-  min(existsFile("keyboard.min",".config"_) ? apply(split(readFile("keyboard.min",".config"_).slice(1)," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 127;})),
-  max(existsFile("keyboard",".config"_) ? apply(split(readFile("keyboard",".config"_).slice(1)," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 1;}))
-{ assert_(min.size == 88,min.size,min,readFile("keyboard.min",".config"_).slice(1)); /*log(min);*/
-   assert_(max.size == 88,max.size,max,readFile("keyboard",".config"_).slice(1)); /*log(max);*/ }
-  MidiInput::~MidiInput() {
-   writeFile("keyboard.min", str(min), ".config"_, true); log(min);
-   writeFile("keyboard", str(max), ".config"_, true); log(max);
-  }
+  min(existsFile("keyboard.min",Folder(".config"_, home())) ? apply(split(readFile("keyboard.min",Folder(".config"_, home()))," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 127;})),
+max(existsFile("keyboard",Folder(".config"_, home())) ? apply(split(readFile("keyboard",Folder(".config"_, home()))," "), [](string s)->int{return parseInteger(s);}) : apply(88, [](int){return 1;}))
+{
+ assert_(min.size == 88,min.size,min,readFile("keyboard.min",Folder(".config"_, home()))); /*log(min);*/
+ assert_(max.size == 88,max.size,max,readFile("keyboard",Folder(".config"_, home()))); /*log(max);*/
+}
+
+MidiInput::~MidiInput() {
+ writeFile("keyboard.min", str(min), Folder(".config"_, home()), true); //log(min);
+ writeFile("keyboard", str(max), Folder(".config"_, home()), true); //log(max);
+}
 
 void MidiInput::event() {
     while(Stream::fd && poll()) {

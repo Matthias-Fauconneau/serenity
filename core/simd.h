@@ -4,6 +4,7 @@
 
 typedef float v4sf __attribute((ext_vector_type(4)));
 
+inline v4sf loada(const float* const ptr) { return *(v4sf*)ptr; }
 inline v4sf loadu(const float* const ptr) { return (v4sf)__builtin_ia32_lddqu((byte*)ptr); }
 
 inline float hsum(v4sf v) { // movshdup, addps, movhlps, addss

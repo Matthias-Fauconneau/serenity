@@ -212,7 +212,7 @@ struct DCCApp {
    buffer<string> bots = split(section(config, '\n', 2, -1), "\n");
    array<String> linkBots;
    for(size_t p=0; p<11; p++) {
-       String searchURL = copyRef(search);
+       String searchURL = copyRef(replace(search,' ','+'));
        if(p>0) searchURL = searchURL+"&pn="+str(p);
        Map document = getURL(searchURL, {}, 1);
        Element root = parseHTML(document);
@@ -243,10 +243,10 @@ struct DCCApp {
            log(file, size/1e9, link.bot);
            {
             int64 remainingSize = size;
-            if(existsFile(file)) {
+            /*if(existsFile(file)) {
              remainingSize -= File(file).size();
              log("Remaining", remainingSize/1e9);
-            }
+            }*/
             if(availableCapacity(".") < remainingSize) continue;
            }
            if(bots.contains(link.bot)) {

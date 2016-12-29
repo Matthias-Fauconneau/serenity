@@ -2,7 +2,6 @@
 /// \file sampler.h High performance, low latency SFZ sound font sampler
 #include "function.h"
 #include "file.h"
-#include "resample.h"
 #include "flac.h"
 #include "thread.h"
 #include "map.h"
@@ -34,10 +33,11 @@ struct Sampler : Poll {
     /// Just before samples are mixed, polls note events
     function<void(uint)> timeChanged;
     uint audioTime=0, stopTime=0;
-    float minValue = -64577408, maxValue = 76015472;
+    //float minValue = -64577408, maxValue = 76015472;
+    float minValue = -266941, maxValue = 259313;
     explicit operator bool() const { return samples.size; }
 
-    Sampler(string path, const uint periodSize=256/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);
+    Sampler(string path, const uint periodSize/*[12ms/82Hz/4m]*/, function<void(uint)> timeChanged={}, Thread& thread=mainThread);
     virtual ~Sampler();
 
     void ccEvent(uint key, uint value);
