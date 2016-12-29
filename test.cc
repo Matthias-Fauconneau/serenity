@@ -39,11 +39,19 @@ Image8 toImage8(const Image& image) {
                 return (uint8)((bgr.b+bgr.g+bgr.r)/3); // FIXME: coefficients ?
                }), image.size);
 }
+Image8 downsample(Image8&& target, const Image8& source) {
+ assert_(target.size == source.size/2, target.size, source.size);
+ for(uint y: range(target.height)) for(uint x: range(target.width))
+  target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / 4;
+ return move(target);
+}
+inline Image8 downsample(const Image8& source) { return downsample(source.size/2, source); }
 
 struct Test {
  Test() {
   Time time{true};
   string name = arguments()[0];
+#if 0
   String imageFile; int2 size;
   auto list = Folder(".").list(Files);
   for(const String& file: list) {
@@ -67,34 +75,16 @@ struct Test {
   }
   Map rawImageFileMap = Map(imageFile, Folder("."));
   Image8 image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
-  log(time, image.size, float(image.ref::size)/1024/1024,"M");
-#if 0
-  Encoder encoder (image.ref::size);
-  for(int x: range(image.size.x)) {
-   for(int y: range(image.size.y)) {
-    encoder.write(image(x, y));
-   }
-  }
-  buffer<byte> encoded = encoder.end();
-  log(encoded.size/1024,"K", (float)encoded.size/image.ref::size);
 #else
+  Image8 image = toImage8(decodePNG(readFile(name+".png", Folder("."))));
+  log(time, image.size, float(image.ref::size)/1024/1024,"M");
+#endif
+  image = downsample(image);
   buffer<uint8> transpose (image.ref::size);
   for(int y: range(image.size.y)) for(int x: range(image.size.x)) transpose[x*image.size.y+y] = image(x, y);
   buffer<uint8> encoded = encodeRunLength(transpose);
-#if 0
-  buffer<uint8> decoded = decodeRunLength(encoded);
-  assert_(decoded.size == transpose.size);
-  for(uint i: range(transpose.size)) {
-   if(decoded[i] != transpose[i]) {
-    log(hex(transpose.slice(0, 40)));
-    log(hex(decodeRunLength(encoded).slice(0, 40)));
-   }
-  }
-  assert_(decoded == transpose);
-#endif
   log(float(encoded.size)/1024/1024,"M", (float)transpose.size/encoded.size);
-#endif
-  writeFile(name+"."+strx(size)+".rle", cast<byte>(encoded), Folder("."));
+  writeFile(name+"."+strx(image.size)+".rle", cast<byte>(encoded), Folder("."));
  }
 } test;
 #endif

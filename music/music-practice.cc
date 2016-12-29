@@ -20,20 +20,20 @@ struct Music : Widget {
  //unique<Sheet> sheet = nullptr;
  //unique<Scroll<HList<GraphicsWidget>>> pages;
  Image8 image;
- unique<Window> window = ::window(/*&pages->area()*/this, int2(1366, 768));
+ unique<Window> window = nullptr;
 
  AudioOutput audio {window?audioThread:mainThread};
  MidiInput input {window?audioThread:mainThread};
 
  Music() {
+  if(files) setTitle(arguments() ? arguments()[0] : files[0]);
+  window = ::window(/*&pages->area()*/this, int2(0, image.size.x));
   if(window) {
    //window->actions[Key('s')] = [this]{ writeFile("keyboard", str(input.max), Folder(".config"_, home()), true); };
    window->actions[UpArrow] = {this, &Music::previousTitle};
    window->actions[DownArrow] = [this]{ writeFile("keyboard", str(input.max), Folder(".config"_, home()), true); nextTitle(); }; //{this, &Music::nextTitle};
    window->actions[Return] = {this, &Music::nextTitle};
-   if(files) setTitle(arguments() ? arguments()[0] : files[0]);
   }
-
   setInstrument("Piano");
 
   //AudioControl("Master Playback Switch") = 1;
@@ -59,7 +59,7 @@ struct Music : Widget {
   decodeThread.spawn();
  }
  void setTitle(string title) {
-  assert_(window);
+  //assert_(window);
   if(endsWith(title,".pdf"_)||endsWith(title,".xml"_)||endsWith(title,".mid"_)) title=title.slice(0,title.size-4);
   this->title = copyRef(title);
 #if 0
@@ -109,15 +109,14 @@ struct Music : Widget {
   //this->pages->vertical = false;
   //this->pages->horizontal = true;
   //window->widget = window->focus = &this->pages->area();
-  window->render();
-  window->setTitle(title);
+  if(window) { window->render(); window->setTitle(title); }
  }
- vec2 sizeHint(vec2) override { return vec2(1366, 768); }
+ vec2 sizeHint(vec2) override { return vec2(1366, image.size.x); }
  shared<Graphics> graphics(vec2) override {
   window->backgroundColor = __builtin_nanf("");
   const Image& target = window->target;
-  assert_(target.size.x < image.size.y && target.size.y < image.size.x, target.size, image.size);
-  for(int x: range(target.size.x)) for(int y: range(target.size.y)) target[y*target.stride+x] = byte4(byte3(image[x*image.size.x+y]), 0xFF);
+  assert_(target.size.x < image.size.y && image.size.x <= target.size.y, target.size, image.size);
+  for(int x: range(target.size.x)) for(int y: range(image.size.x)) target[y*target.stride+x] = byte4(byte3(image[x*image.size.x+y]), 0xFF);
   return shared<Graphics>();
  }
  void previousTitle() {
