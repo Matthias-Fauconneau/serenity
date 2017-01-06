@@ -131,7 +131,7 @@ struct Room {
             }
         }
         if(!location) { reason="Unknown location "+address; return false; }
-        if(negative /*&& threshold<inf*/) {reason="filter "__+url.path; return false;}
+        if(negative && threshold<inf) {reason="filter "__+url.path; return false;}
 
         /*if((find(description,"WOKO") || find(profile,"WOKO")) && !untilDate) {
          assert_(price <= 870, price, url);
@@ -199,7 +199,7 @@ struct Room {
                         if(s.match('#')) break;
                         bool outbound = false;
                         if(s.match('-')) outbound = true;
-                        static Date day = parseDate("19/12");
+                        static Date day = parseDate("1/2");
                         Date date = parseDate(s.whileNo(" -\n"_));
                         date.year = day.year, date.month = day.month, date.day = day.day;
                         int64 time = date;
@@ -266,7 +266,7 @@ struct WG {
 
     WG() {
         URL url ("https://www.wgzimmer.ch/wgzimmer/search/mate.html?");
-        url.post = "query=&priceMin=101&priceMax=600&state=zurich-stadt&permanent=all&student=none"
+        url.post = "query=&priceMin=101&priceMax=1050&state=zurich-stadt&permanent=all&student=none"
                    "&country=ch&orderBy=MetaData%2F%40mgnl%3Alastmodified&orderDir=descending"
                    "&startSearchMate=true&wgStartSearch=true"__;
         TextData s (destinationFile);
