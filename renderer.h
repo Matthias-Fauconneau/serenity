@@ -70,7 +70,7 @@ struct Render {
         assert_(uint(detailCellCount) == detailCellCount);
         File file(str(uint(detailCellCount))+'x'+str(sSize)+'x'+str(tSize), folder, Flags(ReadWrite|Create));
         size_t byteSize = 3*sampleCount*sizeof(Float);
-        assert_(byteSize <= 16ull*1024*1024*1024, byteSize/(1024*1024*1024.f));
+        assert_(byteSize <= 28800ull*1024*1024, byteSize/(1024*1024*1024.f));
         file.resize(byteSize);
         map = Map(file, Map::Prot(Map::Read|Map::Write));
         scene.samples= mcast<Float>(map);

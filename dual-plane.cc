@@ -12,7 +12,7 @@
 #include "renderer/TraceableScene.h"
 #include "integrators/TraceBase.h"
 #include "sampling/UniformPathSampler.h"
-#include "prerender.h"
+//#include "prerender.h"
 
 struct ViewApp : ViewControl {
     string name;
@@ -22,7 +22,8 @@ struct ViewApp : ViewControl {
     Map map;
     ref<half> field;
 
-    bool orthographic = false;
+    bool orthographic = true;
+    bool depthCorrect = true;
 
     unique<Window> window = nullptr;
 
@@ -37,7 +38,8 @@ struct ViewApp : ViewControl {
         load(arguments()[0]);
         window = ::window(this);
         window->setTitle(name);
-        window->actions[Key('o')] = [this]{ orthographic=!orthographic; window->render(); };
+        window->actions[Key('o')] = [this]{ orthographic=!orthographic; count=0; window->render(); };
+        window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
     }
     void load(string name) {
         field = {};
@@ -49,6 +51,7 @@ struct ViewApp : ViewControl {
         Folder tmp (name, Tmp, true);
 
         for(string name: tmp.list(Files)) {
+            //if(name=="32x32x960x960") continue; // WIP
             TextData s (name);
             imageCount.x = s.integer(false);
             if(!s.match('x')) continue;
@@ -62,7 +65,8 @@ struct ViewApp : ViewControl {
             field = cast<half>(map);
             break;
         }
-        assert_(imageCount && imageSize);
+        //assert_(imageCount && imageSize);
+        if(!imageCount && !imageSize) imageSize = uint2(960);
 
         if(window) {
             window->setSize();
@@ -76,7 +80,15 @@ struct ViewApp : ViewControl {
         const Image target = cropShare(window, int2(0), imageSize);
         ImageH Z(imageSize);
         const mat4 camera = parseCamera(readFile("scene.json"));
-        const float s = angles.x/(PI/3), t = angles.y/(PI/3);
+        mat4 newCamera = camera;
+        float s = 0, t = 0;
+        if(orthographic) {
+            newCamera.rotateY(angles.x); // Yaw
+            newCamera.rotateX(angles.y); // Pitch
+            newCamera[3].xyz() = (mat3)newCamera * vec3(0, 0, -2);
+        } else {
+            s = angles.x/(PI/3), t = angles.y/(PI/3);
+        }
 #if 1
         {
             if(this->angles != angles || sumB.size != target.size) {
@@ -90,11 +102,11 @@ struct ViewApp : ViewControl {
             }
             count++;
 
-            parallel_chunk(target.size.y, [this, &target, camera,/*M,*/ &Z, s, t](uint _threadId, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, camera, newCamera, s, t, &Z, &target](uint _threadId, uint start, uint sizeI) {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
-                    const vec3 O = camera * vec3(s, t, 0);
-                    const vec3 P = camera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1);
+                    const vec3 O = newCamera * vec3(s, t, 0);
+                    const vec3 P = newCamera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1); // FIXME: sheared perspective
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance);
                     size_t i = y*target.size.x+x;
@@ -114,19 +126,10 @@ struct ViewApp : ViewControl {
         }
 #endif
 #if 1
-        {
+        if(imageSize && imageCount) {
             const Image target = cropShare(window, int2(imageSize.x,0), imageSize);
-            /*mat4 M;
-            if(orthographic) {
-                M.rotateX(angles.y); // Pitch
-                M.rotateY(angles.x); // Yaw
-                M.scale(vec3(1,1,-1)); // Z-
-            } else {
-                const float s = (angles.x+PI/3)/(2*PI/3), t = (angles.y+PI/3)/(2*PI/3);
-                M = shearedPerspective(s, t);
-            }*/
             assert_(imageCount.x == imageCount.y);
-            parallel_chunk(target.size.y, [this, &target, camera, s, t, &Z](uint, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, &target, camera, newCamera, s, t, &Z](uint, uint start, uint sizeI) {
                 const uint size1 = imageSize.x *1;
                 const uint size2 = imageSize.y *size1;
                 const uint size3 = imageCount.x*size2;
@@ -151,8 +154,10 @@ struct ViewApp : ViewControl {
                 const float scale = (float)(imageSize.x-1) / (imageCount.x-1); // st -> uv
                 for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
                     size_t targetIndex = (target.size.y-1-targetY)*target.stride + targetX;
-                    const vec3 O = /*camera.inverse() * camera **/ vec3(s, t, 0);
-                    const vec3 P = /*camera.inverse() * camera **/ vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
+                    const vec3 Ow = newCamera * vec3(s, t, 0);
+                    const vec3 Pw = newCamera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
+                    const vec3 O = camera.inverse() * Ow;
+                    const vec3 P = camera.inverse() * Pw;
                     const vec3 d = normalize(P-O);
 
                     const vec3 n (0,0,-1);
@@ -161,7 +166,7 @@ struct ViewApp : ViewControl {
 
                     const vec2 Pst = O.xy() + dot(n_nd, vec3(0,0,0)-O) * d.xy();
                     const vec2 ST = (Pst+vec2(1))/2.f;
-                    const vec2 Puv = O.xy() + dot(n_nd, vec3(0,0,1)-O) * d.xy();
+                    const vec2 Puv = P.xy() + dot(n_nd, vec3(0,0,1)-P) * d.xy();
                     const vec2 UV = (Puv+vec2(1))/2.f;
 
                     const vec2 st = vec2(0x1p-16) + vec2(1-0x1p-16) * ST * vec2(imageCount-uint2(1));
@@ -173,9 +178,10 @@ struct ViewApp : ViewControl {
 
                     bgr3f S = 0;
 #if 1
-                    if(1) {
+                    if(depthCorrect) {
                         const float z = Z(targetX, targetY);
                         const float z_ = z==inff ? 1 : (z-1)/z;
+                        const float zW = z * length(Pw-Ow);
 
                         const v4sf x = {st[1], st[0]}; // ts
                         const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
@@ -191,17 +197,17 @@ struct ViewApp : ViewControl {
                             int uIndex = uv_[0], vIndex = uv_[1];
                             if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
                             const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
-                            assert_(base < fieldZ.ref::size, base, tIndex, dt, sIndex, ds, vIndex, uIndex, uv_, z, (z-2)/(z-1));
+                            //assert_(base < fieldZ.ref::size, base, tIndex, dt, sIndex, ds, vIndex, uIndex, uv_, z, (z-2)/(z-1));
                             const v2sf x = {uv_[1], uv_[0]}; // vu
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-#if 1
+#if 0
                             const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                              * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
 #else
                             const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                            const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ || abs(Z - float4(z)) < float4(1/*0x1p-5*/), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                            const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ || abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                     __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                   * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
 #endif

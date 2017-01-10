@@ -3,6 +3,8 @@
 #include "io/FileUtils.h"
 #include <cstring>
 #include "string.h"
+#include <jpeglib.h> // jpeg
+#include <csetjmp>
 
 #if OPENEXR_AVAILABLE
 #include <ImfChannelList.h>
@@ -10,11 +12,6 @@
 #include <ImfInputFile.h>
 #include <ImfIO.h>
 #include <half.h>
-#endif
-
-#if JPEG_AVAILABLE
-#include <jpeglib.h>
-#include <csetjmp>
 #endif
 
 static const int GammaCorrection[] = {
@@ -349,7 +346,6 @@ DeletablePixels loadPng(const Path &path, int &w, int &h, int &channels)
     return DeletablePixels(dst, free);
 }
 
-#if JPEG_AVAILABLE
 DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
 {
     struct jpeg_decompress_struct cinfo;
@@ -365,9 +361,7 @@ DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
     jerr.output_message = [](j_common_ptr cinfo) {
         char buffer[JMSG_LENGTH_MAX];
         (*cinfo->err->format_message) (cinfo, buffer);
-        std::cout << format("Jpg decoding issue for file '%s': %s\n",
-                static_cast<CustomJerr *>(cinfo->err)->fileName, buffer);
-        std::cout.flush();
+        log("Jpg decoding issue for file '%s': %s\n", static_cast<CustomJerr *>(cinfo->err)->fileName, buffer);
     };
     jerr.error_exit = [](j_common_ptr cinfo) {
         (*cinfo->err->output_message)(cinfo);
@@ -419,9 +413,8 @@ DeletablePixels loadJpg(const Path &path, int &w, int &h, int &channels)
         }
     }
 
-    return std::move(result);
+    return result;
 }
-#endif
 
 std::unique_ptr<uint8[]> loadLdr(const Path& path, TexelConversion request, int &w, int &h, bool gammaCorrect)
 {
@@ -429,10 +422,8 @@ std::unique_ptr<uint8[]> loadLdr(const Path& path, TexelConversion request, int 
     DeletablePixels img(makeVoidPixels());
     if (path.testExtension("png"))
         img = loadPng(path, w, h, channels);
-#if JPEG_AVAILABLE
     else if (path.testExtension("jpg") || path.testExtension("jpeg"))
         img = loadJpg(path, w, h, channels);
-#endif
     else
         error("LDR", path._path.c_str());
 

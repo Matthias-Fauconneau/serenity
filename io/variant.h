@@ -35,7 +35,7 @@ struct Variant {
  explicit operator string() const { assert_(type==Data); return data; }
  int64 numerator() {  assert(type==Rational); return number; }
  operator float() const { return real(); }
- operator const map<String, Variant>&() const { return dict; }
+ operator const map<String, Variant>&() const { assert_(type==Dict); return dict; }
  operator const ref<Variant>() const { return list; }
 };
 
