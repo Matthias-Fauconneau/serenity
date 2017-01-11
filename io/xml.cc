@@ -101,7 +101,7 @@ bool Element::contains(string name) const {
 const Element* Element::child(string path) const {
  const Element* element = 0;
  xpath(path, [&element, path, this](const Element& e)->void{
-  if(element) { log("Multiple matches for", path, "in", *this); return; }
+  if(element) { /*log("Multiple matches for", path, "in", *this);*/ return; }
   element = &e;
  });
  return element;

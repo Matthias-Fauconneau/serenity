@@ -12,14 +12,12 @@
 
 Image8 toImage8(const Image& image) {
  return Image8(apply(image, [](byte4 bgr){
-                //assert_(bgr.b==bgr.g && bgr.g==bgr.r, bgr.b, bgr.g, bgr.r);
                 return (uint8)((bgr.b+bgr.g+bgr.r)/3); // FIXME: coefficients ?
                }), image.size);
 }
 void toImage(const Image& image, const Image8& image8) {
  assert_(image.size == image8.size);
  if(image.ref::size == image8.ref::size) {
-  //assert_(image.ref::size == image8.ref::size, image.ref::size, image8.ref::size);
   for(uint i: range(image.ref::size)) { uint8 g=image8[i]; image[i] = byte4(g,g,g,0xFF); }
  } else {
   for(uint y: range(image.size.y)) for(uint x: range(image.size.x)) { uint8 g=image8(x,y); image(x,y) = byte4(g,g,g,0xFF); }
@@ -87,8 +85,8 @@ struct Music : Widget {
  Keyboard keyboard; // 1/6 ~ 120
  map<uint, Sign> active; // Maps active keys to notes (indices)
  uint midiIndex = 0, noteIndex = 0;
- float playbackLineX = 0;
  buffer<Image8> templates;
+ array<OCRNote> highlight;
 
  // Preview
  unique<Window> window = nullptr;
@@ -564,8 +562,6 @@ skip:;
   }
  }
 
- array<OCRNote> highlight;
-
  bool follow(int64 timeNum, int64 timeDen, vec2 size) {
   //constexpr int staffCount = 2;
   bool contentChanged = false;
@@ -645,8 +641,7 @@ skip:;
 
   int64 t = (int64)timeNum*(int64)notes.ticksPerSeconds;
   float previousOffset = scroll.offset.x;
-  float previousPlaybackLineX = playbackLineX;
-  // Cardinal cubic B-Spline
+   // Cardinal cubic B-Spline
   for(int index: range(measureT.size-1)) {
    int64 t1 = (int64)measureT[index]*(int64)timeDen;
    int64 t2 = (int64)measureT[index+1]*(int64)timeDen;
@@ -656,12 +651,11 @@ skip:;
     double w[4] = { 1./6 * cb(1-f), 2./3 - 1./2 * sq(f)*(2-f), 2./3 - 1./2 * sq(1-f)*(2-(1-f)), 1./6 * cb(f) };
     auto X = [&](int index) { return clamp(0.f, measureX[clamp<int>(0, index, measureX.size-1)] - size.x/2, image.size.x-size.x); };
     float newOffset = round( w[0]*X(index-1) + w[1]*X(index) + w[2]*X(index+1) + w[3]*X(index+2) );
-    /*if(newOffset >= -scroll.offset.x)*/ scroll.offset.x = -newOffset;
-    playbackLineX = (1-f) * measureX[index] + f * measureX[index+1];
+    scroll.offset.x = -newOffset;
     break;
    }
   }
-  if(previousOffset != scroll.offset.x || previousPlaybackLineX != playbackLineX) contentChanged = true;
+  if(previousOffset != scroll.offset.x) contentChanged = true;
   //synchronizer.currentTime = (int64)timeNum*notes.ticksPerSeconds/timeDen;
 #if 0
   if(video) {
