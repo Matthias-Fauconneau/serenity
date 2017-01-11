@@ -14,7 +14,7 @@ TraceBase::TraceBase(TraceableScene& scene, uint32 threadId) : scene(scene), _th
         prim->makeSamplable(scene, _threadId);
 }
 
-Vec3f TraceBase::trace(const vec3 O, const vec3 P, float& hitDistance) {
+Vec3f TraceBase::trace(const vec3 O, const vec3 P, float& hitDistance, const int maxBounces) {
     PositionSample position;
     position.p.x() = O.x;
     position.p.y() = O.y;
@@ -58,7 +58,7 @@ Vec3f TraceBase::trace(const vec3 O, const vec3 P, float& hitDistance) {
         } else {
             didHit = false;
         }
-        constexpr int maxBounces = 16;
+        //constexpr int maxBounces = 16;
         if((!didHit && !medium) || bounce >= maxBounces) {
             if(scene.intersectInfinites(ray, data, info)) {
                 if(wasSpecular || !info.primitive->isSamplable())

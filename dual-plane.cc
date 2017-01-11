@@ -24,6 +24,8 @@ struct ViewApp : ViewControl {
 
     bool orthographic = true;
     bool depthCorrect = true;
+    //bool uniformWeights = false;
+    bool wideReconstruction = true;
 
     unique<Window> window = nullptr;
 
@@ -33,13 +35,21 @@ struct ViewApp : ViewControl {
     uint count = 0; // Iteration count (Resets on view angle change)
     vec2 angles = 0;
 
+    struct {
+        ImageF sumB, sumG, sumR;
+        uint count = 0; // Iteration count (Resets on uv change)
+        vec2 uv = 0;
+    } st;
+
     ViewApp() {
         assert_(arguments());
         load(arguments()[0]);
         window = ::window(this);
         window->setTitle(name);
-        window->actions[Key('o')] = [this]{ orthographic=!orthographic; count=0; window->render(); };
+        window->actions[Key('o')] = [this]{ orthographic=!orthographic; count=0; st.count=0; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
+        //window->actions[Key('u')] = [this]{ uniformWeights=!uniformWeights; window->render(); window->setTitle(str(uniformWeights)); };
+        window->actions[Key('w')] = [this]{ wideReconstruction=!wideReconstruction; window->render(); window->setTitle(str(wideReconstruction)); };
     }
     void load(string name) {
         field = {};
@@ -73,7 +83,7 @@ struct ViewApp : ViewControl {
             window->setTitle(name);
         }
     }
-    virtual vec2 sizeHint(vec2) override { return vec2(2*imageSize.x, imageSize.y); }
+    virtual vec2 sizeHint(vec2) override { return vec2(2*imageSize.x, imageSize.y+128); }
     virtual shared<Graphics> graphics(vec2) override { render(ViewControl::angles); return shared<Graphics>(); }
     void render(vec2 angles) {
         const Image& window = ((XWindow*)this->window.pointer)->target;
@@ -108,7 +118,7 @@ struct ViewApp : ViewControl {
                     const vec3 O = newCamera * vec3(s, t, 0);
                     const vec3 P = newCamera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1); // FIXME: sheared perspective
                     float hitDistance;
-                    Vec3f emission = tracer.trace(O, P, hitDistance);
+                    Vec3f emission = tracer.trace(O, P, hitDistance, count);
                     size_t i = y*target.size.x+x;
                     sumR[i] += emission[0];
                     sumG[i] += emission[1];
@@ -183,47 +193,76 @@ struct ViewApp : ViewControl {
                         const float z_ = z==inff ? 1 : (z-1)/z;
                         const float zW = z * length(Pw-Ow);
 
-                        const v4sf x = {st[1], st[0]}; // ts
-                        const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
-                        static const v4sf _0011f = {0,0,1,1};
-                        const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                        v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
-                                * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
-
-                        v4sf B, G, R;
-                        for(int dt: {0,1}) for(int ds: {0,1}) {
-                            vec2 uv_ = uv_uncorrected - scale * (fract(st) - vec2(ds, dt)) * z_;
-                            if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
-                            int uIndex = uv_[0], vIndex = uv_[1];
-                            if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
-                            const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
-                            //assert_(base < fieldZ.ref::size, base, tIndex, dt, sIndex, ds, vIndex, uIndex, uv_, z, (z-2)/(z-1));
-                            const v2sf x = {uv_[1], uv_[0]}; // vu
+                        if(!wideReconstruction) { // Bilinear
+                            const v4sf x = {st[1], st[0]}; // ts
                             const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                             static const v4sf _0011f = {0,0,1,1};
                             const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                            v4sf w01st = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0) // ttTT
+                                    * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // sSsS
+
+                            v4sf B, G, R;
+                            for(int dt: {0,1}) for(int ds: {0,1}) {
+                                vec2 uv_ = uv_uncorrected + scale * (vec2(ds, dt) - fract(st)) * z_;
+                                if(uv_[0] < 0 || uv_[1] < 0) { w01st[dt*2+ds] = 0; continue; }
+                                int uIndex = uv_[0], vIndex = uv_[1];
+                                if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) { w01st[dt*2+ds] = 0; continue; }
+                                const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
+                                //assert_(base < fieldZ.ref::size, base, tIndex, dt, sIndex, ds, vIndex, uIndex, uv_, z, (z-2)/(z-1));
+                                const v2sf x = {uv_[1], uv_[0]}; // vu
+                                const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
+                                static const v4sf _0011f = {0,0,1,1};
+                                const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
 #if 0
-                            const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
-                                             * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+                                const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
+                                        * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
 #else
-                            const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                            const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ || abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
-                                                    __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
-                                                  * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
+                                const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                                const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                                        __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
+                                                        * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
 #endif
-                            float sum = ::hsum(w01uv);
-                            const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
-                            w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
-                            if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
-                            B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
-                            G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
-                            R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
+                                const float sum = ::hsum(w01uv);
+                                if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
+                                const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
+                                w01st[dt*2+ds] *= sum; // Adjusts weight for st interpolation
+                                B[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
+                                G[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
+                                R[dt*2+ds] = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
+                                //if(uniformWeights) w01st[dt*2+ds] = w01st[dt*2+ds] ? 1 : 0;
+                            }
+                            const v4sf w01 = float4(1./hsum(w01st)) * w01st; // Renormalizes st interpolation (in case of discarded samples)
+                            const float b = dot(w01, B);
+                            const float g = dot(w01, G);
+                            const float r = dot(w01, R);
+                            S = bgr3f(b, g, r);
+                        } else { // Wide reconstruction
+                            float b = 0, g = 0, r = 0, w = 0;
+                            for(int dt: range(-1,1 +1+1)) for(int ds: range(-1,1 +1+1)) {
+                                if(sIndex+ds > uint(imageCount.x)-1 || tIndex+dt > uint(imageCount.y)-1) continue;
+                                vec2 uv_ = uv_uncorrected + scale * (vec2(ds, dt) - fract(st)) * z_;
+                                if(uv_[0] < 0 || uv_[1] < 0) continue;
+                                int uIndex = uv_[0], vIndex = uv_[1];
+                                if(uIndex >= int(imageSize.x)-1 || vIndex >= int(imageSize.y)-1) continue;
+                                const size_t base = (size_t)(tIndex+dt)*size3 + (sIndex+ds)*size2 + vIndex*size1 + uIndex;
+                                const v2sf x = {uv_[1], uv_[0]}; // vu
+                                const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
+                                static const v4sf _0011f = {0,0,1,1};
+                                const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
+                                const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                                const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                                        __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
+                                                        * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
+                                const float sum = ::hsum(w01uv);
+                                if(!sum) continue;
+                                const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
+                                b += dot(w01, toFloat((v4hf)gather((float*)(fieldB.data+base), sample2D)));
+                                g += dot(w01, toFloat((v4hf)gather((float*)(fieldG.data+base), sample2D)));
+                                r += dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
+                                w += 1; // FIXME: World space reconstruction filter ?
+                            }
+                            S = bgr3f(b/w, g/w, r/w);
                         }
-                        const v4sf w01 = float4(1./hsum(w01st)) * w01st; // Renormalizes st interpolation (in case of discarded samples)
-                        const float b = dot(w01, B);
-                        const float g = dot(w01, G);
-                        const float r = dot(w01, R);
-                        S = bgr3f(b, g, r);
                     } else
 #endif
                     {
@@ -254,5 +293,40 @@ struct ViewApp : ViewControl {
             });
         }
 #endif
+        {
+            const Image target = cropShare(window, int2(0,imageSize.y), imageCount);
+            if(st.count == 0) {
+                if(st.sumB.size != imageCount) st.sumB = ImageF(imageCount); st.sumB.clear(0);
+                if(st.sumG.size != imageCount) st.sumG = ImageF(imageCount); st.sumG.clear(0);
+                if(st.sumR.size != imageCount) st.sumR = ImageF(imageCount); st.sumR.clear(0);
+            }
+            st.count++;
+            TraceBase tracer(scene, 0); // TODO: parallel
+            for(int tIndex: range(imageCount.y)) for(int sIndex: range(imageCount.x)) {
+                const float s = 2*(sIndex/float(imageCount.x-1))-1, t = 2*(tIndex/float(imageCount.y-1))-1;
+                const vec3 O = newCamera * vec3(s, t, 0);
+                const vec3 P = newCamera * vec3(st.uv, 1);
+                float hitDistance;
+                Vec3f emission = tracer.trace(O, P, hitDistance, 16/*::max(16, st.count)*/);
+                size_t i = tIndex*imageCount.x+sIndex;
+                st.sumR[i] += emission[0];
+                st.sumG[i] += emission[1];
+                st.sumB[i] += emission[2];
+
+                const uint r = 0xFFF*::min(1.f, st.sumR[i]/st.count);
+                const uint g = 0xFFF*::min(1.f, st.sumG[i]/st.count);
+                const uint b = 0xFFF*::min(1.f, st.sumB[i]/st.count);
+                extern uint8 sRGB_forward[0x1000];
+                target[(tIndex*2+0)*target.stride+sIndex*2+0] = target[(tIndex*2+0)*target.stride+sIndex*2+1] =
+                target[(tIndex*2+1)*target.stride+sIndex*2+0] = target[(tIndex*2+1)*target.stride+sIndex*2+1] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
+            }
+        }
+    }
+    virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& widget) override {
+        if(event == Press) {
+            st.uv = vec2((2.f*cursor.x/float(imageSize.x-1)-1), -((2.f*cursor.y/float(imageSize.y-1)-1)));
+            st.count = 0;
+        }
+        return ViewControl::mouseEvent(cursor, size, event, button, widget);
     }
 } view;

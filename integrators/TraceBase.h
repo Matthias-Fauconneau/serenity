@@ -31,6 +31,6 @@ struct TraceBase {
 
     TraceBase(TraceableScene& scene, uint32 threadId);
 
-    Vec3f trace(const vec3 O, const vec3 P, float& hitDistance);
+    Vec3f trace(const vec3 O, const vec3 P, float& hitDistance, const int maxBounces = 16);
     Vec3f generalizedShadowRay(Ray& ray, const Medium* medium, const Primitive* endCap, int bounce);
 };
