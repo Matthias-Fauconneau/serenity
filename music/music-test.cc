@@ -263,7 +263,13 @@ skip:;
     // Transfers to notes
     for(mref<Sign> chord: notes.values) for(Sign& o: chord) {
      if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
-     if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) o.note.glyphIndex[1] = glyphIndex; // Also highlights tied notes
+     if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) {
+      for(int i=1;;i++) {
+       assert_(i < 4);
+       assert_(o.note.glyphIndex[i]!=glyphIndex);
+       if(o.note.glyphIndex[i]==invalid) { o.note.glyphIndex[i] = glyphIndex; break; } // Also highlights tied notes
+      }
+     }
     }
     if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-1,note.note.key()),64,red).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
@@ -581,11 +587,11 @@ skip:;
      if(active.contains(note.key) && active.at(note.key).note.trill) {
       Sign sign = active.take(note.key);
       (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-      for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
+      for(int i: range(4)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
      }
      active.insertMulti(note.key, sign);
      (sign.staff?keyboard.left:keyboard.right).append( sign.note.key() );
-     for(int i: range(2)) {
+     for(int i: range(4)) {
       if(sign.note.glyphIndex[i] != invalid) {
        OCRNote note = OCRNotes[sign.note.glyphIndex[i]];
        note.glyphIndex = sign.note.glyphIndex[i]; // For removal
@@ -619,7 +625,7 @@ skip:;
       if(active.at(note.key).note.trill) continue; // Will be removed on known (marked) note press of same key
       Sign sign = active.take(note.key);
       (sign.staff?keyboard.left:keyboard.right).remove( sign.note.key() );
-      for(int i: range(2)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
+      for(int i: range(4)) if(sign.note.glyphIndex[i] != invalid) highlight.remove(sign.note.glyphIndex[i]);
 #if 0
       // Updates next notes
       //keyboard.measure.clear();
