@@ -515,7 +515,11 @@ skip:;
       const Image8 source = cropRef(imageLo, int2(-scroll.offset.x/2, 0), int2(width, image.size.y/2));
       const Image subTarget = cropRef(target, int2(0, y0),  int2(width, image.size.y/2));
       /*toImage(subTarget, downsample(source));*/
-      for(size_t y: range(source.size.y)) for(size_t x: range(source.size.x)) subTarget(x, y) = source(x, y);
+      for(size_t y: range(source.size.y)) {
+          const uint8* const sourceLine =    source.begin()+y*   source.stride;
+                byte4* const targetLine = subTarget.begin()+y*subTarget.stride;
+          for(size_t x: range(source.size.x)) targetLine[x] = sourceLine[x];
+      }
       resampleTime.stop();
       //fill(target, int2(width, 0), int2(target.size.x-width, image.size.y/2), white, 1);
       for(OCRNote note: highlight) {
