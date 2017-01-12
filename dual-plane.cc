@@ -24,6 +24,7 @@ struct ViewApp : ViewControl {
 
     bool orthographic = false;
     bool depthCorrect = true;
+    bool depthThreshold = true;
     //bool uniformWeights = false;
     bool wideReconstruction = true;
 
@@ -50,6 +51,7 @@ struct ViewApp : ViewControl {
         window->setTitle(name);
         window->actions[Key('o')] = [this]{ orthographic=!orthographic; count=0; st.count=0; window->render(); };
         window->actions[Key('d')] = [this]{ depthCorrect=!depthCorrect; window->render(); };
+        window->actions[Key('t')] = [this]{ depthThreshold=!depthThreshold; window->render(); };
         //window->actions[Key('u')] = [this]{ uniformWeights=!uniformWeights; window->render(); window->setTitle(str(uniformWeights)); };
         window->actions[Key('w')] = [this]{ wideReconstruction=!wideReconstruction; window->render(); window->setTitle(str(wideReconstruction)); };
         st.target = 960/2;
@@ -94,11 +96,12 @@ struct ViewApp : ViewControl {
         ImageH Z(imageSize);
         const mat4 camera = parseCamera(readFile("scene.json"));
         mat4 newCamera = camera;
+        mat4 projection; // Recover w by projecting from world to homogenous coordinates, as w cannot be recovered from normalized coordinates (after perspective divide: w/w=1)
         float s = 0, t = 0;
         if(orthographic) {
             newCamera.rotateY(angles.x); // Yaw
             newCamera.rotateX(angles.y); // Pitch
-            newCamera[3].xyz() = (mat3)newCamera * vec3(0, 0, -2);
+            newCamera[3].xyz() = (mat3)newCamera * vec3(0, 0, -2); // Rotation center
         } else {
             s = angles.x/(PI/3), t = angles.y/(PI/3);
             vec4 O = newCamera * vec4(s, t, 0, 0);
@@ -106,6 +109,8 @@ struct ViewApp : ViewControl {
             newCamera(0, 2) -= O.x;
             newCamera(1, 2) -= O.y;
             newCamera(2, 2) -= O.z;
+            projection(3, 3) = 0;
+            projection(3, 2) = 1;
         }
 #if 1
         {
@@ -120,12 +125,13 @@ struct ViewApp : ViewControl {
             }
             count++;
 
-            parallel_chunk(target.size.y, [this, camera, newCamera, /*s, t,*/ &Z, &target](uint _threadId, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, camera, newCamera, projection, /*s, t,*/ &Z, &target](uint _threadId, uint start, uint sizeI) {
                 TraceBase tracer(scene, _threadId);
                 for(int y: range(start, start+sizeI)) for(uint x: range(target.size.x)) {
-                    //const vec3 O = newCamera * vec3(s, t, 0);
-                    const vec3 O = newCamera * vec3(0, 0, 0);
-                    const vec3 P = newCamera * vec3((2.f*x/float(target.size.x-1)-1), ((2.f*y/float(target.size.y-1)-1)), 1); // FIXME: sheared perspective
+                    const vec4 Op = vec4((2.f*x/float(imageSize.x-1)-1), ((2.f*y/float(imageSize.y-1)-1)), 0, (projection*vec4(0,0,0,1)).w);
+                    const vec4 Pp = vec4((2.f*x/float(imageSize.x-1)-1), ((2.f*y/float(imageSize.y-1)-1)), 1, (projection*vec4(0,0,1,1)).w); // FIXME: sheared perspective
+                    const vec3 O = newCamera * (Op.w * Op.xyz());
+                    const vec3 P = newCamera * (Pp.w * Pp.xyz());
                     float hitDistance;
                     Vec3f emission = tracer.trace(O, P, hitDistance, /*count*/8);
                     size_t i = y*target.size.x+x;
@@ -148,7 +154,7 @@ struct ViewApp : ViewControl {
         if(imageSize && imageCount) {
             const Image target = cropShare(window, int2(imageSize.x,0), imageSize);
             assert_(imageCount.x == imageCount.y);
-            parallel_chunk(target.size.y, [this, &target, camera, newCamera, /*s, t,*/ &Z](uint, uint start, uint sizeI) {
+            parallel_chunk(target.size.y, [this, &target, camera, newCamera, projection, /*s, t,*/ &Z](uint, uint start, uint sizeI) {
                 const uint size1 = imageSize.x *1;
                 const uint size2 = imageSize.y *size1;
                 const uint size3 = imageCount.x*size2;
@@ -173,9 +179,10 @@ struct ViewApp : ViewControl {
                 const float scale = (float)(imageSize.x-1) / (imageCount.x-1); // st -> uv
                 for(int targetY: range(start, start+sizeI)) for(int targetX: range(target.size.x)) {
                     size_t targetIndex = (target.size.y-1-targetY)*target.stride + targetX;
-                    //const vec3 Ow = newCamera * vec3(s, t, 0);
-                    const vec3 Ow = newCamera * vec3(0, 0, 0);
-                    const vec3 Pw = newCamera * vec3((2.f*targetX/float(target.size.x-1)-1), ((2.f*targetY/float(target.size.y-1)-1)), 1);
+                    const vec4 Op = vec4((2.f*targetX/float(imageSize.x-1)-1), ((2.f*targetY/float(imageSize.y-1)-1)), 0, (projection*vec4(0,0,0,1)).w);
+                    const vec4 Pp = vec4((2.f*targetX/float(imageSize.x-1)-1), ((2.f*targetY/float(imageSize.y-1)-1)), 1, (projection*vec4(0,0,1,1)).w); // FIXME: sheared perspective
+                    const vec3 Ow = newCamera * (Op.w * Op.xyz());
+                    const vec3 Pw = newCamera * (Pp.w * Pp.xyz());
                     const vec3 O = camera.inverse() * Ow;
                     const vec3 P = camera.inverse() * Pw;
                     const vec3 d = normalize(P-O);
@@ -223,15 +230,16 @@ struct ViewApp : ViewControl {
                                 const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                                 static const v4sf _0011f = {0,0,1,1};
                                 const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-#if 0
-                                const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
-                                        * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
-#else
-                                const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                                const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                v4sf w01uv;
+                                if(!depthThreshold) {
+                                    w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
+                                          * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
+                                } else {
+                                    const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                                    w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-1/length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
-#endif
+                                }
                                 const float sum = ::hsum(w01uv);
                                 if(!sum) { B[dt*2+ds] = 0; G[dt*2+ds] = 0; R[dt*2+ds] = 0; continue; }
                                 const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
@@ -260,7 +268,7 @@ struct ViewApp : ViewControl {
                                 static const v4sf _0011f = {0,0,1,1};
                                 const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                                 const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                                const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                const v4sf w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow))), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
                                 const float sum = ::hsum(w01uv);
@@ -311,7 +319,7 @@ struct ViewApp : ViewControl {
                 if(st.sumR.size != imageCount) st.sumR = ImageF(imageCount); st.sumR.clear(0);
             }
             st.count++;
-            //TraceBase tracer(scene, 0); // TODO: parallel
+            TraceBase tracer(scene, 0); // TODO: parallel
             {
                 const uint size1 = imageSize.x *1;
                 const uint size2 = imageSize.y *size1;
@@ -333,9 +341,10 @@ struct ViewApp : ViewControl {
                 assert_(imageSize.x%2==0); // Gather 32bit / half
                 const v2ui sample2D = {    0,           size1/2};
                 const float scale = (float)(imageSize.x-1) / (imageCount.x-1); // st -> uv
-                //const vec3 Ow = newCamera * vec3(s, t, 0);
-                const vec3 Ow = newCamera * vec3(0, 0, 0);
-                const vec3 Pw = newCamera * vec3((2.f*st.target.x/float(imageSize.x-1)-1), ((2.f*st.target.y/float(imageSize.y-1)-1)), 1);
+                const vec4 Op = vec4((2.f*st.target.x/float(imageSize.x-1)-1), ((2.f*st.target.y/float(imageSize.y-1)-1)), 0, (projection*vec4(0,0,0,1)).w);
+                const vec4 Pp = vec4((2.f*st.target.x/float(imageSize.x-1)-1), ((2.f*st.target.y/float(imageSize.y-1)-1)), 1, (projection*vec4(0,0,1,1)).w); // FIXME: sheared perspective
+                const vec3 Ow = newCamera * (Op.w * Op.xyz());
+                const vec3 Pw = newCamera * (Pp.w * Pp.xyz());
                 {
                     const vec3 O = camera.inverse() * Ow;
                     const vec3 P = camera.inverse() * Pw;
@@ -359,6 +368,10 @@ struct ViewApp : ViewControl {
 
                     for(int tIndex: range(imageCount.y)) for(int sIndex: range(imageCount.x)) {
                         vec2 uv_ = uv_uncorrected + scale * (vec2(sIndex,tIndex)-st) * z_;
+#if 0
+                        const vec3 Ow = newCamera * vec3(0, 0, 0);
+                        const vec3 Pw = newCamera * vec3((2.f*st.target.x/float(imageSize.x-1)-1), ((2.f*st.target.y/float(imageSize.y-1)-1)), 1);
+#else
                         float b = 0, g = 0, r = 0;
                         if(!(uv_[0] < 0 || uv_[1] < 0)) {
                             int uIndex = uv_[0], vIndex = uv_[1];
@@ -368,15 +381,16 @@ struct ViewApp : ViewControl {
                                 const v4sf X = __builtin_shufflevector(x, x, 0,1, 0,1);
                                 static const v4sf _0011f = {0,0,1,1};
                                 const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
-                                const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-#if 0
-                                const v4sf w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                v4sf w01uv;
+                                if(depthThreshold) {
+                                    const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
+                                    w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-1*length(Pw-Ow))), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
-#else
-                                const v4sf w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
+                                } else {
+                                    w01uv = __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)  // vvVV
                                                  * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
-#endif
+                                }
                                 const float sum = ::hsum(w01uv);
                                 if(sum) {
                                     const v4sf w01 = float4(1./sum) * w01uv; // Renormalizes uv interpolation (in case of discarded samples)
@@ -385,6 +399,7 @@ struct ViewApp : ViewControl {
                                     r = dot(w01, toFloat((v4hf)gather((float*)(fieldR.data+base), sample2D)));
                                 }
                             }
+#endif
                         }
                         const uint R = 0xFFF*::min(1.f, r);
                         const uint G = 0xFFF*::min(1.f, g);
