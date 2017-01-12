@@ -9,6 +9,7 @@
 #include "asound.h"
 #include "render.h"
 #include "text.h"
+#include "sort.h"
 
 Image8 toImage8(const Image& image) {
  return Image8(apply(image, [](byte4 bgr){
@@ -550,7 +551,7 @@ skip:;
          /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
-    if(timeTicks >= durationTicks+this->notes.ticksPerSeconds/*1sec fadeout*/) break;
+    if(timeTicks >= durationTicks+3*this->notes.ticksPerSeconds/*1sec fadeout*/) break;
     //if(video && video.videoTime >= video.duration) break;
     //if(timeTicks > 4*this->notes.ticksPerSeconds) break; // DEBUG
    }
