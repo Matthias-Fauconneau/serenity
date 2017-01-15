@@ -31,7 +31,7 @@ struct Room {
     float altScore = 0;
     String reason;
 
-    bool evaluate(const float threshold, const float c) {
+    bool evaluate(const float threshold, const float c, const float clipPrice=inf, const float clipTime=inf) {
      /*if(0 && url.host && existsFile(cacheFile(url)) && 1) { // Get address for debugging (only when cached and recent enough)
       const Map data = getURL(copy(url));
       const Element root = parseHTML(data);
@@ -87,7 +87,7 @@ struct Room {
          assert_(!s, s.data, s.index);
         }
         if(until && until < Date(currentTime()+60*24*60*60)) {assert_(!negative,"until",until, url.path); reason=str("until",until); return false;}*/
-        if((score=price) > threshold) {/*assert_(!negative,"price",price);*/ reason="price"__; return false;}
+        if((score=price) > threshold/*750*/ && threshold < inf) {/*assert_(!negative,"price",price);*/ reason="price"__; return false;}
 
         // Room detail request
         if(url.host) {
@@ -214,11 +214,18 @@ struct Room {
                         }
                         //if(destinationIndex==0) {assert(!negative, duration, A, B, address, url.path); reason="far"__; return false;}
                         //if(route) log(A, B, duration);
-                        /*if(destinationIndex==0 && find(address, "Lerchen")) { // ETH Link
+                        if(destinationIndex==0 && (find(address, "Lerchen")||find(address, "Pauli")||find(address, "Einstein"))) { // ETH Link
                          //log("Lerchen", address);
-                         assert_(duration > 19 && duration < 21.5, duration, address);
-                         duration = 19;
-                        }*/
+                         /**/ if(find(address, "Lerchen")) {
+				 assert_(duration > 19 && duration < 23, duration, address);
+				 duration = 1+2+2+13+1;
+			 } 
+			 else if(find(address, "Pauli")||find(address, "Einstein")) {
+				 assert_(duration > 18 && duration < 23, duration, address);
+				 duration = 2+13+1;
+			 } 
+			 else error("E");
+                        }
                         durationSum += duration; tripCount+=1;
                         /*if(destinationIndex!=0) altScore += duration*c;
                         if(destinationIndex!=1)*/ score += duration*c;
@@ -237,6 +244,7 @@ struct Room {
                 assert_(perTrip < 90, perTrip);
                 durations[destinationIndex] = perTrip;
                 if(score > threshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
+                if(price>clipPrice && score-price > clipTime && threshold < inf) { assert_(!negative, durations, score, score-price, price, address, url); reason="clip"__; return false;}
                 //if(altScore > altThreshold) {assert_(!negative, durations, score, score-price, price, address, url); reason="threshold"__; return false;}
             }
         }
@@ -275,6 +283,10 @@ struct WG {
         static float c = s.decimal();
         s.skip(' ');
         veloFactor = s.decimal();
+        s.skip(' ');
+        static float clipPrice = s.decimal();
+        s.skip(' ');
+        static float clipTime = s.decimal();
         s.skip('\n');
         if(arguments().size == 1) {
             const Map data = getURL(copy(url), {}, 1);
@@ -301,7 +313,7 @@ struct WG {
                     if(room.price <= 200) continue;
                 }
 
-                if(room.evaluate(threshold, c)) rooms.insertSorted(move(room));
+                if(room.evaluate(threshold, c, clipPrice, clipTime)) rooms.insertSorted(move(room));
                 else {
                     bool negative;
                     {static String negativeFile = readFile("-");
