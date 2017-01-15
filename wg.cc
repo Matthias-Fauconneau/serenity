@@ -10,6 +10,7 @@
 #include "layout.h"
 #include "window.h"
 #include "png.h"
+#include "render.h"
 
 static String destinationFile = readFile("destinations");
 
@@ -271,6 +272,7 @@ struct WG {
     unique<Window> window {nullptr};
     array<Room> rooms; // Sorted by score
     size_t roomIndex = -1;
+    Image plot {1366, 822};
 
     WG() {
         URL url ("https://www.wgzimmer.ch/wgzimmer/search/mate.html?");
@@ -292,6 +294,7 @@ struct WG {
             const Map data = getURL(copy(url), {}, 1);
             const Element root = parseHTML(data);
             const auto& list = root("html")("body")("#main")("#container")("#content")("ul");
+            plot.clear(0xFF);
             for(const Element& li: list.children) {
                 const Element& a = li.children[1];
                 Room room;
@@ -313,8 +316,13 @@ struct WG {
                     if(room.price <= 200) continue;
                 }
 
-                if(room.evaluate(threshold, c, clipPrice, clipTime)) rooms.insertSorted(move(room));
-                else {
+                if(room.evaluate(threshold, c, clipPrice, clipTime)) {
+                 assert_(room.price > 0 && room.price <= (uint)plot.size.y, room.price);
+                 assert_(room.score-room.price > 0 && room.score-room.price <= plot.size.x, room.score-room.price);
+                 //plot(room.score-1-room.price, room.price-1) = 0xFF;
+                 render(plot, Text(replace(room.address,"strasse",""), 12).graphics(0), vec2(room.score-1-room.price, room.price-1));
+                 rooms.insertSorted(move(room));
+                } else {
                     bool negative;
                     {static String negativeFile = readFile("-");
                     assert_(url.path);
@@ -349,7 +357,6 @@ struct WG {
             room.startDate = copyRef(section(id,'-',0,3));
             room.untilDate = copyRef(section(id,'-',3,4));
             room.price = parseInteger(copyRef(section(id,'-',4,5)));
-            if(room.price <= 240) room.price = room.price*10/3;
             room.evaluate(threshold, c);
             rooms.append(move(room));
         }
@@ -368,6 +375,7 @@ struct WG {
                 rooms.insertSorted(move(room));
             }
         }
+        writeFile("plot.png", encodePNG(plot), currentWorkingDirectory(), true);
         array<Room> newRooms;
         for(size_t i: reverse_range(rooms.size)) {
          Room& room = rooms[i];
