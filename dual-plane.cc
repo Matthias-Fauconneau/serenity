@@ -12,7 +12,7 @@
 #include "renderer/TraceableScene.h"
 #include "integrators/TraceBase.h"
 #include "sampling/UniformPathSampler.h"
-//#include "prerender.h"
+#include "prerender.h"
 
 struct ViewApp : ViewControl {
     string name;
@@ -26,7 +26,7 @@ struct ViewApp : ViewControl {
     bool depthCorrect = true;
     bool depthThreshold = true;
     //bool uniformWeights = false;
-    bool wideReconstruction = true;
+    bool wideReconstruction = false;
 
     unique<Window> window = nullptr;
 
@@ -144,7 +144,7 @@ struct ViewApp : ViewControl {
                     const uint b = 0xFFF*::min(1.f, sumB[i]/count);
                     extern uint8 sRGB_forward[0x1000];
                     target[(target.size.y-1-y)*target.stride+x] = byte4(sRGB_forward[b], sRGB_forward[g], sRGB_forward[r], 0xFF);
-                    Z[i] = hitDistance / ::length(P-O);
+                    Z[i] = hitDistance;// / ::length(P-O);
                 }
             });
             if(count < 1024) this->window->render();
@@ -208,7 +208,7 @@ struct ViewApp : ViewControl {
                     if(depthCorrect) {
                         const float z = Z(targetX, targetY);
                         const float z_ = z==inff ? 1 : (z-1)/z;
-                        const float zW = z * length(Pw-Ow);
+                        const float zW = z;// * length(Pw-Ow);
 
                         if(!wideReconstruction) { // Bilinear
                             const v4sf x = {st[1], st[0]}; // ts
@@ -236,7 +236,7 @@ struct ViewApp : ViewControl {
                                           * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1); // uUuU
                                 } else {
                                     const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                                    w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-1/length(Pw-Ow)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                    w01uv = and( Z==float4(z)/*inf=inf*/ | abs(Z - float4(zW)) < float4(0x1p-1/*/length(Pw-Ow)*/), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
                                 }
@@ -268,7 +268,7 @@ struct ViewApp : ViewControl {
                                 static const v4sf _0011f = {0,0,1,1};
                                 const v4sf w_1mw = abs(X - floor(X) - _0011f); // fract(x), 1-fract(x)
                                 const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                                const v4sf w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-2*length(Pw-Ow))), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                const v4sf w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-1/**length(Pw-Ow)*/)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
                                 const float sum = ::hsum(w01uv);
@@ -364,7 +364,7 @@ struct ViewApp : ViewControl {
 
                     const float z = Z(this->st.target.x, this->st.target.y);
                     const float z_ = z==inff ? 1 : (z-1)/z;
-                    const float zW = z * length(Pw-Ow);
+                    const float zW = z; // * length(Pw-Ow);
 
                     for(int tIndex: range(imageCount.y)) for(int sIndex: range(imageCount.x)) {
                         vec2 uv_ = uv_uncorrected + scale * (vec2(sIndex,tIndex)-st) * z_;
@@ -384,7 +384,7 @@ struct ViewApp : ViewControl {
                                 v4sf w01uv;
                                 if(depthThreshold) {
                                     const v4sf Z = toFloat((v4hf)gather((float*)(fieldZ.data+base), sample2D)); // FIXME
-                                    w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-1*length(Pw-Ow))), // Discards far samples (tradeoff between edge and anisotropic accuracy)
+                                    w01uv = and( (Z==float4(z)/*inf=inf*/) | (abs(Z - float4(zW)) < float4(0x1p-1/**length(Pw-Ow)*/)), // Discards far samples (tradeoff between edge and anisotropic accuracy)
                                                         __builtin_shufflevector(w_1mw, w_1mw, 2,2,0,0)    // vvVV
                                                         * __builtin_shufflevector(w_1mw, w_1mw, 3,1,3,1) ); // uUuU
                                 } else {
