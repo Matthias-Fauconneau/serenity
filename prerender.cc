@@ -64,16 +64,6 @@ struct Render {
                 half* const targetR = R.begin();
                 TraceBase tracer(scene, id);
                 for(int y: range(start, start+sizeI)) for(uint x: range(size.x)) {
-                    //const vec4 Op = vec4((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 0, /*(projection*vec4(0,0,0,1)).w*/0);
-                    //const vec3 O = (mat3)C1 * vec3(0,0,0); //(Op.w * Op.xyz());
-                    //const vec3 O = (C1 * vec4(s, t, 0, 1)).xyz();
-                    //assert_(camera * vec4(s, t, 0, 1).xyz() == C1 * vec4(0, 0, 0, 1).xyz(), camera * vec4(s, t, 0, 1).xyz(), C1 * vec4(0, 0, 0, 1).xyz());
-                    //const vec4 Pp = vec4((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 1, /*(projection*vec4(0,0,1,1)).w*/1);
-                    //const vec3 Pp = vec3((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 1);
-                    //const vec3 P = (mat3)C1 * Pp; //* (Pp.w * Pp.xyz());
-                    //const vec3 P = C1 * Pp; //* (Pp.w * Pp.xyz());
-                    //const vec3 P = (C1 * Pp).xyz();
-
                     const vec4 Op = vec4((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 0, (projection*vec4(0,0,0,1)).w);
                     const vec3 O = C1 * (Op.w * Op.xyz());
                     const vec4 Pp = vec4((2.f*x/float(size.x-1)-1), ((2.f*y/float(size.y-1)-1)), 1, (projection*vec4(0,0,1,1)).w);
@@ -82,13 +72,13 @@ struct Render {
                     float hitDistance;
                     Vec3f emission (0.f);
                     for(int unused i : range(spp)) emission += tracer.trace(O, P, hitDistance);
-                    targetZ[y*size.x+x] = hitDistance; // / ::length(P-O);
+                    targetZ[y*size.x+x] = hitDistance / ::length(P-O); // (orthogonal) distance to ST plane
                     targetB[y*size.x+x] = emission[2] / spp;
                     targetG[y*size.x+x] = emission[1] / spp;
                     targetR[y*size.x+x] = emission[0] / spp;
                 }
             });
-#if 1 // DEBUG
+#if 0 // DEBUG
             Image bgr (size);
             extern uint8 sRGB_forward[0x1000];
             for(uint svIndex: range(size.y)) for(uint suIndex: range(size.x)) {
