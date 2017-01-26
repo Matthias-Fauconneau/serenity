@@ -130,29 +130,34 @@ struct Music : Widget {
   //image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
 
-  templates = apply(4, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
+  templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
 
   Image target;
   if(!existsFile("OCRNotes",name) || 0) {
-   buffer<Image8> negatives = apply(4, [name](int i){
+   buffer<Image8> negatives = apply(templates.size, [name](int i){
     return existsFile(str(i)+"-.png") ? toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name)))) : Image8();
    });
 
-   if(1) target = toImage(cropRef(image,0,int2(image.size.x/2, image.size.y)));
+   if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
    uint sumX[image.size.y]; // Σ[x-Tx,x]
    const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
-   uint intensityThreshold[4];
-   for(uint t: range(4)) {
+   uint intensityThreshold[templates.size];
+#if 1
+   uint sum=0; for(uint x: range(Tx)) for(uint y: range(Ty)) sum += templates[1](x, y);
+   for(uint t: range(templates.size)) intensityThreshold[t] = sum;
+#else
+   for(uint t: range(templates.size)) {
     uint sum = 0;
     for(uint x: range(templates[t].size.x)) for(uint y: range(templates[t].size.y)) sum += templates[1](x, y);
     int Dx = Tx-templates[t].size.x;
     int Dy = Ty-templates[t].size.y;
     if((uint)templates[t].size.x < Tx) {
      assert_((uint)templates[t].size.y < Ty);
-     sum += 0xFF*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Conservative cull
+     sum += (int[]){0xFF,0x40,0x40,0xC0}[t]*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Semi conservative cull
     }
     intensityThreshold[t]=sum;
    }
+#endif
    for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
    Image16 corrMap (image.size); corrMap.clear(0);
    Image8 localMax (image.size); localMax.clear(0);
@@ -172,20 +177,23 @@ struct Music : Widget {
       sumY += sumX[y] - sumX[y-Ty];
       for(uint t: range(templates.size)) {
        if(sumY >= intensityThreshold[t]) continue;
-       if(t==3) target(x-templates[t].size.x+1,y-templates[t].size.x+1) = byte4(0xFF,0,0,0xFF);
+       //if(t==0) target(x-templates[t].size.x+1,y-templates[t].size.x+1) = byte4(0xFF,0,0,0xFF);
        //const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
-       const int correlationThreshold = (templates[t].size.x)*(templates[t].size.y)*sq((int[]){/*96*/104,96,104,96}[t]);
+       //const int correlationThreshold = (templates[t].size.x)*(templates[t].size.y)*sq((int[]){/*96*/104,96,104,104}[t]);
+       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){104,96,104,104}[t]);
        int corr = 0;
-       const int x0 = x-templates[t].size.x+1, y0 = y-templates[t].size.y+1;
+       //const int x0 = x-templates[t].size.x+1, y0 = y-templates[t].size.y+1;
+       const int x0 = x-Tx+1, y0 = y-Ty+1;
        const int half = 128;
-       for(uint dy: range(templates[t].size.y)) for(uint dx: range(templates[t].size.x)) {
-        corr += (int(image(x0+dx,y0+dy))-half) * (int(templates[t](dx, dy))-half);
+       //for(uint dy: range(templates[t].size.y)) for(uint dx: range(templates[t].size.x)) {
+       for(uint dy: range(Ty)) for(uint dx: range(Tx)) {
+               corr += (int(image(x0+dx,y0+dy))-half) * (int(templates[t](dx, dy))-half);
        }
        if(corr < correlationThreshold) continue;
        int ncorr = 0;
-       if(1 && (t==3)) for(uint dy: range(negatives[t].size.y)) for(uint dx: range(negatives[t].size.x)) {
+       /*if(t==3) for(uint dy: range(negatives[t].size.y)) for(uint dx: range(negatives[t].size.x)) {
         ncorr += (int(image(x0+dx,y0+dy))-half) * (int(negatives[t](dx, dy))-half);
-       }
+       }*/
        if(corr*2 > ncorr*3) {
         corr /= 512;
         assert_(corr < 65536, corr);
@@ -233,7 +241,7 @@ skip:;
 
    writeFile("measureX", cast<byte>(measureX), name, true);
    writeFile("OCRNotes", cast<byte>(OCRNotes), name, true);
-  } else if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
+  } //else if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
   measureX = cast<uint>(readFile("measureX", name));
   if(target) for(uint i: range(measureX.size)) render(target, Text(str(1+i),64).graphics(0), vec2(measureX[i], 64));
   OCRNotes = cast<OCRNote>(readFile("OCRNotes", name));
