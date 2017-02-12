@@ -127,9 +127,7 @@ struct Music : Widget {
    writeFile(imageFile, cast<byte>(toImage8(image)));
   }
   rawImageFileMap = Map(imageFile);
-  //image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
-
   templates = apply(3, [](int i){ return toImage8(decodePNG(readFile(str(i)+".png")));});
 
   Image target;
@@ -153,7 +151,7 @@ struct Music : Widget {
     int Dy = Ty-templates[t].size.y;
     if((uint)templates[t].size.x < Tx) {
      assert_((uint)templates[t].size.y < Ty);
-     sum += (int[]){0xC0,0x40,0x40,0xC0}[t]*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Semi conservative cull
+     sum += (int[]){0xC0,0xFF,0x40,0xC0}[t]*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Semi conservative cull
     }
     intensityThreshold[t]=sum;
    }
@@ -180,7 +178,7 @@ struct Music : Widget {
        //if(t==0) target(x-templates[t].size.x+1,y-templates[t].size.x+1) = byte4(0xFF,0,0,0xFF);
        //const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
        //const int correlationThreshold = (templates[t].size.x)*(templates[t].size.y)*sq((int[]){/*96*/104,96,104,104}[t]);
-       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){104,96,104,104}[t]);
+       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){96,88,104,104}[t]);
        int corr = 0;
        //const int x0 = x-templates[t].size.x+1, y0 = y-templates[t].size.y+1;
        const int x0 = x-Tx+1, y0 = y-Ty+1;
@@ -197,6 +195,8 @@ struct Music : Widget {
        if(corr*2 > ncorr*3) {
         corr /= 512;
         assert_(corr < 65536, corr);
+        //corr /= 256;
+        //assert_(corr < 256, corr);
 
         const int r = 6;
         for(int dy: range(-r, r)) for(uint dx: range(-r, r +1)) { // FIXME: -1,{-1,0,1}; 0,-1
@@ -283,17 +283,19 @@ skip:;
   for(ref<Sign> chord: allNotes.values) {
    for(Sign note: chord.reverse()) { // Top to Bottom
     // Transfers to notes
+    bool tied = false;
     for(mref<Sign> chord: notes.values) for(Sign& o: chord) {
      if(o.note.signIndex == note.note.signIndex) o.note.glyphIndex[0] = glyphIndex; // FIXME: dot, accidentals
      if(o.note.signIndex == (size_t)note.note.tieStartNoteIndex) {
       for(int i=1;;i++) {
        assert_(i < 4);
        assert_(o.note.glyphIndex[i]!=glyphIndex);
-       if(o.note.glyphIndex[i]==invalid) { o.note.glyphIndex[i] = glyphIndex; break; } // Also highlights tied notes
+       if(o.note.glyphIndex[i]==invalid) { o.note.glyphIndex[i] = glyphIndex; tied=true; break; } // Also highlights tied notes
       }
      }
     }
-    if(target && glyphIndex < OCRNotes.size) render(target, Text(strKey(-1,note.note.key()),64,red).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
+    if(target && glyphIndex < OCRNotes.size)
+     render(target, Text(strKey(-1,note.note.key()),64,tied?green:red).graphics(0), vec2(OCRNotes[glyphIndex].position)); // DEBUG
     glyphIndex++;
     //strNotes.append(strKey(-1,note.note.key())+" ");
    }
