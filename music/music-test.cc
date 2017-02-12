@@ -145,6 +145,7 @@ struct Music : Widget {
    uint sum=0; for(uint x: range(Tx)) for(uint y: range(Ty)) sum += templates[1](x, y);
    for(uint t: range(templates.size)) intensityThreshold[t] = sum;
 #else
+   uint I0=0; for(uint x: range(Tx)) for(uint y: range(Ty)) I0 += templates[1](x, y);
    for(uint t: range(templates.size)) {
     uint sum = 0;
     for(uint x: range(templates[t].size.x)) for(uint y: range(templates[t].size.y)) sum += templates[t](x, y);
@@ -153,7 +154,11 @@ struct Music : Widget {
     if(Dy>0 && (uint)templates[t].size.x < Tx) sum += (int[]){0xC0,0xFF,0x40,0xC0}[t]*(templates[t].size.x*Dy); // Semi conservative cull
     if(Dx>0 && (uint)templates[t].size.y < Ty) sum += (int[]){0xC0,0xFF,0x40,0xC0}[t]*(templates[t].size.x*Dy); // Semi conservative cull
     if(Dx>0 && Dy>0) sum += (int[]){0xC0,0xFF,0x40,0xC0}[t]*(Dx*Dy); // Semi conservative cull
-    intensityThreshold[t] = sum;
+    //assert_(sum >= I0, sum, I0);
+    //assert_(sum <= I0, sum, I0);
+    //intensityThreshold[t] = I0; //sum;
+    //intensityThreshold[t] = ::max(I0, sum); //sum;
+    intensityThreshold[t] = ::min(I0, sum); //sum;
    }
 #endif
    for(uint y: range(1,image.size.y)) { sumX[y]=0; for(uint x: range(1,Tx+1)) sumX[y] += image(x,y); }
@@ -178,7 +183,7 @@ struct Music : Widget {
        //if(t==0) target(x-templates[t].size.x+1,y-templates[t].size.x+1) = byte4(0xFF,0,0,0xFF);
        //const int correlationThreshold = int(Tx)*int(Ty)*sq(96);
        //const int correlationThreshold = (templates[t].size.x)*(templates[t].size.y)*sq((int[]){/*96*/104,96,104,104}[t]);
-       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){96,88,104,104}[t]);
+       const int correlationThreshold = int(Tx)*int(Ty)*sq((int[]){103/*97-103*/,88,104,104}[t]);
        int corr = 0;
        //const int x0 = x-templates[t].size.x+1, y0 = y-templates[t].size.y+1;
        const int x0 = x-Tx+1, y0 = y-Ty+1;
@@ -189,9 +194,10 @@ struct Music : Widget {
        }
        if(corr < correlationThreshold) continue;
        int ncorr = 0;
-       /*if(t==3) for(uint dy: range(negatives[t].size.y)) for(uint dx: range(negatives[t].size.x)) {
+       if(t==0) for(uint dy: range(negatives[t].size.y)) for(uint dx: range(negatives[t].size.x)) {
         ncorr += (int(image(x0+dx,y0+dy))-half) * (int(negatives[t](dx, dy))-half);
-       }*/
+       }
+       //if(corr*2 > ncorr*3) {
        if(corr*2 > ncorr*3) {
         corr /= 512;
         assert_(corr < 65536, corr);
@@ -241,7 +247,7 @@ skip:;
 
    writeFile("measureX", cast<byte>(measureX), currentWorkingDirectory(), true);
    writeFile("OCRNotes", cast<byte>(OCRNotes), currentWorkingDirectory(), true);
-  } else if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
+  } else if(0) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
   measureX = cast<uint>(readFile("measureX"));
   if(target) for(uint i: range(measureX.size)) render(target, Text(str(1+i),64).graphics(0), vec2(measureX[i], 64));
   OCRNotes = cast<OCRNote>(readFile("OCRNotes"));
@@ -296,7 +302,7 @@ skip:;
       }
      }
     }
-    if(1 && target && ocrIndex < OCRNotes.size) render(target, Text(strKey(2,note.note.key()),64,tied?green:red).graphics(0), vec2(OCRNotes[ocrIndex].position)); // DEBUG
+    if(0 && target && ocrIndex < OCRNotes.size) render(target, Text(strKey(2,note.note.key()),64,tied?green:red).graphics(0), vec2(OCRNotes[ocrIndex].position)); // DEBUG
     ocrIndex++;
     //strNotes.append(strKey(2,note.note.key())+" ");
    }
@@ -304,11 +310,11 @@ skip:;
   //log(strNotes);
 
   if(ocrIndex != OCRNotes.size) log(ocrIndex, OCRNotes.size);
-  if(1 && target) { writeFile("debug.png", encodePNG(target), currentWorkingDirectory(), true); return; }
+  if(0 && target) { writeFile("debug.png", encodePNG(target), currentWorkingDirectory(), true); return; }
   //assert_(glyphIndex <= OCRNotes.size, glyphIndex, OCRNotes.size);
   //assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
 
-  String audioFileName = existsFile(name+".mp3") ? name+".mp3" : name+".opus";
+  String audioFileName = existsFile(name+".m4a") ? name+".m4a" : name+".mp3";
   audioFile = unique<FFmpeg>(audioFileName);
   assert_(audioFile->audioFrameRate);
 
@@ -521,9 +527,10 @@ skip:;
   }
 
   if(encode) { // Encode
-   Encoder encoder {name+".tutorial.mp4"_};
+   assert_(!existsFile(name+".mp4"));
+   Encoder encoder {name+".mp4"_};
    encoder.setH264(int2(1920, 1080), 60);
-   if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3)) encoder.setAudio(audioFile);
+   if(audioFile && (audioFile->codec==FFmpeg::AAC || audioFile->codec==FFmpeg::MP3 || audioFile->codec==FFmpeg::Opus)) encoder.setAudio(audioFile);
    else error("Unknown codec");
    encoder.open();
 
@@ -610,7 +617,7 @@ skip:;
          /*,int(round((float)totalTime*((float)durationTicks/timeTicks-1))), "/", int(round((float)totalTime/timeTicks*durationTicks)), "s"*/);
      lastReport=percent;
     }
-    if(timeTicks >= durationTicks+3*this->notes.ticksPerSeconds/*1sec fadeout*/) break;
+    if(timeTicks >= durationTicks+2*this->notes.ticksPerSeconds/*2sec fadeout*/) break;
     //if(video && video.videoTime >= video.duration) break;
     //if(timeTicks > 4*this->notes.ticksPerSeconds) break; // DEBUG
    }
