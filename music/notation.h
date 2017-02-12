@@ -233,10 +233,10 @@ inline String strKey(int fifths, int key) {
     return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt]+superDigit(octave);
     //return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
 }
-inline String strNote(int octave, int step, Accidental accidental) {
-    octave += /*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
-    octave -= 3;
-    assert_(octave >= 0, octave);
+inline String strNote(const int octaveBias, const int step, Accidental accidental) {
+    //assert_(step >= 0);
+    int octave = octaveBias + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    //assert_(octave >= 0, octave, octaveBias, step);
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
     array<char> s;
     s.append("CDEFGABcdefgab"_[min(1,octave)*7+octaveStep]);
@@ -247,8 +247,9 @@ inline String strNote(int octave, int step, Accidental accidental) {
 }
 inline String str(const Note& o) {
  array<char> s = strNote(o.clef.octave, o.step, o.accidental);
- /**/  /*if(o.value == Half) s.append('-');
- else*/ if(o.value == Quarter) s.append('-');
+ /**/ if(o.value == Whole) s.append('O');
+ else if(o.value == Half) s.append('o');
+ else if(o.value == Quarter) s.append('-');
  else if(o.value == Eighth) {}
  else if(o.value == Sixteenth) s.append(';');
  else error(int(o.value));
