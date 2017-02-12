@@ -104,9 +104,9 @@ struct Music : Widget {
 
  Music() {
   Time time{true};
-  string name = arguments()[0];
+  const String name = copyRef(section(Folder(".").name(), '/', -2, -1));
   String imageFile; int2 size;
-  auto list = Folder(name).list(Files);
+  auto list = currentWorkingDirectory().list(Files);
   for(const String& file: list) {
    TextData s (file);
    if(!s.match(name)) continue;
@@ -121,39 +121,39 @@ struct Music : Widget {
    imageFile = copyRef(file);
   }
   if(!imageFile) {
-   Image image = decodePNG(readFile(name+".png", Folder(name)));
+   Image image = decodePNG(readFile(name+".png"));
    size = image.size;
    imageFile = name+"."+strx(size);
-   writeFile(imageFile, cast<byte>(toImage8(image)), Folder(name));
+   writeFile(imageFile, cast<byte>(toImage8(image)));
   }
-  rawImageFileMap = Map(imageFile, Folder(name));
+  rawImageFileMap = Map(imageFile);
   //image = Image(cast<byte4>(unsafeRef(rawImageFileMap)), size);
   image = Image8(cast<uint8>(unsafeRef(rawImageFileMap)), size);
 
-  templates = apply(3, [name](int i){ return toImage8(decodePNG(readFile(str(i)+".png", Folder(name))));});
+  templates = apply(3, [](int i){ return toImage8(decodePNG(readFile(str(i)+".png")));});
 
   Image target;
-  if(!existsFile("OCRNotes",name) || 0) {
-   buffer<Image8> negatives = apply(templates.size, [name](int i){
-    return existsFile(str(i)+"-.png") ? toImage8(decodePNG(readFile(str(i)+"-.png", Folder(name)))) : Image8();
+  if(!existsFile("OCRNotes") || File("0.png").modifiedTime() > File("OCRNotes").modifiedTime() || 1) {
+   buffer<Image8> negatives = apply(templates.size, [](int i){
+    return existsFile(str(i)+"-.png") ? toImage8(decodePNG(readFile(str(i)+"-.png"))) : Image8();
    });
 
    if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y)));
    uint sumX[image.size.y]; // Σ[x-Tx,x]
    const uint Tx = templates[0].size.x, Ty = templates[2].size.y;
    uint intensityThreshold[templates.size];
-#if 1
+#if 0
    uint sum=0; for(uint x: range(Tx)) for(uint y: range(Ty)) sum += templates[1](x, y);
    for(uint t: range(templates.size)) intensityThreshold[t] = sum;
 #else
    for(uint t: range(templates.size)) {
     uint sum = 0;
-    for(uint x: range(templates[t].size.x)) for(uint y: range(templates[t].size.y)) sum += templates[1](x, y);
+    for(uint x: range(templates[t].size.x)) for(uint y: range(templates[t].size.y)) sum += templates[t](x, y);
     int Dx = Tx-templates[t].size.x;
     int Dy = Ty-templates[t].size.y;
     if((uint)templates[t].size.x < Tx) {
      assert_((uint)templates[t].size.y < Ty);
-     sum += (int[]){0xFF,0x40,0x40,0xC0}[t]*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Semi conservative cull
+     sum += (int[]){0xC0,0x40,0x40,0xC0}[t]*(Dx*templates[t].size.y+templates[t].size.x*Dy+Dx*Dy); // Semi conservative cull
     }
     intensityThreshold[t]=sum;
    }
@@ -239,14 +239,14 @@ skip:;
     }
    }
 
-   writeFile("measureX", cast<byte>(measureX), name, true);
-   writeFile("OCRNotes", cast<byte>(OCRNotes), name, true);
-  } //else if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
-  measureX = cast<uint>(readFile("measureX", name));
+   writeFile("measureX", cast<byte>(measureX), currentWorkingDirectory(), true);
+   writeFile("OCRNotes", cast<byte>(OCRNotes), currentWorkingDirectory(), true);
+  } else if(1) target = toImage(cropRef(image,0,int2(image.size.x, image.size.y))); // DEBUG
+  measureX = cast<uint>(readFile("measureX"));
   if(target) for(uint i: range(measureX.size)) render(target, Text(str(1+i),64).graphics(0), vec2(measureX[i], 64));
-  OCRNotes = cast<OCRNote>(readFile("OCRNotes", name));
+  OCRNotes = cast<OCRNote>(readFile("OCRNotes"));
 
-  signs = MusicXML(readFile(name+".xml"_, Folder(name))).signs;
+  signs = MusicXML(readFile(name+".xml"_)).signs;
 
   map<uint, array<Sign>> notes; // skips tied (for MIDI)
   map<uint, array<Sign>> allNotes; // also tied (for OCR)
@@ -254,6 +254,7 @@ skip:;
    Sign sign = signs[signIndex];
    if(sign.type == Sign::Note) {
     Note& note = sign.note;
+    if(note.grace) continue;
     note.signIndex = signIndex;
     allNotes.sorted(sign.time).add( sign );
     if(note.tie == Note::NoTie || note.tie == Note::TieStart) {
@@ -300,14 +301,14 @@ skip:;
   //log(strNotes);
 
   if(glyphIndex != OCRNotes.size) log(glyphIndex, OCRNotes.size);
-  if(target) { writeFile("debug.png", encodePNG(target), Folder(name), true); return; }
+  if(target) { writeFile("debug.png", encodePNG(target), currentWorkingDirectory(), true); return; }
   //assert_(glyphIndex <= OCRNotes.size, glyphIndex, OCRNotes.size);
   //assert_(glyphIndex == OCRNotes.size, glyphIndex, OCRNotes.size);
 
   String audioFileName = name+"/"+name+".mp3";
   audioFile = unique<FFmpeg>(audioFileName);
 
-  this->notes = ::scale(MidiFile(readFile(name+".mid"_, Folder(name))).notes, audioFile->audioFrameRate, audioStart(audioFileName));
+  this->notes = ::scale(MidiFile(readFile(name+".mid"_)).notes, audioFile->audioFrameRate, audioStart(audioFileName));
   buffer<MidiNote> midiNotes = filter(this->notes, [](MidiNote o){return o.velocity==0;});
 
   // Associates MIDI notes with score notes
@@ -489,7 +490,7 @@ skip:;
     }
    }
   }
-  if(target) { writeFile("debug.png", encodePNG(target), Folder(name), true); return; }
+  if(target) { writeFile("debug.png", encodePNG(target), currentWorkingDirectory(), true); return; }
 
   if(encode) { // Encode
    Encoder encoder {name+".tutorial.mp4"_};
