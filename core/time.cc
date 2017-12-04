@@ -12,9 +12,6 @@ long currentTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.
 int64 realTime() { timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 int64 threadCPUTime() { timespec ts; clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts); return ts.tv_sec*1000000000ull+ts.tv_nsec; }
 
-inline double round(double x) { return __builtin_round(x); } // math.h
-String strD(uint64 num, uint64 div) { return str(int(round(100.*num/div)))+'%'; }
-
 static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0)); }
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
@@ -22,21 +19,10 @@ int daysInMonth(int month, int year=0) {
     return daysPerMonth[month];
 }
 
-void Date::invariant(string unused s) const {
-    //Date
-    if(year!=-1) { assert(inRange(2012, year, 2099), year, s); }
-    if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12), month, s); }
-    if(day!=-1) {
-        assert(month!=-1);
-        assert(inRange(0, day, daysInMonth(month,year)), day, daysInMonth(month,year), month, year, s);
-    }
-    if(weekDay!=-1) {
-        assert(inRange(0, weekDay, 7));
-        if(year!=-1 && month!=-1 && day!=-1) {
-            //assert(weekDay==(Thursday+days())%7,weekDay,(Thursday+days())%7,str(*this));
-        }
-    }
-    //Hour
+void Date::invariant() const {
+    if(year!=-1) { assert(inRange(2012, year, 2099), year); }
+    if(month!=-1) { assert(year!=-1); assert(inRange(0, month, 12)); }
+    if(day!=-1) { assert(month!=-1); assert(inRange(0, day, daysInMonth(month,year)),day,daysInMonth(month,year));  }
     if(hours!=-1) { assert(inRange(0, hours, 24)); }
     if(minutes!=-1) { assert(inRange(0, minutes, 60)); assert(hours>=0); }
     if(seconds!=-1) { assert(inRange(0, seconds, 60)); assert(minutes>=0, hours, minutes, seconds); }
@@ -44,8 +30,8 @@ void Date::invariant(string unused s) const {
 int Date::days() const {
     assert(year>=0 && month>=0, year, month, day, hours, minutes, seconds);
     int days=0; //days from Thursday, 1st January 1970
-    for(int year=1970;year<this->year;year++) days+= leap(year)?366:365;
-    for(int month=0;month<this->month;month++) days+=daysInMonth(month,year);
+    for(int year: range(1970, this->year)) days+= leap(year)?366:365;
+    for(int month: range(this->month)) days+=daysInMonth(month, year);
     return days+day;
 }
 Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {
@@ -59,6 +45,7 @@ bool Date::summerTime() const { //FIXME: always European Summer Time
     return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }
+
 int Date::localTimeOffset(int64 utc) const {
     assert(year>=0);
     // Parses /etc/localtime to get local time zone offset (without DST)
@@ -70,12 +57,13 @@ int Date::localTimeOffset(int64 utc) const {
     uint i = 0; for(; i < transitionCount; i++) if(utc < (int)big32(transitionTimes[i])) break; i--;
     ref<uint8> transitionIndices = s.read<uint8>(transitionCount);
     uint index = transitionIndices[i];
-    struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; } packed;
+    struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; } _packed;
     ref<ttinfo> infos = s.read<ttinfo>(infoCount);
     return big32(infos[index].gmtOffset);
 }
+
 Date::Date(int64 time) {
-    int64 utc = time;
+    const int64 utc = time;
     for(uint i unused: range(2)) { // First pass computes UTC date to determine DST, second pass computes local date
         seconds = time;
         minutes=seconds/60; seconds %= 60;
@@ -88,12 +76,11 @@ Date::Date(int64 time) {
         time += localTimeOffset(utc); // localTimeOffset is only defined once we computed the UTC date
     }
     invariant();
-    assert(long(*this)==utc);
 }
 Date::operator int64() const {
     invariant();
     int64 local = ((days()*24+(hours>=0?hours:0))*60+(minutes>=0?minutes:0))*60+(seconds>=0?seconds:0);
-    return local-localTimeOffset(local /*FIXME*/);
+    return local - localTimeOffset(local);
 }
 
 bool operator <(const Date& a, const Date& b) {
@@ -109,23 +96,23 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
             && a.day==b.day && a.month==b.month && a.year==b.year ; }
 
 String str(Date date, const string format) {
-	array<char> r;
+    array<char> r;
     for(TextData s(format);s;) {
-     /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2u,'0') ); else s.until(' '); }
-     else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2u,'0') ); else s.until(' '); }
-     else if(s.match("hh")){ if(date.hours>=0) r.append( str(date.hours,2u,'0') ); else s.until(' '); }
-     else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
-     else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
-     else if(s.match("dd")){ if(date.day>=0) r.append( str(date.day+1,2u,'0') ); else s.until(' '); }
-     else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
-     else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
-     else if(s.match("MM")){ if(date.month>=0) r.append( str(date.month+1,2u,'0') ); else s.until(' '); }
-     else if(s.match("yyyy")){ if(date.year>=0) r.append( str(date.year) ); else s.until(' '); }
-     else if(s.match("TZD")) r.append("GMT"); //FIXME
-     else r.append( s.next() );
+        /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2u,'0') ); else s.until(' '); }
+        else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2u,'0') ); else s.until(' '); }
+        else if(s.match("hh")){ if(date.hours>=0) r.append( str(date.hours,2u,'0') ); else s.until(' '); }
+        else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
+        else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
+        else if(s.match("dd")){ if(date.day>=0) r.append( str(date.day+1,2u,'0') ); else s.until(' '); }
+        else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
+        else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
+        else if(s.match("MM")){ if(date.month>=0) r.append( str(date.month+1,2u,'0') ); else s.until(' '); }
+        else if(s.match("yyyy")){ if(date.year>=0) r.append( str(date.year) ); else s.until(' '); }
+        else if(s.match("TZD")) r.append("GMT"); //FIXME
+        else r.append( s.next() );
     }
     if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds
-	return move(r);
+    return move(r);
 }
 
 Date parseDate(TextData& s) {
@@ -135,80 +122,25 @@ Date parseDate(TextData& s) {
     for(;;) {
         s.whileAny(" ,\t");
         for(int i=0;i<12;i++) {
-         if(s.match(months[i]) || s.match(months[i].slice(0,3))) {
-             date.month=i;
-             // Corrects slightly invalid date
-             if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
-             goto continue2_;
-         }
+            if(s.match(months[i]) || s.match(months[i].slice(0,3))) { date.month=i; goto continue2_; }
         } /*else */ if(s.available(1) && s.peek()>='0'&&s.peek()<='9') {
             int number = s.integer();
-            if(s.match(":")) {
-                assert_(date.hours==-1 && date.minutes==-1, date.hours, date.minutes);
-                date.hours=number; date.minutes=s.integer();
-                if(s.match(":")) {
-                    assert_(date.seconds==-1);
-                    date.seconds=s.integer();
-                }
-            }
-            else if(s.match('h')) {
-                assert_(date.hours==-1 && date.minutes==1);
-                date.hours=number; date.minutes=(s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0;
-            }
+            if(s.match(":")) { date.hours=number; date.minutes=s.integer(); if(s.match(":")) date.seconds=s.integer(); }
+            else if(s.match('h')) { date.hours=number; date.minutes= (s.available(2)>=2 && isInteger(s.peek(2)))? s.integer() : 0; }
             else if(s.match("/")) {
-                assert_(date.day==-1 && date.month==-1);
-                date.day=number-1;
-                date.month=s.integer()-1;
-                assert_(date.month < 12, date.month, s);
-                if(s.match("/")) {
-                    assert_(date.year==-1);
-                    date.year=s.integer();
-                    if(date.year < 100) date.year += 2000;
-                }
-                assert_(date.day < daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year));
+                date.month=number; date.day=s.integer();
+                if(s.match("/")) date.year=s.integer();
             }
             else if(s.match("-")) {
-                assert_(date.year==-1 && date.month==-1);
-                date.year=number;
-                date.month=s.integer()-1;
-                if(s.match("-")) {
-                    assert_(date.day==-1);
-                    date.day=s.integer()-1;
-                }
+                date.year=number; date.month=s.integer()-1;
+                if(s.match("-")) date.day=s.integer()-1;
                 s.match('T');
             }
-            else if(s.match(".")) {
-             if(date.day==-1) {
-                 date.day=number-1;
-                 if(s.peek()>='0'&&s.peek()<='9') {
-                     assert_(date.month==-1);
-                     date.month=s.integer()-1;
-                     if(s.match(".")) {
-                         assert_(date.year==-1);
-                         date.year=s.integer();
-                         if(date.year < 100) date.year += 2000;
-                     } else {
-                         if(date.day < 12 && date.month>2000) {
-                             date.year = date.month;
-                             date.month = date.day;
-                             date.day = -1;
-                         }
-                     }
-                     // Corrects slightly invalid date
-                     if(date.day==daysInMonth(date.month, date.year==-1?Date(currentTime()).year:date.year) && date.month<11) { date.day=0; date.month++; }
-                 }
-             } else {
-                 assert_(date.year==-1);
-                 assert_(number>31, number, s);
-                 date.year=number;
-             }
-            }
-            else if(date.day==-1 && number <= 31) date.day=number-1;
-            //else if(date.month==-1 && number <= 12) date.month=number-1;
-            else if(date.year==-1) { assert_(number>31, number, s); date.year=number; }
-            else return {}; //error("Invalid date", s);
+            else if(date.day==-1) date.day=number-1;
+            else if(date.year==-1) date.year=number;
+            else error("Invalid date", s);
         } else break;
-        continue2_:;
+        /**/continue2_:;
     }
     if(date.year<0 && (date.month>=0 || date.day>=0)) {
         Date now(currentTime());
@@ -221,23 +153,20 @@ Date parseDate(TextData& s) {
             }
         }
     }
-    date.invariant(s.data);
+    date.invariant();
     return date;
 }
 
 Timer::Timer(const function<void()>& timeout, long sec, Thread& thread)
-    : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(0, POLLIN, thread), timeout(timeout) {
-    Poll::fd = Stream::fd; // Registers only when set
-    if(sec) setRelative(sec*1000);
+    : Stream(timerfd_create(CLOCK_REALTIME,TFD_CLOEXEC)), Poll(Stream::fd, POLLIN, thread), timeout(timeout) {
+    if(sec) setAbsolute(realTime()+sec*1000000000ull);
 }
-void Timer::event() { read<uint64>(); unregisterPoll(); /*One shot*/ timeout(); }
+void Timer::event() { read<uint64>(); timeout(); }
 void Timer::setAbsolute(uint64 nsec) {
-    registerPoll();
     timespec time[2]={{0,0},{long(nsec/1000000000ull),long(nsec%1000000000ull)}};
-    timerfd_settime(Stream::fd,1,(const itimerspec*)time,0);
+    timerfd_settime(Stream::fd, 1, (const itimerspec*)time,0);
 }
 void Timer::setRelative(long msec) {
-    registerPoll();
     timespec time[2]={{0,0},{msec/1000,(msec%1000)*1000000}};
-    timerfd_settime(Stream::fd,0,(const itimerspec*)time,0);
+    timerfd_settime(Stream::fd, 0, (const itimerspec*)time,0);
 }

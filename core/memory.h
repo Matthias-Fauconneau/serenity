@@ -2,13 +2,18 @@
 /// \file memory.h Memory operations and management (mref, buffer, unique, shared)
 #include "core.h"
 
-/// Aligns \a offset to \a width (only for power of two \a width)
-inline size_t align(size_t width, size_t offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }
-
 // C runtime memory allocation
+#if 0
+#include <stdlib.h>
+#else
 extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
+#endif
+
+#ifdef __INTEL_COMPILER
+#define __atomic_fetch_add __atomic_fetch_add_explicit
+#endif
 
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
@@ -21,16 +26,19 @@ generic struct buffer : mref<T> {
  using mref<T>::set;
  using mref<T>::slice;
 
- buffer(){}
+ no_copy(buffer);
+ constexpr buffer(){}
  buffer(buffer&& o) : mref<T>(o), capacity(o.capacity) { o.data=0; o.size=0; o.capacity=0; }
- buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
+ constexpr buffer(T* data, size_t size, size_t capacity) : mref<T>(data, size), capacity(capacity) {}
 
  /// Allocates an uninitialized buffer for \a capacity elements
  buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
-  assert(capacity>=size && size>=0);
-  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory", size, capacity, sizeof(T));
+  assert_(capacity>=size);
+  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
+   error("Out of memory", size, capacity, sizeof(T));
+  assert_(size_t(data)%32==0);
  }
- explicit buffer(size_t size) : buffer(size, size) {}
+ /*explicit*/ buffer(size_t size) : buffer(size, size) {}
 
  buffer& operator=(buffer&& o) { this->~buffer(); new (this) buffer(::move(o)); return *this; }
 
@@ -43,20 +51,29 @@ generic struct buffer : mref<T> {
   data=0; capacity=0; size=0;
  }
 
- void setSize(size_t size) { assert(size<=capacity, size, capacity); this->size=size; }
  /// Appends a default element
- T& append() { setSize(size+1); return set(size-1, T()); }
+ T& append() { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), T()); }
+
  /// Appends an implicitly copiable value
- T& append(const T& e) { setSize(size+1); return set(size-1, e); }
+ T& append(const T& e) { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), e); }
+
  /// Appends a movable value
- T& append(T&& e) { setSize(size+1); return set(size-1, ::move(e)); }
- template<Type A0, Type A1, Type... Args> void append(A0&& a0, A1&& a1, Args&&... args) const {
-  set(size-1, forward<A0>(a0), forward<A1>(a1), forward<Args>(args)...); }
+ T& append(T&& e) { return set(__atomic_fetch_add(&size, 1, 5/*SeqCst*/), ::move(e)); }
+
  /// Appends another list of elements to this array by moving
- void append(const mref<T> source) { setSize(size+source.size); slice(size-source.size).move(source); }
+ void append(const mref<T> source) {
+  slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).move(source);
+ }
+
  /// Appends another list of elements to this array by copying
- void append(const ref<T> source) { setSize(size+source.size); slice(size-source.size).copy(source); }
+ void append(const ref<T> source) {
+  slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
+ }
+#define appendAtomic append // atomic by default
 };
+
+typedef buffer<char> String;
+
 /// Initializes a new buffer with the content of \a o
 generic buffer<T> copy(const buffer<T>& o) { buffer<T> t(o.capacity?:o.size, o.size); t.copy(o); return t; }
 
@@ -73,17 +90,23 @@ generic buffer<T> copyRef(ref<T> o) { buffer<T> copy(o.size); copy.mref<T>::copy
 
 /// Returns an array of the application of a function to every index up to a size
 template<Type Function> auto apply(size_t size, Function function) -> buffer<decltype(function(0))> {
- buffer<decltype(function(0))> target(size); target.apply(function); return target;
+ buffer<decltype(function(0))> target(size);
+ target.apply(function);
+ return ::move(target);
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(ref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
- buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size);
+ target.apply(function, source);
+ return ::move(target);
 }
 
 /// Returns an array of the application of a function to every elements of a reference
 template<Type Function, Type T> auto apply(mref<T> source, Function function) -> buffer<decltype(function(source[0]))> {
- buffer<decltype(function(source[0]))> target(source.size); target.apply(function, source); return target;
+ buffer<decltype(function(source[0]))> target(source.size);
+ target.apply(function, source);
+ return ::move(target);
 }
 
 /// Replaces in \a array every occurence of \a before with \a after
@@ -98,19 +121,21 @@ template<Type T, Type Function> buffer<T> filter(const ref<T> source, Function p
  buffer<T> target(source.size, 0); for(const T& e: source) if(!predicate(e)) target.append(copy(e)); return target;
 }
 
+// -- Join --
+
+generic buffer<T> join(ref<ref<T>> list, const ref<T> separator) {
+ if(!list) return {};
+ size_t size = 0;
+ for(auto e: list) {
+  assert_(size < 8192 && e.size < 8192, size, e.size, list.size);
+  size += e.size;
+ }
+ buffer<T> target (size + (list.size-1)*separator.size, 0);
+ for(size_t i: range(list.size)) { target.append( list[i] ); if(i<list.size-1) target.append( separator ); }
+ return target;
+}
+
 // -- Reinterpret casts
-
-/// Reinterpret casts a const reference to another type
-template<Type T, Type O> ref<T> cast(const ref<O> o) {
- assert((o.size*sizeof(O))%sizeof(T) == 0);
- return ref<T>((const T*)o.data, o.size*sizeof(O)/sizeof(T));
-}
-
-/// Reinterpret casts a mutable reference to another type
-template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
- assert((o.size*sizeof(O))%sizeof(T) == 0);
- return mref<T>((T*)o.data, o.size*sizeof(O)/sizeof(T));
-}
 
 /// Reinterpret casts a buffer to another type
 template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
@@ -123,10 +148,6 @@ template<Type T, Type O> buffer<T> cast(buffer<O>&& o) {
  o.data=0; o.size=0; o.capacity = 0;
  return buffer;
 }
-
-// -- String
-
-typedef buffer<char> String;
 
 // -- unique
 
@@ -182,6 +203,8 @@ generic shared<T> share(const shared<T>& o) { return shared<T>(o); }
 struct shareable {
  virtual void addUser() { ++userCount; }
  virtual uint removeUser() { return --userCount; }
- virtual ~shareable() {}
  uint userCount = 1;
 };
+
+/// Aligns \a offset to \a width (only for power of two \a width)
+inline size_t align(size_t width, size_t offset) { assert((width&(width-1))==0); return (offset + (width-1)) & ~(width-1); }

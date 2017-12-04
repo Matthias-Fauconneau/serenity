@@ -1,7 +1,8 @@
 #pragma once
 /// \file time.h Time and date operations
 #include "data.h"
-#include "thread.h"
+#include "function.h"
+#include "string.h"
 
 /// A second in nanoseconds
 const int64 second = 1000000000ull;
@@ -12,32 +13,58 @@ long currentTime();
 int64 realTime();
 int64 threadCPUTime();
 
-inline uint64 rdtsc() { uint32 lo, hi; asm volatile("rdtsc":"=a" (lo), "=d" (hi)::"memory"); return (((uint64)hi)<<32)|lo; }
+#if 0
+// FIXME: thread might switch core between cycle counter reads
+#define readCycleCounter realTime
+#else
+#if __clang__
+#define readCycleCounter  __builtin_readcyclecounter
+#elif __INTEL_COMPILER
+#define readCycleCounter __rdtsc
+#else
+#define readCycleCounter __builtin_ia32_rdtsc
+#endif
+#endif
+/// Returns the number of cycles used to execute \a statements (low overhead)
+#define cycles( statements ) ({ uint64 start=readCycleCounter(); statements; readCycleCounter()-start; })
+struct tsc {
+ uint64 total=0, tsc=0;
+ void reset() { total=0; tsc=0;}
+ void start() { if(!tsc) tsc=readCycleCounter(); }
+ void stop() { if(tsc) total+=readCycleCounter()-tsc; tsc=0; }
+ uint64 cycleCount() const {return total + (tsc?readCycleCounter()-tsc:0); }
+ operator uint64() const { return cycleCount(); }
+ void operator =(int unused v) { assert(v == 0); reset(); }
+};
+inline String strD(const tsc& num, const tsc& div) { return strD(num.cycleCount(), div.cycleCount()); }
+inline String str(const tsc& t) { return str(t.cycleCount()/1e9f)+"Gc"_; }
 
 struct Time {
- uint64 startTime=realTime(), stopTime=0;
- Time(bool start=false) : stopTime(start?0:startTime) {}
- void start() { if(stopTime) startTime=realTime()-(stopTime-startTime); stopTime=0; }
- void stop() { if(!stopTime) stopTime=realTime(); }
- uint64 reset() { stop(); uint64 t = stopTime-startTime; startTime=stopTime; stopTime=0; return t; }
- operator uint64() const { return ((stopTime?:realTime()) - startTime); }
- uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
- uint64 microseconds() const { return ((stopTime?:realTime()) - startTime)/1000; }
- uint64 milliseconds() const { return ((stopTime?:realTime()) - startTime)/1000000; }
- float seconds() const { return ((stopTime?:realTime()) - startTime)/1000000000.; }
- explicit operator bool() const { return !stopTime; }
+    uint64 startTime=realTime(), stopTime=0;
+    explicit Time(const bool start) : stopTime(start?0:startTime) {}
+    void start() { assert_(stopTime); startTime=realTime()-(stopTime-startTime); stopTime=0; }
+    Time stop() { assert(!stopTime); stopTime=realTime(); return *this; }
+    Time reset() { bool wasRunning=running(); stopTime=realTime(); Time time=*this; startTime=stopTime; if(wasRunning) stopTime=0; return time; }
+    uint64 nanoseconds() const { return ((stopTime?:realTime()) - startTime); }
+    uint64 microseconds() const { return nanoseconds()/1000; }
+    uint64 milliseconds() const { return nanoseconds()/1000000; }
+    float seconds() const { return nanoseconds()/1000000000.; }
+    bool running() const { return stopTime == 0; }
 };
-
-String strD(uint64 num, uint64 div);
-template<> inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
-
-inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
-inline bool operator<(double a, const Time& b) { return a < b.seconds(); }
+inline uint64 operator+(const Time& a, const Time& b) { return a.nanoseconds()+b.nanoseconds(); }
+inline uint64 operator+(const uint64& a, const Time& b) { return a+b.nanoseconds(); }
+inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
+inline bool operator<(const Time& a, const Time& b) { return a.nanoseconds() < b.nanoseconds(); }
+inline bool operator<(const uint64& a, const Time& b) { return a < b.nanoseconds(); }
+//inline bool operator<(float a, const Time& b) { return a < b.seconds(); }
+inline String strD(const Time& num, const Time& div) {
+ return strD(num.nanoseconds(), div.nanoseconds());
+}
 
 struct Date {
     int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
-    void invariant(string s=""_) const;
+    void invariant() const;
     /// Default constructs an undetermined date
     Date(){}
     /// Constructs a calendar date (unspecified hour)
@@ -50,9 +77,8 @@ struct Date {
     bool summerTime() const;
     /// Returns the local time offset from UTC in seconds (time zone + DST)
     int localTimeOffset(int64 utc) const;
-    /// Converts the date to Unix time (in seconds)
+    /// Converts the date to UTC Unix time (in seconds)
     operator int64() const;
-    explicit operator bool() const { return year>=0&&month>=0&&day>=0; }
 };
 /// Orders two dates
 bool operator <(const Date& a, const Date& b);
@@ -70,28 +96,32 @@ String str(Date date, const string format="dddd, dd MMMM yyyy hh:mm:ss");
 
 /// Parses a date from s
 Date parseDate(TextData& s);
-inline Date parseDate(const string s) { TextData t(s); return parseDate(t); }
+inline Date parseDate(string s) { TextData t(s); Date date = parseDate(t); return t ? Date() : date; }
 
-struct Timer : Stream, Poll {
-    Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
-    virtual ~Timer() {}
-    void setAbsolute(uint64 nsec);
-    void setRelative(long msec);
-    function<void()> timeout;
-    virtual void event();
-};
-
+#if 0
 /// Generates a sequence of uniformly distributed pseudo-random 64bit integers
 struct Random {
- uint sz=1,sw=1;
- uint z=sz, w=sw;
- void seed() { z=sz=rdtsc(); w=sw=rdtsc(); } // and resets
- void reset() { z=sz; w=sw; }
- uint64 next() {
-  z = 36969 * (z & 0xFFFF) + (z >> 16);
-  w = 18000 * (w & 0xFFFF) + (w >> 16);
-  return (z << 16) + w;
- }
- operator uint64() { return next(); }
- float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
+    uint sz,sw;
+    uint z,w;
+    Random(uint sz=1, uint sw=1) : sz(sz), sw(sw) { reset(); }
+    void seed() { z=sz=readCycleCounter(); w=sw=readCycleCounter(); }
+    void reset() { z=sz; w=sw; }
+    uint64 next() {
+     z = 36969 * (z & 0xFFFF) + (z >> 16);
+     w = 18000 * (w & 0xFFFF) + (w >> 16);
+     return (z << 16) + w;
+    }
+    operator uint64() { return next(); }
+    float operator()() { float f = float(next()&((1<<24)-1))*0x1p-24f; assert(f>=0 && f<1); return f; }
+};
+#endif
+
+#include "thread.h"
+struct Timer : Stream, Poll {
+ Timer(const function<void()>& timeout={}, long sec=0, Thread& thread=mainThread);
+ virtual ~Timer() {}
+ void setAbsolute(uint64 nsec);
+ void setRelative(long msec);
+ function<void()> timeout;
+ virtual void event();
 };

@@ -26,7 +26,7 @@ struct Tuner : Poll {
     uint writeIndex = 0, readIndex = 0;
     Semaphore readCount {0}; // Audio thread releases input samples, processing thread acquires
     Semaphore writeCount {(int64)signal.size}; // Processing thread releases processed samples, audio thread acquires
-    uint periods=0, frames=0, skipped=0; Time lastReport; // For average overlap statistics report
+    uint periods=0, frames=0, skipped=0; Time lastReport {true}; // For average overlap statistics report
 
     // Analysis
     float confidenceThreshold = 10; // 1/ Relative harmonic energy (i.e over current period energy)
@@ -84,7 +84,7 @@ struct Tuner : Poll {
             readCount.acquire(periodSize); periods++; skipped++;
             readIndex = (readIndex+periodSize)%signal.size; // Updates ring buffer pointer
             writeCount.release(periodSize); // Releases free samples
-            if((float)lastReport > 1) { // Limits report rate
+            if(lastReport.nanoseconds() > second) { // Limits report rate
                 log("Skipped",skipped,"periods, total",periods-frames,"from",periods,"-> Average overlap", 1 - (float) (periods * periodSize) / (frames * N));
                 lastReport.reset(); skipped=0;
             }

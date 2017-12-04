@@ -3,8 +3,9 @@
 #include "array.h"
 #include "string.h"
 
-template<Type K, Type V> struct const_entry { const K& key; const V& value; };
-template<Type K, Type V> struct entry { K& key; V& value; };
+template<Type K, Type V> struct entry { K key; V value; };
+template<Type K, Type V> struct const_ref_entry { const K& key; const V& value; };
+template<Type K, Type V> struct mutable_ref_entry { K& key; V& value; };
 
 /// Associates keys with values
 template<Type K, Type V> struct map {
@@ -12,8 +13,11 @@ template<Type K, Type V> struct map {
  array<V> values;
 
  map(){}
- map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert(keys.size==values.size); }
- map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert(keys.size==values.size); }
+ map(ref<entry<K,V>> entries) : keys(entries.size), values(entries.size) {
+     for(entry<K,V> entry: entries ) { keys.append(entry.key); values.append(entry.value); }
+ }
+ //map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert_(keys.size==values.size, keys.size, values.size); }
+ //map(buffer<K>&& keys, buffer<V>&& values) : keys(move(keys)), values(move(values)) { assert_(keys.size==values.size, keys.size, values.size); }
 
  size_t size() const { return keys.size; }
  size_t count() const { return keys.size; }
@@ -33,8 +37,22 @@ template<Type K, Type V> struct map {
  }
 
  /// Returns whether this object has the same values for all keys in subsets.
+ /// Missing keys fail if subset value is not null
  bool includes(const map<K, V>& subset) const {
-  for(auto argument: subset) if(at(argument.key) != argument.value) return false;
+  for(auto entry: subset) {
+   if(contains(entry.key)) { if(at(entry.key) != entry.value) return false; }
+   else if(entry.value) return false;
+  }
+  return true;
+ }
+
+ /// Returns whether this object has the same values for all keys in subsets.
+ /// Missing keys always pass regardless of subset value
+ bool includesPassMissing(const map<K, V>& subset) const {
+  for(auto entry: subset) {
+   if(!contains(entry.key) || !at(entry.key)) continue;
+   if(at(entry.key) != entry.value) return false;
+  }
   return true;
  }
 
@@ -45,7 +63,7 @@ template<Type K, Type V> struct map {
   size_t i = keys.indexOf(key);
   return i!=invalid ? VV(values[i]) : forward<VV>(value);
  }
- template<Type KK> const V value(const KK& key, const V value=V()) const {
+ template<Type KK> const V value(const KK& key, const V& value=V()) const {
   size_t i = keys.indexOf(key);
   return i!=invalid ? values[i] : value;
  }
@@ -69,7 +87,10 @@ template<Type K, Type V> struct map {
   assertNo(key);
   return values.insertAt(keys.insertSorted(key),move(value));
  }
+ V& insertSortedMulti(K&& key, V&& value) { return values.insertAt(keys.insertSorted(::move(key)),::move(value)); }
+ V& insertSortedMulti(const K& key, V&& value) { return values.insertAt(keys.insertSorted(key),::move(value)); }
  V& insertSortedMulti(K&& key, const V& value) { return values.insertAt(keys.insertSorted(::move(key)),value); }
+ V& insertSortedMulti(const K& key, const V& value) { return values.insertAt(keys.insertSorted(key),value); }
 
  template<Type KK> V& operator [](KK&& key) { size_t i = keys.indexOf(key); return i!=invalid ? values[i] : insertSorted(key); }
  /// Returns value for \a key, inserts a new sorted key with a default value if not existing
@@ -85,7 +106,7 @@ template<Type K, Type V> struct map {
   const K* k; const V* v;
   const_iterator(const K* k, const V* v) : k(k), v(v) {}
   bool operator!=(const const_iterator& o) const { return k != o.k; }
-  const_entry<K,V> operator* () const { return {*k,*v}; }
+  const_ref_entry<K,V> operator* () const { return {*k,*v}; }
   const const_iterator& operator++ () { k++; v++; return *this; }
  };
  const_iterator begin() const { return const_iterator(keys.begin(),values.begin()); }
@@ -95,7 +116,7 @@ template<Type K, Type V> struct map {
   K* k; V* v;
   iterator(K* k, V* v) : k(k), v(v) {}
   bool operator!=(const iterator& o) const { return k != o.k; }
-  entry<K,V> operator* () const { return {*k,*v}; }
+  mutable_ref_entry<K,V> operator* () const { return {*k,*v}; }
   const iterator& operator++ () { k++; v++; return *this; }
  };
  iterator begin() { return iterator(keys.begin(),values.begin()); }
@@ -103,40 +124,26 @@ template<Type K, Type V> struct map {
 
  template<Type F> map& filter(F f) { for(size_t i=0; i<size();) if(f(keys[i], values[i])) { keys.removeAt(i); values.removeAt(i); } else i++; return *this; }
 
- void append(map&& b) { for(entry<K, V> e: b) { insert(move(e.key), move(e.value)); } }
- void appendReplace(map&& b) { for(entry<K, V> e: b) { operator[](move(e.key)) = move(e.value); } }
+ void append(map&& b) { for(mutable_ref_entry<K, V> e: b) { insert(move(e.key), move(e.value)); } }
+ void appendReplace(map&& b) { for(mutable_ref_entry<K, V> e: b) { operator[](move(e.key)) = move(e.value); } }
 
- void appendMulti(const map& b) { for(const_entry<K, V> e: b) { insertMulti(copy(e.key), copy(e.value)); } }
- void appendMulti(map&& b) { for(entry<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }
+ void appendMulti(const map& b) { for(const_ref_entry<K, V> e: b) { insertMulti(copy(e.key), copy(e.value)); } }
+ void appendMulti(map&& b) { for(mutable_ref_entry<K, V> e: b) { insertMulti(move(e.key), move(e.value)); } }
 };
 
 template<Type K, Type V> map<K,V> copy(const map<K,V>& o) {
  map<K,V> t; t.keys=copy(o.keys); t.values=copy(o.values); return t;
 }
 
-#if 0
 template<Type K, Type V> String str(const map<K,V>& m, string separator=","_) {
  array<char> s;
- s.append('{');
- s.append(separator.last());
  for(uint i: range(m.size())) {
-  s.append(str(m.keys[i])+": "+str(m.values[i]));
+  s.append(str(m.keys[i])+"="+str(m.values[i])); // = instead of : for compatibility as SGE job name
   if(i<m.size()-1) s.append(separator);
  }
- s.append(separator.last());
- s.append('}');
  return move(s);
-}
-#endif
-
-/// Returns a map of the application of a function to every values of a map
-template<Type Function, Type K, Type V> auto apply(const map<K, V>& source, Function function) -> map<K, decltype(function(source.values[0]))> {
- map<K, decltype(function(source.values[0]))> target;
- target.keys = copy(source.keys);
- target.values = apply(source.values, function);
- return target;
 }
 
 /// Associates each argument's name with its string conversion
-template<Type... Args> map<string,String> withName(string names, const Args&... args) { return {split(names,", "),{str(args)...}}; }
+template<Type... Args> map<string,String> withName(string names, const Args&... args) { log(names, split(names,", "_)); return map<string,String>(split(names,", "_),{str(args)...}); }
 #define withName(args...) withName(#args, args)

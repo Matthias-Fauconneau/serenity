@@ -2,21 +2,19 @@
 
 // ScrollArea
 
-shared<Graphics> ScrollArea::graphics(vec2 size) {
+void ScrollArea::render(RenderTarget2D& target, vec2 offset, vec2 size) {
     this->viewSize = size;
     vec2 hint = abs(widget().sizeHint(vec2( horizontal||size.x<0 ? 0/*-1 FIXME*/: 1, vertical||size.y<0? 0/*-1 FIXME*/: 1 )*abs(size)));
     vec2 view (horizontal?max(hint.x,size.x):size.x, vertical?max(hint.y,size.y):size.y);
     //offset = min(vec2(0), max(-vec2(hint-size), offset));
     //assert(offset <= vec2(0) && (!(size < view) || offset==vec2(0)));
-    shared<Graphics> graphics;
-    graphics->graphics.insert(offset, widget().graphics(view, Rect::fromOriginAndSize(vec2(-offset), size)));
+    widget().render(target, -offset, size);
     if(scrollbar) {
 	if(size.y<view.y)
-        graphics->fills.append( vec2(size.x-scrollBarWidth, -(int64)offset.y*size.y/view.y), vec2(scrollBarWidth, (int64)size.y*size.y/view.y), 1.f/2, 1.f/2);
+        target.fill( vec2(size.x-scrollBarWidth, -(int64)offset.y*size.y/view.y), vec2(scrollBarWidth, (int64)size.y*size.y/view.y), 1.f/2, 1.f/2);
 	if(size.x<view.x)
-        graphics->fills.append( vec2(-(int64)offset.x*size.x/view.x, size.y-scrollBarWidth), vec2((int64)size.x*size.x/view.x, scrollBarWidth), 1.f/2, 1.f/2);
+        target.fill( vec2(-(int64)offset.x*size.x/view.x, size.y-scrollBarWidth), vec2((int64)size.x*size.x/view.x, scrollBarWidth), 1.f/2, 1.f/2);
     }
-    return graphics;
 }
 
 bool ScrollArea::mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) {
@@ -85,6 +83,7 @@ bool ScrollArea::keyPress(Key key, Modifiers) {
     return false;
 }
 
+#if 0
 // Progress
 
 vec2 Progress::sizeHint(vec2) { return vec2(-height,height); }
@@ -157,3 +156,4 @@ bool WidgetCycle::keyPress(Key key, Modifiers modifiers) {
     if(key == Backspace || key == PageDown) index = (index+widgets.size-1)%widgets.size;
     return widgets[index]->keyPress(key, modifiers) || previousIndex != index;
 }
+#endif

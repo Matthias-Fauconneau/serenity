@@ -4,6 +4,8 @@
 #include "function.h"
 #include "image.h"
 #include "utf8.h"
+#include "font.h"
+#include "graphics.h"
 
 /// Rich text format control code encoded in 00-1F range
 enum class TextFormat { Begin=14, Regular=Begin, Bold, Italic, Superscript, Subscript, Stack, Fraction, Link, Color, End };
@@ -21,54 +23,54 @@ inline buffer<uint> color(ref<uint> s, bgr3f bgr) { return uint(TextFormat::Colo
 inline buffer<uint> color(string s, bgr3f bgr) { return s ? color(toUCS4(s), bgr) : buffer<uint>(); }
 
 struct Cursor {
-	size_t line=0, column=0;
-	Cursor(){}
-	Cursor(size_t line, size_t column) : line(line), column(column) {}
-	bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
-	bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
-	bool operator <=(const Cursor& o) const { return line<o.line || (line==o.line && column<=o.column); }
+    size_t line=0, column=0;
+    Cursor(){}
+    Cursor(size_t line, size_t column) : line(line), column(column) {}
+    bool operator ==(const Cursor& o) const { return line==o.line && column==o.column; }
+    bool operator <(const Cursor& o) const { return line<o.line || (line==o.line && column<o.column); }
+    bool operator <=(const Cursor& o) const { return line<o.line || (line==o.line && column<=o.column); }
 };
 struct Link { Cursor begin,end; buffer<uint> identifier;};
 
 /// Layouts formatted text with wrapping, justification and links
 struct TextLayout {
-	// Parameters
-	float size = 0;
-	float wrap = 0;
-	float interline = 0;
-	float spaceAdvance = 0;
-	int align = 0;
+    // Parameters
+    float size = 0;
+    float wrap = 0;
+    float interline = 0;
+    float spaceAdvance = 0;
+    int align = 0;
 
-	// Variables
-	float lineOriginY = 0;
-	struct Glyph : Font::Metrics, ::Glyph {
-		size_t sourceIndex;
-		Glyph(const Font::Metrics& metrics, const ::Glyph& glyph, size_t sourceIndex)
-			: Font::Metrics(metrics), ::Glyph(glyph), sourceIndex(sourceIndex) {}
-	};
-	array<array<Glyph>> words;
- vec2 bbMin = 0, bbMax = 0;
+    // Variables
+    float lineOriginY = 0;
+    struct Glyph : Font::Metrics, ::Glyph {
+        size_t sourceIndex;
+        Glyph(const Font::Metrics& metrics, const ::Glyph& glyph, size_t sourceIndex)
+            : Font::Metrics(metrics), ::Glyph(glyph), sourceIndex(sourceIndex) {}
+    };
+    array<array<Glyph>> words;
+    vec2 bbMin = 0, bbMax = 0;
 
-	// Outputs
-	array<array<array<Glyph>>> glyphs;
-	array<Line> lines;
-	array<Link> links;
+    // Outputs
+    array<array<array<Glyph>>> glyphs;
+    array<Line> lines;
+    array<Link> links;
 
-	TextLayout() {}
-	TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,
-			   bool justify, bool justifyExplicit, bool justifyLast, bgr3f color);
+    TextLayout() {}
+    TextLayout(const ref<uint> text, float size, float wrap, string fontName, bool hint, float interline, int align,
+               bool justify, bool justifyExplicit, bool justifyLast, bgr3f color);
 
-	operator bool() const { return size; }
+    operator bool() const { return size; }
 
-	void nextLine(bool justify, int align);
-	void nextWord(array<Glyph>&& word, bool justify);
+    void nextLine(bool justify, int align);
+    void nextWord(array<Glyph>&& word, bool justify);
 
-	// Bounding box for stacking
- vec2 min(const ref<Glyph> word);
- vec2 max(const ref<Glyph> word);
-	// Length for justification
-	float width(const ref<Glyph> word);
-	float advance(const ref<Glyph> word);
+    // Bounding box for stacking
+    vec2 min(const ref<Glyph> word);
+    vec2 max(const ref<Glyph> word);
+    // Length for justification
+    float width(const ref<Glyph> word);
+    float advance(const ref<Glyph> word);
 };
 
 struct EditStop { float left, center, right; size_t sourceIndex; };
@@ -76,49 +78,49 @@ array<EditStop> lineStops(ref<array<TextLayout::Glyph>> line);
 
 /// Text is a \a Widget displaying text (can be multiple lines)
 struct Text : virtual Widget {
-	/// Create a caption that display \a text using a \a size pixel font
- Text(buffer<uint>&& text, float size=16, bgr3f color=0, float opacity=1,
-      float wrap=0, string font="DejaVuSans"_, bool hint=true,
-     float interline=1, int align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false);
     /// Create a caption that display \a text using a \a size pixel font
- Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true,
-     float interline=1, int align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false) :
-		Text(toUCS4(text), size, color, opacity, wrap, font, hint, interline, align, minimalSizeHint, justify, justifyExplicitLineBreak) {}
+    Text(buffer<uint>&& text, float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true,
+         float interline=1, int2 align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false);
+    /// Create a caption that display \a text using a \a size pixel font
+    Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true,
+         float interline=1, int2 align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false) :
+    Text(toUCS4(text), size, color, opacity, wrap, font, hint, interline, align, minimalSizeHint, justify, justifyExplicitLineBreak) {}
 
-	/// Displayed text in UCS4
-	array<uint> text;
-	// Parameters
+    /// Displayed text in UCS4
+    array<uint> text;
+    // Parameters
     /// Font size
-	int size;
+    int size;
     /// Text color
-	bgr3f color;
+    bgr3f color;
     /// Text opacity
-	float opacity;
+    float opacity;
     /// Line wrap limit in pixels (0: no wrap)
-	float wrap = 0;
+    float wrap = 0;
     /// Font name
-	string font;
+    string font;
     /// Whether font should be hinted for display
-	bool hint;
+    bool hint;
     /// Interline stretch
-	float interline;
-    /// Horizontal alignment
-	int align;
-	/// Whether to justify
-	bool justify;
-	/// Whether to justify explicit line breaks
-	bool justifyExplicitLineBreak;
+    float interline;
+    /// Alignment
+    int2 align;
+    /// Whether to justify
+    bool justify;
+    /// Whether to justify explicit line breaks
+    bool justifyExplicitLineBreak;
     /// Minimal size hint
     vec2 minimalSizeHint;
-	/// User activated a link
-	function<void(ref<uint>)> linkActivated;
+    /// User activated a link
+    function<void(ref<uint>)> linkActivated;
 
-	/// Caches last text layout (for a given wrap)
-	TextLayout lastTextLayout;
+    /// Caches last text layout (for a given wrap)
+    TextLayout lastTextLayout;
 
-	const TextLayout& layout(float wrap=0);
+    const TextLayout& layout(float wrap=0);
     vec2 sizeHint(vec2 size=0) override;
-    shared<Graphics> graphics(vec2 size) override;
- Cursor cursorFromPosition(vec2 size, vec2 position);
- bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
+    buffer<Glyph> glyphs(vec2 offset);
+    void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
+    Cursor cursorFromPosition(vec2 size, vec2 position);
+    bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;
 };

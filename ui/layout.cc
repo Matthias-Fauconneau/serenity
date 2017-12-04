@@ -2,14 +2,12 @@
 #include "algorithm.h"
 
 // Layout
-shared<Graphics> Layout::graphics(vec2 size, Rect clip) {
+void Layout::render(RenderTarget2D& target, vec2 offset, vec2 size) {
     array<Rect> widgets = layout(size);
-	shared<Graphics> graphics;
-	for(size_t i: range(count())) if(widgets[i] & clip) {
-        assert_(isNumber(widgets[i].origin()), widgets[i], size, clip);
-        graphics->graphics.insert(vec2(widgets[i].origin()), at(i).graphics(widgets[i].size(), Rect(widgets[i].size()) /*& (clip-origin)*/));
+    for(size_t i: range(count())) if(widgets[i] & Rect::fromOriginAndSize(offset, size)) {
+        assert_(isNumber(widgets[i].origin()));
+        at(i).render(target, vec2(widgets[i].origin()), widgets[i].size());
 	}
-    return graphics;
 }
 
 float Layout::stop(vec2 size, int axis, float currentPosition, int direction) {

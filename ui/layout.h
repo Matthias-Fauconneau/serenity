@@ -2,6 +2,7 @@
 /// \file layout.h Widget layouts (Linear, Grid)
 #include "widget.h"
 #include "function.h"
+#include "rect.h"
 
 /// Proxy Widget containing multiple widgets.
 struct Layout : Widget {
@@ -14,7 +15,7 @@ struct Layout : Widget {
     virtual float stop(vec2 size, int unused axis, float currentPosition, int direction=0) override;
 
     /// Renders all visible child widgets
-    shared<Graphics> graphics(vec2 size, Rect clip) override;
+    virtual void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
     /// Forwards event to intersecting child widgets until accepted
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
 };

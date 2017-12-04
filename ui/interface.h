@@ -20,7 +20,7 @@ struct ScrollArea : Widget {
     virtual Widget& widget() abstract;
 
     vec2 sizeHint(vec2 size) override { return widget().sizeHint(size); }
-    shared<Graphics> graphics(vec2 size) override;
+    void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus) override;
     bool keyPress(Key key, Modifiers modifiers) override;
 };
@@ -37,7 +37,7 @@ generic struct Scroll : ScrollArea, T {
 };
 
 // Interface
-
+#if 0
 /// Shows a bounded value
 struct Progress : Widget {
     int minimum, maximum;
@@ -135,3 +135,4 @@ struct WidgetCycle : Widget {
     // Forwards events and cycle widgets
     bool keyPress(Key key, Modifiers modifiers) override;
 };
+#endif

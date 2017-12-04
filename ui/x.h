@@ -4,28 +4,28 @@
 namespace X11 {
 struct Event {
     uint8 type;
-    struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; } packed;
-    struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } packed;
+    struct Error { uint8 code; uint16 seq; uint id; uint16 minor; uint8 major; } _packed;
+    struct Generic { uint8 ext; uint16 seq; uint size; uint16 type; } _packed;
     union {
         Error error;
-		struct { byte padOrFdCount; uint16 seq; uint size; byte pad1[24]; } packed reply;
-        struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } packed; // input
-        struct { byte detail; uint16 seq; uint window; uint8 mode; } packed focus;
-        struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } packed expose;
-        struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } packed create;
-        struct { byte pad; uint16 seq; uint event,window; int8 override_redirect; } packed map;
-        struct { byte pad; uint16 seq; uint event,window; int8 from_configure; } packed unmap;
-		struct { byte pad; uint16 seq; uint parent,window; } packed mapRequest;
-        struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; int8 override_redirect; } packed configure;
-		struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } packed configureRequest;
-        struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } packed property;
-		struct { byte pad; uint16 seq; uint time,owner,requestor,selection,target,property; } packed selectionRequest;
-		struct { byte pad; uint16 seq; uint time,          requestor,selection,target,property; } packed selectionNotify;
-        struct { byte format; uint16 seq; uint window, type; uint data[5]; } packed client;
+        struct { byte padOrFdCount; uint16 seq; uint size; byte pad1[24]; } _packed reply;
+        struct { uint8 key; uint16 seq; uint time,root,event,child; int16 rootX,rootY,x,y; int16 state; int8 sameScreen; } _packed; // input
+        struct { byte detail; uint16 seq; uint window; uint8 mode; } _packed focus;
+        struct { byte pad; uint16 seq; uint window; uint16 x,y,w,h,count; } _packed expose;
+        struct { byte pad; uint16 seq; uint parent,window; int16 x,y,w,h,border; int8 override_redirect; } _packed create;
+        struct { byte pad; uint16 seq; uint event,window; int8 override_redirect; } _packed map;
+        struct { byte pad; uint16 seq; uint event,window; int8 from_configure; } _packed unmap;
+        struct { byte pad; uint16 seq; uint parent,window; } _packed mapRequest;
+        struct { byte pad; uint16 seq; uint event,window,above; int16 x,y,w,h,border; int8 override_redirect; } _packed configure;
+        struct { byte stackMode; uint16 seq; uint parent,window,sibling; int16 x,y,w,h,border; int16 valueMask; } _packed configureRequest;
+        struct { byte pad; uint16 seq; uint window, atom, time; uint8 state; } _packed property;
+        struct { byte pad; uint16 seq; uint time,owner,requestor,selection,target,property; } _packed selectionRequest;
+        struct { byte pad; uint16 seq; uint time,          requestor,selection,target,property; } _packed selectionNotify;
+        struct { byte format; uint16 seq; uint window, type; uint data[5]; } _packed client;
         Generic genericEvent;
         byte pad[31];
-    } packed;
-} packed;
+    } _packed;
+} _packed;
 static_assert(sizeof(Event)==32,"");
 
 enum ValueMask { BackgroundPixmap=1<<0, BackgroundPixel=1<<1, BorderPixmap=1<<2, BorderPixel=1<<3, BitGravity=1<<4,
@@ -46,11 +46,13 @@ enum StackMode { Above,Below,TopIf,BottomIf,Opposite };
 
 struct ConnectionSetup { byte bom='l', pad=0; int16 major=11,minor=0; uint16 nameSize=0, dataSize=0, pad2=0; };
 struct ConnectionSetupReply1 { int8 status,reason; int16 major,minor,additionnal; };
-struct ConnectionSetupReply2 { int32 release, ridBase, ridMask, motionBufferSize; int16 vendorLength, maxRequestSize; int8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode; int32 pad2; };
+struct ConnectionSetupReply2 { uint32 release, ridBase, ridMask, motionBufferSize; uint16 vendorLength, maxRequestSize;
+                               uint8 numScreens, numFormats, imageByteOrder, bitmapBitOrder, bitmapScanlineUnit, bitmapScanlinePad, minKeyCode, maxKeyCode;
+                               int32 pad2; };
 struct XFormat { uint8 depth, bitsPerPixel, scanlinePad; int32 pad; };
-struct Screen { int32 root, colormap, white, black, inputMask; int16 width, height, widthMM, heightMM, minMaps, maxMaps; int32 visual;
-                int8 backingStores, saveUnders, depth, numDepths; };
-struct XDepth { int8 depth; int16 numVisualTypes; int32 pad; };
+struct Screen { uint32 root, colormap, white, black, inputMask; uint16 width, height, widthMM, heightMM, minMaps, maxMaps; int32 visual;
+                uint8 backingStores, saveUnders, depth, numDepths; };
+struct XDepth { int8 depth; uint16 numVisualTypes; int32 pad; };
 struct VisualType { uint id; uint8 class_, bpp; int16 colormapEntries; int32 red,green,blue,pad; };
 
 struct CreateWindow {
@@ -68,9 +70,9 @@ struct GetWindowAttributes {
     struct Reply {
         int8 backingStore; uint16 seq; uint size, visual; int16 class_; int8 bit,win; uint planes, pixel;
         int8 saveUnder, mapIsInstalled, mapState, overrideRedirect; uint colormap, allEventMask, yourEventMask; int16 nopropagate, pad;
-    } packed;
+    } _packed;
 };
-struct DestroyWindow { int8 req=4; uint16 size=2; uint id; };
+struct DestroyWindow { int8 req=4, pad=0; uint16 size=2; uint id; };
 struct MapWindow { int8 req=8, pad=0; uint16 size=2; uint id;};
 struct UnmapWindow { int8 req=10, pad=0; uint16 size=2; uint id;};
 struct ConfigureWindow { int8 req=12, pad=0; uint16 size=8; uint id; int16 mask=X|Y|W|H|StackMode,pad2=0; uint x,y,w,h,stackMode; };
@@ -80,31 +82,31 @@ struct SetGeometry { int8 req=12, pad=0; uint16 size=7; uint id; int16 mask=X|Y|
 struct RaiseWindow { int8 req=12, pad=0; uint16 size=4; uint id; int16 mask=StackMode, pad3=0; uint stackMode=Above; };
 struct GetGeometry{
     int8 req=14, pad=0; uint16 size=2; uint id;
-    struct Reply { byte depth; uint16 seq; uint size; uint root; int16 x,y,w,h,border; byte pad[10]; } packed;
+    struct Reply { byte depth; uint16 seq; uint size; uint root; int16 x,y,w,h,border; byte pad[10]; } _packed;
 };
 struct QueryTree {
     int8 req=15, pad=0; uint16 size=2; uint id;
-    struct Reply { byte pad; uint16 seq; uint size; uint root,parent; uint16 count; byte pad2[14]; } packed;
+    struct Reply { byte pad; uint16 seq; uint size; uint root,parent; uint16 count; byte pad2[14]; } _packed;
 };
 struct InternAtom {
     int8 req=16,exists=0; uint16 size=2; uint16 length, pad=0;
-    struct Reply { byte pad; uint16 seq; uint size, atom; byte pad2[20]; } packed;
+    struct Reply { byte pad; uint16 seq; uint size, atom; byte pad2[20]; } _packed;
 };
 struct GetAtomName {
 	int8 req=17,pad=0; uint16 size=2; uint atom;
-	struct Reply { byte pad; uint16 seq; uint size; uint16 length; byte pad2[22]; } packed;
+    struct Reply { byte pad; uint16 seq; uint size; uint16 length; byte pad2[22]; } _packed;
 };
 struct ChangeProperty { int8 req=18,replace=0; uint16 size=6; uint window,property,type; uint8 format,pad[3]={}; uint length; };
 struct GetProperty {
     int8 req=20,remove=0; uint16 size=6; uint window,property,type=0; uint offset=0,length=-1;
-    struct Reply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } packed;
+    struct Reply { uint8 format; uint16 seq; uint size; uint type,bytesAfter,length,pad[3]; } _packed;
 };
 struct SetSelectionOwner {
 	uint8 req=22,pad=0; uint16 size=4; uint owner=0, selection=1, time = 0;
 };
 struct GetSelectionOwner {
     uint8 req=23,pad=0; uint16 size=2; uint selection=1;
-    struct Reply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } packed;
+    struct Reply { uint8 pad; uint16 seq; uint size; uint owner, pad2[5]; } _packed;
 };
 struct ConvertSelection { uint8 req=24,pad=0; uint16 size=6; uint requestor=0,selection=1,target,property=0,time=0; };
 struct SendEvent { int8 req=25,propagate=0; uint16 size=11; uint window; uint eventMask=0; Event event; };
@@ -125,15 +127,15 @@ struct CreateColormap { int8 req=78,alloc=0; uint16 size=4; uint colormap,window
 struct FreeCursor { int8 req=95,pad=0; uint16 size=2; uint cursor; };
 struct QueryExtension {
     int8 req=98,pad=0; uint16 size=2, length, pad2=0;
-	struct Reply { byte pad; uint16 seq; uint size; uint8 present,major,firstEvent,firstError; byte pad2[20]; } packed;
+    struct Reply { byte pad; uint16 seq; uint size; uint8 present,major,firstEvent,firstError; byte pad2[20]; } _packed;
 };
 struct ListExtensions {
 	int8 req=99, pad=0; uint16 size=1;
-	struct Reply { uint8 extensionCount; uint16 seq; uint size; byte pad[24]; } packed;
+    struct Reply { uint8 extensionCount; uint16 seq; uint size; byte pad[24]; } _packed;
 };
 struct GetKeyboardMapping {
-    int8 req=101; uint16 size=2; uint8 keycode, count=1; int16 pad=0;
-    struct Reply { uint8 numKeySymsPerKeyCode; uint16 seq; uint size; byte pad[24]; } packed;
+    int8 req=101, pad=0; uint16 size=2; uint8 keycode, count=1; int16 pad2=0;
+    struct Reply { uint8 numKeySymsPerKeyCode; uint16 seq; uint size; byte pad[24]; } _packed;
 };
 
 constexpr string requests[] = {"0","CreateWindow","ChangeWindowAttributes","GetWindowAttributes","DestroyWindow","DestroySubwindows","ChangeSaveSet","ReparentWindow","MapWindow","MapSubwindows","UnmapWindow","UnmapSubwindows",
@@ -155,15 +157,15 @@ namespace Shm {
 extern int EXT, event, errorBase;
 struct QueryVersion {
     int8 ext=EXT, req=0; uint16 size=1;
-    struct Reply { int8 sharedPixmaps; uint16 seq; uint size; uint16 major,minor,uid,gid; uint8 format,pad[15]; } packed;
+    struct Reply { int8 sharedPixmaps; uint16 seq; uint size; uint16 major,minor,uid,gid; uint8 format,pad[15]; } _packed;
 };
-struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg, shm; int8 readOnly=0, pad[3]={}; };
+struct Attach { int8 ext=EXT, req=1; uint16 size=4; uint seg; int shm; int8 readOnly=0, pad[3]={}; };
 struct Detach { int8 ext=EXT, req=2; uint16 size=2; uint seg; };
 struct PutImage { int8 ext=EXT, req=3; uint16 size=10; uint window,context; uint16 totalW, totalH, srcX, srcY, srcW, srcH,
 		  dstX, dstY; uint8 depth=32,format=2,sendEvent=1,bpad=32; uint seg,offset=0; };
 struct GetImage {
     int8 ext=EXT, req=4; uint16 size=8; uint window; uint16 x=0,y=0,w,h; uint mask=~0; uint8 format=2; uint seg,offset=0;
-    struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } packed;
+    struct Reply { uint8 depth; uint16 seq; uint size; uint visual, length, pad[4]; } _packed;
 };
 enum { Completion };
 constexpr string requests[] = {"QueryVersion","Attach","Detach","PutImage","GetImage"};
@@ -180,11 +182,11 @@ struct PictScreen { uint numDepths; uint fallback; /*PictDepth[numDepths]*/ };
 extern int EXT, errorBase;
 struct QueryVersion {
     int8 ext=EXT,req=0; uint16 size=3; uint major=0,minor=11;
-    struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
+    struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } _packed;
 };
 struct QueryPictFormats{
     int8 ext=EXT,req=1; uint16 size=1;
-    struct Reply { int8 pad; uint16 seq; uint size; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } packed;
+    struct Reply { int8 pad; uint16 seq; uint size; uint numFormats,numScreens,numDepths,numVisuals,numSubpixels,pad2; } _packed;
 };
 struct CreatePicture { int8 ext=EXT, req=4; uint16 size=5; uint picture, drawable, format, valueMask=0; };
 struct FreePicture { int8 ext=EXT, req=7; uint16 size=2; uint picture; };
@@ -203,25 +205,25 @@ struct Pixmap { int8 ext=EXT,req=1; uint16 size=18; uint window, pixmap, serial=
 struct NotifyMSC { int8 ext=EXT,req=2; uint16 size=10; uint window, serial=0, pad; uint64 targetMSC=0, divisor=0, remainder=0; };
 struct SelectInput { int8 ext=EXT, req=3; uint16 size=4; uint eid, window, eventMask=CompleteNotifyMask; };
 enum { ConfigureNotify, CompleteNotify };
-struct CompleteNotify { uint8 type; X11::Event::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } packed;
+struct CompleteNotify { uint8 type; X11::Event::Generic genericEvent; uint8 kind, mode; uint event_id, window, serial; uint64 ust, msc; } _packed;
 }
 
 namespace DRI3 {
 extern int EXT;
 struct QueryVersion {
 	int8 ext=EXT,req=0; uint16 size=3; uint major=1,minor=0;
-	struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } packed;
+    struct Reply { int8 pad; uint16 seq; uint size; uint major,minor,pad2[4]; } _packed;
 };
 struct Open {
 	int8 ext=EXT, req=1; uint16 size=3; uint drawable, provider=0;
-	struct Reply { uint8 nfd; uint16 seq; uint size; uint pad[6]; } packed;
-} packed;
+    struct Reply { uint8 nfd; uint16 seq; uint size; uint pad[6]; } _packed;
+} _packed;
 struct PixmapFromBuffer {
 	int8 ext=EXT, req=2; uint16 size=6; uint pixmap, drawable, bufferSize; uint16 width, height, stride; uint8 depth=32, bpp=32; //FD fd;
-} packed;
+} _packed;
 struct BufferFromPixmap {
 	int8 ext=EXT, req=3; uint16 size=2; uint pixmap;
-	struct Reply { uint8 nfd; uint16 seq; uint size; uint16 width, height, stride; uint8 depth, bpp; uint pad[4]; } packed;
-} packed;
+    struct Reply { uint8 nfd; uint16 seq; uint size; uint16 width, height, stride; uint8 depth, bpp; uint pad[4]; } _packed;
+} _packed;
 constexpr string requests[] = {"QueryVersion","Open","PixmapFromBuffer","BufferFromPixmap"};
 }

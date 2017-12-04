@@ -1,7 +1,7 @@
 #pragma once
-/// notation.h Music notation definitions
+/// \file notation.h Music notation definitions
 #include "string.h"
-#include "vector.h" // float2 gain
+#include "vector.h"
 
 inline bool isPowerOfTwo(uint v) { return !(v & (v - 1)); }
 

@@ -31,7 +31,6 @@ void Poll::unregisterPoll() {
  if(thread.contains(this) && !thread.unregistered.contains(this)) thread.unregistered.append(this);
 }
 void Poll::queue() {Locker lock(thread); if(!thread.queue.contains(this)) thread.queue.append(this); thread.post();}
-extern "C" int poll (pollfd* fds, ulong nfds, int timeout);
 bool Poll::wait() { if(::poll(this,1,-1)!=1 || !(revents&events)) return false; event(); return true; }
 
 EventFD::EventFD() : Stream(check(eventfd(0, EFD_SEMAPHORE))) {}

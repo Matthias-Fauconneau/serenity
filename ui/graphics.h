@@ -2,6 +2,8 @@
 /// \file graphics.h 2D graphics primitives (fill, blit, line)
 #include "image.h"
 #include "font.h"
+#include "rect.h"
+#include "math.h"
 
 /// Primary colors
 static constexpr bgr3f black {0, 0, 0};
@@ -36,20 +38,20 @@ struct Glyph {
  FontData& font;
  uint code;
  uint index;
- bgr3f color = black;
+ bgr3f color = 0;
  float opacity = 1;
  bool hint = false;
- Glyph(vec2 origin, float fontSize, FontData& font, uint code, uint index, bgr3f color = black, float opacity = 1, bool hint = false)
-  : origin(origin), fontSize(fontSize), font(font), code(code), index(index), color(color), opacity(opacity), hint(hint) {} //req C++14
+ /*Glyph(vec2 origin, float fontSize, FontData& font, uint code, uint index, bgr3f color = 0, float opacity = 1, bool hint = false)
+  : origin(origin), fontSize(fontSize), font(font), code(code), index(index), color(color), opacity(opacity), hint(hint) {}*/
 };
 
 /// Line graphic element
 struct Line {
- vec2 a, b;
- bgr3f color = black;
+ vec2 p0, p1;
+ bgr3f color = 0;
  float opacity = 1;
  bool hint = false;
- Line(vec2 a, vec2 b, bgr3f color = black, float opacity = 1, bool hint = false) : a(a), b(b), color(color), opacity(opacity), hint(hint) {} //req C++14
+ //Line(vec2 a, vec2 b, bgr3f color = 0, float opacity = 1, bool hint = false) : a(a), b(b), color(color), opacity(opacity), hint(hint) {}
 };
 
 /// Parallelogram graphic element
@@ -61,33 +63,11 @@ struct Parallelogram {
  Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=black, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
 };
 
-/*/// Polygon graphic element
-// FIXME: Implements as cubic path
-struct Polygon {
-    vec2 min,max; array<Line> edges;
-};*/
-
 struct Cubic {
  buffer<vec2> points;
  bgr3f color = black; float opacity = 1;
  Cubic(buffer<vec2>&& points, bgr3f color=black, float opacity=1) : points(move(points)), color(color), opacity(opacity) {}
 };
-
-/// Axis-aligned rectangle with 2D floating point coordinates
-struct Rect {
- vec2 min, max;
- explicit Rect(vec2 size) : min(0), max(size) {}
- explicit Rect(vec2 min, vec2 max) : min(min), max(max) {}
- static Rect fromOriginAndSize(vec2 origin, vec2 size) { return Rect(origin, origin+size); }
- vec2 origin() const { return min; }
- vec2 size() const { return max-min; }
- explicit operator bool() { return min<max; }
- bool contains(vec2 p) const { return p>=min && p<=max; }
- void extend(vec2 p) { min=::min(min, p); max=::max(max, p); }
-};
-inline Rect operator &(Rect a, Rect b) { return Rect(max(a.min,b.min),min(a.max,b.max)); }
-inline String str(const Rect& r) { return "["_+str(r.min)+" - "_+str(r.max)+"]"_; }
-inline Rect operator +(vec2 offset, Rect rect) { return Rect(offset+rect.min,offset+rect.max); }
 
 /// Set of graphic elements
 struct Graphics : shareable {
@@ -101,6 +81,7 @@ struct Graphics : shareable {
  array<Cubic> cubics;
 
  map<vec2, shared<Graphics>> graphics;
+ virtual ~Graphics() {}
 
  void translate(vec2 offset) {
   bounds = offset+bounds;
@@ -108,7 +89,7 @@ struct Graphics : shareable {
   for(auto& o: blits) o.origin += offset;
   for(auto& o: glyphs) o.origin += offset;
   for(auto& o: parallelograms) { o.min+=offset; o.max+=offset; }
-  for(auto& o: lines) { o.a+=offset; o.b+=offset; }
+  for(auto& o: lines) { o.p0+=offset; o.p1+=offset; }
   for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
  }
  void append(const Graphics& o) {

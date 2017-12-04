@@ -3,7 +3,9 @@
 #include "ui/layout.h"
 #include "interface.h"
 #include "window.h"
+#if PDFEXPORT
 #include "pdf.h"
+#endif
 
 struct MusicPDF {
     // Name
@@ -26,9 +28,11 @@ struct MusicPDFPreview : MusicPDF, Application {
 };
 registerApplication(MusicPDFPreview);
 
+#if PDFEXPORT
 struct MusicPDFExport : MusicPDF, Application {
     MusicPDFExport() {
         writeFile(name+"_.pdf"_, toPDF(vec2(sheet.pageSize) ?: sheet.pages[0].bounds.max, sheet.pages, 72/*PostScript point per inch*/ / inchPx /*px/inch*/), home(), true);
     }
 };
 registerApplication(MusicPDFExport, export);
+#endif

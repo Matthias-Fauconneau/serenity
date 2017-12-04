@@ -165,7 +165,7 @@ String Element::str(uint depth) const {
  for(auto attr: attributes) line.append(' '+attr.key+"=\""+attr.value+'"');
  if(trim(content)||children) {
   if(name) line.append(">");
-  if(trim(content)) line.append(replace(simplify(trim(content)),"\n",'\n'+indent));
+  if(trim(content)) line.append(replace(simplify(copyRef(trim(content))),"\n",'\n'+indent));
   if(children) {
    line.append('\n');
    for(const Element& e: children) line.append( e.str(depth+1) );

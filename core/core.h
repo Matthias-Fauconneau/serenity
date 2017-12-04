@@ -4,17 +4,18 @@
 // Keywords
 #ifdef PROFILE
 #define notrace __attribute((no_instrument_function))
+#define inline  inline __attribute((no_instrument_function))
 #else
 #define notrace
+#define inline inline
 #endif
-#define inline inline notrace
 #define unused __attribute((unused))
-#define packed __attribute((packed))
+#define _packed __attribute((packed))
 #define Type typename
-#define generic template<Type T>
+#define generic template<typename T>
 #define abstract =0
 #define default_move(T) T(T&&)=default; T& operator=(T&&)=default
-#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete; T(T&& o) = delete;
+#define no_copy(T) T(const T&)=delete; T& operator=(const T&)=delete
 
 // Traits
 template<Type> struct is_lvalue_reference { static constexpr bool value = false; };
@@ -28,6 +29,8 @@ generic struct remove_reference<T&&> { typedef T type; };
 generic __attribute((warn_unused_result)) inline constexpr Type remove_reference<T>::type&& move(T&& t)
 { return (Type remove_reference<T>::type&&)(t); }
 /// Swap values (using move semantics as necessary)
+//#include <utility>
+//using std::swap;
 generic inline void swap(T& a, T& b) { T t = move(a); a=move(b); b=move(t); }
 /// Forwards references and copyable values
 generic constexpr T&& forward(Type remove_reference<T>::type& t) { return (T&&)t; }
@@ -40,9 +43,10 @@ generic __attribute((warn_unused_result)) T copy(const T& o) { return o; }
 generic struct handle {
  T pointer;
 
+ no_copy(handle);
  handle(T pointer=T()) : pointer(pointer){}
- handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
  handle(handle&& o) : pointer(o.pointer){ o.pointer=T(); }
+ handle& operator=(handle&& o) { pointer=o.pointer; o.pointer={}; return *this; }
 
  operator T() const { return pointer; }
  operator T&() { return pointer; }
@@ -53,7 +57,7 @@ generic struct handle {
 
 template<Type A, Type B> constexpr bool operator !=(const A& a, const B& b) { return !(a==b); }
 
-// -- Integer types
+// -- Primitive types
 typedef char byte;
 typedef signed char int8;
 typedef unsigned char uint8;
@@ -63,34 +67,37 @@ typedef signed int int32;
 typedef unsigned int uint32;
 typedef unsigned int uint;
 typedef unsigned long ptr;
-typedef signed long long int64;
-typedef unsigned long long uint64;
+typedef __INT64_TYPE__ int64;
+typedef __UINT64_TYPE__ uint64;
 typedef __SIZE_TYPE__ size_t;
-constexpr size_t invalid = -1; // Invalid index
-#define null nullptr
+typedef __fp16 half;
+typedef float float32;
+constexpr size_t invalid = ~0ull; // Invalid index
 
 // -- Number arithmetic
 template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
 template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
 generic inline constexpr T min(T a, T b) { return a<b ? a : b; }
-generic inline constexpr T max(T a, T b) { return a<b ? b : a; }
-generic T clamp(T min, T x, T max) { return x < min ? min : max < x ? max : x; }
+generic inline constexpr T max(T a, T b) { return a>b ? a : b; }
+generic  T clamp(T min, T x, T max) { return ::min(::max(min, x), max); }
+generic T abs(T x) { return x>=0 ? x : -x; }
+generic inline constexpr T sq(const T x) { return x*x; }
 
 /// Numeric range
 struct range {
- inline range(int start, int stop) : start(start), stop(stop){}
- inline range(int size) : range(0, size) {}
+ inline constexpr range(const int64 start, const int64 stop) : start(start), stop(stop){}
+ inline constexpr range(const uint64 size) : range(0, int64(size)) {}
  struct iterator {
-  int i;
-  inline int operator*() { return i; }
-  inline iterator& operator++() { i++; return *this; }
-  inline bool operator !=(const iterator& o) const { return i<o.i; }
+  int64 i;
+  inline constexpr int64 operator*() { return i; }
+  inline constexpr iterator& operator++() { i++; return *this; }
+  inline constexpr bool operator !=(const iterator& o) const { return i<o.i; }
  };
- inline iterator begin() const { return {start}; }
- inline iterator end() const { return {stop}; }
- explicit operator bool() const { return start < stop; }
- int size() { return stop-start; }
- int start, stop;
+ inline constexpr iterator begin() const { return {start}; }
+ inline constexpr iterator end() const { return {stop}; }
+ explicit constexpr operator bool() const { return start < stop; }
+ constexpr int64 size() { return stop-start; }
+ int64 start, stop;
 };
 
 /// Numeric range
@@ -110,19 +117,19 @@ struct reverse_range {
  int start, stop;
 };
 
-// -- initializer_list
-#ifndef _INITIALIZER_LIST
-namespace std {
-generic struct initializer_list {
- const T* data;
- size_t length;
- constexpr initializer_list(const T* data, size_t size) : data(data), length(size) {}
- constexpr size_t size() const noexcept { return length; }
- constexpr const T* begin() const noexcept { return data; }
- constexpr const T* end() const { return (T*)data+length; }
+// -- atomic
+
+struct atomic {
+ size_t count = 0;
+ operator size_t() { return count; }
+ //size_t operator++(int/*postfix*/) { return __atomic_fetch_add(&count, 1, 5/*SeqCst*/); }
+ //size_t operator+=(int increment) { return __atomic_fetch_add(&count, increment, 5/*SeqCst*/); }
+ size_t fetchAdd(int increment) { return __atomic_fetch_add(&count, increment, 5/*SeqCst*/); }
 };
-}
-#endif
+
+// -- initializer_list
+#include <initializer_list>
+
 // -- ref
 
 generic struct Ref;
@@ -142,7 +149,7 @@ generic struct Ref {
  /// Converts a real std::initializer_list to ref
  constexpr Ref(const std::initializer_list<T>& list) : data(list.begin()), size(list.size()) {}
  /// Explicitly references a static array
- template<size_t N> explicit constexpr Ref(const T (&a)[N]) : Ref(a,N) {}
+ template<size_t N> /*explicit*/ constexpr Ref(const T (&a)[N]) : Ref(a,N) {}
 
  explicit operator bool() const { return size; }
  explicit operator const T*() const { return data; }
@@ -160,16 +167,16 @@ generic struct Ref {
  inline ref<T> slice(size_t pos) const;
 
  struct reverse_ref {
-  const T* start; const T* stop;
-  struct iterator {
-   const T* pointer;
-   const T& operator*() { return *pointer; }
-   iterator& operator++() { pointer--; return *this; }
-   typedef __INTPTR_TYPE__ intptr_t;
-   bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
-  };
-  iterator begin() const { return {start}; }
-  iterator end() const { return {stop}; }
+     const T* start; const T* stop;
+     struct iterator {
+         const T* pointer;
+         const T& operator*() { return *pointer; }
+         iterator& operator++() { pointer--; return *this; }
+         typedef __INTPTR_TYPE__ intptr_t;
+         bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
+     };
+     iterator begin() const { return {start}; }
+     iterator end() const { return {stop}; }
  };
  reverse_ref reverse() { return {end()-1, begin()}; }
 
@@ -185,12 +192,9 @@ generic struct Ref {
  }
 };
 
-// -- string
-
 /// ref discarding trailing zero byte in ref(char[N])
 // Needs to be a template specialization as a direct derived class specialization prevents implicit use of ref(char[N]) to bind ref<char>
 template<> struct ref<char> : Ref<char> {
- using Ref::Ref;
  constexpr ref() {}
  inline constexpr ref(const char* data, size_t size) : Ref<char>(data, size) {}
  /// Implicitly references a string literal
@@ -199,6 +203,8 @@ template<> struct ref<char> : Ref<char> {
 
 /// Returns const reference to memory used by \a t
 generic ref<byte> raw(const T& t) { return ref<byte>((byte*)&t,sizeof(T)); }
+
+// -- string
 
 /// ref<char> holding a UTF8 text string
 typedef ref<char> string;
@@ -217,10 +223,10 @@ void log(string message);
 
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
 template<Type... Args> void  __attribute((noreturn)) error(const Args&... args);
-template<> void __attribute((noreturn,no_instrument_function)) error(const string& message);
+template<> void __attribute((noreturn)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
-#define assert_(expr, message...) ({ if(!(expr)) error(#expr ""_, ## message); })
+#define assert_(expr, message...) ({ if(!(expr)) ::error(#expr ""_, ## message); })
 #if DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) assert_(expr, ## message)
@@ -228,26 +234,22 @@ template<> void __attribute((noreturn,no_instrument_function)) error(const strin
 #define assert(expr, message...) ({})
 #endif
 
-// -- ref
+// -- ref (requires assert)
 generic inline const T& Ref<T>::at(size_t i) const { assert(i<size, i, size); return data[i]; }
 generic inline ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+size<=this->size); return ref<T>(data+pos, size); }
 generic inline ref<T> Ref<T>::sliceRange(size_t begin, size_t end) const { assert(end<=this->size); return ref<T>(data+begin, end-begin); }
 generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
-// -- FILE
-
-/// Declares a file to be embedded in the binary
-#define FILE(name) static ref<byte> name() { \
- extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
- return ref<byte>(_binary_ ## name ##_start,_binary_ ## name ##_end - _binary_ ## name ##_start); \
- }
+/// Reinterpret casts a const reference to another type
+template<Type T, Type O> ref<T> cast(const ref<O> o) {
+ assert((o.size*sizeof(O))%sizeof(T) == 0);
+ return ref<T>((const T*)o.data, o.size*sizeof(O)/sizeof(T));
+}
 
 // -- mref
 
 /// Initializes memory using a constructor (placement new)
-#ifndef _NEW
-inline void* operator new(size_t, void* p) noexcept { return p; }
-#endif
+#include <new>
 
 /// Unmanaged fixed-size mutable reference to an array of elements
 generic struct mref : ref<T> {
@@ -257,7 +259,7 @@ generic struct mref : ref<T> {
  /// Default constructs an empty reference
  constexpr mref(){}
  /// References \a size elements from \a data pointer
- inline mref(T* data, size_t size) : ref<T>(data,size) {}
+ constexpr mref(T* data, size_t size) : ref<T>(data,size) {}
  /// Converts an std::initializer_list to mref
  constexpr mref(std::initializer_list<T>&& list) : ref<T>(list.begin(), list.size()) {}
  /// Converts a static array to ref
@@ -291,19 +293,34 @@ generic struct mref : ref<T> {
  /// Initializes reference from \a source using copy constructor
  void copy(const ref<T> source) const { assert(size==source.size); for(size_t index: range(size)) set(index, ::copy(source[index])); }
 
- /// Stores the application of a function to every index up to a size
+ /// Stores the application of a function to every index up to a size in a mref
  template<Type Function> void apply(Function function) const { for(size_t index: range(size)) set(index, function(index)); }
- /// Stores the application of a function to every elements of a ref
- template<Type Function, Type... V> void apply(Function function, ref<V>... sources) const {
+ /// Stores the application of a function to every elements of a ref in a mref
+ template<Type Function, Type... S> void apply(Function function, ref<S>... sources) const {
   for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
  }
- /// Stores the application of a function to every elements of a mref
- template<Type Function, Type... V> void apply(Function function, mref<V>... sources) const {
+ /// Stores the application of a function to every elements of a ref in a mref
+ template<Type Function, Type... S> void apply(Function function, mref<S>... sources) const {
   for(size_t index: range(size)) new (&at(index)) T(function(sources[index]...));
  }
 
  /// Replaces in \a array every occurence of \a before with \a after
  template<Type K> mref& replace(const K& before, const T& after) { for(T& e : *this) if(e==before) e=::copy(after); return *this; }
 };
+
 /// Returns mutable reference to memory used by \a t
 generic mref<byte> raw(T& t) { return mref<byte>((byte*)&t,sizeof(T)); }
+
+/// Reinterpret casts a mutable reference to another type
+template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
+ assert((o.size*sizeof(O))%sizeof(T) == 0);
+ return mref<T>((T*)o.data, o.size*sizeof(O)/sizeof(T));
+}
+
+// -- FILE
+
+/// Declares a file to be embedded in the binary
+#define FILE(name) static ref<byte> name() { \
+ extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
+ return ref<byte>(_binary_ ## name ##_start,(size_t)(_binary_ ## name ##_end - _binary_ ## name ##_start)); \
+}

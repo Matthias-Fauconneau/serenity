@@ -27,13 +27,13 @@ struct Font {
     bool hint;
     handle<FT_FaceRec_*> face;
     float ascender = 0, descender = 0;
-    //vec2 bboxMin = 0, bboxMax = 0; // in font units
+    vec2 bboxMin = 0, bboxMax = 0; // in font units
 
     struct Glyph {
-	int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
-	Image image;
-	Glyph() : offset(0) {}
-	Glyph(int2 offset, Image&& image) : offset(offset), image(move(image)) {}
+        int2 offset; // (left bearing, min.y-baseline) //FIXME: -> Image
+        Image image;
+        Glyph() : offset(0) {}
+        Glyph(int2 offset, Image&& image) : offset(offset), image(move(image)) {}
     };
     map<uint, Glyph> cache;
 

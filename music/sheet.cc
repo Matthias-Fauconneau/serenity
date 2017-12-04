@@ -11,8 +11,7 @@ static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyp
  Text text(message, fontSize, 0, 1, 0, "LinLibertine", false);
  vec2 textSize = text.sizeHint();
  origin -= align*textSize;
- auto textGlyphs = move(text.graphics(0)->glyphs); // Holds a valid reference during iteration
- for(auto glyph: textGlyphs) { glyph.origin+=origin; glyphs.append(glyph); }
+ glyphs.append( text.glyphs(origin) );
  return textSize;
 }
 
@@ -252,7 +251,7 @@ void System::layoutNotes(uint staff) {
  if(beam.size==1) { // Draws single stem
   assert_(beam[0]);
   Sign sign = stemUp ? beam[0].last() : beam[0].first();
-  float yBottom = -inf, yTop = inf;
+  float yBottom = -inff, yTop = inff;
   for(Sign sign: beam[0]) if(sign.note.value >= Half) { yBottom = max(yBottom, Y(sign)); yTop = min(yTop, Y(sign)); } // inverted Y
   float yBase = stemUp ? yBottom-1./2 : yTop+1./2;
   float yStem = stemUp ? yTop-stemLength : yBottom+stemLength;

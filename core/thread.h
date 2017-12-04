@@ -3,6 +3,7 @@
 #include "map.h"
 #include "file.h"
 #include "function.h"
+#include <poll.h>
 #include <pthread.h> //pthread
 
 /// Abstract factory pattern (allows construction of class by names)
@@ -91,8 +92,6 @@ struct Thread;
 /// Original thread spawned when this process was forked, terminating this thread leader terminates the whole thread group
 extern Thread mainThread;
 
-struct pollfd { int fd; short events; short revents; };
-enum { POLLIN=1, POLLOUT=4, POLLHUP=0x10 };
 /// Poll is a convenient interface to participate in the event loop
 struct Poll : pollfd {
     enum { IDLE=64 };
