@@ -18,14 +18,17 @@ int64 Build::parse(string fileName) {
     File file(fileName, folder);
     lastEdit = file.modifiedTime();
     TextData s = file.read(file.size());
-    s.match("#pragma once");
+    s.match("\xEF\xBB\xBF");
+    if(endsWith(fileName,".h")) assert_(s.match("#pragma once"));
+    else assert_(!s.match("#pragma once"));
     for(;;) {
         s.whileAny(" \t\r\n");
         /**/ if(s.match("#include \"") || s.match("//include \"")) { // Module header
             string name = s.until('.');
             if(!s.match("h\"\n")) error(fileName, "Expected '"+escape("h\"\n")+"', got '"+escape(s.peek("h\"\n"_.size))+'\'', s.line());
             String module;
-            if(fileName.contains('/')) module = find(section(fileName,'/')+'/'+name+".h") ? find(section(fileName,'/')+'/'+name+".h") : find(section(fileName,'/')+'/'+name+".cc");
+            if(fileName.contains('/'))
+                module = find(section(fileName,'/')+'/'+name+".h") ? find(section(fileName,'/')+'/'+name+".h") : find(section(fileName,'/')+'/'+name+".cc");
             if(!module) module = find(name+".h") ? find(name+".h") : find(name+".cc");
             assert_(module, "No such module", name, "imported from", fileName);
             if(existsFile(module+".h")) {
@@ -83,7 +86,10 @@ int64 Build::parse(string fileName) {
         else if(s.match("//") || s.match("extern \"C\" {")) {
             s.line(); continue;
         }
-        else break;
+        else {
+            assert_(!s.match("#pragma once"));
+            break;
+        }
     }
     this->lastEdit.insert(copyRef(fileName), lastEdit);
     return lastEdit;
