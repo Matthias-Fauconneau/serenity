@@ -13,11 +13,15 @@ struct MusicPDF {
     // MusicXML
     MusicXML xml = readFile(name+".xml"_);
     // Page
-    static constexpr float inchMM = 25.4;//, inchPx = 90;
+    static constexpr float inchMM = 25.4;
+#if 1
+    static constexpr float inchPx = 276;
     //const int2 pageSize = int2(210/*mm*/ * (inchPx/inchMM), 297/*mm*/ * (inchPx/inchMM));
+#else
     const int2 pageSizeMM = int2(210, 297);
     const int2 pageSize = int2(pageSizeMM.x*1024/pageSizeMM.y, 1024);
     const float inchPx = pageSize.y/pageSizeMM.y*inchMM;
+#endif
     // Sheet
     Sheet sheet {xml.signs, xml.divisions, 0, 7/*mm*/*(inchPx/inchMM) / 8/*half intervals / staff height*/, {}, "", false, true};
 };

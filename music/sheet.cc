@@ -24,6 +24,7 @@ struct SheetContext {
  KeySignature keySignature = 0;
  vec2 pedalStart = 0; size_t pedalStartSystemIndex=0; // Last pedal start/change position
  Sign wedgeStart {.time=0, .wedge={}}; // Current wedge
+ float wedgeStartX = 0;
 
  // Sheet layout parameters
  ///*static constexpr*/const size_t staffCount;
@@ -96,6 +97,7 @@ struct Staff {
  // Staff sheet context
  Clef clef {NoClef,0};
  Sign octaveStart {.octave=OctaveStop}; // Current octave shift (for each staff)
+ float octaveStartX = 0;
  uint beatTime = 0; // Time after last commited chord in .16 quarters since last time signature change
  //uint64 time = 0; // Time after last commited chord in ticks
  // Staff measure context
@@ -160,10 +162,10 @@ struct System : SheetContext {
  // Each measure has uniform time <-> horizontal position mapping fixed by shortestNote
  uint firstMeasureTime = 0; // in .16 quarters
  float measureStartX = 0;
- uint measureStartTime = 0; // in ticks
+ uint64 measureStartTime = 0; // in ticks
  uint shortestInterval = 0; // in ticks
  float X(uint time) {
-  //assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
+  assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
   return measureStartX + (time-measureStartTime)/shortestInterval*spaceWidth;
  }
  size_t justifiedSpace = 0;
@@ -732,15 +734,14 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       //assert_(staves[staff].clef.octave == 0, staff, staves[staff].clef.octave, pages.size, pageSystems.size, int(sign.octave));
       //if(!timeTrack.contains(sign.time)) timeTrack.insert(sign.time, timeTrack.values[min(timeTrack.keys.linearSearch(sign.time), timeTrack.keys.size-1)]);
       //float x = staves[staff].octaveStart.time < timeTrack.keys.first() ? 0 /*TODO: wrap*/: X(staves[staff].octaveStart.time);
-      float x = X(staves[staff].octaveStart.time);
+      float x = staves[staff].octaveStartX;
       float start = x + space * 2;
       float end = x;
-      for(float x=start; x<=end-space; x+=space*2) {
-       system.lines.append(vec2(x, y), vec2(x+space, y));
-      }
+      for(float x=start; x<=end-space; x+=space*2) system.lines.append(vec2(x, y), vec2(x+space, y));
      }
      else error(int(sign.octave));
      staves[staff].octaveStart = sign;
+     staves[staff].octaveStartX = X(staves[staff].octaveStart.time); // FIXME: multiline
      //log(pages.size, pageSystems.size, sign, staves[staff].clef.octave);
     } else error(int(sign.type));
     //timeTrack.at(sign.time).staves[staff].x = x;
@@ -1168,11 +1169,12 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
     if(sign.wedge == WedgeStop) {
      bool crescendo = wedgeStart.wedge == Crescendo;
      //float x = wedgeStart.time < timeTrack.keys.first() ? 0 /*TODO: wrap*/: X(wedgeStart.time);
-     float x = X(wedgeStart.time);
+     float x = wedgeStartX;
      system.parallelograms.append( vec2(x, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
      system.parallelograms.append( vec2(x, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
     } else {
      wedgeStart = sign;
+     wedgeStartX = X(wedgeStart.time);
     }
    } else if(sign.type == Sign::Pedal) {
     float y = staffY(0, min(-8,line[0].bottom)) + lineInterval; // FIXME: staff assignment

@@ -16,7 +16,7 @@ struct Window : Poll {
  /// Window size
  uint2 size = 0;
  /// Background color
- bgr3f backgroundColor = 0;
+ bgr3f backgroundColor = white;
  /// Current cursor
  MouseCursor cursor = MouseCursor::Arrow;
 

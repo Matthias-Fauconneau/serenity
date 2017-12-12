@@ -289,8 +289,7 @@ void XWindow::event() {
         } else
 #endif
         {
-            //target.clear(byte4(0xFF));
-            target.clear(byte4(0,0,0,0xFF));
+            target.clear(byte4(sRGB(backgroundColor.b),sRGB(backgroundColor.g),sRGB(backgroundColor.r),0xFF));
             render(target);
             {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window);
                                      r.context=id+GraphicContext; r.seg=id+Segment;
@@ -328,7 +327,7 @@ unique<Window> window(Widget* widget, int2 size, Thread& thread, int useGL_sampl
     if(environmentVariable("DISPLAY")) {
         auto window = unique<XWindow>(widget, thread, size, useGL_samples);
         if(title) window->setTitle(title);
-        //window->show();
+        window->show();
         return move(window);
     }
     error("");
