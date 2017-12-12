@@ -4,12 +4,13 @@
 #include "graphics.h"
 
 extern "C" {
-#define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
-#define _STDLIB_H // Prevent system <stdlib.h> inclusion which conflicts with local "thread.h"
+#define _MATH_H
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h> //lzma
 #define _LIBCPP_MATH_H
 #define _LIBCPP_STDLIB_H
+#define _GLIBCXX_CMATH
+#define _GLIBCXX_MATH_H
 #include <libavformat/avformat.h> //avformat
 #include <libswscale/swscale.h> //swscale
 #include <libavcodec/avcodec.h> //avcodec
@@ -169,7 +170,7 @@ void Encoder::writeMJPEGPacket(ref<byte> data, uint64 pts) {
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
-    assert_(videoStream && image.size==int2(width,height), image.size);
+    assert_(videoStream && image.size==uint2(width,height), image.size);
     int stride = image.stride*4;
     sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
     //assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == (int)videoFrameRate);

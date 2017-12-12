@@ -7,7 +7,7 @@ void Layout::render(RenderTarget2D& target, vec2 offset, vec2 size) {
     for(size_t i: range(count())) if(widgets[i] & Rect::fromOriginAndSize(offset, size)) {
         assert_(isNumber(widgets[i].origin()));
         at(i).render(target, vec2(widgets[i].origin()), widgets[i].size());
-	}
+    } else log(offset, size, i, widgets[i]);
 }
 
 float Layout::stop(vec2 size, int axis, float currentPosition, int direction) {

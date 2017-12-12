@@ -1,24 +1,26 @@
 #include "keyboard.h"
+#include "image-render.h"
 #include "render.h"
+#include "math.h"
 
 void gradientY(const Image& target, int x0, int dx, int y0, int dy, bgr3f color0, bgr3f color1, float opacity=1, Op op=Src) {
  for(int y: range(dy)) {
   const float t = float(y)/(dy-1);
-  fill(target, int2(x0, y0+y), int2(dx, 1), color0 + t*(color1-color0), opacity, op);
+  fill(target, int2(x0, y0+y), uint2(dx, 1), color0 + t*(color1-color0), opacity, op);
  }
 }
 
 void gradientX(const Image& target, int x0, int dx, int y0, int dy, bgr3f color0, bgr3f color1, float opacity=1, Op op=Src) {
  for(int x: range(dx)) {
   const float t = float(x)/(dx-1);
-  fill(target, int2(x0+x, y0), int2(1, dy), color0 + t*(color1-color0), opacity, op);
+  fill(target, int2(x0+x, y0), uint2(1, dy), color0 + t*(color1-color0), opacity, op);
  }
 }
 
 void gradientR(const Image& target, int x0, int dx, int y0, int dy, bgr3f color0, bgr3f color1, float opacity=1, Op op=Src) {
   for(int y: range(dy)) for(int x: range(dx)) {
    const float t = sqrt(float(sq(x)+sq(y))/float(sq(dx-1)));
-   fill(target, int2(x0+x, y0+y), int2(1, 1), color0 + t*(color1-color0), opacity, op);
+   fill(target, int2(x0+x, y0+y), uint2(1, 1), color0 + t*(color1-color0), opacity, op);
   }
 }
 
@@ -34,8 +36,8 @@ void Keyboard::render(const Image& target) {
  const int dx = round(X/88.f);
  const int margin = (X-88*dx)/2;
  gradientY(target, 0, X, 0, y0b, 5./6, 1./6); // Top side gradient
- gradientY(target, 0, X, y0b, 3, red/4.f, red/2.f); // Red line
- fill(target, int2(0, y1w), int2(X, 1), 1./4); // Bottom line
+ gradientY(target, 0, X, y0b, 3, bgr3f(0,0,1/4.f), bgr3f(0,0,1/2.f)); // Red line
+ fill(target, int2(0, y1w), uint2(X, 1), 1/4.f); // Bottom line
  for(uint key=0; key<88; key++) {
   int x0 = margin + key*dx;
   int x1 = x0 + dx;
@@ -47,28 +49,28 @@ void Keyboard::render(const Image& target) {
   const int S = 4;
   if(key==0) l=0; //A-1 has no left notch
   if(l==1) { // black key
-   fill(target, int2(x0+0, y0b), int2(1, y1b-y0b), color); // Left vertical edge
-   fill(target, int2(x0+1, y0b), int2(1, y1br-y0b), ::min(bgr3f(1), color+bgr3f(1.f/8))); // Left vertical edge (highlight)
-   fill(target, int2(x0+2, y0b), int2(dx-2, y1br-y0b), color); // Key
+   fill(target, int2(x0+0, y0b), uint2(1, y1b-y0b), color); // Left vertical edge
+   fill(target, int2(x0+1, y0b), uint2(1, y1br-y0b), ::min(bgr3f(1), color+bgr3f(1.f/8))); // Left vertical edge (highlight)
+   fill(target, int2(x0+2, y0b), uint2(dx-2, y1br-y0b), color); // Key
    //if(!pressed) fill(target, int2(x0+1, y1br-1), int2(dx, 1), ::min(bgr3f(1), color+bgr3f(1.f/8))); // Bottom edge (highlight)
-   fill(target, int2(x0+1, y1br), int2(dx, y1b-1-y1br), ::min(bgr3f(1), color+bgr3f(1.f/32))); // Bottom side
-   fill(target, int2(x0+1, y1b-1), int2(dx-1, 1), color); // Bottom edge (edge)
+   fill(target, int2(x0+1, y1br), uint2(dx, y1b-1-y1br), ::min(bgr3f(1), color+bgr3f(1.f/32))); // Bottom side
+   fill(target, int2(x0+1, y1b-1), uint2(dx-1, 1), color); // Bottom edge (edge)
   } else { // White key
-   fill(target, int2(x0, y0w), int2(dx, y1b-y0w), color); // White key top
+   fill(target, int2(x0, y0w), uint2(dx, y1b-y0w), color); // White key top
    if(l!=1) gradientY(target, x0+1, dx, y0w, S, 1.f/2, 3.f/4, 1, Mul); // Top shadow
    //if(r) fill(target, int2(x0+dx, y1b-1), int2(1, 1), 1.f/4*color); // Corner with black
-   if(l==0) fill(target, int2(x0, l==1?y0b:y0w), int2(1, y1b-1-(l==1?y0b:y0w)), black); // Vertical edge top part
-   fill(target, int2(x0-l*dx/6, y1b-1), int2(1, y1w-(y1b-1)), black); // Left vertical edge (black to bottom)
+   if(l==0) fill(target, int2(x0, l==1?y0b:y0w), uint2(1, y1b-1-(l==1?y0b:y0w)), black); // Vertical edge top part
+   fill(target, int2(x0-l*dx/6, y1b-1), uint2(1, y1w-(y1b-1)), black); // Left vertical edge (black to bottom)
    int left = l*dx/6;
    int wx0 = x0+1-left; // Left notch
    int right = (6-r)*dx/6;
    int dx1 = dx+right; // Right notch
-   fill(target, int2(wx0, y1b), int2(dx1, (pressed?y1w:y1wr)-y1b), color); // white key bottom
+   fill(target, int2(wx0, y1b), uint2(dx1, (pressed?y1w:y1wr)-y1b), color); // white key bottom
    if(left) gradientY(target, wx0, x0-wx0, y1b, S, 1.f/2, 3.f/4, 1, Mul); // Left Black/White H shadow
    if(right) gradientY(target, x0+dx, right, y1b, S, 1.f/2, 3.f/4, 1, Mul); // Right Black/White H shadow
    if(!pressed) {
-    fill(target, int2(wx0, y1wr), int2(dx1, 1), 1./4); // white key bottom edge
-    fill(target, int2(wx0, y1wr+1), int2(dx1, y1w-(y1wr+1)), 1./2); // white key bottom side
+    fill(target, int2(wx0, y1wr), uint2(dx1, 1), 1./4); // white key bottom edge
+    fill(target, int2(wx0, y1wr+1), uint2(dx1, y1w-(y1wr+1)), 1./2); // white key bottom side
    }
    if(l) {
     gradientX(target, x0, S, y0w, y1b-y0w, 1.f/2, 3.f/4, 1, Mul); // Black|White vertical shadow
@@ -78,8 +80,8 @@ void Keyboard::render(const Image& target) {
    // Right edge will be next left edge
   }
   if(key==87) { //C7 has no right notch
-   fill(target, int2(x1+dx/2, 0), int2(1, y1w), color);
-   fill(target, int2(x1, 0), int2(x1+dx/2, y1b-1), color);
+   fill(target, int2(x1+dx/2, 0), uint2(1, y1w), color);
+   fill(target, int2(x1, 0), uint2(x1+dx/2, y1b-1), color);
   }
  }
 }

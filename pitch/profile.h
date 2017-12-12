@@ -7,6 +7,7 @@
 generic T sign(T x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
 
 static constexpr int keyCount = 85;
+inline double exp(double x) { return __builtin_exp(x); }
 inline float stretch(int m) { return -exp((-54 - m)/12.) + exp((m - 129)/12.); }
 
 static Folder config(".config", home(), true);

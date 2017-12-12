@@ -12,7 +12,7 @@
 /// Estimates fundamental frequency (~pitch) of audio input
 struct Tuner : Poll {
     // Static parameters
-    static constexpr uint rate = 96000;
+    static constexpr uint rate = 48000;
     static constexpr uint N = 32768; // Analysis window size (A0 (27Hz~4K) * 2 (flat top window) * 2 (periods) * 2 (Nyquist))
     const uint periodSize = 4096; // Overlaps to increase time resolution (compensates loss from Hann window (which improves frequency resolution))
 
@@ -64,6 +64,7 @@ struct Tuner : Poll {
 		log(input.sampleBits, input.rate, input.periodSize);
         thread.spawn();
         readCount.acquire(N-periodSize);
+        window->show();
     }
 
 	uint write(const ref<int32> input) {

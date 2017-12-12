@@ -176,7 +176,7 @@ template<template<Type> class T, int N> buffer<byte> predict(const byte4* source
 }
 
 buffer<byte> encodePNG(const Image& image) {
- struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } packed ihdr
+ struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr
  { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:2), 0, 0, 0 };
  buffer<byte> IHDR = "IHDR"_+raw(ihdr);
 

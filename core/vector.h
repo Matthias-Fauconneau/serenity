@@ -115,6 +115,7 @@ generic struct lr {
  T l, r;
 };
 typedef vec<lr,uint16,2> short2;
+typedef vec<lr,float,2> float2;
 
 generic struct xyz {
  T x,y,z;

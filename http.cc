@@ -92,7 +92,7 @@ uint resolve(string host) {
  if(ip==uint(-1)) {
   static UDPSocket dns(nameserver(), 53);
   array<byte> query;
-  struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } packed header;
+  struct Header { uint16 id=big16(currentTime()); uint16 flags=1; uint16 qd=big16(1), an=0, ns=0, ar=0; } _packed header;
   query.append( raw(header) );
   for(TextData s(host);s;) { //QNAME
    ref<byte> label = s.until('.');

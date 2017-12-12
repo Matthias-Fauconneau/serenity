@@ -4,10 +4,13 @@
 #include "graphics.h"
 
 extern "C" {
-#define _MATH_H // Prevent system <math.h> inclusion which conflicts with local "math.h"
-#define _STDLIB_H // Prevent system <stdlib.h> inclusion which conflicts with local "thread.h"
+#define _MATH_H
 #define __STDC_CONSTANT_MACROS
 #include <stdint.h>
+#define _LIBCPP_MATH_H
+#define _LIBCPP_STDLIB_H
+#define _GLIBCXX_CMATH
+#define _GLIBCXX_MATH_H
 #include <libavformat/avformat.h> //avformat
 #include <libswscale/swscale.h> //swscale
 #include <libavcodec/avcodec.h> //avcodec
@@ -83,14 +86,14 @@ Image Decoder::read() { Image image(size); if(read(image)) return image; else re
 
 Image8 Decoder::YUV(size_t i) const {
  assert_(frame->linesize[i] == (i ? frame->width/2 : frame->width));
- return Image8(buffer<uint8>(frame->data[i], frame->linesize[i]*(height/(i?2:1)), 0), int2(frame->width/(i?2:1), frame->height/(i?2:1)), frame->linesize[i]);
+ return Image8(buffer<uint8>(frame->data[i], frame->linesize[i]*(height/(i?2:1)), 0), uint2(frame->width/(i?2:1), frame->height/(i?2:1)), frame->linesize[i]);
 }
 
 void Decoder::scale(const Image& image) {
  if(image.size != scaledSize) {
   if(swsContext) sws_freeContext(swsContext);
-  swsContext = sws_getContext(width, height, videoCodec->pix_fmt == AV_PIX_FMT_YUVJ422P ? PIX_FMT_YUV422P : videoCodec->pix_fmt,
-                              image.width, image.height,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
+  swsContext = sws_getContext(width, height, videoCodec->pix_fmt == AV_PIX_FMT_YUVJ422P ? AV_PIX_FMT_YUV422P : videoCodec->pix_fmt,
+                              image.size.x, image.size.y,  AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, 0, 0, 0);
   assert_(swsContext);
   scaledSize = image.size;
  }

@@ -1,7 +1,7 @@
 #pragma once
 #include "function.h"
 #include "core/image.h"
-#include "audio.h" // AudioFile
+#include "audio.h"
 
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {

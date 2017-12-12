@@ -137,4 +137,4 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  void setSelection(string selection, bool clipboard) override;
 };
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, int useGL_samples=1, string title={});
+unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, int useGL_samples=0, string title={});

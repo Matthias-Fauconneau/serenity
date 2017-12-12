@@ -3,7 +3,7 @@
 #include "notation.h"
 #include "widget.h"
 #include "font.h"
-#include "midi.h" // FIXME
+#include "midi.h"
 #include "graphics.h"
 
 inline void render(const Graphics& graphics, RenderTarget2D& target, vec2 offset=0, vec2 unused size=0) {
@@ -27,7 +27,8 @@ inline void render(const Graphics& graphics, RenderTarget2D& target, vec2 offset
 
 struct GraphicsWidget : Graphics, Widget {
     GraphicsWidget() {}
-    GraphicsWidget(Graphics&& o) : Graphics(move(o)) {}
+    GraphicsWidget(Graphics&& o) : Graphics(::move(o)) {}
+    virtual ~GraphicsWidget() {}
     vec2 sizeHint(vec2) override { assert_(isNumber(bounds.max), bounds); return bounds.max; }
     void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override { ::render(*this, target, offset, size); }
 };

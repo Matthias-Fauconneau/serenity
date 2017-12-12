@@ -126,7 +126,7 @@ Symbol findSymbol(void* find) {
         if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
     for(BinaryData& s = debug_line; s;) {
         uint begin = s.index;
-        struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } packed;
+        struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } _packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) { s.whileNot(0); s.skip('\0'); }
@@ -158,7 +158,7 @@ Symbol findSymbol(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else error("Unknown opcode");
+                else error("Unknown opcode", opcode);
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {

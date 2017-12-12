@@ -2,37 +2,51 @@
 #include "font.h"
 #include "math.h"
 
-static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
-    byte4& target_sRGB = target(x,y);
-    bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-    bgr3i linearBlend = bgr3i(round((0xFFF*(1-opacity))*target_linear + (0xFFF*opacity)*source_linear));
-    target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
-            min(0xFF,target_sRGB.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
+void blend(byte4& target_sRGB, bgr3f source_linear, float opacity) {
+ bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
+ bgr3i linearBlend = bgr3i(round(0xFFF*(1-opacity)*target_linear + 0xFFF*opacity*source_linear));
+ target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
+   min(0xFF,target_sRGB.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
+}
+void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
+ blend(target(x,y), source_linear, opacity);
 }
 
-
-static void fill(uint* target, uint stride, uint w, uint h, uint value) {
-    for(uint unused y: range(h)) {
-        for(uint x: range(w)) target[x] = value;
-        target += stride;
-    }
+void mul(byte4& target_sRGB, bgr3f source_linear) {
+ bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
+ bgr3i linearSub = bgr3i(round(float(0xFFF)*(target_linear * source_linear)));
+ target_sRGB = byte4(sRGB_forward[linearSub[0]], sRGB_forward[linearSub[1]], sRGB_forward[linearSub[2]], target_sRGB.a);
+}
+void mul(const Image& target, uint x, uint y, bgr3f source_linear) {
+ mul(target(x,y), source_linear);
 }
 
-void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opacity) {
-    assert_(bgr3f(0) <= color && color <= bgr3f(1));
+static inline void fill(uint* target, uint stride, uint w, uint h, uint value) {
+ for(uint y=0; y<h; y++) {
+  for(uint x=0; x<w; x++) target[x] = value;
+  target += stride;
+ }
+}
 
-    int2 min = ::max(int2(0), origin);
-    int2 max = ::min(int2(target.size), origin+int2(size));
-    if(max<=min) return;
+void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opacity, Op op) {
+ assert_(bgr3f(0) <= color && color <= bgr3f(1));
 
-    if(opacity==1) { // Solid fill
-        if(!(min < max)) return;
-        bgr3i linear = bgr3i(round(float(0xFFF)*color));
-        byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
-        fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
-    } else {
-        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, opacity);
-    }
+ int2 min = ::max(int2(0), origin);
+ int2 max = ::min(int2(target.size), origin+int2(size));
+ if(max<=min) return;
+
+ if(op == Src && opacity==1) { // Solid fill
+  if(!(min < max)) return;
+  bgr3i linear = bgr3i(round(float(0xFFF)*color));
+  byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
+  fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);
+ } else {
+  /**/ if(op==Src) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, opacity);
+  //else if(op==Sub && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::sub(target, x, y, color);
+  else if(op==Mul && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::mul(target, x, y, color);
+  //else if(op==Min && opacity==1) for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) ::min(target, x, y, color);
+  else error("");
+ }
 }
 
 void blit(const Image& target, int2 origin, uint2 size, const Image& source, bgr3f color, float opacity) {

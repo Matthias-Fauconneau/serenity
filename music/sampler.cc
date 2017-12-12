@@ -184,7 +184,7 @@ Sampler::Sampler(string path, const uint periodSize, function<void(uint)> timeCh
    else if(key=="ampeg_vel2attack"_) {} //FIXME
    else if(key=="fil_type"_) {} //FIXME
    else if(key=="cutoff"_) {} //FIXME
-   else error("Unknown opcode"_,key);
+   else error("Unknown SFZ opcode"_,key);
   }
  }
  add();

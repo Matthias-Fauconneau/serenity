@@ -5,30 +5,21 @@
 #include "rect.h"
 #include "math.h"
 
-/// Primary colors
-static constexpr bgr3f black {0, 0, 0};
-static constexpr bgr3f red {0, 0, 1};
-static constexpr bgr3f green {0, 1, 0};
-static constexpr bgr3f blue {1, 0, 0};
-static constexpr bgr3f white {1, 1, 1};
-static constexpr bgr3f cyan {1, 1, 0};
-static constexpr bgr3f magenta {1, 0, 1};
-static constexpr bgr3f yellow {0, 1, 1};
-
 /// Fill graphic element
 // FIXME: Implement as polygon
 struct Fill {
  vec2 origin, size;
- bgr3f color = black; float opacity = 1;
- Fill(vec2 origin, vec2 size, bgr3f color = black, float opacity = 1) : origin(origin), size(size), color(color), opacity(opacity) {}
+ bgr3f color = 0; float opacity = 1;
+ Fill(vec2 origin, vec2 size, bgr3f color = 0, float opacity = 1) : origin(origin), size(size), color(color), opacity(opacity) {}
 };
 
 /// Image graphic element
 struct Blit {
  vec2 origin, size;
  Image image;
- bgr3f color = white; float opacity = 1;
- Blit(vec2 origin, vec2 size, Image&& image, bgr3f color = white, float opacity = 1) : origin(origin), size(size), image(move(image)), color(color), opacity(opacity) {}
+ bgr3f color = 1; float opacity = 1;
+ Blit(vec2 origin, vec2 size, Image&& image, bgr3f color = 1, float opacity = 1)
+     : origin(origin), size(size), image(move(image)), color(color), opacity(opacity) {}
 };
 
 /// Text graphic element
@@ -59,14 +50,14 @@ struct Line {
 struct Parallelogram {
  vec2 min,max;
  float dy;
- bgr3f color = black; float opacity = 1;
- Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=black, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
+ bgr3f color = 0; float opacity = 1;
+ Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=0, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
 };
 
 struct Cubic {
  buffer<vec2> points;
- bgr3f color = black; float opacity = 1;
- Cubic(buffer<vec2>&& points, bgr3f color=black, float opacity=1) : points(move(points)), color(color), opacity(opacity) {}
+ bgr3f color = 0; float opacity = 1;
+ Cubic(buffer<vec2>&& points, bgr3f color=0, float opacity=1) : points(move(points)), color(color), opacity(opacity) {}
 };
 
 /// Set of graphic elements
@@ -81,6 +72,9 @@ struct Graphics : shareable {
  array<Cubic> cubics;
 
  map<vec2, shared<Graphics>> graphics;
+
+ Graphics(){}
+ default_move(Graphics);
  virtual ~Graphics() {}
 
  void translate(vec2 offset) {

@@ -6,7 +6,7 @@
 #include "interface.h"
 #include "ui/layout.h"
 #include "keyboard.h"
-#include "fret.h"
+//#include "fret.h"
 #include "audio.h"
 #include "asound.h"
 #include "ui/render.h"

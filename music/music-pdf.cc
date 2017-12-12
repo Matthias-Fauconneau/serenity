@@ -23,7 +23,7 @@ struct MusicPDF {
 };
 
 struct MusicPDFPreview : MusicPDF, Application {
-    Scroll<HList<GraphicsWidget> > pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(move(o));})};
+    Scroll<HList<GraphicsWidget> > pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(::move(o));})};
     unique<Window> window = ::window(&pages, sheet.pageSize ?: int2(sheet.pages[0].bounds.max), mainThread, false, str(name, pages.size));
 };
 registerApplication(MusicPDFPreview);

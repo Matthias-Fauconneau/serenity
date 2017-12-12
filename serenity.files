@@ -128,6 +128,11 @@ audio/audio.h
 audio/resample.cc
 audio/resample.h
 
+video/encoder.cc
+video/encoder.h
+video/video.cc
+video/video.h
+
 pitch/analysis.cc
 pitch/biquad.h
 pitch/estimate.cc

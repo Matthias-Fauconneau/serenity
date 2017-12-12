@@ -48,7 +48,7 @@ void Window::render(const Image& target) {
     currentWindow = this; // hasFocus
     ImageRenderTarget renderTarget(unsafeShare(target));
     update = false; // Lets Window::render within Widget::render trigger new rendering on next event
-    widget->render(renderTarget);
+    widget->render(renderTarget, 0, renderTarget.RenderTarget2D::size);
     currentWindow = 0;
 }
 
@@ -128,7 +128,7 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, int useGL_sample
         // Program/shader state info: GLSL shader failed to compile.
         glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 1, (uint[]){0x20090}, false);
 #else
-        error("UNIMPL");
+        error("UNIMPL GL");
 #endif
     }
 
@@ -289,7 +289,8 @@ void XWindow::event() {
         } else
 #endif
         {
-            target.clear(byte4(0xFF));
+            //target.clear(byte4(0xFF));
+            target.clear(byte4(0,0,0,0xFF));
             render(target);
             {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window);
                                      r.context=id+GraphicContext; r.seg=id+Segment;

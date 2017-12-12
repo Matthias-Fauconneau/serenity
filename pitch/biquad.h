@@ -19,7 +19,7 @@ struct Biquad {
 // H(s) = (s/Q) / (s^2 + s/Q + 1)
 struct BandPass : Biquad {
     BandPass(double f, double Q/*bw*/) {
-        double w0 = 2*PI*f;
+        double w0 = 2*π*f;
         //double alpha = sin(w0) * sinh(ln(2)/2*bw*w0/sin(w0));
         double alpha = sin(w0)/(2*Q);
         double a0 = 1+alpha;

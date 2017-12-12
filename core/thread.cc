@@ -172,6 +172,7 @@ int __attribute((noreturn)) exit_group(int status) { syscall(SYS_exit_group, sta
 
 template<> void __attribute((noreturn)) error(const string& message) {
  static bool reentrant = false;
+ log(message);
  if(!reentrant) { // Avoid hangs if tracing errors
   reentrant = true;
   traceAllThreads();
