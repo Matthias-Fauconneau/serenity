@@ -48,6 +48,7 @@ void Window::render(const Image& target) {
     currentWindow = this; // hasFocus
     ImageRenderTarget renderTarget(unsafeShare(target));
     update = false; // Lets Window::render within Widget::render trigger new rendering on next event
+    assert_(renderTarget.Image::size.x < 4096);
     widget->render(renderTarget, 0, renderTarget.RenderTarget2D::size);
     currentWindow = 0;
 }
@@ -75,7 +76,8 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, int useGL_sample
         if(sizeHint.x<0) Window::size.x=min(max(uint(abs(hint.x)),uint(-sizeHint.x)), XDisplay::size.x);
         if(sizeHint.y<0) Window::size.y=min(max(uint(abs(hint.y)),uint(-sizeHint.y)), XDisplay::size.y-46);
     }
-    assert_(Window::size);
+    Window::size = ::min(Window::size, XDisplay::size);
+    assert_(Window::size && Window::size <=XDisplay::size, Window::size, XDisplay::size);
     {CreateColormap r; send(({r.colormap=id+Colormap; r.window=root; r.visual=visual; r;}));}
     {CreateWindow r;
         send(({r.id=id+Window; r.parent=root; r.width=uint16(Window::size.x); r.height=uint16(Window::size.y); r.visual=visual; r.colormap=id+Colormap; r;}));}

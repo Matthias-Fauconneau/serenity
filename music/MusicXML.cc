@@ -339,10 +339,10 @@ MusicXML::MusicXML(string document, string) {
                             if(d("metronome"_).contains("per-minute"_)) {
                              TextData s (d("metronome"_)("per-minute"_).text());
                              s.whileNo("0123456789"_);
-                             s.decimal();
+                             perMinute = s.decimal();
                             }
                             assert_(perMinute==uint(perMinute));
-                            insertSign({Sign::Metronome, time, {.metronome={beatUnit, uint(perMinute)}}});
+                            insertSign({Sign::Metronome, time, {.metronome={beatUnit, d("metronome"_).contains("beat-unit-dot"_), uint(perMinute)}}});
                         }
                         else if(d.contains("pedal"_)) {
                             Pedal pedal = Pedal(ref<string>({"start"_,"change"_,"stop"_}).indexOf(d("pedal"_)["type"_]));
@@ -385,7 +385,7 @@ MusicXML::MusicXML(string document, string) {
                         else error("Unknown direction", d);
                     }
                     if(e.contains("sound"_) && e("sound"_)["tempo"_]) {
-                        insertSign({Sign::Metronome, time, .metronome={Quarter, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
+                        insertSign({Sign::Metronome, time, .metronome={Quarter, false, uint(parseDecimal(e("sound"_).attribute("tempo"_)))}});
                     }
                 }
                 else if(e.name=="attributes"_) {

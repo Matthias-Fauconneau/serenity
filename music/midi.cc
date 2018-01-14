@@ -47,7 +47,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
  KeySignature keySignature = 0;
  TimeSignature timeSignature = {4,4};
  uint64 usPerBeat = 60000000 / 120; // 500000
- Metronome metronome = {Quarter, 120};
+ Metronome metronome = {Quarter, false, 120};
  uint lastTempoChange = 0, lastTempoChangeUS = 0; // Last tempo changes in ticks and microseconds
  uint measureIndex = 0;
  int lastMeasureStart = 0;
@@ -161,7 +161,7 @@ MidiFile::MidiFile(ref<byte> file) { /// parse MIDI header
     usPerBeat = ((data[0]<<16)|(data[1]<<8)|data[2]); // Microseconds per beat (quarter)
     trackTimeUS = lastTempoChangeUS;
     metronome.perMinute = round(60000000. / usPerBeat); // Beats per minute
-    if(metronome.perMinute) insertSign({Sign::Metronome, track.time, .metronome={Quarter, metronome.perMinute}});
+    if(metronome.perMinute) insertSign({Sign::Metronome, track.time, .metronome={Quarter, false, metronome.perMinute}});
    }
    else if(MIDI(key)==MIDI::KeySignature) {
     int newKeySignature = (int8)data[0];

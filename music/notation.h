@@ -151,7 +151,7 @@ struct Measure {
 enum class Repeat { Begin=-2, End=-1, None=0 };
 typedef int KeySignature; // Index on the fifths circle
 struct TimeSignature { uint beats, beatUnit; };
-struct Metronome { Value beatUnit; uint perMinute; };
+struct Metronome { Value beatUnit; bool dot; uint perMinute; };
 struct ChordName { char name[24]={}; };
 struct ChordBox { int top=0; char name[24]={}; };
 struct Tuplet { uint size; struct { int min, max; } first, last; int min, max; };

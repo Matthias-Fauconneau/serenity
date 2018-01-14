@@ -1,3 +1,4 @@
+#pragma once
 #include "file.h"
 #include "widget.h"
 #include "graphics.h"

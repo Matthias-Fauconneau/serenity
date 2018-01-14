@@ -19,8 +19,8 @@ int64 Build::parse(string fileName) {
     lastEdit = file.modifiedTime();
     TextData s = file.read(file.size());
     s.match("\xEF\xBB\xBF");
-    if(endsWith(fileName,".h")) assert_(s.match("#pragma once"));
-    else assert_(!s.match("#pragma once"));
+    if(endsWith(fileName,".h")) assert_(s.match("#pragma once"), fileName);
+    else assert_(!s.match("#pragma once"), fileName);
     for(;;) {
         s.whileAny(" \t\r\n");
         /**/ if(s.match("#include \"") || s.match("//include \"")) { // Module header

@@ -45,13 +45,19 @@ struct Line {
  //Line(vec2 a, vec2 b, bgr3f color = 0, float opacity = 1, bool hint = false) : a(a), b(b), color(color), opacity(opacity), hint(hint) {}
 };
 
-/// Parallelogram graphic element
+/*/// Parallelogram graphic element
 // FIXME: Implement as polygon
 struct Parallelogram {
  vec2 min,max;
  float dy;
  bgr3f color = 0; float opacity = 1;
  Parallelogram(vec2 min, vec2 max, float dy, bgr3f color=0, float opacity=1) : min(min), max(max), dy(dy), color(color), opacity(opacity) {}
+};*/
+
+struct TrapezoidY {
+    struct Span { float x, min, max; };
+    Span s0, s1;
+    bgr3f color = 0; float opacity = 1;
 };
 
 struct Cubic {
@@ -68,7 +74,8 @@ struct Graphics : shareable {
  array<Blit> blits;
  array<Glyph> glyphs;
  array<Line> lines;
- array<Parallelogram> parallelograms;
+ //array<Parallelogram> parallelograms;
+ array<TrapezoidY> trapezoidYs;
  array<Cubic> cubics;
 
  map<vec2, shared<Graphics>> graphics;
@@ -82,7 +89,8 @@ struct Graphics : shareable {
   for(auto& o: fills) o.origin += offset;
   for(auto& o: blits) o.origin += offset;
   for(auto& o: glyphs) o.origin += offset;
-  for(auto& o: parallelograms) { o.min+=offset; o.max+=offset; }
+  //for(auto& o: parallelograms) { o.min+=offset; o.max+=offset; }
+  for(auto& o: trapezoidYs) { o.s0.x += offset.x; o.s1.x += offset.x; o.s0.min+=offset.y; o.s0.max+=offset.y; o.s1.min+=offset.y; o.s1.max+=offset.y; }
   for(auto& o: lines) { o.p0+=offset; o.p1+=offset; }
   for(auto& o: cubics) for(vec2& p: o.points) p+=vec2(offset);
  }
@@ -92,7 +100,8 @@ struct Graphics : shareable {
   fills.append(o.fills);
   blits.append(o.blits);
   glyphs.append(o.glyphs);
-  parallelograms.append(o.parallelograms);
+  //parallelograms.append(o.parallelograms);
+  trapezoidYs.append(o.trapezoidYs);
   lines.append(o.lines);
   cubics.append(o.cubics);
  }
@@ -107,5 +116,5 @@ struct Graphics : shareable {
 };
 
 inline String str(const Graphics& o) {
- return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, o.parallelograms.size, o.cubics.size, o.graphics.size());
+ return str(o.bounds, o.fills.size, o.blits.size, o.glyphs.size, o.lines.size, /*o.parallelograms.size,*/ o.trapezoidYs.size, o.cubics.size, o.graphics.size());
 }

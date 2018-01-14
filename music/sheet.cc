@@ -287,21 +287,21 @@ void System::layoutNotes(uint staff) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   system.trapezoidYs.append({{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}, black, opacity});
   }
   for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, (tip[0]+tip[1])/2 + Y);
    p1 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   system.trapezoidYs.append({{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}, black, opacity});
   }
   for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
    float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
    p0 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
-   system.parallelograms.append(p0, p1, beamWidth, black, opacity);
+   system.trapezoidYs.append({{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}, black, opacity});
   }
  }
  else // Draws grouping beam
@@ -329,9 +329,9 @@ void System::layoutNotes(uint staff) {
    Value value = ::min(beam[chordIndex][0].note.value, beam[chordIndex+1][0].note.value);
    for(size_t index: range(value-Quarter)) {
     float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
-    system.parallelograms.append(
-       vec2(stemX(beam[chordIndex], stemUp)-(chordIndex==0?1./2:0), stemsY[chordIndex]+dy),
-       vec2(stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1./2:0), stemsY[chordIndex+1]+dy), beamWidth);
+    system.trapezoidYs.append(TrapezoidY{
+       {stemX(beam[chordIndex+0], stemUp)-(chordIndex==0          ?1.f/2:0), stemsY[chordIndex+0]+dy, stemsY[chordIndex+0]+dy+beamWidth},
+       {stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1.f/2:0), stemsY[chordIndex+1]+dy, stemsY[chordIndex+1]+dy+beamWidth}});
    }
   }
  }
@@ -621,8 +621,8 @@ uint System::evaluateShortestInterval(ref<Sign> signs) const {
 // Layouts a system
 System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, mref<Sign> signs,
                map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth, bool measureNumbers)
- : SheetContext(context), staves(copyRef(_staves)), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex), previousSystem(previousSystem),
-   measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
+ : SheetContext(context), staves(copyRef(_staves)), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex),
+   previousSystem(previousSystem), measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
 
  // System first measure bar
  {float x = margin;
@@ -670,8 +670,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
   if((sign.type == Sign::Note ||sign.type == Sign::Rest) || sign.type == Sign::KeySignature) {
       float advance = 0;
       for(size_t index=0; index<pendingClefChange.size;) {
-          // Skips if not needed yet to keep the opportunity to clear right before measure bar
-          if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff) // Same staff
+          // Skips if not needed yet to keep the opportunity to clear right before measure bar // Same staff
+          if(((sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) && sign.staff == pendingClefChange[index].staff)
                   || sign.type == Sign::TimeSignature || sign.type == Sign::KeySignature) { // Non staff signs requiring pending clefs to be cleared
               Sign signClef = pendingClefChange.take(index);
               Clef clef = signClef.clef;
@@ -781,8 +781,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
        float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
        vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
        vec2 p1 (x[1]+stemWidth/2, tip[1]-beamWidth/2 + Y);
-       system.parallelograms.append(p0, p1, beamWidth, black);
-      }
+       system.trapezoidYs.append(TrapezoidY{{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}});
+       }
       tremolo.clear();
      }
 
@@ -872,10 +872,12 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      }
     }*/
 
-    /*if(timeTrack.contains(sign.time+sign.duration)) {
-                                                timeTrack.at(sign.time).staves[staff].x = x; // Advances position on staff
-                                                timeTrack.at(sign.time+sign.duration).staff = max(timeTrack.at(sign.time+sign.duration).staff, x); // Advances synchronization point
-                                        else timeTrack.insert(sign.time+sign.duration, {{x,x},x,x,x,x,x});*/
+#if 0
+    if(timeTrack.contains(sign.time+sign.duration)) {
+        timeTrack.at(sign.time).staves[staff].x = x; // Advances position on staff
+        timeTrack.at(sign.time+sign.duration).staff = max(timeTrack.at(sign.time+sign.duration).staff, x); // Advances synchronization
+        else timeTrack.insert(sign.time+sign.duration, {{x,x},x,x,x,x,x});
+#endif
     //staves[staff].x = x;
     //timeTrack[sign.time+sign.duration] = max(timeTrack[sign.time+sign.duration], x);
    }
@@ -1059,7 +1061,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
   } else if(sign.type == Sign::Tuplet) {
    const Tuplet tuplet = sign.tuplet;
 
-   bool stemUp = isStemUp({signs[signIndex+tuplet.min].staff, clefStep(signs[signIndex+tuplet.min])}, {signs[signIndex+tuplet.max].staff, clefStep(signs[signIndex+tuplet.max])});
+   bool stemUp = isStemUp({signs[signIndex+tuplet.min].staff, clefStep(signs[signIndex+tuplet.min])},
+                          {signs[signIndex+tuplet.max].staff, clefStep(signs[signIndex+tuplet.max])});
    bool above = stemUp;
 
    float x0 = X((signs[signIndex + (above ? tuplet.first.max : tuplet.first.min)]).time);// + spaceWidth;
@@ -1096,7 +1099,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
    if(sign.type == Sign::Metronome) {
     if(beatsPerMinute!=sign.metronome.perMinute) {
-     x += text(vec2(x, staffY(staves.size-1, 16)), "♩="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs, vec2(0,0)).x;
+     x += text(vec2(x, staffY(staves.size-1, 16)), "♩"+(sign.metronome.dot?"."_:""_)+"="_+str(sign.metronome.perMinute)+" "_, textSize, system.glyphs, vec2(0,0)).x;
      if(beatsPerMinute) log(beatsPerMinute, "->", sign.metronome.perMinute); // FIXME: variable tempo
      beatsPerMinute = sign.metronome.perMinute;
     }
@@ -1170,8 +1173,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
      bool crescendo = wedgeStart.wedge == Crescendo;
      //float x = wedgeStart.time < timeTrack.keys.first() ? 0 /*TODO: wrap*/: X(wedgeStart.time);
      float x = wedgeStartX;
-     system.parallelograms.append( vec2(x, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
-     system.parallelograms.append( vec2(x, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
+     system.lines.append( vec2(x, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3));
+     system.lines.append( vec2(x, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3));
+     //system.parallelograms.append( vec2(x, y+(-!crescendo-1)*3), vec2(x, y+(-crescendo-1)*3), 1.f);
+     //system.parallelograms.append( vec2(x, y+(!crescendo-1)*3), vec2(x, y+(crescendo-1)*3), 1.f);
     } else {
      wedgeStart = sign;
      wedgeStartX = X(wedgeStart.time);

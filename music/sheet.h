@@ -21,6 +21,8 @@ inline void render(const Graphics& graphics, RenderTarget2D& target, vec2 offset
         if(glyph.image) target.blit(round(offset+e.origin)+vec2(glyph.offset), vec2(glyph.image.size), glyph.image, e.color, e.opacity);
     }
     //for(const auto& e: graphics.parallelograms) target.parallelogram(int2(round(offset+e.min)), int2(round(offset+e.max)), e.dy, e.color, e.opacity);
+    for(const auto& e: graphics.trapezoidYs) target.trapezoidY(Span{offset.x+e.s0.x,offset.y+e.s0.min,offset.y+e.s0.max},
+                                                               Span{offset.x+e.s1.x,offset.y+e.s1.min,offset.y+e.s1.max}, e.color, e.opacity);
     //for(const auto& e: graphics.cubics) cubic(target, e.points, e.color, e.opacity, offset);
     for(const auto& e: graphics.graphics) render(e.value, target, offset+e.key);
 }

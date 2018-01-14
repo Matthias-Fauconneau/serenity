@@ -149,7 +149,7 @@ void trapezoidY(const Image& target, Span s0, Span s1, bgr3f color, float opacit
         int i1 = int(f1);
         if(uint(i0)<target.size.y) blend(target, x, i0, color, opacity*(1-(y0-f0)));
         for(uint y: range(max(0,i0+1), min(int(target.size.y),i1))) { // FIXME: clip once
-            blend(target, x,y, color, opacity); // FIXME: antialias first last column
+            blend(target, x,y, color, opacity); // FIXME: antialias first/last column
         }
         if(uint(i1)<target.size.y) blend(target, x, i1, color, opacity*(y1-f1));
     }
