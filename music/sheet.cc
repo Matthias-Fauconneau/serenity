@@ -284,20 +284,20 @@ void System::layoutNotes(uint staff) {
   Value second = max(apply(beam[1], [](Sign sign){return sign.note.value;}));
   // Beams
   for(size_t index: range(min(first,second)-Quarter)) {
-   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
    system.trapezoidYs.append({{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}, black, opacity});
   }
   for(size_t index: range(min(first,second)-Quarter, first-Quarter)) {
-   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, (tip[0]+tip[1])/2 + Y);
    p1 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
    system.trapezoidYs.append({{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}, black, opacity});
   }
   for(size_t index: range(int(min(first,second)-Quarter), int(second-Quarter))) {
-   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+   float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2) - !stemUp * beamWidth;
    vec2 p0 (x[0]-stemWidth/2, tip[0] + Y);
    vec2 p1 (x[1]+stemWidth/2, tip[1] + Y);
    p0 = (float(sign[1].duration)*p0 + float(sign[0].duration)*p1)/float(sign[0].duration+sign[1].duration);
@@ -327,11 +327,21 @@ void System::layoutNotes(uint staff) {
   // Beam
   for(size_t chordIndex: range(beam.size-1)) {
    Value value = ::min(beam[chordIndex][0].note.value, beam[chordIndex+1][0].note.value);
+   const float x0 = stemX(beam[chordIndex+0], stemUp)-(chordIndex==0          ?1.f/2:0);
+   const float x1 = stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1.f/2:0);
+   const float y0 = stemsY[chordIndex+0];
+   const float y1 = stemsY[chordIndex+1];
    for(size_t index: range(value-Quarter)) {
-    float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth+1) - !stemUp * beamWidth;
+    float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2) - !stemUp * beamWidth;
     system.trapezoidYs.append(TrapezoidY{
-       {stemX(beam[chordIndex+0], stemUp)-(chordIndex==0          ?1.f/2:0), stemsY[chordIndex+0]+dy, stemsY[chordIndex+0]+dy+beamWidth},
-       {stemX(beam[chordIndex+1], stemUp)+(chordIndex==beam.size-1?1.f/2:0), stemsY[chordIndex+1]+dy, stemsY[chordIndex+1]+dy+beamWidth}});
+       {x0, y0+dy, y0+dy+beamWidth},
+       {x1, y1+dy, y1+dy+beamWidth}});
+   }
+   for(size_t index: range(value-Quarter, beam[chordIndex+1][0].note.value-Quarter)) { // Half beam
+    float dy = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2) - !stemUp * beamWidth;
+    system.trapezoidYs.append(TrapezoidY{
+       {(x0+x1)/2, (y0+y1)/2+dy, (y0+y1)/2+dy+beamWidth},
+       {x1, y1+dy, y1+dy+beamWidth}});
    }
   }
  }
@@ -432,7 +442,7 @@ void System::layoutNotes(uint staff) {
     // Dot
     if(note.dot) {
      float dotOffset = glyphSize(SMuFL::NoteHead::Black).x*7/6;
-     glyph(vec2(X(sign.time) + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, note.step/2*2 +1)), SMuFL::Dot, opacity);
+     glyph(vec2(X(sign.time) + (shift.contains(true) ? noteSize(sign) : 0)+dotOffset, Y(sign.staff, note.clef, ((60+note.step)/2*2-60) +1)), SMuFL::Dot, opacity);
     }
 
     if(0) error(
@@ -778,7 +788,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       float delta[2] = {clamp(-lineInterval, tip[0]-midTip, lineInterval), clamp(-lineInterval, tip[1]-midTip, lineInterval)};
       for(uint i: range(2)) tip[i] = midTip+delta[i];
       for(size_t index: range(3 /*FIXME: parseInteger(tremolo.text())*/)) {
-       float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth+1);
+       float Y = (stemUp ? 1 : -1) * float(index) * (beamWidth*3/2);
        vec2 p0 (x[0]-stemWidth/2, tip[0]-beamWidth/2 + Y);
        vec2 p1 (x[1]+stemWidth/2, tip[1]-beamWidth/2 + Y);
        system.trapezoidYs.append(TrapezoidY{{p0.x,p0.y,p0.y+beamWidth}, {p1.x,p1.y,p1.y+beamWidth}});
