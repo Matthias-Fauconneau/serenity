@@ -5,6 +5,8 @@
 #include "window.h"
 #if PDFEXPORT
 #include "pdf.h"
+#else
+#include "image-render.h"
 #endif
 
 struct MusicPDF {
@@ -26,9 +28,23 @@ struct MusicPDF {
     Sheet sheet {xml.signs, xml.divisions, 0, 7/*mm*/*(inchPx/inchMM) / 8/*half intervals / staff height*/, {}, "", false, true};
 };
 
+Image render(const Graphics& sheet) {
+    const uint N = 3;
+    const uint W = 3840, H = sheet.bounds.size().y;
+    ImageRenderTarget target(Image(W*N, H));
+    target.clear(0xFF);
+    ::render(sheet, target);
+    Image composite (W, N*H);
+    for(uint i: range(N)) {
+        copy(cropShare(composite,int2(0,i*H),uint2(W,H)), cropShare(target,int2(i*W,0),uint2(W,H)));
+    }
+    return ::move(composite);
+}
+
 struct MusicPDFPreview : MusicPDF, Application {
-    Scroll<HList<GraphicsWidget> > pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(::move(o));})};
-    unique<Window> window = ::window(&pages, sheet.pageSize ?: int2(sheet.pages[0].bounds.max), mainThread, false, str(name, pages.size));
+    //Scroll<HList<GraphicsWidget> > pages {apply(sheet.pages, [](Graphics& o) { return GraphicsWidget(::move(o));})};
+    ImageView pages{render(sheet.pages[0])};
+    unique<Window> window = ::window(&pages, /*sheet.pageSize ?: int2(sheet.pages[0].bounds.max)*/-1, mainThread, false, str(name/*, pages.size*/));
 };
 registerApplication(MusicPDFPreview);
 

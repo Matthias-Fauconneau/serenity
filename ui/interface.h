@@ -36,6 +36,20 @@ generic struct Scroll : ScrollArea, T {
     Widget* operator&() { return &area(); }
 };
 
+/// Displays an image
+struct ImageView : Widget {
+    Image image;
+    String caption;
+
+    ImageView() {}
+    /// Creates a widget displaying \a image
+    ImageView(Image&& image, string caption={}) : image(move(image)), caption(copyRef(caption)) {}
+
+    String title() const override { return copyRef(caption); }
+    vec2 sizeHint(vec2) override;
+    void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
+};
+
 // Interface
 #if 0
 /// Shows a bounded value
@@ -50,20 +64,6 @@ struct Progress : Widget {
     shared<Graphics> graphics(vec2 size) override;
 
     static constexpr int height = 32;
-};
-
-/// Displays an image
-struct ImageView : Widget {
-    Image image;
-    String caption;
-
-    ImageView() {}
-    /// Creates a widget displaying \a image
-    ImageView(Image&& image, string caption={}) : image(move(image)), caption(copyRef(caption)) {}
-
-    String title() override { return copyRef(caption); }
-    vec2 sizeHint(vec2) override;
-    shared<Graphics> graphics(vec2 size) override;
 };
 
 // Control

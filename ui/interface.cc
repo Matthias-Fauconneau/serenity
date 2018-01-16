@@ -83,19 +83,6 @@ bool ScrollArea::keyPress(Key key, Modifiers) {
     return false;
 }
 
-#if 0
-// Progress
-
-vec2 Progress::sizeHint(vec2) { return vec2(-height,height); }
-shared<Graphics> Progress::graphics(vec2 size) {
-    shared<Graphics> graphics;
-    assert(minimum <= value && value <= maximum, minimum, value, maximum);
-    int x = size.x*uint(value-minimum)/uint(maximum-minimum);
-    graphics->fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
-    graphics->fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);
-    return graphics;
-}
-
 // ImageView
 
 vec2 ImageView::sizeHint(vec2 size) {
@@ -106,18 +93,20 @@ vec2 ImageView::sizeHint(vec2 size) {
     vec2((uint64)image.size.x*size.y/image.size.y, (uint64)image.size.y*size.y/image.size.y);
 }
 
-shared<Graphics> ImageView::graphics(vec2 size) {
+void ImageView::render(RenderTarget2D& target, vec2 offset, vec2 size) {
+    target.blit(offset+(size-sizeHint(size))/2.f, sizeHint(size), image); // Resizes
+}
+
+#if 0
+// Progress
+
+vec2 Progress::sizeHint(vec2) { return vec2(-height,height); }
+shared<Graphics> Progress::graphics(vec2 size) {
     shared<Graphics> graphics;
-    if(image) {
-        //graphics->blits.append(vec2(0), vec2(image.size), unsafeRef(image));
-        // Crop
-        /*int2 offset = max(int2(0),image.size-int2(size))/2;
-        graphics->blits.append(
-                    max(vec2(0),vec2((int2(size)-image.size)/2)), // Centers
-                    vec2(min(int2(size), image.size)), // or fits
-                    cropShare(image, offset, min(int2(size), image.size-offset)) );*/ // by cropping center*/
-        graphics->blits.append((size-sizeHint(size))/2.f, sizeHint(size), unsafeRef(image) ); // Resizes
-    }
+    assert(minimum <= value && value <= maximum, minimum, value, maximum);
+    int x = size.x*uint(value-minimum)/uint(maximum-minimum);
+    graphics->fills.append(vec2(0,1), vec2(x,size.y-1-1), lightBlue, 1.f);
+    graphics->fills.append(vec2(x,1), vec2(size.x-x,size.y-1-1), gray, 1.f);
     return graphics;
 }
 

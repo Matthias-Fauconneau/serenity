@@ -27,9 +27,17 @@ static constexpr char accidentals[14][12+1] = {
 };
 inline int keyStep(int fifths, int key) {
     assert_(fifths >= -7 && fifths <= 6, fifths);
-    int h=key/12*7; for(int i: range(key%12)/*0-10*/) h+=(fifths<=/*!!!*/0?"10101101010"_:"01011010101"_)[i]-'0';
+    int h = key/12*7;
+    if(fifths <0) h += "011223445566"[key%12]-'0';
+    if(fifths >0) h += "011223445566"[key%12]-'0';
+    if(fifths==0) { char c = "0 1 2 34 5 6"[key%12]; assert_(c!=' '); h += c-' '; }
     return h - 35; // 0 = C4;
 }
+/*inline int stepKey(int fifths, int step) {
+    assert_(fifths >= -7 && fifths <= 6, fifths);
+    int s=(step+35)/7*12; s += {0,;
+    return h - 35; // 0 = C4;
+}*/
 
 namespace SMuFL { //Standard Music Font Layout
 namespace NoteHead { enum { Breve=0xE0A1, Whole, Half, Black }; }
@@ -39,10 +47,12 @@ namespace TimeSignature {  enum { _0=0xE080 }; }
 enum { Dot=0xE1E7 };
 enum Tremolos { Tremolo };
 namespace Flag { enum { Above=0xE240, Below }; }
-enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp, TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
+enum Accidental { None=0, AccidentalBase=0xE260, Flat=AccidentalBase, Natural, Sharp, DoubleSharp, DoubleFlat, TripleSharp,
+            TripleFlat, NaturalFlat, NaturalSharp, SharpSharp};
 static constexpr string accidental[] = {"flat"_,"natural"_,"sharp"_,"double-sharp"_,"flat-flat"_/*double-flat*/};
 namespace Articulation { enum { Base=0xE4A0, Accent=0, Staccato=1, Tenuto=2 }; }
-enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando, z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
+enum Dynamic { DynamicBase=0xE520/*Piano=DynamicBase, Mezzo, Forte, Rinforzando, Sforzando,
+        z, n, pppppp, ppppp, pppp, ppp, pp, mp, mf, pf, ff, fff, ffff, fffff, ffffff,
                                               fp, fz, sf, sfp, sfpp, sfz, sfzp, sffz, rf, rfz*/ };
 static constexpr string dynamic[] = {
     "p", "m", "f", "r", "s", "z", "n", "pppppp", "ppppp", "pppp", "ppp", "pp", "mp", "mf", "pf", "ff", "fff", "ffff", "fffff", "ffffff",
@@ -93,7 +103,9 @@ inline int noteKey(int octave, int step, int alteration) {
     int octaveStep = (step - step/7*7 + 7)%7; // signed step%7 (Step offset on octave scale)
     assert_(stepOctave*7 + octaveStep == step);
     // C [C#] D [D#] E F [F#] G [G#] A [A#] B
-    return 60 + octave*12 + ref<uint>{0,2,4,5,7,9,11}[octaveStep] + alteration;
+    int key = 60 + octave*12 + ref<uint>{0,2,4,5,7,9,11}[octaveStep] + alteration;
+    assert_(key >= 0);
+    return key;
 }
 
 inline int signatureAlteration(int keySignature, int step) {
@@ -227,10 +239,10 @@ inline String strKey(int fifths, int key) {
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
     const int step = keyStep(fifths, key)+37;
-    const int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
+    //const int octave = key/12-2; //*lowest A-1*/3 + (step>0 ? step/7 : (step-6)/7); // Rounds towards negative
     const int alt = keyAlteration(fifths, key)+1;
     assert_(alt >= 0 && alt <= 2);
-    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt]+superDigit(octave);
+    return char('A'+step%7)+ref<string>{"♭"_,""_,"♯"_}[alt];//+superDigit(octave);
     //return char('A'+step%7)+ref<string>{"b"_,""_,"#"_}[alt]+str(octave);
 }
 inline String strNote(const int octaveBias, const int step, Accidental accidental) {
@@ -397,7 +409,8 @@ inline void convertAccidentals(mref<Sign> signs) {
 
    //assert(!sign.note.clef.octave, sign.note.clef.octave, sign.note.step);
    assert_(key == noteKey(sign.note.clef.octave, step, alteration),
-           keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration, noteKey(sign.note.clef.octave, step, alteration),
+           keySignature, sign.note, sign.note.clef.octave, sign.note.step, sign.note.alteration, key, step, alteration,
+           noteKey(sign.note.clef.octave, step, alteration),
            strNote(0, step, accidental)/*, strKey(101), strKey(113)*/);
 
    if((accidental && !sign.note.accidental) // Does not introduce additional accidentals (for ambiguous tones)

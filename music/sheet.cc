@@ -166,7 +166,7 @@ struct System : SheetContext {
  uint shortestInterval = 0; // in ticks
  float X(uint time) {
   assert_(shortestInterval && measureStartTime <= time, shortestInterval, measureStartTime, time);
-  return measureStartX + (time-measureStartTime)/shortestInterval*spaceWidth;
+  return measureStartX + (time-measureStartTime)*spaceWidth/shortestInterval;
  }
  size_t justifiedSpace = 0;
 
@@ -621,16 +621,23 @@ buffer<System::Range> System::evaluateStepRanges(ref<Sign> signs) const {
 uint System::evaluateShortestInterval(ref<Sign> signs) const {
  uint shortestInterval = -1;
  for(Sign sign : signs) {
-  if(sign.type == Sign::Note || sign.type == Sign::Rest) {
+  if((sign.type == Sign::Note || sign.type == Sign::Rest) && sign.note.value<=Eighth) {
    shortestInterval = ::min(shortestInterval, uint(sign.duration));
   }
+ }
+ if(shortestInterval==uint(-1)) { // All >/8
+     for(Sign sign : signs) {
+         if(sign.type == Sign::Note || sign.type == Sign::Rest) {
+             shortestInterval = ::min(shortestInterval, uint(sign.duration));
+         }
+     }
  }
  return shortestInterval;
 }
 
 // Layouts a system
 System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t pageIndex, size_t systemIndex, Graphics* previousSystem, mref<Sign> signs,
-               map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth, bool measureNumbers)
+               map<uint, float>* measureBars, array<TieStart>* activeTies, map<uint, array<Sign>>* notes, float _spaceWidth, bool unused measureNumbers)
  : SheetContext(context), staves(copyRef(_staves)), spaceWidth(_spaceWidth?:space), pageWidth(pageWidth), pageIndex(pageIndex), systemIndex(systemIndex),
    previousSystem(previousSystem), measureBars(measureBars), activeTies(activeTies), notes(notes), line(evaluateStepRanges(signs)) {
 
@@ -656,8 +663,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
  while(nextMeasureIndex < signs.size && signs[nextMeasureIndex].type != Sign::Measure) nextMeasureIndex++;
  buffer<Range> measure = evaluateStepRanges(signs.slice(0, nextMeasureIndex));
  shortestInterval = evaluateShortestInterval(signs.slice(0, nextMeasureIndex));
- array<uint> measureNoteKeys;
- float measureFirstNote;
+ array<Sign> chordNotes;
+ float chordFirstNote;
+ array<char> lastChord;
 
  for(size_t signIndex: range(signs.size)) {
   Sign sign = signs[signIndex];
@@ -707,6 +715,58 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
           } else { index++; continue; }
       }
       measureStartX += advance;
+  }
+
+  // Clears any pending chord name
+  if(beatsPerMinute) {
+      uint64 chordStart = -1, chordEnd = 0;
+      for(Sign sign: chordNotes) {
+          chordStart = ::min(chordStart, sign.time);
+          chordEnd = ::max(chordEnd, sign.time+sign.duration);
+      }
+      uint minChordDuration = ticksPerSecond * 60 / beatsPerMinute * timeSignature.beats/2 * 4 / timeSignature.beatUnit; // Half measure
+      //log(chordStart, chordEnd, sign.time, ::max(chordEnd, chordStart+minChordDuration));
+      if(sign.time >= ::max(chordEnd, chordStart+minChordDuration)) {
+          array<uint> keys;
+          for(Sign sign: chordNotes) if(sign.time == chordStart) keys.addSorted( sign.note.key() );
+          chordNotes.clear();
+          array<char> chord;
+          //if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
+          if(keys) { // Chord names
+              const uint bass = keys[0];
+              const bool firstInversion = keys.size > 2 && (keys[2]-bass==8||keys[2]-bass==9);
+              const bool invertedFifth = keys.size > 1 && (keys[1]-bass==8||keys[2]-bass==9);
+              const uint root = firstInversion ? keys[2] : invertedFifth ? keys[1] : bass;
+              bool major = false, minor = false;
+              {
+                  int majorKey = ((keySignature+12)%12*7)%12; // 0=C
+                  int rootStep = "1 2 34 5 6 7"[(root-majorKey+12)%12]-'0';
+                  if(rootStep != ' '-'0') {
+                      assert_(rootStep != ' '-'0');
+                      int third = 0; for(int i: range(2)) third += "2212221"[(majorKey+rootStep+i)%7]-'0';
+                      assert_(third == 3 || third == 4);
+                      if(third == 3) minor = true;
+                      if(third == 4) major = true;
+                  }
+              }
+              bool fifths = false;
+              if(keys.size>1) {
+                  const uint third = firstInversion ? keys[0]+12 : keys[1];
+                  if(third-root == 3) { minor = true; major=false; }
+                  if(third-root == 4) { major = true; minor=false; }
+                  if(third-root == 5) fifths = true;
+              }
+              chord.append( strKey(keySignature, root) );
+              if(minor) chord[0] = lowerCase(chord[0]);
+              if(minor) assert_(!major);
+              if(major) assert_(!minor);
+              if(chord != lastChord) {
+                  float x = chordFirstNote;
+                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
+                  lastChord = ::move(chord);
+              }
+          }
+      }
   }
 
   if(sign.type == Sign::Note||sign.type == Sign::Rest||sign.type == Sign::Clef||sign.type == Sign::OctaveShift) { // Staff signs
@@ -798,8 +858,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
      assert_(note.tie != Note::Merged);
      if(!note.grace) {
-      if(!measureNoteKeys) measureFirstNote = x;
-      measureNoteKeys.addSorted( note.key() );
+      if(!chordNotes) chordFirstNote = x;
+      chordNotes.addSorted( sign );
 
       x += glyphAdvance(SMuFL::NoteHead::Black);
       /*for(Sign sign: staves[staff].chord) // Dichord
@@ -815,6 +875,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       float gx = x - dx - glyphAdvance(SMuFL::Flag::Above, &smallFont), y = Y(sign);
 
       ledger(sign, gx, dx);
+
+      for(Sign sign: staves[staff].chord) // Dichord
+       if(abs(sign.note.step-note.step) <= 1) { x += glyphAdvance(SMuFL::NoteHead::Black, &smallFont); break; }
+
       // Body
       {note.glyphIndex[0] = system.glyphs.size;
        glyph(vec2(gx, y), SMuFL::NoteHead::Black, 1, 6);}
@@ -944,23 +1008,6 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       staves[staff].pendingWhole = false;
      }
 
-     { array<uint> keys = ::move(measureNoteKeys);
-      array<char> chord;
-      if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
-      if(keys && 0) { // Chord names
-       uint root = keys[0];
-       chord.append( strKey(keySignature, root) );
-       if(keys.size>1) {
-        uint third = keys[1];
-        if(third-root == 3) chord.append("m");
-       }
-       float x = measureFirstNote;
-       text(vec2(x, staffY(staves.size-1, max(11, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
-      }
-      //error(chord);
-      //log_(chord+" ");
-      //log(chord, keys);
-     }
 
      // Clears any pending clef changes right before measure bar (FIXME: defer to new system on break)
      float dx = 0;
