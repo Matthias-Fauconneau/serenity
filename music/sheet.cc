@@ -4,7 +4,17 @@
 #include "algorithm.h"
 #include "sort.h"
 
-struct ChordSymbol { KeySignature keySignature; uint root; bool minor, major; };
+struct ChordSymbol {
+    KeySignature keySignature; uint root = 0; bool minor, major; // Maybe both true when ambiguous
+    operator bool() const { return minor || major; }
+    bool contains(uint note) const {
+        if(root%12 == note%12) return true; // Root
+        if(minor && (root+3)%12 == note%12) return true; // Minor third
+        if(major && (root+4)%12 == note%12) return true; // Major third
+        if((root+7)%12 == note%12) return true; // Perfect fifths
+        return false;
+    }
+};
 bool operator==(const ChordSymbol& a, const ChordSymbol& b) { return a.keySignature==b.keySignature && a.root%12==b.root%12 && a.minor==b.minor && a.major==b.major; }
 template<> String str(const ChordSymbol& chord) {
     array<char> s (3);
@@ -13,19 +23,12 @@ template<> String str(const ChordSymbol& chord) {
     else assert_(chord.major);
     return ::move(s);
 }
-bool contains(const ChordSymbol& chord, uint note) {
-    if(chord.root%12 == note%12) return true; // Root
-    if(chord.minor && (chord.root+3)%12 == note%12) return true; // Minor third
-    if(chord.major && (chord.root+4)%12 == note%12) return true; // Major third
-    if((chord.root+6)%12 == note%12) return true; // Perfect fifths
-    return false;
-}
 
 static int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
 static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return clefStep(sign.note.clef, sign.note.step); }
 
-static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 unused align=0 /*0:right|top,1/2,center,1:left|bottom*/) {
- Text text(message, fontSize, 0, 1, 0, "LinLibertine", false);
+static vec2 text(vec2 origin, string message, float fontSize, array<Glyph>& glyphs, vec2 unused align=0 /*0:right|top,1/2,center,1:left|bottom*/, bgr3f color=black) {
+ Text text(message, fontSize, color, 1, 0, "LinLibertine", false);
  vec2 textSize = text.sizeHint();
  origin -= align*textSize;
  glyphs.append( text.glyphs(origin) );
@@ -749,7 +752,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
       if(chordStart%chordBeat != 0) { chordNotes.clear(); }*/
       if(sign.time >= ::max(chordEnd, chordStart+chordBeat)) {
           array<uint> keys; array<uint> pitchClass;
-          for(Sign sign: chordNotes) if(sign.time == chordStart || pitchClass.size==1) {
+          for(Sign sign: chordNotes) if(sign.time == chordStart || (pitchClass.size==1 && ChordSymbol{keySignature, keys[0], true, true}.contains(sign.note.key()))) {
               keys.addSorted( sign.note.key() );
               pitchClass.add( sign.note.key() % 12 );
           }
@@ -774,21 +777,24 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                   }
               }
               bool fifths = false;
+              bool outOfKey = false;
               if(keys.size>1) {
                   const uint third = firstInversion ? keys[0]+12 : keys[1];
-                  if(third-root == 3) { minor = true; major=false; }
-                  if(third-root == 4) { major = true; minor=false; }
-                  if(third-root == 5) fifths = true;
+                  if(third-root == 3) { /*assert_(minor, root%12);*/if(!minor) outOfKey=true; minor = true; major=false; }
+                  if(third-root == 4) { /*assert_(major, root%12);*/if(!major) outOfKey=true; major = true; minor=false; }
+                  if(third-root == 7) fifths = true;
               }
               if(minor) assert_(!major);
               if(major) assert_(!minor);
+              assert_(minor || major);
               ChordSymbol chord {keySignature, root, minor, major};
-              if(chord != lastChord && !keys.all([lastChord](const uint key){return contains(lastChord, key);})) {
-                  for(const uint key: keys) if(!contains(lastChord, key)) goto skip;
-                  /*else*/ error(keys);
-                  skip:;
-                  zfloat x = chordFirstNote;
-                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), str(chord), textSize, system.glyphs, vec2(1./2,0/*1*/));
+              if(chord != lastChord && !keys.all([lastChord, chord](const uint key){ if(chord.contains(key)) return lastChord.contains(key); return true;})) {
+                  if(lastChord) log(lastChord, chord, apply(keys, [=](const uint key){return str(key%12, lastChord.contains(key), chord.contains(key));}));
+                  float x = chordFirstNote;
+                  String s = str(chord);
+                  if(outOfKey) s = "! "+s+" !";
+                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), s, textSize, system.glyphs, vec2(1./2,0/*1*/),
+                       outOfKey?red:black);
                   lastChord = chord;
               }
           }

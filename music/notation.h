@@ -236,8 +236,8 @@ inline bool operator <(const Sign& a, const Sign& b) {
 inline String superDigit(int digit) {
     assert_(abs(digit) <= 9); return (digit>=0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
 }
-inline String strKey(int fifths, int key) {
-    assert_(key>=0);
+inline String strKey(int fifths, uint key) {
+    assert_(key>=0, key);
     //assert_(key>0);
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
