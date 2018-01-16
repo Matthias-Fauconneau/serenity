@@ -4,6 +4,23 @@
 #include "algorithm.h"
 #include "sort.h"
 
+struct ChordSymbol { KeySignature keySignature; uint root; bool minor, major; };
+bool operator==(const ChordSymbol& a, const ChordSymbol& b) { return a.keySignature==b.keySignature && a.root%12==b.root%12 && a.minor==b.minor && a.major==b.major; }
+template<> String str(const ChordSymbol& chord) {
+    array<char> s (3);
+    s.append( strKey(chord.keySignature, chord.root) );
+    if(chord.minor) s[0] = lowerCase(s[0]);
+    else assert_(chord.major);
+    return ::move(s);
+}
+bool contains(const ChordSymbol& chord, uint note) {
+    if(chord.root%12 == note%12) return true; // Root
+    if(chord.minor && (chord.root+3)%12 == note%12) return true; // Minor third
+    if(chord.major && (chord.root+4)%12 == note%12) return true; // Major third
+    if((chord.root+6)%12 == note%12) return true; // Perfect fifths
+    return false;
+}
+
 static int clefStep(Clef clef, int step) { return step - (clef.clefSign==GClef ? 10 : -2) - clef.octave*7; } // Translates C4 step to top line step using clef
 static int clefStep(Sign sign) { assert_(sign.type==Sign::Note, int(sign.type)); return clefStep(sign.note.clef, sign.note.step); }
 
@@ -665,7 +682,7 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
  shortestInterval = evaluateShortestInterval(signs.slice(0, nextMeasureIndex));
  array<Sign> chordNotes;
  float chordFirstNote;
- array<char> lastChord;
+ ChordSymbol lastChord;
 
  for(size_t signIndex: range(signs.size)) {
   Sign sign = signs[signIndex];
@@ -718,24 +735,31 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
   }
 
   // Clears any pending chord name
-  if(beatsPerMinute) {
+  if(beatsPerMinute && chordNotes) {
       uint64 chordStart = -1, chordEnd = 0;
       for(Sign sign: chordNotes) {
           chordStart = ::min(chordStart, sign.time);
           chordEnd = ::max(chordEnd, sign.time+sign.duration);
       }
-      uint minChordDuration = ticksPerSecond * 60 / beatsPerMinute * timeSignature.beats/2 * 4 / timeSignature.beatUnit; // Half measure
-      //log(chordStart, chordEnd, sign.time, ::max(chordEnd, chordStart+minChordDuration));
-      if(sign.time >= ::max(chordEnd, chordStart+minChordDuration)) {
-          array<uint> keys;
-          for(Sign sign: chordNotes) if(sign.time == chordStart) keys.addSorted( sign.note.key() );
+      uint chordBeat = ticksPerSecond*60*timeSignature.beats*2/(beatsPerMinute*timeSignature.beatUnit); // Half measure
+      /*assert_( (ticksPerSecond*60*timeSignature.beats*2) % (beatsPerMinute*timeSignature.beatUnit) == 0,
+               (ticksPerSecond*60*timeSignature.beats*2),
+               (beatsPerMinute*timeSignature.beatUnit));
+      log(chordStart, chordStart%chordBeat, chordBeat);
+      if(chordStart%chordBeat != 0) { chordNotes.clear(); }*/
+      if(sign.time >= ::max(chordEnd, chordStart+chordBeat)) {
+          array<uint> keys; array<uint> pitchClass;
+          for(Sign sign: chordNotes) if(sign.time == chordStart || pitchClass.size==1) {
+              keys.addSorted( sign.note.key() );
+              pitchClass.add( sign.note.key() % 12 );
+          }
           chordNotes.clear();
-          array<char> chord;
           //if(measureNumbers && measureBars) chord.append(str(measureBars->size())+" "_); // Measure index
           if(keys) { // Chord names
               const uint bass = keys[0];
               const bool firstInversion = keys.size > 2 && (keys[2]-bass==8||keys[2]-bass==9);
-              const bool invertedFifth = keys.size > 1 && (keys[1]-bass==8||keys[2]-bass==9);
+              const bool invertedFifth = keys.size > 1 && (keys[1]-bass==5); //(keys[1]-bass==8||keys[1]-bass==9);
+              //log(bass, keys[1], invertedFifth);
               const uint root = firstInversion ? keys[2] : invertedFifth ? keys[1] : bass;
               bool major = false, minor = false;
               {
@@ -756,14 +780,16 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
                   if(third-root == 4) { major = true; minor=false; }
                   if(third-root == 5) fifths = true;
               }
-              chord.append( strKey(keySignature, root) );
-              if(minor) chord[0] = lowerCase(chord[0]);
               if(minor) assert_(!major);
               if(major) assert_(!minor);
-              if(chord != lastChord) {
-                  float x = chordFirstNote;
-                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), chord, textSize, system.glyphs, vec2(1./2,0/*1*/));
-                  lastChord = ::move(chord);
+              ChordSymbol chord {keySignature, root, minor, major};
+              if(chord != lastChord && !keys.all([lastChord](const uint key){return contains(lastChord, key);})) {
+                  for(const uint key: keys) if(!contains(lastChord, key)) goto skip;
+                  /*else*/ error(keys);
+                  skip:;
+                  zfloat x = chordFirstNote;
+                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), str(chord), textSize, system.glyphs, vec2(1./2,0/*1*/));
+                  lastChord = chord;
               }
           }
       }
@@ -858,8 +884,14 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
 
      assert_(note.tie != Note::Merged);
      if(!note.grace) {
-      if(!chordNotes) chordFirstNote = x;
-      chordNotes.addSorted( sign );
+      if(!chordNotes) {
+          bool onBeat = staves[staff].beatTime % (quarterDuration * timeSignature.beats/2 * 4/timeSignature.beatUnit) == 0;
+          if(onBeat) {
+              chordFirstNote = x;
+              chordNotes.append( sign ); // Only start chords on beat
+          }
+      }
+      else chordNotes.addSorted( sign );
 
       x += glyphAdvance(SMuFL::NoteHead::Black);
       /*for(Sign sign: staves[staff].chord) // Dichord

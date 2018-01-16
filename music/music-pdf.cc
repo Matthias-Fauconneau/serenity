@@ -29,7 +29,7 @@ struct MusicPDF {
 };
 
 Image render(const Graphics& sheet) {
-    const uint N = 3;
+    const uint N = 4;
     const uint W = 3840, H = sheet.bounds.size().y;
     ImageRenderTarget target(Image(W*N, H));
     target.clear(0xFF);

@@ -77,7 +77,9 @@ enum OctaveShift { Down, Up, OctaveStop };
 
 using Accidental = SMuFL::Accidental;
 inline int keyAlteration(int fifths, int key) {
-    assert_(fifths >= -7 && fifths <= 6 && key>0, fifths, key);
+    assert_(key>=0);
+    //assert_(key>0);
+    assert_(fifths >= -7 && fifths <= 6, fifths);
     char c = accidentals[fifths+7][key%12];
     if(c== 'b' || c=='-') return -1;
     if(c=='N' || c=='.') return 0;
@@ -235,7 +237,8 @@ inline String superDigit(int digit) {
     assert_(abs(digit) <= 9); return (digit>=0?""_:"⁻"_)+ref<string>{"⁰"_,"¹"_, "²"_, "³"_, "⁴"_, "⁵"_, "⁶"_, "⁷"_, "⁸"_, "⁹"_}[abs(digit)];
 }
 inline String strKey(int fifths, int key) {
-    assert_(key>0);
+    assert_(key>=0);
+    //assert_(key>0);
     //return (string[]){"A"_,"A♯"_,"B"_,"C"_,"C♯"_,"D"_,"D♯"_,"E"_,"F"_,"F♯"_,"G"_,"G♯"_}[(key+2*12+3)%12]
     /*+superDigit(key/12-2)*/;
     const int step = keyStep(fifths, key)+37;

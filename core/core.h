@@ -138,7 +138,7 @@ generic struct ref : Ref<T> { using Ref<T>::Ref; };
 
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct Ref {
- typedef T type;
+ typedef T elementType;
  const T* data = 0;
  size_t size = 0;
 
@@ -190,6 +190,11 @@ generic struct Ref {
   for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
   return true;
  }
+ /// Tests condition on all elements, breaks on first test failure
+ template<Type F> bool all (F/*bool(A::elementType)*/ condition) {
+     for(const auto& e: *this) if(!condition(e)) return false;
+     return true;
+ };
 };
 
 /// ref discarding trailing zero byte in ref(char[N])
