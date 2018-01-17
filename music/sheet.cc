@@ -767,10 +767,10 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
               bool major = false, minor = false;
               {
                   int majorKey = ((keySignature+12)%12*7)%12; // 0=C
-                  int rootStep = "1 2 34 5 6 7"[(root-majorKey+12)%12]-'0';
+                  int rootStep = "0 1 23 4 5 6"[(root-majorKey+12)%12]-'0';
                   if(rootStep != ' '-'0') {
                       assert_(rootStep != ' '-'0');
-                      int third = 0; for(int i: range(2)) third += "2212221"[(majorKey+rootStep+i)%7]-'0';
+                      int third = 0; for(int i: range(2)) third += "2212221"[(/*majorKey+*/rootStep+i)%7]-'0';
                       assert_(third == 3 || third == 4);
                       if(third == 3) minor = true;
                       if(third == 4) major = true;
@@ -780,8 +780,8 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
               bool outOfKey = false;
               if(keys.size>1) {
                   const uint third = firstInversion ? keys[0]+12 : keys[1];
-                  if(third-root == 3) { /*assert_(minor, root%12);*/if(!minor) outOfKey=true; minor = true; major=false; }
-                  if(third-root == 4) { /*assert_(major, root%12);*/if(!major) outOfKey=true; major = true; minor=false; }
+                  if(third-root == 3) { /*assert_(minor, root%12);*/if(!minor && major) outOfKey=true; minor = true; major=false; }
+                  if(third-root == 4) { /*assert_(major, root%12);*/if(!major && minor) outOfKey=true; major = true; minor=false; }
                   if(third-root == 7) fifths = true;
               }
               if(minor) assert_(!major);
@@ -789,11 +789,9 @@ System::System(SheetContext context, ref<Staff> _staves, float pageWidth, size_t
               assert_(minor || major);
               ChordSymbol chord {keySignature, root, minor, major};
               if(chord != lastChord && !keys.all([lastChord, chord](const uint key){ if(chord.contains(key)) return lastChord.contains(key); return true;})) {
-                  if(lastChord) log(lastChord, chord, apply(keys, [=](const uint key){return str(key%12, lastChord.contains(key), chord.contains(key));}));
+                  //if(lastChord) log(lastChord, chord, apply(keys, [=](const uint key){return str(key%12, lastChord.contains(key), chord.contains(key));}));
                   float x = chordFirstNote;
-                  String s = str(chord);
-                  if(outOfKey) s = "! "+s+" !";
-                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), s, textSize, system.glyphs, vec2(1./2,0/*1*/),
+                  text(vec2(x+glyphSize(SMuFL::NoteHead::Black).x/2, staffY(staves.size-1, max(11, line.last().top))), str(chord), textSize, system.glyphs, vec2(1./2,0/*1*/),
                        outOfKey?red:black);
                   lastChord = chord;
               }
