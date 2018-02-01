@@ -177,12 +177,12 @@ template<template<Type> class T, int N> buffer<byte> predict(const byte4* source
 
 buffer<byte> encodePNG(const Image& image) {
  struct { uint32 w,h; uint8 depth, type, compression, filter, interlace; } _packed ihdr
- { big32(image.width), big32(image.height), 8, uint8(image.alpha?6:2), 0, 0, 0 };
+ { big32(image.size.x), big32(image.size.y), 8, uint8(image.alpha?6:2), 0, 0, 0 };
  buffer<byte> IHDR = "IHDR"_+raw(ihdr);
 
  buffer<byte> predicted;
- if(!image.alpha) predicted = predict<rgb,3>(image.data, image.width, image.height, image.stride);
- else predicted = predict<rgba,4>(image.data, image.width, image.height, image.stride);
+ if(!image.alpha) predicted = predict<rgb,3>(image.data, image.size.x, image.size.y, image.stride);
+ else predicted = predict<rgba,4>(image.data, image.size.x, image.size.y, image.stride);
  buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);
 
  return "\x89PNG\r\n\x1A\n"_
