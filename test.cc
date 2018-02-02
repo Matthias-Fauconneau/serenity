@@ -41,7 +41,7 @@ struct Test {
             s.whileAny(' ');
             string object = s.until("  ");
             s.whileAny(' ');
-            uint nativeAmount = s.integer();
+            int nativeAmount = s.integer();
             s.skip(' ');
             string currency = s.word();
             assert_(currencies.contains(currency));
@@ -53,6 +53,8 @@ struct Test {
             array<string> entryUsers;
             if(s.match(" ->")) {
                 while(s.match(' ')) {
+                    s.whileAny(' ');
+                    if(s.wouldMatch('\n')) break;
                     string user = s.word();
                     assert_(allUsers.contains(user), user);
                     entryUsers.append(user);
@@ -132,7 +134,7 @@ struct Test {
             }
         }
         log(output);
-        writeFile(arguments()[1], output);
+        writeFile(arguments()[1], output, currentWorkingDirectory(), true);
     }
 } app;
 
