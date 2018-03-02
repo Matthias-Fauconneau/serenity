@@ -111,12 +111,6 @@ typedef vec<xy,int64,2> int64x2;
 typedef vec<xy,uint32,2> uint2;
 typedef vec<xy,float,2> vec2;
 
-generic struct lr {
- T l, r;
-};
-typedef vec<lr,uint16,2> short2;
-typedef vec<lr,float,2> float2;
-
 generic struct xyz {
  T x,y,z;
  vec<xy,T,2>& xy() const { return (vec< ::xy,T,2>&)*this; }

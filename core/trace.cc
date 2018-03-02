@@ -5,13 +5,13 @@
 
 struct Ehdr { byte ident[16]; uint16 type,machine; uint version; ptr entry,phoff,shoff; uint flags; uint16 ehsize,phentsize,phnum,shentsize,shnum,shstrndx; };
 struct Shdr { uint name,type; long flags,addr,offset,size; uint link,info; long addralign,entsize; };
-struct Sym { uint	name; byte info,other; uint16 shndx; byte* value; long size; };
+struct Sym { uint name; byte info,other; uint16 shndx; byte* value; long size; };
 
 /// Reads a little endian variable size integer
 static int readLEV(BinaryData& s, bool sign=false) {
-    int result=0; int shift=0; uint8 b;
+    uint result=0; uint shift=0; uint8 b;
     do { b = s.read(); result |= (b & 0x7f) << shift; shift += 7; } while(b & 0x80);
-    if(sign && (shift < 32) && (b & 0x40)) result |= -1 << shift;
+    if(sign && (shift < 32) && (b & 0x40)) result |= uint(~0) << shift;
     return result;
 }
 
@@ -66,7 +66,7 @@ String demangle(TextData& s, bool function=true) {
     else if(s.match('F')||s.match("Dp")) r.append(demangle(s));
     else if(s.match("Li")) r.append(str(s.integer()));
     else if(s.match("Lj")) r.append(str(s.integer()));
-    else if(s.match("Lb")) r.append(str((bool)s.integer()));
+    //else if(s.match("Lb")) r.append(str((bool)s.integer()));
     else if(s.match('L')) { r.append("extern "); r.append(demangle(s)); }
     else if(s.match('I')||s.match('J')) { //template | argument pack
         r.append('<');
@@ -122,8 +122,12 @@ Symbol findSymbol(void* find) {
         else if(name==".symtab") symtab=ref<Sym>((Sym*)(elf+s.offset),s.size/sizeof(Sym));
     }
     Symbol symbol;
-    for(const Sym& sym: symtab)
-        if(find >= sym.value && find < sym.value+sym.size) { symbol.function = demangle(str(strtab+sym.name)); break; }
+    for(const Sym& sym: symtab) {
+        if(find >= sym.value && find < sym.value+sym.size) {
+         symbol.function = demangle(str(strtab+sym.name));
+         break;
+        }
+    }
     for(BinaryData& s = debug_line; s;) {
         uint begin = s.index;
         struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } _packed;
@@ -146,7 +150,11 @@ Symbol findSymbol(void* find) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
                 line += (opcode % cu.line_range) + cu.line_base;
-                if(find>=address && find<address+delta) { symbol.file=files[file_index-1]; symbol.line=line; return symbol; }
+                if(find>=address && find<address+delta) {
+                    symbol.file = files[file_index-1];
+                    symbol.line=line;
+                    return ::move(symbol);
+                }
                 address += delta;
             }
             else if(opcode == extended_op) {
@@ -158,7 +166,7 @@ Symbol findSymbol(void* find) {
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else error("Unknown opcode", opcode);
+                else error("Unknown opcode");
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
@@ -190,37 +198,22 @@ Symbol findSymbol(void* find) {
     return symbol;
 }
 
-void* caller_frame(void* fp) { return *(void**)fp; }
-void* return_address(void* fp) { return *((void**)fp+1); }
 #include <execinfo.h>
 
 String trace(int skip, void* ip) {
-	array<char> log;
+    array<char> log;
     void* stack[32];
-#if 1
     int i = backtrace(stack, 32);
-#else
-    int i=0;
-    void* frame = __builtin_frame_address(0);
-    for(;i<32;i++) {
-        ::log(frame);
-        if(ptr(frame)<0x70000F000000 || ptr(frame)>0x800000000000) break; //1MB stack
-        stack[i]=return_address(frame);
-        frame=caller_frame(frame);
-    }
-#endif
     for(i=i-4; i>=skip; i--) {
         Symbol s = findSymbol(stack[i]);
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
-        else log.append("0x"+hex(ptr(stack[i]))+'\n');
+        //else log.append("0x"+hex(ptr(stack[i]))+'\n');
     }
     if(ip) {
         Symbol s = findSymbol(ip);
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
-        else log.append("0x"+hex(ptr(ip))+'\n');
+        //else log.append("0x"+hex(ptr(ip))+'\n');
     }
-	log.pop(); // Pops last \n
-	return move(log);
+    log.pop(); // Pops last \n
+    return move(log);
 }
-
-void logTrace() { log(trace()); }

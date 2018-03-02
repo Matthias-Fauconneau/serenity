@@ -5,11 +5,12 @@
 
 struct Variant {
  enum { Null, Boolean, Integer, Real, Data, List, Dict, Rational } type = Null;
- double number = 0;
+ static constexpr string types[] = {"0","bool","int","real","data","[]","{}","/"};
+ float number = 0;
  String data;
  array<Variant> list;
  map<String,Variant> dict;
- double denominator = 1;
+ float denominator = 1;
 
  Variant(){}
  Variant(decltype(nullptr)) : type(Null) {}
@@ -25,93 +26,40 @@ struct Variant {
  Variant(map<String,Variant>&& dict) : type(Dict), dict(move(dict)) {}
  Variant(int64 numerator, int64 denominator) : type(Rational), number(numerator), denominator(denominator) {}
 
- explicit operator bool() const { return type != Null; }
+ //explicit operator bool() const { return type != Null; }
 
- int64 integer() const { assert_(type==Integer, *this); return number; }
- double real() const {
-  if(type==Rational) { assert_((number/denominator)*denominator==number); return number/denominator; }
+ float real() const {
+  if(type==Rational) { return number/denominator; }
   if(type==Real||type==Integer) return number;
-  if(type==Data) return parseDecimal(data);
-  error(int(type));
+  error("NaN"_, types[int(type)], *this);
  }
- explicit operator string() const { assert(type==Data); return data; }
- int64 numerator() {  assert(type==Rational, *this); return number; }
- operator float() const { return real(); }
- operator int() const { return real(); }
+
+          operator bool() const { assert_(type==Boolean); return number; }
+          operator string() const { assert_(type==Data); return data; }
+          operator float() const { return real(); }
+          operator const map<String, Variant>&() const { assert_(type==Dict); return dict; }
+ explicit operator const ref<Variant>() const { assert_(type==List); return list; }
+
+ const Variant& operator[](const size_t index) const { assert_(type==List); return list[index]; }
+
+ bool contains(const string key) const { assert_(type==Dict); return dict.contains(key); }
+ const Variant& operator()(const string key) const { assert_(type==Dict); return dict.at(key); }
+
+ inline const Variant* begin() const { assert_(type==List); return list.begin(); }
+ inline const Variant* end() const { assert_(type==List); return list.end(); }
+
+ inline bool operator==(const string& s) const { return (string)*this == s; }
 };
-
-/*inline bool operator ==(const Variant& a, const bool& b) {
- assert_(a.type == Variant::Boolean);
- return bool(a.number) == b;
-}*/
-
-/*inline bool operator ==(const Variant& a, const Variant& b) {
- if((a.type == Variant::Integer || a.type == Variant::Real) &&
-    (b.type == Variant::Integer || b.type == Variant::Real))
-  return a.number == b.number;
- if(a.type != b.type) return false;
- if(a.type == Variant::Data) return a.data == b.data;
- error(int(a.type));
-}*/
-inline bool operator <(const Variant& a, const Variant& b) {
- if((a.type == Variant::Integer || a.type == Variant::Real) &&
-    (b.type == Variant::Integer || b.type == Variant::Real))
-  return a.number < b.number;
- if(a.type != b.type) return false;
- if(a.type == Variant::Data) {
-  if(isDecimal(a.data) && isDecimal(b.data)) return parseDecimal(a.data) < parseDecimal(b.data);
-  return a.data < b.data;
- }
- error(int(a.type));
-}
-
-template<> inline Variant copy(const Variant& v) {
- if(v.type == Variant::Integer || v.type == Variant::Real) return v.number;
- if(v.type == Variant::Data) return v.data;
- if(v.type == Variant::List) return copy(v.list);
- if(v.type == Variant::Dict) return copy(v.dict);
- error(int(v.type));
-}
-
-generic String str(const map<T,Variant>& dict) {
- array<char> s;
- s.append("<<"); for(auto entry: dict) s.append( '/'+entry.key+' '+str(entry.value)+' ' ); s.append(">>");
- return move(s);
-}
 
 inline String str(const Variant& o) {
  if(o.type==Variant::Boolean) return unsafeRef(str(bool(o.number)));
  if(o.type==Variant::Integer) { assert(o.number==int(o.number)); return str(int(o.number)); }
  if(o.type==Variant::Real || o.type==Variant::Rational) return str(o.real());
- if(o.type==Variant::Data) return copy(o.data);
- if(o.type==Variant::List) return '['+str(o.list)+']';
+ if(o.type==Variant::Data) return unsafeRef(o.data);
+ if(o.type==Variant::List) return str(o.list);
  if(o.type==Variant::Dict) return str(o.dict);
- error("Invalid Variant",int(o.type));
+ if(o.type==Variant::Null) return String();
+ error("Invalid variant", Variant::types[int(o.type)]);
 }
 
 typedef map<String,Variant> Dict; /// Associative array of variants
-
-inline Dict parseDict(TextData& s) {
- Dict dict;
- bool curly = s.match('{');
- if(curly && s.match('}')) return dict;
- for(;;) {
-  s.whileAny(" "_);
-  string key = s.whileNo(":=|},"_);
-  string value; s.whileAny(" "_);
-  if(s.matchAny(":="_)) { s.whileAny(" "_); value = s.whileNo("|,} "_,'{','}'); }
-  assert_(key && value, s.data);
-  if(!dict.contains(key)) dict.insertSorted(copyRef(key), replace(copyRef(value),'\\','/'));
-  /*else {
-   if(dict.at(key)==value) log("Duplicate entry with same value", key, value);
-   else error("Duplicate entry with different value", key, dict.at(key), value);
-  }*/
-  s.whileAny(" "_);
-  if(s.matchAny("|,"_)) continue;
-  else if(curly && s.match('}')) break;
-  else if(!curly && !s) break;
-  else error("Invalid Dict '"+s.slice(s.index)+"'", (bool)s, curly, dict, s.data);
- }
- return dict;
-}
-inline Dict parseDict(string str) { TextData s (str); return parseDict(s); }

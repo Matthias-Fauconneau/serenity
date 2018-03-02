@@ -277,17 +277,6 @@ vec2 Text::sizeHint(vec2 size) {
     return max(minimalSizeHint, ceil(layout.bbMax - layout.bbMin));
 }
 
-buffer<Glyph> Text::glyphs(vec2 offset) {
-    //if(!size) size=target.size;
-    const TextLayout& layout = this->layout(wrap);
-    //vec2 textSize = ceil(layout.bbMax - /*min(vec2(0),*/layout.bbMin/*)*/);
-    //offset += /*max(vec2(0),*/ vec2(align.x==0 ? size.x/2 : 0/*(size.x-textSize.x)/2.f*/, /*align.y==0 ? size.y/2 :*/ (size.y-textSize.y)/2.f);//);
-    //if(align == -1) offset.x = 0;
-    array<Glyph> glyphs;
-    for(const auto& line: layout.glyphs) for(const auto& word: line) for(Glyph e: word) { e.origin += offset; glyphs.append(e); }
-    return ::move(glyphs);
-}
-
 void Text::render(RenderTarget2D& target, vec2 offset, vec2 size) {
     //if(!size) size=target.size;
     const TextLayout& layout = this->layout(size.x ? min<float>(wrap, size.x) : wrap);

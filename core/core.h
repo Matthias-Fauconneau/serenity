@@ -138,7 +138,7 @@ generic struct ref : Ref<T> { using Ref<T>::Ref; };
 
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct Ref {
- typedef T elementType;
+ typedef T type;
  const T* data = 0;
  size_t size = 0;
 
@@ -166,20 +166,6 @@ generic struct Ref {
  /// Slices a reference to elements from \a pos to the end of the reference
  inline ref<T> slice(size_t pos) const;
 
- struct reverse_ref {
-     const T* start; const T* stop;
-     struct iterator {
-         const T* pointer;
-         const T& operator*() { return *pointer; }
-         iterator& operator++() { pointer--; return *this; }
-         typedef __INTPTR_TYPE__ intptr_t;
-         bool operator !=(const iterator& o) const { return intptr_t(pointer)>=intptr_t(o.pointer); }
-     };
-     iterator begin() const { return {start}; }
-     iterator end() const { return {stop}; }
- };
- reverse_ref reverse() { return {end()-1, begin()}; }
-
  /// Returns the index of the first occurence of \a value. Returns invalid if \a value could not be found.
  template<Type K> size_t indexOf(const K& key) const { for(size_t index: range(size)) { if(data[index]==key) return index; } return invalid; }
  /// Returns whether the array contains an occurrence of \a value
@@ -190,11 +176,6 @@ generic struct Ref {
   for(size_t i: range(size)) if(data[i]!=o.data[i]) return false;
   return true;
  }
- /// Tests condition on all elements, breaks on first test failure
- template<Type F> bool all (F/*bool(A::elementType)*/ condition) {
-     for(const auto& e: *this) if(!condition(e)) return false;
-     return true;
- };
 };
 
 /// ref discarding trailing zero byte in ref(char[N])

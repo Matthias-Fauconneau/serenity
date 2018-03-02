@@ -1,12 +1,8 @@
-/usr/lib/clang/3.8.1/include
 .
+/usr/lib/clang/5.0.0/include
+/usr/include/freetype2
 core
 io
 ui
-audio
-music
-tuner
-image
-layout
 video
-/usr/include/freetype2
+app

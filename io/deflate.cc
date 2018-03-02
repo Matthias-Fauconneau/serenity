@@ -1,6 +1,6 @@
 #include "deflate.h"
 #include "string.h"
-#include <string.h>
+#include <cstring>
 
 // Decompression flags used by decompress().
 // FLAG_PARSE_ZLIB_HEADER: If set, the input has a valid zlib header and ends with an adler32 checksum (it's a valid zlib stream). Otherwise, the input is a raw deflate stream.
@@ -292,7 +292,8 @@ status decompress(decompressor *r, const uint8 *pIn_buf_next, size_t *pIn_buf_si
 						if ((r->m_table_sizes[0] + r->m_table_sizes[1]) != counter) {
 							RETURN_FOREVER(21, STATUS_FAILED);
 						}
-						memcpy(r->m_tables[0].m_code_size, r->m_len_codes, r->m_table_sizes[0]); memcpy(r->m_tables[1].m_code_size, r->m_len_codes + r->m_table_sizes[0], r->m_table_sizes[1]);
+                        mref<uint8>(r->m_tables[0].m_code_size, r->m_table_sizes[0]).copy(ref<uint8>(r->m_len_codes, r->m_table_sizes[0]));
+                        mref<uint8>(r->m_tables[1].m_code_size, r->m_table_sizes[1]).copy(ref<uint8>(r->m_len_codes+ r->m_table_sizes[0], r->m_table_sizes[1]));
 					}
 				}
 				for ( ; ; ) {
@@ -442,7 +443,6 @@ buffer<byte> inflate(const ref<byte> source, bool zlib) {
 	buffer<byte> data; size_t size;
 	data.data = (byte*)decompress_mem_to_heap(source.data, source.size, &size, zlib?FLAG_PARSE_ZLIB_HEADER:0);
 	data.capacity=data.size=size;
-        assert_(size);
 	return data;
 }
 
@@ -618,8 +618,8 @@ static void start_dynamic_block(compressor *d) {
 	for (num_lit_codes = 286; num_lit_codes > 257; num_lit_codes--) if (d->m_huff_code_sizes[0][num_lit_codes - 1]) break;
 	for (num_dist_codes = 30; num_dist_codes > 1; num_dist_codes--) if (d->m_huff_code_sizes[1][num_dist_codes - 1]) break;
 
-	memcpy(code_sizes_to_pack, &d->m_huff_code_sizes[0][0], num_lit_codes);
-	memcpy(code_sizes_to_pack + num_lit_codes, &d->m_huff_code_sizes[1][0], num_dist_codes);
+    mref<uint8>(code_sizes_to_pack, num_lit_codes).copy(ref<uint8>(&d->m_huff_code_sizes[0][0], num_lit_codes));
+    mref<uint8>(code_sizes_to_pack + num_lit_codes, num_dist_codes).copy(ref<uint8>(&d->m_huff_code_sizes[1][0], num_dist_codes));
 	total_code_sizes_to_pack = num_lit_codes + num_dist_codes; num_packed_code_sizes = 0; rle_z_count = 0; rle_repeat_count = 0;
 
 	memset(&d->m_huff_count[2][0], 0, sizeof(d->m_huff_count[2][0]) * MAX_HUFF_SYMBOLS_2);
@@ -862,9 +862,9 @@ static bool compress_fast(compressor *d) {
 
 		while (num_bytes_to_process) {
 			uint32 n = min(LZ_DICT_SIZE - dst_pos, num_bytes_to_process);
-			memcpy(d->m_dict + dst_pos, d->m_pSrc, n);
+            mref<uint8>(d->m_dict + dst_pos, n).copy(ref<uint8>(d->m_pSrc, n));
 			if (dst_pos < (MAX_MATCH_LEN - 1))
-				memcpy(d->m_dict + LZ_DICT_SIZE + dst_pos, d->m_pSrc, min(n, (MAX_MATCH_LEN - 1) - dst_pos));
+                mref<uint8>(d->m_dict + LZ_DICT_SIZE + dst_pos, min(n, (MAX_MATCH_LEN - 1) - dst_pos)).copy(ref<uint8>(d->m_pSrc, min(n, (MAX_MATCH_LEN - 1) - dst_pos)));
 			d->m_pSrc += n;
 			dst_pos = (dst_pos + n) & LZ_DICT_SIZE_MASK;
 			num_bytes_to_process -= n;
@@ -1033,7 +1033,7 @@ static bool output_buffer_putter(const void *pBuf, int len, void *pUser) {
 		pNew_buf = (uint8*)realloc(p->m_pBuf, new_capacity); if (!pNew_buf) return false;
 		p->m_pBuf = pNew_buf; p->m_capacity = new_capacity;
 	}
-	memcpy((uint8*)p->m_pBuf + p->m_size, pBuf, len); p->m_size = new_size;
+    mref<uint8>((uint8*)p->m_pBuf + p->m_size, len).copy(ref<uint8>((uint8*)pBuf, len)); p->m_size = new_size;
 	return true;
 }
 

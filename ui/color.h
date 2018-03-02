@@ -1,6 +1,13 @@
 #pragma once
 #include "vector.h"
 
+/// Primary colors
+static constexpr bgr3f black {0, 0, 0};
+static constexpr bgr3f red {0, 0, 1};
+static constexpr bgr3f green {0, 1, 0};
+static constexpr bgr3f blue {1, 0, 0};
+static constexpr bgr3f white {1, 1, 1};
+
 static vec3 LChuvtoLuv(float L, float C, float h) {
  return vec3(L, C*cos(h) , C*sin(h));
 }
@@ -9,7 +16,7 @@ static vec3 LuvtoXYZ(float L, float u, float v) {
 	const float un = 4*xn/(-2*xn+12*yn+3), vn = 9*yn/(-2*xn+12*yn+3);
 	float u2 = un + u / (13*L);
 	float v2 = vn + v / (13*L);
-	float Y = L<=8 ? L * cb(3./29) : cb((L+16)/116);
+ float Y = L</*=*/8 ? L * cb(3./29) : cb((L+16)/116);
 	float X = Y * (9*u2)/(4*v2);
 	float Z = Y * (12-3*u2-20*v2)/(4*v2);
  return vec3(X, Y, Z);

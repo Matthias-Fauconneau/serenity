@@ -5,7 +5,29 @@
 #include "image.h"
 #include "utf8.h"
 #include "font.h"
-#include "graphics.h"
+
+/// Text graphic element
+struct Glyph {
+ vec2 origin;
+ float fontSize;
+ FontData& font;
+ uint code;
+ uint index;
+ bgr3f color = 0;
+ float opacity = 1;
+ bool hint = false;
+ /*Glyph(vec2 origin, float fontSize, FontData& font, uint code, uint index, bgr3f color = 0, float opacity = 1, bool hint = false)
+  : origin(origin), fontSize(fontSize), font(font), code(code), index(index), color(color), opacity(opacity), hint(hint) {}*/
+};
+
+/// Line graphic element
+struct Line {
+ vec2 p0, p1;
+ bgr3f color = 0;
+ float opacity = 1;
+ bool hint = false;
+ //Line(vec2 a, vec2 b, bgr3f color = 0, float opacity = 1, bool hint = false) : a(a), b(b), color(color), opacity(opacity), hint(hint) {}
+};
 
 /// Rich text format control code encoded in 00-1F range
 enum class TextFormat { Begin=14, Regular=Begin, Bold, Italic, Superscript, Subscript, Stack, Fraction, Link, Color, End };
@@ -84,7 +106,7 @@ struct Text : virtual Widget {
     /// Create a caption that display \a text using a \a size pixel font
     Text(const string text="", float size=16, bgr3f color=0, float opacity=1, float wrap=0, string font="DejaVuSans"_, bool hint=true,
          float interline=1, int2 align=-1, int2 minimalSizeHint=0, bool justify = false, bool justifyExplicitLineBreak = false) :
-    Text(toUCS4(text), size, color, opacity, wrap, font, hint, interline, align, minimalSizeHint, justify, justifyExplicitLineBreak) {}
+        Text(toUCS4(text), size, color, opacity, wrap, font, hint, interline, align, minimalSizeHint, justify, justifyExplicitLineBreak) {}
 
     /// Displayed text in UCS4
     array<uint> text;
@@ -119,7 +141,6 @@ struct Text : virtual Widget {
 
     const TextLayout& layout(float wrap=0);
     vec2 sizeHint(vec2 size=0) override;
-    buffer<Glyph> glyphs(vec2 offset);
     void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
     Cursor cursorFromPosition(vec2 size, vec2 position);
     bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*& focus /*FIXME: -> Window& window*/) override;

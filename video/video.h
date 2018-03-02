@@ -18,7 +18,7 @@ struct Decoder {
 
     handle<AVFormatContext*> file;
     handle<SwsContext*> swsContext;
-    uint2 scaledSize = 0;
+    int2 scaledSize = 0;
     handle<AVStream*> videoStream;
     handle<AVCodecContext*> videoCodec;
     int videoTime = 0; // in stream time base
@@ -32,11 +32,5 @@ struct Decoder {
 
     /// Reads a video frame
     bool read(const Image& image);
-    Image read();
-    void scale(const Image& image);
-    Image scale();
-    Image8 YUV(size_t i) const;
-    Image8 Y() const { return YUV(0); }
-
     void seek(uint64 videoTime);
 };

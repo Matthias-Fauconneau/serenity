@@ -57,6 +57,9 @@ typedef ImageT<byte4> Image;
 /// 2D array of 32bit floating-point samples
 typedef ImageT<float> ImageF;
 
+/// 2D array of 16bit floating-point samples
+typedef ImageT<half> ImageH;
+
 /// 2D array of 8bit integer samples
 typedef ImageT<uint8> Image8;
 

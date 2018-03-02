@@ -1,62 +1,24 @@
 #include "encoder.h"
 #include "thread.h"
 #include "string.h"
-#include "graphics.h"
-
 extern "C" {
-#define _MATH_H
-#define __STDC_CONSTANT_MACROS
-#include <stdint.h> //lzma
-#define _LIBCPP_MATH_H
-#define _LIBCPP_STDLIB_H
-#define _GLIBCXX_CMATH
-#define _GLIBCXX_MATH_H
-#include <libavformat/avformat.h> //avformat
-#include <libswscale/swscale.h> //swscale
-#include <libavcodec/avcodec.h> //avcodec
-#include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h> //avutil
-#include <libavutil/opt.h>
-//fdk-aac
-#include <libavutil/channel_layout.h> //x264
-#include <libavutil/mathematics.h> //swresample
+#include <libavformat/avformat.h> // avformat avcodec avutil
+#include <libswscale/swscale.h> // swscale
+#include <libavutil/pixdesc.h>
 }
 
 #undef check
-#define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_,/* (const char*)av_err2str(int(e)),*/ ##args); e; })
+#define check(expr, args...) ({ auto e = expr; if(int(e)<0) error(#expr ""_, ##args); e; })
 
 Encoder::Encoder(string name) : path(copyRef(name)) {
-    lock.lock();
+    //lock.lock();
     av_register_all();
     avformat_alloc_output_context2(&context, NULL, NULL, strz(path));
 }
 
-void Encoder::setMJPEG(int2 size, uint videoFrameRate) {
+#if 1
+void Encoder::setH264(uint2 size, uint videoFrameRate) {
     assert_(!videoStream);
-    assert_(videoFrameRate=30, videoFrameRate);
-    this->size=size;
-    this->videoFrameRateNum=videoFrameRate;
-    this->videoFrameRateDen=1;
-
-    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
-    videoStream = avformat_new_stream(context, codec);
-    videoCodec = videoStream->codec;
-    avcodec_get_context_defaults3(videoCodec, codec);
-    videoCodec->codec_id = AV_CODEC_ID_MJPEG;
-    videoCodec->width = width;
-    videoCodec->height = height;
-    videoStream->time_base.num = videoCodec->time_base.num = 1;
-    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-    videoCodec->pix_fmt = AV_PIX_FMT_YUV444P;
-    videoCodec->color_range = AVCOL_RANGE_JPEG;
-    if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    check( avcodec_open2(videoCodec, codec, 0) );
-    //frame = av_frame_alloc();
-}
-
-void Encoder::setH264(int2 size, uint videoFrameRate) {
-    assert_(!videoStream);
-    //assert_(videoFrameRate, videoFrameRate);
     this->size=size;
     swsContext = sws_getContext(width, height, AV_PIX_FMT_BGR0, width, height, AV_PIX_FMT_YUV420P, SWS_FAST_BILINEAR, 0, 0, 0);
 
@@ -64,116 +26,111 @@ void Encoder::setH264(int2 size, uint videoFrameRate) {
     videoStream = avformat_new_stream(context, codec);
     videoCodec = videoStream->codec;
     avcodec_get_context_defaults3(videoCodec, codec);
-    videoCodec->codec_id = AV_CODEC_ID_H264;
+    videoCodec->codec_id = codec->id;
     videoCodec->width = width;
     videoCodec->height = height;
-    if(videoFrameRate) {
-        videoStream->time_base.num = videoCodec->time_base.num = 1;
-        videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
-        this->videoFrameRateNum = videoFrameRate;
-        this->videoFrameRateDen = 1;
-    } else {
-        videoStream->time_base.num = videoCodec->time_base.num = 1001;
-        videoStream->time_base.den = videoCodec->time_base.den = 1000*30;
-        this->videoFrameRateNum = 1000*30;
-        this->videoFrameRateDen = 1001;
-    }
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+    this->videoFrameRateNum = videoFrameRate;
+    this->videoFrameRateDen = 1;
     videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
-    videoCodec->max_b_frames = 2; // Youtube constraint
-    //videoCodec->bit_rate = 5000000;
     if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
     AVDictionary* options = 0;
     av_dict_set(&options, "preset", "ultrafast", 0);
-    check( avcodec_open2(videoCodec, codec, &options), size );
+    av_dict_set(&options, "crf", "0", 0);
+    //av_dict_set(&options, "x264-params", "lossless=1:bframes=0", 0);
+    check( avcodec_open2(videoCodec, codec, &options) );
     frame = av_frame_alloc();
     avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_YUV420P, width, height);
     frame->format = AV_PIX_FMT_YUV420P;
     frame->width = width;
     frame->height = height;
 }
+#endif
 
-void Encoder::setAudio(const FFmpeg& audio) {
-    assert_(!audioStream);
-    audioFrameRate = audio.audioFrameRate;
-    AVCodec* codec = avcodec_find_encoder(audio.audio->codec_id);
-    audioStream = avformat_new_stream(context, codec);
-    check( avcodec_copy_context(audioStream->codec, audio.audio) );
-    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioStream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    audioStream->codec->codec_tag = 0;
-    // audioCodec is not set (to audioStream->codec) to flag audio stream as being a copy and not encoded (no encoder flush)
+
+#if 1
+void Encoder::setH265(uint2 size, uint videoFrameRate) {
+    assert_(!videoStream);
+    this->size=size;
+    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGR0, width, height, AV_PIX_FMT_GBRP, SWS_FAST_BILINEAR, 0, 0, 0);
+
+    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_H265);
+    videoStream = avformat_new_stream(context, codec);
+    videoCodec = videoStream->codec;
+    avcodec_get_context_defaults3(videoCodec, codec);
+    videoCodec->codec_id = codec->id;
+    videoCodec->width = width;
+    videoCodec->height = height;
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+    this->videoFrameRateNum = videoFrameRate;
+    this->videoFrameRateDen = 1;
+    videoCodec->pix_fmt = AV_PIX_FMT_GBRP; //AV_PIX_FMT_BGR0;
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    AVDictionary* options = 0;
+    av_dict_set(&options, "preset", "ultrafast", 0);
+    av_dict_set(&options, "crf", "0", 0);
+    av_dict_set(&options, "x265-params", "lossless=1:bframes=0", 0);
+    check( avcodec_open2(videoCodec, codec, &options) );
+    frame = av_frame_alloc();
+    avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_GBRP/*AV_PIX_FMT_BGR0*/, width, height);
+    frame->format = AV_PIX_FMT_GBRP; //AV_PIX_FMT_BGR0;
+    frame->width = width;
+    frame->height = height;
 }
+#endif
 
-void Encoder::setAAC(uint channels, uint rate) {
-    assert_(!audioStream);
-    this->channels = channels;
-    audioFrameRate = rate;
-    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
-    audioStream = avformat_new_stream(context, codec);
-    audioStream->id = 1;
-    audioCodec = audioStream->codec;
-    audioCodec->codec_id = AV_CODEC_ID_AAC;
-    audioCodec->sample_fmt  = AV_SAMPLE_FMT_S16;
-    audioCodec->sample_rate = rate;
-    audioCodec->channels = channels;
-    audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
-    audioCodec->bit_rate = 192000;
-    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    avcodec_open2(audioCodec, codec, 0);
-    assert_(audioCodec->bit_rate == 192000, audioCodec->bit_rate);
-    audioFrameSize = audioCodec->frame_size;
-}
+void Encoder::setAPNG(uint2 size, uint videoFrameRate) {
+    assert_(!videoStream);
+    this->size=size;
+    swsContext = sws_getContext(width, height, AV_PIX_FMT_BGR0, width, height, AV_PIX_FMT_RGB24, 0, 0, 0, 0);
 
-void Encoder::setFLAC(uint sampleBits, uint channels, uint rate) {
-    assert_(!audioStream);
-    this->channels = channels;
-    audioFrameRate = rate;
-    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_FLAC);
-    audioStream = avformat_new_stream(context, codec);
-    audioStream->id = 1;
-    audioCodec = audioStream->codec;
-    audioCodec->codec_id = AV_CODEC_ID_FLAC;
-    assert_(sampleBits==16 || sampleBits==32);
-    audioCodec->sample_fmt  = sampleBits==16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_S32;
-    audioCodec->sample_rate = rate;
-    audioStream->time_base.num = audioCodec->time_base.num = 1;
-    audioStream->time_base.den = audioCodec->time_base.den = rate;
-    audioCodec->channels = channels;
-    audioCodec->channel_layout = ref<int>{0,AV_CH_LAYOUT_MONO,AV_CH_LAYOUT_STEREO}[channels];
-    if(context->oformat->flags & AVFMT_GLOBALHEADER) audioCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-    avcodec_open2(audioCodec, codec, 0);
-    audioFrameSize = audioCodec->frame_size;
+    AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_APNG);
+    videoStream = avformat_new_stream(context, codec);
+    videoCodec = videoStream->codec;
+    avcodec_get_context_defaults3(videoCodec, codec);
+    videoCodec->codec_id = codec->id;
+    videoCodec->width = width;
+    videoCodec->height = height;
+    videoStream->time_base.num = videoCodec->time_base.num = 1;
+    videoStream->time_base.den = videoCodec->time_base.den = videoFrameRate;
+    this->videoFrameRateNum = videoFrameRate;
+    this->videoFrameRateDen = 1;
+    videoCodec->pix_fmt = AV_PIX_FMT_RGB24;
+    if(context->oformat->flags & AVFMT_GLOBALHEADER) videoCodec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+    AVDictionary* options = 0;
+    av_dict_set(&options, "plays", "0", 0);
+    check( avcodec_open2(videoCodec, codec, &options) );
+    frame = av_frame_alloc();
+    avpicture_alloc((AVPicture*)frame, AV_PIX_FMT_RGB24, width, height);
+    frame->format = AV_PIX_FMT_RGB24;
+    frame->width = width;
+    frame->height = height;
 }
 
 void Encoder::open() {
-    assert_(context && (videoStream || audioStream));
+    assert_(context && (videoStream /*|| audioStream*/));
     avio_open(&context->pb, strz(path), AVIO_FLAG_WRITE);
     AVDictionary* options = 0;
     assert_(videoStream);
     av_dict_set(&options, "movflags", "faststart", 0);
     check( avformat_write_header(context, &options) );
-    lock.unlock();
-}
-
-void Encoder::writeMJPEGPacket(ref<byte> data, uint64 pts) {
-    assert_(videoStream);
-    assert_(!frame);
-
-    AVPacket pkt;
-    av_init_packet(&pkt);
-    pkt.data = (uint8*)data.data;
-    pkt.size = data.size;
-    pkt.stream_index = videoStream->index;
-    pkt.dts = pkt.pts = pts*videoStream->time_base.den/(1000000*videoStream->time_base.num);
-    Locker locker(lock);
-    av_interleaved_write_frame(context, &pkt);
-    videoTime++;
+    //lock.unlock();
 }
 
 void Encoder::writeVideoFrame(const Image& image) {
     assert_(videoStream && image.size==uint2(width,height), image.size);
-    int stride = image.stride*4;
-    sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
-    //assert_(videoCodec->time_base.num==1 && videoCodec->time_base.den == (int)videoFrameRate);
+    if(swsContext) {
+        int stride = image.stride*4;
+        sws_scale(swsContext, &(uint8*&)image.data, &stride, 0, height, frame->data, frame->linesize);
+    } else {
+        assert_(videoCodec->pix_fmt == AV_PIX_FMT_BGR0);
+        frame->data[0] = ((uint8*)image.begin())+0;
+        frame->data[1] = ((uint8*)image.begin())+1;
+        frame->data[2] = ((uint8*)image.begin())+2;
+        frame->linesize[0] = frame->linesize[1] = frame->linesize[2] = image.stride*4;
+    }
     frame->pts = videoTime;
 
     AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
@@ -184,98 +141,17 @@ void Encoder::writeVideoFrame(const Image& image) {
         pkt.dts = pkt.dts*videoStream->time_base.den*videoFrameRateDen/(videoFrameRateNum*videoStream->time_base.num);
         pkt.pts = pkt.pts*videoStream->time_base.den*videoFrameRateDen/(videoFrameRateNum*videoStream->time_base.num);
         pkt.stream_index = videoStream->index;
-        Locker locker(lock); // ?
         av_interleaved_write_frame(context, &pkt);
     }
     videoTime++;
 }
 
-void Encoder::writeAudioFrame(ref<int16> audio) {
-    assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S16);
-    AVFrame frame = {};
-    frame.nb_samples = audio.size/channels;
-    avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S16, (uint8*)audio.data, audio.size * channels * sizeof(int16), 1);
-    assert_(audioCodec->time_base.num == audioStream->time_base.num);
-    assert_(audioCodec->time_base.den == audioStream->time_base.den);
-    assert_(audioCodec->time_base.den == int(audioFrameRate));
-    frame.pts = audioTime;
-
-    AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-    int gotAudioPacket;
-    assert_(frame.nb_samples == audioCodec->frame_size);
-    avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
-    if(gotAudioPacket) {
-        audioEncodeTime = pkt.pts;
-        pkt.dts = pkt.dts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
-        pkt.pts = pkt.pts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
-        pkt.stream_index = audioStream->index;
-        Locker locker(lock);
-        av_interleaved_write_frame(context, &pkt);
-    }
-
-    audioTime += audio.size/channels;
-}
-
-void Encoder::writeAudioFrame(ref<int32> audio) {
-    assert_(audioStream && audioCodec->sample_fmt==AV_SAMPLE_FMT_S32);
-    AVFrame frame; raw(frame).clear();
-    frame.nb_samples = audio.size/channels;
-    assert_(frame.nb_samples < audioCodec->frame_size);
-    avcodec_fill_audio_frame(&frame, channels, AV_SAMPLE_FMT_S32, (uint8*)audio.data, audio.size * channels * sizeof(int32), 1);
-    assert_(audioCodec->time_base.num == audioStream->time_base.num);
-    //assert_(audioCodec->time_base.den == audioStream->time_base.den, audioCodec->time_base.num, audioCodec->time_base.den, audioStream->time_base.num, audioStream->time_base.den);
-    assert_(audioCodec->time_base.den == int(audioFrameRate));
-    frame.pts = audioTime;
-
-    AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
-    int gotAudioPacket;
-    avcodec_encode_audio2(audioCodec, &pkt, &frame, &gotAudioPacket);
-    if(gotAudioPacket) {
-        audioEncodeTime = pkt.pts;
-        pkt.dts = pkt.dts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
-        pkt.pts = pkt.pts*audioStream->time_base.den/(audioFrameRate*audioStream->time_base.num);
-        pkt.stream_index = audioStream->index;
-        Locker locker(lock);
-        av_interleaved_write_frame(context, &pkt);
-    }
-
-    audioTime += audio.size/channels;
-}
-
-bool Encoder::copyAudioPacket(FFmpeg& audio) {
-    AVPacket packet;
-    int status = av_read_frame(audio.file, &packet);
-    if(status != 0) { log("copyAudioPacket failed", status); return false; }
-    assert_(status == 0);
-    if(audio.file->streams[packet.stream_index]==audio.audioStream) {
-        assert_(audioStream->time_base.num == audio.audioStream->time_base.num);
-        packet.pts=packet.dts=audioTime=
-                packet.pts*audioStream->time_base.den/audio.audioStream->time_base.den;
-        packet.duration = (int64)packet.duration*audioStream->time_base.den/audio.audioStream->time_base.den;
-        packet.stream_index = audioStream->index;
-        av_interleaved_write_frame(context, &packet);
-    }
-    return true;
-}
-
-void Encoder::abort() {
-    lock.lock();
-    if(frame) av_frame_free(&frame);
-    if(videoCodec) { avcodec_close(videoCodec); videoCodec=0; videoStream=0; }
-    if(audioCodec) { avcodec_close(audioCodec); audioCodec=0; audioStream=0; }
-    avio_close(context->pb);
-    avformat_free_context(context);
-    context = 0;
-}
-
 Encoder::~Encoder() {
-    if(!context) { assert(!frame && !videoStream && !audioStream && !context); return; } // Aborted
-    lock.lock();
     if(frame) av_frame_free(&frame);
-    while(videoCodec || audioCodec) {
+    while(videoCodec) {
         AVPacket pkt; av_init_packet(&pkt); pkt.data=0, pkt.size=0;
         int gotPacket = 0;
-        if(videoCodec && (!audioCodec || videoEncodeTime*audioFrameRate*videoFrameRateDen<audioEncodeTime*videoFrameRateNum)) {
+        if(videoCodec) {
             avcodec_encode_video2(videoCodec, &pkt, 0, &gotPacket);
             if(gotPacket) {
                 assert_(videoStream);
@@ -289,24 +165,11 @@ Encoder::~Encoder() {
                 continue;
             }
         }
-        if(audioCodec && (!videoCodec || audioEncodeTime*videoFrameRateNum<=videoEncodeTime*audioFrameRate*videoFrameRateDen)) {
-            avcodec_encode_audio2(audioCodec, &pkt, 0, &gotPacket);
-            if(gotPacket) {
-                assert_(audioStream);
-                pkt.stream_index = audioStream->index;
-                audioEncodeTime = pkt.dts;
-                // No time rescale ?
-            } else {
-                avcodec_close(audioCodec); audioCodec=0;
-                audioStream=0; // Released by avformat_free_context
-                continue;
-            }
-        }
         assert_(gotPacket);
         av_interleaved_write_frame(context, &pkt);
         if(!pkt.buf) av_free_packet(&pkt);
     }
-    log("videoTime", videoTime, "audioTime", audioTime, "videoEncodeTime", videoEncodeTime, "audioEncodeTime", audioEncodeTime);
+    log("videoTime", videoTime, "videoEncodeTime", videoEncodeTime);
     av_interleaved_write_frame(context, 0);
     av_write_trailer(context);
     avio_close(context->pb);

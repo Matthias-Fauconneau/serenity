@@ -48,8 +48,7 @@ void Window::render(const Image& target) {
     currentWindow = this; // hasFocus
     ImageRenderTarget renderTarget(unsafeShare(target));
     update = false; // Lets Window::render within Widget::render trigger new rendering on next event
-    assert_(renderTarget.Image::size.x < 4096);
-    widget->render(renderTarget, 0, renderTarget.RenderTarget2D::size);
+    widget->render(renderTarget);
     currentWindow = 0;
 }
 
@@ -76,8 +75,7 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, int useGL_sample
         if(sizeHint.x<0) Window::size.x=min(max(uint(abs(hint.x)),uint(-sizeHint.x)), XDisplay::size.x);
         if(sizeHint.y<0) Window::size.y=min(max(uint(abs(hint.y)),uint(-sizeHint.y)), XDisplay::size.y-46);
     }
-    Window::size = ::min(Window::size, XDisplay::size);
-    assert_(Window::size && Window::size <=XDisplay::size, Window::size, XDisplay::size);
+    assert_(Window::size);
     {CreateColormap r; send(({r.colormap=id+Colormap; r.window=root; r.visual=visual; r;}));}
     {CreateWindow r;
         send(({r.id=id+Window; r.parent=root; r.width=uint16(Window::size.x); r.height=uint16(Window::size.y); r.visual=visual; r.colormap=id+Colormap; r;}));}
@@ -130,7 +128,7 @@ XWindow::XWindow(Widget* widget, Thread& thread, int2 sizeHint, int useGL_sample
         // Program/shader state info: GLSL shader failed to compile.
         glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_OTHER, GL_DONT_CARE, 1, (uint[]){0x20090}, false);
 #else
-        error("UNIMPL GL");
+        error("UNIMPL");
 #endif
     }
 
@@ -291,7 +289,7 @@ void XWindow::event() {
         } else
 #endif
         {
-            target.clear(byte4(sRGB(backgroundColor.b),sRGB(backgroundColor.g),sRGB(backgroundColor.r),0xFF));
+            target.clear(byte4(0xFF));
             render(target);
             {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window);
                                      r.context=id+GraphicContext; r.seg=id+Segment;
@@ -329,7 +327,7 @@ unique<Window> window(Widget* widget, int2 size, Thread& thread, int useGL_sampl
     if(environmentVariable("DISPLAY")) {
         auto window = unique<XWindow>(widget, thread, size, useGL_samples);
         if(title) window->setTitle(title);
-        window->show();
+        //window->show();
         return move(window);
     }
     error("");

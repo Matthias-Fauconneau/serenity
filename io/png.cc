@@ -5,26 +5,28 @@
 generic struct ia { T i,a; operator byte4() const {return byte4(i,i,i,a); } };
 generic struct luma { T i; operator byte4() const {return byte4(i,i,i,0xFF); } };
 
+typedef vec<rgb,uint8,3> rgb3;
+
 // Paeth median
-template<template<Type> class T, int N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
+template<template<Type> class T, uint N> vec<T, uint8, N> Paeth(vec<T, int, N> a, vec<T, int, N> b, vec<T, int, N> c) {
  vec<T, int, N> d = a + b - c;
  vec<T, int, N> pa = abs(d-a), pb = abs(d-b), pc = abs(d-c);
- vec<T, uint8, N> p; for(int i=0;i<N;i++) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
+ vec<T, uint8, N> p; for(uint i: range(N)) p[i]=uint8(pa[i] <= pb[i] && pa[i] <= pc[i] ? a[i] : pb[i] <= pc[i] ? b[i] : c[i]);
  return p;
 }
 
 enum class Predictor { None, Left, Up, Average, Paeth };
 
 template<template<Type> class T, int N>
-void unpredict(byte4* target, const byte* source, size_t width, size_t height, size_t xStride, size_t yStride) {
+void unpredict(byte4* target, const byte* source, size_t width, int height, size_t xStride, size_t yStride) {
  typedef vec<T, uint8, N> U;
  typedef vec<T, int, N> V;
  buffer<U> prior(width); prior.clear(0);
- for(size_t unused y: range(height)) {
+ for(int unused y: range(height)) {
   Predictor predictor = Predictor(*source++);
-  U* src = (U*)source;
+  const U* src = reinterpret_cast<const U*>(source);
   U a = 0;
-  /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=       src[x];
+  /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=     src[x];
   else if(predictor==Predictor::Left) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
   else if(predictor==Predictor::Up) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
   else if(predictor==Predictor::Average) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= U((V(prior[x])+V(a))/2)+src[x];
@@ -61,17 +63,15 @@ Image decodePNG(const ref<byte> file) {
    interlace = s.read();
   } else if(tag == "IDAT") {
    /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
-            else*/
-   if(s.available(size) < size) { log("Expected", size, "got", s.available(size)); return Image(); }
-   IDAT.append(s.read<byte>(size)); // Explicitly concatenates chunks (FIXME: stream inflate)
+            else*/ IDAT.append(s.read<byte>(size)); // Explicitly concatenates chunks (FIXME: stream inflate)
   } else if(tag == "IEND") {
    assert(size==0);
    s.advance(4); //CRC
    break;
   } else if(tag == "PLTE") {
-   ref<vec<rgb,uint8,3>> plte = s.read<vec<rgb,uint8,3>>(size/3);
+   ref<rgb3> plte = s.read<rgb3>(size/3);
    assert(plte.size<=256);
-   for(size_t i: range(plte.size)) palette[i] = plte[i];
+   for(size_t i: range(plte.size)) palette[i] = byte4(plte[i].b, plte[i].g, plte[i].r, 0xFF);
   }  else if(tag == "tRNS") {
    ref<byte> trns = s.read<byte>(size);
    assert(trns.size<=256);
@@ -84,7 +84,6 @@ Image decodePNG(const ref<byte> file) {
   assert(s);
  }
  buffer<byte> predicted = inflate(IDAT, true);
- assert_(predicted, IDAT.size);
  if(bitDepth==1 || bitDepth==4) {
   assert(type==0 || type==3, type);
   assert(depth==1,depth);
@@ -102,7 +101,7 @@ Image decodePNG(const ref<byte> file) {
   predicted = move(unpackedBytes);
  }
  assert_(predicted.size == height*(1+width*depth), "Invalid PNG", predicted.size, height*(1+width*depth), width, height, depth, bitDepth);
- Image image(width,height,width,alpha);
+ Image image(width,height,alpha);
  byte4* target = image.begin();
  int w=width,h=height;
  const byte* source=predicted.data;
@@ -134,8 +133,7 @@ Image decodePNG(const ref<byte> file) {
 
 uint32 crc32(const ref<byte> data) {
  static uint crc_table[256];
- static int unused once = ({ for(uint n: range(256)) {
-                              uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
+ static int unused once = ({ for(uint n: range(256)) { uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
  uint crc = 0xFFFFFFFF;
  for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
  return ~crc;
@@ -152,7 +150,7 @@ uint adler32(const ref<byte> data) {
  return a | (b << 16);
 }
 
-template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t width, size_t height, size_t stride) {
+template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t stride, size_t width, size_t height) {
  typedef vec<T,uint8,N> U;
  typedef vec<T,int,N> V;
  buffer<U> prior(width); prior.clear(0);
@@ -181,8 +179,8 @@ buffer<byte> encodePNG(const Image& image) {
  buffer<byte> IHDR = "IHDR"_+raw(ihdr);
 
  buffer<byte> predicted;
- if(!image.alpha) predicted = predict<rgb,3>(image.data, image.size.x, image.size.y, image.stride);
- else predicted = predict<rgba,4>(image.data, image.size.x, image.size.y, image.stride);
+ if(!image.alpha) predicted = predict<rgb,3>(image.data, image.stride, image.size.x, image.size.y);
+ else predicted = predict<rgba,4>(image.data, image.stride, image.size.x, image.size.y);
  buffer<byte> IDAT = ref<byte>("IDAT"_)+deflate(predicted, true);
 
  return "\x89PNG\r\n\x1A\n"_
