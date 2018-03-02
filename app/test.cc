@@ -23,7 +23,7 @@ bool intersect(const Plane& plane, const vec3 O, const vec3 D, float& nearestT, 
     const vec3 T = plane.T;
     const vec3 B = plane.B;
     const vec3 N = plane.N;
-    const float invdet = 1 / dot(N, D);
+    const float invdet = 1 / dot(D, N);
     const float t = invdet * dot(N, P);
     u = invdet * dot(cross(D, B), P);
     v = invdet * dot(cross(D, T), P);
@@ -34,13 +34,12 @@ bool intersect(const Plane& plane, const vec3 O, const vec3 D, float& nearestT, 
     return false;
 }
 
-bool intersect(const Sphere& sphere, const vec3 O, const vec3 D, float& nearestT, bgr3f& color) {
+bool intersect(const Sphere& sphere, const vec3 O, const vec3 D, float& nearestT) {
     const vec3 P = sphere.P - O;
-    const float Δ = sphere.r2 - dot(P, P) + sq(dot(P, D));
+    const float Δ = sphere.r2 - dot(P, P) + sq(dot(D, P));
     if(Δ > 0) {
-        const float t = dot(P, D) - sqrt(Δ);
+        const float t = dot(D, P) - sqrt(Δ);
         if(t < nearestT) {
-            color = sphere.albedo;
             nearestT = t;
             return true;
         }
@@ -62,8 +61,8 @@ static struct Test : Widget {
 
         Scene scene;
         scene.planes.append(Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, Image3f(512)});
-        scene.spheres.append(Sphere{{-1./2,0,1./2}, sq(1./2), {1,0,0}, true});
-        scene.spheres.append(Sphere{{+1./2,0,1./2}, sq(1./2), {1,0,0}, false});
+        scene.spheres.append(Sphere{{-1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, true});
+        scene.spheres.append(Sphere{{+1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, false});
 
         for(const Plane& plane: scene.planes) {
             const Image3f& target = plane.differentialOutgoingRadiance;
@@ -78,11 +77,10 @@ static struct Test : Widget {
                         float nearestRealT = inff, nearestMixedT = inff;
                         bgr3f differentialIncomingRadiance;
                         {
-                            bgr3f color;
                             bgr3f realIncomingRadiance = 1, mixedIncomingRadiance = 1; // Directional light
                             for(const Sphere sphere: scene.spheres) {
-                                if(!sphere.real) if(intersect(sphere, O, D, nearestMixedT, color)) mixedIncomingRadiance = 0;
-                                if( sphere.real) if(intersect(sphere, O, D, nearestRealT, color)) { realIncomingRadiance = 0; mixedIncomingRadiance = 0; }
+                                if(!sphere.real) if(intersect(sphere, O, D, nearestMixedT)) mixedIncomingRadiance = 0;
+                                if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) { realIncomingRadiance = 0; mixedIncomingRadiance = 0; }
                             }
                             differentialIncomingRadiance = mixedIncomingRadiance - realIncomingRadiance;
                         }
@@ -104,7 +102,7 @@ static struct Test : Widget {
                 bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
                 bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
                 bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
-                bool unrealHit = 0;
+                bool virtualHit = 0;
                 float nearestRealT = inff;
                 for(const Plane& plane: scene.planes) {
                     float u, v;
@@ -122,9 +120,8 @@ static struct Test : Widget {
                                 const vec3 O = hitO;
                                 const vec3 D = L;
                                 float nearestRealT = inff;
-                                bgr3f color;
                                 for(const Sphere sphere: scene.spheres) {
-                                    if( sphere.real) if(intersect(sphere, O, D, nearestRealT, color)) realIncomingRadiance = 0;
+                                    if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) realIncomingRadiance = 0;
                                 }
                             }
                             const bgr3f albedo = 1;
@@ -133,11 +130,18 @@ static struct Test : Widget {
                     }
                 }
                 for(const Sphere sphere: scene.spheres) {
-                  if(!sphere.real) if(intersect(sphere, O, D, nearestRealT, virtualOutgoingRadiance)) unrealHit=true; // FIXME: nearestRealT
-                  if( sphere.real) intersect(sphere, O, D, nearestRealT, realOutgoingRadiance);
+                    if(intersect(sphere, O, D, nearestRealT)) { // nearestVirtualT ?
+                        const bgr3f incomingRadiance = 1;
+                        const vec3 L = vec3(0,0,1);
+                        const vec3 N = normalize( (O+nearestRealT*D) - sphere.P );
+                        const bgr3f f = sphere.albedo * ::max(0.f, dot(N, L));
+                        const bgr3f outgoingRadiance = f * incomingRadiance;
+                        if(!sphere.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
+                        else realOutgoingRadiance = outgoingRadiance;
+                    }
                 }
-                //const bgr3f finalColor = mix(cameraInputColor + differentialColor, virtualOutgoingRadiance, unrealHit);
-                const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
+                const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
+                //const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                 target(x, y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
             }
         }
