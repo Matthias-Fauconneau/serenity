@@ -3,23 +3,25 @@
 #include "matrix.h"
 #include "window.h"
 #include "image-render.h"
+#include "mwc.h"
 
 generic T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
 
-struct Plane {
-    vec3 P, T, B, N;
-    Image3f differentialOutgoingRadiance;
-};
-
-struct Sphere { vec3 P; float r2; bgr3f albedo; bool real; };
-
 struct Scene {
+    struct Plane {
+        vec3 O, T, B, N;
+        Image3f differentialOutgoingRadiance;
+    };
+
+    struct Sphere { vec3 O; float r2; bgr3f albedo; bool real; };
+    struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
+
     array<Plane> planes;
     array<Sphere> spheres;
 };
 
-bool intersect(const Plane& plane, const vec3 O, const vec3 D, float& nearestT, float& u, float& v) {
-    const vec3 P = plane.P - O;
+bool intersect(const Scene::Plane& plane, const vec3 O, const vec3 D, float& nearestT, float& u, float& v) {
+    const vec3 P = plane.O - O;
     const vec3 T = plane.T;
     const vec3 B = plane.B;
     const vec3 N = plane.N;
@@ -34,11 +36,11 @@ bool intersect(const Plane& plane, const vec3 O, const vec3 D, float& nearestT, 
     return false;
 }
 
-bool intersect(const Sphere& sphere, const vec3 O, const vec3 D, float& nearestT) {
-    const vec3 P = sphere.P - O;
-    const float Δ = sphere.r2 - dot(P, P) + sq(dot(D, P));
+bool intersect(const Scene::Sphere& sphere, const vec3 O, const vec3 D, float& nearestT) {
+    const vec3 P = sphere.O - O;
+    const float Δ = sphere.r2 - dot(P, P) + sq(dot(D, P)/dot(D, D));
     if(Δ > 0) {
-        const float t = dot(D, P) - sqrt(Δ);
+        const float t = dot(D, P)/dot(D, D) - sqrt(Δ);
         if(t < nearestT) {
             nearestT = t;
             return true;
@@ -46,6 +48,25 @@ bool intersect(const Sphere& sphere, const vec3 O, const vec3 D, float& nearestT
     }
     return false;
 }
+
+/*
+// Light Area sampling
+struct LightRay {
+    bool hit;
+    vec3 L;
+    rgb3f incomingRadiance;
+};
+static inline LightRay lightRay(Random& random, const Scene& scene, const vec3 O, const vec3 N) {
+    v8sf random8 = random();
+    const vec2 uv (random8[0], random8[1]);
+    Scene::QuadLight quadLight = scene.quadLights[0];
+    const vec3 D = (quadLight.O + uv[0] * quadLight.size.x * quadLight.T + uv[1] * quadLight.size.y * quadLight.B) - O;
+
+    const float dotAreaL = - dot(quadLight.N, D);
+    if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
+    const float dotNL = dot(D, N);
+    if(dotNL <= 0) return {false,0,0};
+*/
 
 static struct Test : Widget {
     unique<Window> window = ::window(this, 2048, mainThread, 0);
@@ -60,90 +81,151 @@ static struct Test : Widget {
         const vec3 O = view.inverse() * vec3(0,0,0);
 
         Scene scene;
-        scene.planes.append(Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, Image3f(512)});
-        scene.spheres.append(Sphere{{-1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, true});
-        scene.spheres.append(Sphere{{+1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, false});
+        scene.planes.append(Scene::Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, Image3f(512)});
+        scene.spheres.append(Scene::Sphere{{-1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, true});
+        scene.spheres.append(Scene::Sphere{{+1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, false});
 
-        for(const Plane& plane: scene.planes) {
-            const Image3f& target = plane.differentialOutgoingRadiance;
-            for(uint y: range(target.size.y)) {
-                const float v = -(float(y)/float(target.size.y-1)*2-1);
-                for(uint x: range(target.size.x)) {
-                    const float u = float(x)/float(target.size.x-1)*2-1;
-                    const vec3 O = plane.P + v * plane.B + u * plane.T;
-                    bgr3f differentialOutgoingRadiance; // Directional light
-                    { // for(samples)
-                        const vec3 D = vec3(0,0,1);
-                        float nearestRealT = inff, nearestMixedT = inff;
-                        bgr3f differentialIncomingRadiance;
-                        {
-                            bgr3f realIncomingRadiance = 1, mixedIncomingRadiance = 1; // Directional light
-                            for(const Sphere sphere: scene.spheres) {
-                                if(!sphere.real) if(intersect(sphere, O, D, nearestMixedT)) mixedIncomingRadiance = 0;
-                                if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) { realIncomingRadiance = 0; mixedIncomingRadiance = 0; }
-                            }
-                            differentialIncomingRadiance = mixedIncomingRadiance - realIncomingRadiance;
-                        }
-                        const bgr3f albedo = 1;
-                        differentialOutgoingRadiance = albedo * differentialIncomingRadiance;
-                    }
-                    target(x, y) = differentialOutgoingRadiance;
-                }
-            }
-        }
+        const float lightSize = 1./4;
+        Scene::QuadLight light {{-lightSize/2,-lightSize/2,1}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-1}, 1};
 
+        Random random;
 
-        for(uint y: range(target.size.y)) {
-            const float Dy = -(float(y)/float(target.size.y-1)*2-1);
-            for(uint x: range(target.size.x)) {
-                const float Dx = float(x)/float(target.size.x-1)*2-1;
-                //const vec3 D = normalize(view.inverse().normalMatrix() * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
-                const vec3 D = normalize((mat3)(view.transpose()) * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
-                bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
-                bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
-                bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
-                bool virtualHit = 0;
-                float nearestRealT = inff;
-                for(const Plane& plane: scene.planes) {
-                    float u, v;
-                    if(intersect(plane, O, D, nearestRealT, u, v)) {
-                        const uint2 texSize = plane.differentialOutgoingRadiance.size;
-                        const uint x = (1+u)/2*(texSize.x-1);
-                        const uint y = (1+v)/2*(texSize.y-1);
-                        assert_(x<texSize.x && y<texSize.y, x, y, u, v);
-                        differentialOutgoingRadiance = plane.differentialOutgoingRadiance(x, y); // FIXME: bilinear
-                        { // for(samples)
-                            bgr3f realIncomingRadiance = 1; // Directional light
-                            const vec3 hitO = O + nearestRealT*D;
-                            const vec3 L = vec3(0,0,1);
+        {
+            Time time (true);
+            for(const Scene::Plane& plane: scene.planes) {
+                const Image3f& target = plane.differentialOutgoingRadiance;
+                for(uint y: range(target.size.y)) {
+                    const float v = -(float(y)/float(target.size.y-1)*2-1);
+                    for(uint x: range(target.size.x)) {
+                        const float u = float(x)/float(target.size.x-1)*2-1;
+                        const vec3 O = plane.O + v * plane.B + u * plane.T;
+                        bgr3f differentialOutgoingRadianceSum = 0; // Directional light
+                        const uint N = 16;
+                        for(uint unused i: range(N)) {
+                            bgr3f differentialIncomingRadiance;
                             {
-                                const vec3 O = hitO;
-                                const vec3 D = L;
-                                float nearestRealT = inff;
-                                for(const Sphere sphere: scene.spheres) {
-                                    if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) realIncomingRadiance = 0;
+                                v8sf random8 = random();
+                                const vec2 uv (random8[0], random8[1]);
+                                const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
+
+                                const float dotAreaL = - dot(light.N, D);
+                                //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
+                                const float dotNL = dot(D, plane.N);
+                                //if(dotNL <= 0) return {false,0,0};
+
+                                bgr3f incomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
+
+                                float nearestRealT = inff, nearestVirtualT = inff;
+                                for(const Scene::Sphere sphere: scene.spheres) {
+                                    if(!sphere.real) intersect(sphere, O, D, nearestVirtualT);
+                                    if( sphere.real) intersect(sphere, O, D, nearestRealT);
                                 }
+                                differentialIncomingRadiance = (nearestVirtualT < nearestRealT) ? - incomingRadiance : 0;
                             }
                             const bgr3f albedo = 1;
-                            realOutgoingRadiance = albedo * realIncomingRadiance;
+                            differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
+                        }
+                        target(x, y) = (1/float(N)) * differentialOutgoingRadianceSum;
+                    }
+                }
+            }
+            log(time);
+        }
+
+        {
+            Time time {true};
+            //Image3f realOutgoingRadianceImage (target.size);
+            //Image3f differentialOutgoingRadianceImage (target.size);
+            Image3f mixedOutgoingRadianceImage (target.size);
+            Image3f virtualOutgoingRadianceImage (target.size);
+            for(uint y: range(target.size.y)) {
+                const float Dy = -(float(y)/float(target.size.y-1)*2-1);
+                for(uint x: range(target.size.x)) {
+                    const float Dx = float(x)/float(target.size.x-1)*2-1;
+                    //const vec3 D = normalize(view.inverse().normalMatrix() * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
+                    const vec3 D = normalize((mat3)(view.transpose()) * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
+                    bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
+                    bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
+                    bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
+                    bool virtualHit = 0;
+                    float nearestRealT = inff;
+                    for(const Scene::Plane& plane: scene.planes) {
+                        float u, v;
+                        if(intersect(plane, O, D, nearestRealT, u, v)) {
+                            const vec3 hitO = O + nearestRealT*D;
+                            const uint2 texSize = plane.differentialOutgoingRadiance.size;
+                            const uint x = (1+u)/2*(texSize.x-1);
+                            const uint y = (1+v)/2*(texSize.y-1);
+                            assert_(x<texSize.x && y<texSize.y, x, y, u, v);
+                            differentialOutgoingRadiance = plane.differentialOutgoingRadiance(x, y); // FIXME: bilinear
+                            const uint N = 1;
+                            bgr3f realOutgoingRadianceSum = 0;
+                            for(uint unused i: range(N)) {
+                                bgr3f realIncomingRadiance;
+                                {
+                                    const vec3 O = hitO;
+
+                                    v8sf random8 = random();
+                                    const vec2 uv (random8[0], random8[1]);
+                                    const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
+
+                                    const float dotAreaL = - dot(light.N, D);
+                                    //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
+                                    const float dotNL = dot(D, plane.N);
+                                    //if(dotNL <= 0) return {false,0,0};
+
+                                    realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
+
+                                    float nearestRealT = inff;
+                                    for(const Scene::Sphere sphere: scene.spheres) {
+                                        if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) realIncomingRadiance = 0;
+                                    }
+                                }
+                                const bgr3f albedo = 1;
+                                realOutgoingRadianceSum += albedo * realIncomingRadiance;
+                            }
+                            realOutgoingRadiance = (1/float(N)) * realOutgoingRadianceSum;
                         }
                     }
-                }
-                for(const Sphere sphere: scene.spheres) {
-                    if(intersect(sphere, O, D, nearestRealT)) { // nearestVirtualT ?
-                        const bgr3f incomingRadiance = 1;
-                        const vec3 L = vec3(0,0,1);
-                        const vec3 N = normalize( (O+nearestRealT*D) - sphere.P );
-                        const bgr3f f = sphere.albedo * ::max(0.f, dot(N, L));
-                        const bgr3f outgoingRadiance = f * incomingRadiance;
-                        if(!sphere.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
-                        else realOutgoingRadiance = outgoingRadiance;
+                    for(const Scene::Sphere sphere: scene.spheres) {
+                        if(intersect(sphere, O, D, nearestRealT)) { // nearestVirtualT ?
+                            const bgr3f incomingRadiance = 1;
+                            const vec3 L = vec3(0,0,1);
+                            const vec3 N = normalize( (O+nearestRealT*D) - sphere.O );
+                            const bgr3f f = sphere.albedo * ::max(0.f, dot(N, L));
+                            const bgr3f outgoingRadiance = f * incomingRadiance;
+                            if(!sphere.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
+                            else { realOutgoingRadiance = outgoingRadiance; differentialOutgoingRadiance = 0; /*FIXME*/ }
+                        }
                     }
+                    /*realOutgoingRadianceImage(x, y) = realOutgoingRadiance;
+                    differentialOutgoingRadianceImage(x, y) = differentialOutgoingRadiance;*/
+                    mixedOutgoingRadianceImage(x, y) = realOutgoingRadiance + differentialOutgoingRadiance;
+                    virtualOutgoingRadianceImage(x, y) = virtualOutgoingRadiance;
                 }
-                const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
-                //const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
-                target(x, y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
             }
+            for(uint y: range(target.size.y)) {
+                for(uint x: range(target.size.x)) {
+                    // Box blur mixed image to avoid bias from negative values
+                    bgr3f sum = 0;
+                    const int R = 1;
+                    for(int dy: range(-R, +R +1)) {
+                        for(int dx: range(-R, +R +1)) {
+                            sum += mixedOutgoingRadianceImage(clamp(0u,x+dx,target.size.x-1),clamp(0u,y+dy,target.size.y-1));
+                        }
+                    }
+                    mixedOutgoingRadianceImage(x, y) = (1/float(sq(R+1+R))) * sum;
+                }
+            }
+            for(uint i: range(target.ref::size)) {
+                //const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
+                //const bgr3f finalOutgoingRadiance = realOutgoingRadianceImage[i] + differentialOutgoingRadianceImage[i];
+                //const bgr3f finalOutgoingRadiance = realOutgoingRadiance;
+                //const bgr3f finalOutgoingRadiance = bgr3f(1) + differentialOutgoingRadiance;
+                const bgr3f finalOutgoingRadiance = mixedOutgoingRadianceImage[i];
+                target[i] = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
+            }
+            log(time);
         }
     }
 } test;
