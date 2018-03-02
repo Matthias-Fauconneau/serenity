@@ -87,6 +87,7 @@ static struct Test : Widget {
 
         const float lightSize = 1./4;
         Scene::QuadLight light {{-lightSize/2,-lightSize/2,1}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-1}, 1};
+        const bgr3f ambientIncomingRadiance = 0.1;
 
         Random random;
 
@@ -100,7 +101,7 @@ static struct Test : Widget {
                         const float u = float(x)/float(target.size.x-1)*2-1;
                         const vec3 O = plane.O + v * plane.B + u * plane.T;
                         bgr3f differentialOutgoingRadianceSum = 0; // Directional light
-                        const uint N = 16;
+                        const uint N = 128;
                         for(uint unused i: range(N)) {
                             bgr3f differentialIncomingRadiance;
                             {
@@ -120,7 +121,7 @@ static struct Test : Widget {
                                     if(!sphere.real) intersect(sphere, O, D, nearestVirtualT);
                                     if( sphere.real) intersect(sphere, O, D, nearestRealT);
                                 }
-                                differentialIncomingRadiance = (nearestVirtualT < nearestRealT) ? - incomingRadiance : 0;
+                                differentialIncomingRadiance = nearestVirtualT < nearestRealT ? ambientIncomingRadiance - incomingRadiance : 0;
                             }
                             const bgr3f albedo = 1;
                             differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
@@ -136,8 +137,8 @@ static struct Test : Widget {
             Time time {true};
             //Image3f realOutgoingRadianceImage (target.size);
             //Image3f differentialOutgoingRadianceImage (target.size);
-            Image3f mixedOutgoingRadianceImage (target.size);
-            Image3f virtualOutgoingRadianceImage (target.size);
+            //Image3f mixedOutgoingRadianceImage (target.size);
+            //Image3f virtualOutgoingRadianceImage (target.size);
             for(uint y: range(target.size.y)) {
                 const float Dy = -(float(y)/float(target.size.y-1)*2-1);
                 for(uint x: range(target.size.x)) {
@@ -178,7 +179,7 @@ static struct Test : Widget {
 
                                     float nearestRealT = inff;
                                     for(const Scene::Sphere sphere: scene.spheres) {
-                                        if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) realIncomingRadiance = 0;
+                                        if( sphere.real) if(intersect(sphere, O, D, nearestRealT)) realIncomingRadiance = ambientIncomingRadiance;
                                     }
                                 }
                                 const bgr3f albedo = 1;
@@ -200,11 +201,14 @@ static struct Test : Widget {
                     }
                     /*realOutgoingRadianceImage(x, y) = realOutgoingRadiance;
                     differentialOutgoingRadianceImage(x, y) = differentialOutgoingRadiance;*/
-                    mixedOutgoingRadianceImage(x, y) = realOutgoingRadiance + differentialOutgoingRadiance;
-                    virtualOutgoingRadianceImage(x, y) = virtualOutgoingRadiance;
+                    //mixedOutgoingRadianceImage(x, y) = virtualHit ? 0 : bgr3f(1) + differentialOutgoingRadiance;
+                    //mixedOutgoingRadianceImage(x, y) = virtualHit ? 0 : realOutgoingRadiance + differentialOutgoingRadiance;
+                    //virtualOutgoingRadianceImage(x, y) = virtualHit ? virtualOutgoingRadiance : 0;
+                    const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
+                    target(x, y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
                 }
             }
-            for(uint y: range(target.size.y)) {
+            /*for(uint y: range(target.size.y)) {
                 for(uint x: range(target.size.x)) {
                     // Box blur mixed image to avoid bias from negative values
                     bgr3f sum = 0;
@@ -222,9 +226,9 @@ static struct Test : Widget {
                 //const bgr3f finalOutgoingRadiance = realOutgoingRadianceImage[i] + differentialOutgoingRadianceImage[i];
                 //const bgr3f finalOutgoingRadiance = realOutgoingRadiance;
                 //const bgr3f finalOutgoingRadiance = bgr3f(1) + differentialOutgoingRadiance;
-                const bgr3f finalOutgoingRadiance = mixedOutgoingRadianceImage[i];
+                const bgr3f finalOutgoingRadiance = mixedOutgoingRadianceImage[i] + virtualOutgoingRadianceImage[i];
                 target[i] = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
-            }
+            }*/
             log(time);
         }
     }
