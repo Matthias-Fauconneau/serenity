@@ -4,42 +4,47 @@
 #include "window.h"
 #include "image-render.h"
 
+generic T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
+
 struct Plane { vec3 P, T, B, N; };
 
-struct Sphere { vec3 P; float r2; bgr3f albedo; };
+struct Sphere { vec3 P; float r2; bgr3f albedo; bool real; };
 
 struct Scene {
     array<Plane> planes;
     array<Sphere> spheres;
 };
 
-void intersect(const Scene& scene, const mat4 view, const vec3 D, float& nearestT, bgr3f& color) {
-    for(const Plane plane: scene.planes) {
-        const vec3 P = view * plane.P;
-        const vec3 T = view.normalMatrix() * plane.T;
-        const vec3 B = view.normalMatrix() * plane.B;
-        const vec3 N = view.normalMatrix() * plane.N;
-        const int2 texSize (128);
-        const float invdet = 1 / dot(N, D);
-        const float t = invdet * dot(N, P);
-        const float u = invdet * dot(cross(D, B), P);
-        const float v = invdet * dot(cross(D, T), P);
-        if(t < nearestT) if(u >= -1 && u < 1) if(v >= -1 && v < 1) {
+bool intersect(const Plane& plane, const vec3 O, const vec3 D, float& nearestT, bgr3f& color) {
+    const vec3 P = plane.P - O;
+    const vec3 T = plane.T;
+    const vec3 B = plane.B;
+    const vec3 N = plane.N;
+    const int2 texSize (128);
+    const float invdet = 1 / dot(N, D);
+    const float t = invdet * dot(N, P);
+    const float u = invdet * dot(cross(D, B), P);
+    const float v = invdet * dot(cross(D, T), P);
+    if(u >= -1 && u < 1) if(v >= -1 && v < 1) if(t < nearestT) {
+        nearestT = t;
+        color = (int((1+u)/2*texSize.x)%2) ^ (int((1+v)/2*texSize.y)%2);
+        return true;
+    }
+    return false;
+}
+
+bool intersect(const Sphere& sphere, const vec3 O, const vec3 D, float& nearestT, bgr3f& color) {
+    const vec3 P = sphere.P - O;
+    const float Δ = sphere.r2 - dot(P, P) + sq(dot(P, D));
+    if(Δ > 0) {
+        const float t = dot(P, D) - sqrt(Δ);
+        if(t < nearestT) {
+            color = sphere.albedo;
             nearestT = t;
-            color = (int((1+u)/2*texSize.x)%2) ^ (int((1+v)/2*texSize.y)%2);
+            return true;
         }
     }
-    for(const Sphere sphere: scene.spheres) {
-        const vec3 P = view * sphere.P;
-        const float Δ = sphere.r2 - dot(P, P) + sq(dot(P, D));
-        if(Δ > 0) {
-            const float t = dot(P, D) - Δ;
-            if(t < nearestT) {
-                color = sphere.albedo;
-                nearestT = t;
-            }
-        }
-    }
+    return false;
 }
 
 static struct Test : Widget {
@@ -52,27 +57,54 @@ static struct Test : Widget {
 
         const float near = 3;
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(-π/4);
+        const vec3 O = view.inverse() * vec3(0,0,0);
 
-        Scene real;
-        real.planes.append(Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}});
-        real.spheres.append(Sphere{{-1./2,0,0}, sq(1./2), {1,0,0}});
-
-        Scene unreal;
-        unreal.spheres.append(Sphere{{+1./2,0,0}, sq(1./2), {1,0,0}});
+        Scene scene;
+        scene.planes.append(Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}});
+        scene.spheres.append(Sphere{{-1./2,0,1./2}, sq(1./2), {1,0,0}, true});
+        scene.spheres.append(Sphere{{+1./2,0,1./2}, sq(1./2), {1,0,0}, false});
 
         for(uint y: range(target.size.y)) {
             const float Dy = -(float(y)/float(target.size.y-1)*2-1);
             for(uint x: range(target.size.y)) {
                 const float Dx = float(x)/float(target.size.x-1)*2-1;
-                const vec3 D = normalize(vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
-                float nearestT = inff;
-                bgr3f color = bgr3f(0,0,0);
-                intersect(real, view, D, nearestT, color);
-                const bgr3f realModelColor = color;
-                const bgr3f cameraInputColor = color; // FIXME: synthetic
-                intersect(unreal, view, D, nearestT, color);
-                const bgr3f mixedColor = color;
-                const bgr3f finalColor = cameraInputColor + (mixedColor - realModelColor);
+                //const vec3 D = normalize(view.inverse().normalMatrix() * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
+                const vec3 D = normalize((mat3)(view.transpose()) * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
+                bgr3f cameraInputColor = bgr3f(0, 0, 0); // FIXME: synthetic
+                bgr3f differentialColor = bgr3f(0, 0, 0);
+                bgr3f unrealColor = bgr3f(0, 0, 0);
+                bool unrealHit = 0;
+                float nearestRealT = inff;
+                for(const Plane plane: scene.planes) {
+                    bgr3f albedo;
+                    if(intersect(plane, O, D, nearestRealT, albedo)) {
+                        bgr3f differentialIrradiance; // TODO: directly sample differential irradiance
+                        {
+                            bgr3f realIrradiance = 1, mixedIrradiance = 1; // Directional light
+                            const vec3 hitO = O + nearestRealT*D;
+                            const vec3 L = vec3(0,0,1);
+                            {
+                                const vec3 O = hitO;
+                                const vec3 D = L;
+                                float nearestRealT = inff, nearestMixedT = inff;
+                                bgr3f color;
+                                for(const Sphere sphere: scene.spheres) {
+                                    if(!sphere.real) if(intersect(sphere, O, D, nearestMixedT, color)) mixedIrradiance = 0;
+                                    if( sphere.real) if(intersect(sphere, O, D, nearestRealT, color)) { realIrradiance = 0; mixedIrradiance = 0; }
+                                }
+                            }
+                            cameraInputColor = albedo * realIrradiance;
+                            differentialIrradiance = mixedIrradiance - realIrradiance;
+                        }
+                        differentialColor = albedo * differentialIrradiance;
+                    }
+                }
+                for(const Sphere sphere: scene.spheres) {
+                  if(!sphere.real) if(intersect(sphere, O, D, nearestRealT, unrealColor)) unrealHit=true; // FIXME: nearestRealT
+                  if( sphere.real) intersect(sphere, O, D, nearestRealT, cameraInputColor);
+                }
+                //const bgr3f finalColor = mix(cameraInputColor + differentialColor, unrealColor, unrealHit);
+                const bgr3f finalColor = cameraInputColor + differentialColor;
                 target(x, y) = byte4(sRGB(finalColor.b), sRGB(finalColor.g), sRGB(finalColor.r), 0xFF);
             }
         }

@@ -121,7 +121,7 @@ struct mat4 {
         C(3,0) = -minor(1, 2, 3, 0, 1, 2), C(3,1) =  minor(0, 2, 3, 0, 1, 2), C(3,2) = -minor(0, 1, 3, 0, 1, 2), C(3,3) =  minor(0, 1, 2, 0, 1, 2);
         return C;
     }
-    mat4 transpose() {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
+    mat4 transpose() const {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
     mat4 adjugate() const { return cofactor().transpose(); }
     mat4 inverse() const { return 1/det() * adjugate() ; }
     explicit operator mat3() const {
