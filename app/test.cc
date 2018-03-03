@@ -75,6 +75,7 @@ void importSTL(Scene& scene, string path) {
     TextData s (readFile(path));
     s.skip("solid "); s.line(); // name
     array<uint3> triangles;
+    array<vec3> vertices;
     while(!s.match("endsolid")) {
         s.whileAny(' ');
         s.skip("facet normal "); s.line(); // normal
@@ -82,7 +83,7 @@ void importSTL(Scene& scene, string path) {
         uint3 triangle;
         for(const uint triangleVertex: range(3)) {
             s.whileAny(' '); s.skip("vertex "); const vec3 v = parse<vec3>(s); s.skip('\n');
-            const uint index = scene.vertices.add(v);
+            const uint index = vertices.add(v);
             triangle[triangleVertex] = index;
         }
         triangles.append(triangle);
@@ -91,8 +92,16 @@ void importSTL(Scene& scene, string path) {
     }
     s.line(); // name
     assert_(!s);
-    assert_(scene.vertices.size==8);
+    assert_(vertices.size==8);
 
+    { // Rescale
+        const vec3 min = ::min(vertices);
+        const vec3 max = ::max(vertices);
+        for(vec3& v: vertices) v = (v-min)/(max-min)*2.f-vec3(1); // -> [-1, 1]
+        for(vec3& v: vertices) v /= 2;
+    }
+
+    const uint base = scene.vertices.size;
     while(triangles) {
         uint3 A = triangles.take(0);
         for(uint i: range(triangles.size)) {
@@ -105,16 +114,12 @@ void importSTL(Scene& scene, string path) {
                 else if(A[0] == e0 && A[2] == e1) {}
                 else continue;
                 const uint32 A3 = B[(edgeIndex+2)%3];
-                scene.quads.append({uint4(A[0],A[1],A[2],A3),Image3f(4),Image3f(4)});
+                scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3),Image3f(4),Image3f(4)});
             }
         }
     }
 
-    { // Rescale
-        const vec3 min = ::min(scene.vertices);
-        const vec3 max = ::max(scene.vertices);
-        for(vec3& v: scene.vertices) v = (v-min)/(max-min)*2.f-vec3(1); // -> [-1, 1]
-    }
+    scene.vertices.append(vertices);
 }
 
 void step(Scene& scene) {
@@ -182,7 +187,7 @@ static struct Test : Widget {
                                        scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
                                        Image3f(4),Image3f(4)});
 
-        //importSTL(scene, "Cube.stl");
+        importSTL(scene, "Cube.stl");
 
         //step(scene);
 
@@ -211,7 +216,6 @@ static struct Test : Widget {
                         float u, v; vec3 N;
                         if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) {
                             realOutgoingRadiance = bgr3f(0,v,u);
-                            break;
                             N = normalize(N);
                             const vec3 hitO = O + nearestRealT*D;
                             const uint2 texSize = quad.outgoingRadiance.size;
