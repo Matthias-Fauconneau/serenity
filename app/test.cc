@@ -35,7 +35,7 @@ template<> String str(const Scene::Quad& q) { return str(q.quad); }
 generic T select(bool mask, T t, T f) { return mask ? t : f; }
 generic T rcp(T x) { return 1/x; }
 
-inline bool intersectO0(const vec3 N, const vec3 e1v0, const vec3 v0e2, const vec3 D, float& u, float& v, float& det) {
+inline bool intersect(const vec3 N, const vec3 e1v0, const vec3 v0e2, const vec3 D, float& u, float& v, float& det) {
     u = dot(D, e1v0);
     v = dot(D, v0e2);
     if(!(max(u,v) <= 0)) return false; // u>0, v>0
@@ -45,35 +45,37 @@ inline bool intersectO0(const vec3 N, const vec3 e1v0, const vec3 v0e2, const ve
     return true;
 }
 
-inline bool intersectNEEV(const vec3 N, const vec3 e1, const vec3 e2, const vec3 v0, const vec3 D, float& u, float& v, float& det, float& t) {
-    if(intersectO0(N, cross(e1, v0), cross(v0, e2), D, u, v, det)) {
+inline bool intersect(const vec3 N, const vec3 e1, const vec3 e2, const vec3 v0, const vec3 D, float& u, float& v, float& rcpDet, float& t) {
+    float det;
+    if(intersect(N, cross(e1, v0), cross(v0, e2), D, u, v, det)) {
         const float Nv0 = dot(N, v0);
-        t = Nv0 / det;
+        rcpDet = rcp( det );
+        t = Nv0 * rcpDet;
         return true;
     }
     return false;
 }
 
-inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 O, const vec3 D, vec3& N, float& u, float& v, float& det, float& t) {
+inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 O, const vec3 D, vec3& N, float& u, float& v, float& rcpDet, float& t) {
     const vec3 e1 = v2 - v0;
     const vec3 e2 = v1 - v0;
     N = cross(e2, e1);
-    return intersectNEEV(N, e1, e2, v0-O, D, t, u, v, det);
+    return intersect(N, e1, e2, v0-O, D, t, u, v, rcpDet);
 }
 
 bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
-#if 1
-    float det, t;
-    if(intersect(a, b, c, O, D, N, u, v, det, t) && t < nearestT) {
+#if 0
+    float rcpDet, t;
+    if(intersect(a, b, c, O, D, N, u, v, rcpDet, t) && t < nearestT) {
         nearestT = t;
-        u /= det;
-        v /= det;
+        u *= rcpDet;
+        v *= rcpDet;
         return true;
     }
-    if(intersect(a, c, d, O, D, N, u, v, det, t) && t < nearestT) {
+    if(intersect(a, c, d, O, D, N, u, v, rcpDet, t) && t < nearestT) {
         nearestT = t;
-        u /= det;
-        v /= det;
+        u *= rcpDet;
+        v *= rcpDet;
         u = 1 - u;
         v = 1 - v;
         return true;
@@ -81,21 +83,21 @@ bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec
     return false;
 #else
     const vec3 vA = a-O, vB = b-O, vC = c-O, vD = d-O;
-    const vec3 eDB = vB-vD;
-    const float W = dot(cross(vD,eDB), D);
-    const vec3 v0 = select(W > 0,vA,vC);
-    const vec3 v1 = select(W > 0,vB,vD);
-    const vec3 v2 = select(W > 0,vD,vB);
+    const vec3 eAC = vC-vA;
+    const float W = dot(cross(vA,eAC), D);
+    const vec3 v0 = select(W>0, vB, vD);
+    const vec3 v1 = select(W>0, vC, vA);
+    const vec3 v2 = select(W>0, vA, vC);
     const vec3 e1 = v2-v0;
     const vec3 e2 = v0-v1;
-    const float U = dot(cross(v0,e1), D);
-    const float V = dot(cross(v1,e2), D);
-    if(!(min(U,V) > 0)) return false;
     N = cross(e2,e1);
-    const float det = dot(N,D);
-    if(!(det != 0)) return false; // FIXME: single-sided
+    const float U = dot(cross(v0,e1), D);
+    const float V = dot(cross(v0,e2), D);
+    if(!(min(U,V) > 0)) return false;
+    const float det = dot(N, D);
+    if(!(det > 0)) return false;
     const float rcpDet = rcp( det );
-    const float t = rcpDet * dot(v0, N);
+    const float t = rcpDet * dot(N, v0);
     if(!(t < nearestT)) return false;
     nearestT = t;
     const float triU = rcpDet * U;
