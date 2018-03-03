@@ -35,36 +35,62 @@ template<> String str(const Scene::Quad& q) { return str(q.quad); }
 generic T select(bool mask, T t, T f) { return mask ? t : f; }
 generic T rcp(T x) { return 1/x; }
 
-inline bool intersect(const vec3 A, const vec3 B, const vec3 C, const vec3 O, const vec3 D, float& det, float& u, float& v, float& t) {
-    const vec3 eAC = C - A;
-    const vec3 P = cross(D, eAC);
-    const vec3 eAB = B - A;
-    det = dot(eAB, P);
-    const vec3 T = O - A;
-    u = dot(T, P) / det;
-    const vec3 Q = cross(T, eAB);
-    v = dot(D, Q) / det;
-    t = dot(eAC, Q) / det;
-    return det != 0 && u >= 0 && v >= 0 && (u + v) <= 1; // && t > 0;
+inline bool intersectO0(const vec3 N, const vec3 e1v0, const vec3 v0e2, const vec3 D, float& u, float& v, float& det) {
+    u = dot(D, e1v0);
+    v = dot(D, v0e2);
+    if(!(max(u,v) <= 0)) return false; // u>0, v>0
+    det = dot(N, D);
+    if(!(det < 0)) return false; // Backward
+    if(!((u + v) > det)) return false; // u+v<1
+    return true;
 }
 
-bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec3 O, const vec3 D, float& nearestT, float& u, float& v, vec3& N) {
+inline bool intersectNEEV(const vec3 N, const vec3 e1, const vec3 e2, const vec3 v0, const vec3 D, float& u, float& v, float& det, float& t) {
+    if(intersectO0(N, cross(e1, v0), cross(v0, e2), D, u, v, det)) {
+        const float Nv0 = dot(N, v0);
+        t = Nv0 / det;
+        return true;
+    }
+    return false;
+}
+
+inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 O, const vec3 D, vec3& N, float& u, float& v, float& det, float& t) {
+    const vec3 e1 = v2 - v0;
+    const vec3 e2 = v1 - v0;
+    N = cross(e2, e1);
+    return intersectNEEV(N, e1, e2, v0-O, D, t, u, v, det);
+}
+
+bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
 #if 1
     float det, t;
-    return intersect(a, b, c, O, D, det, u, v, t);
+    if(intersect(a, b, c, O, D, N, u, v, det, t) && t < nearestT) {
+        nearestT = t;
+        u /= det;
+        v /= det;
+        return true;
+    }
+    if(intersect(a, c, d, O, D, N, u, v, det, t) && t < nearestT) {
+        nearestT = t;
+        u /= det;
+        v /= det;
+        u = 1 - u;
+        v = 1 - v;
+        return true;
+    }
+    return false;
 #else
     const vec3 vA = a-O, vB = b-O, vC = c-O, vD = d-O;
     const vec3 eDB = vB-vD;
-    const float WW = dot(cross(vD,eDB), D);
-    const vec3 v0 = select(WW <= 0.0f,vA,vC);
-    const vec3 v1 = select(WW <= 0.0f,vB,vD);
-    const vec3 v2 = select(WW <= 0.0f,vD,vB);
+    const float W = dot(cross(vD,eDB), D);
+    const vec3 v0 = select(W > 0,vA,vC);
+    const vec3 v1 = select(W > 0,vB,vD);
+    const vec3 v2 = select(W > 0,vD,vB);
     const vec3 e1 = v2-v0;
     const vec3 e2 = v0-v1;
     const float U = dot(cross(v0,e1), D);
     const float V = dot(cross(v1,e2), D);
-    if(!(max(U,V) <= 0.0f)) return false;
-    error(O, D, WW, U, V);
+    if(!(min(U,V) > 0)) return false;
     N = cross(e2,e1);
     const float det = dot(N,D);
     if(!(det != 0)) return false; // FIXME: single-sided
@@ -74,17 +100,17 @@ bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec
     nearestT = t;
     const float triU = rcpDet * U;
     const float triV = rcpDet * V;
-    u = select(WW <= 0.0f, triU, 1-triU);
-    v = select(WW <= 0.0f, triV, 1-triV);
+    u = select(W > 0, triU, 1-triU);
+    v = select(W > 0, triV, 1-triV);
     return true;
 #endif
 }
 
-bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, float& nearestT, float& u, float& v, vec3& N) {
-    return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, nearestT, u, v, N);
+bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+    return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, N, nearestT, u, v);
 }
-bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, float& nearestT, float& u, float& v, vec3& N) {
-    return intersect(scene.vertices, quad.quad, O, D, nearestT, u, v, N);
+bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+    return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
 }
 
 void importSTL(Scene& scene, string path) {
@@ -168,8 +194,8 @@ void step(Scene& scene) {
                         float nearestRealT = inff, nearestVirtualT = inff;
                         for(const Scene::Quad& quad: scene.quads) {
                             float u,v; vec3 N;
-                            if(!quad.real) intersect(scene, quad, O, D, nearestVirtualT, u, v, N);
-                            if( quad.real) intersect(scene, quad, O, D, nearestRealT, u, v, N);
+                            if(!quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
+                            if( quad.real) intersect(scene, quad, O, D, N, nearestRealT, u, v);
                         }
                         differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
                     }
@@ -225,7 +251,7 @@ static struct Test : Widget {
                     float nearestRealT = inff;
                     for(const Scene::Quad& quad: scene.quads) {
                         float u, v; vec3 N;
-                        if(intersect(scene, quad, O, D, nearestRealT, u, v, N)) {
+                        if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) {
                             realOutgoingRadiance = 1;
                             break;
                             N = normalize(N);
@@ -257,7 +283,7 @@ static struct Test : Widget {
                                     float nearestRealT = inff;
                                     for(const Scene::Quad& quad: scene.quads) {
                                         float u,v; vec3 N;
-                                        if( quad.real) if(intersect(scene, quad, O, D, nearestRealT, u, v, N)) realIncomingRadiance = 0;
+                                        if( quad.real) if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
                                     }
                                 }
                                 const bgr3f albedo = 1;
