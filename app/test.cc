@@ -1,5 +1,6 @@
 #include "thread.h"
 #if 1
+#include "parse.h"
 #include "matrix.h"
 #include "window.h"
 #include "image-render.h"
@@ -80,6 +81,20 @@ static struct Test : Widget {
 
     unique<Window> window = ::window(this, 2048, mainThread, 0);
     Test() {
+        TextData s (readFile("Cube.stl"));
+        s.skip("solid "); s.line(); // name
+        while(!s.match("endsolid")) {
+            s.whileAny(' ');
+            s.skip("facet normal "); s.line(); // normal
+            s.whileAny(' '); s.skip("outer loop\n");
+            vec3 V[3];
+            for(uint i: range(3)) { s.whileAny(' '); s.skip("vertex "); V[i] = parse<vec3>(s); s.skip('\n'); }
+            log(V);
+            s.whileAny(' '); s.skip("endloop\n");
+            s.whileAny(' '); s.skip("endfacet\n");
+        }
+        s.line(); // name
+        assert_(!s);
 
         scene.planes.append(Scene::Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, Image3f(512)});
         scene.spheres.append(Scene::Sphere{{-1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, true});
