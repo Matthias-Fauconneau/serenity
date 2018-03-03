@@ -69,26 +69,21 @@ static inline LightRay lightRay(Random& random, const Scene& scene, const vec3 O
 */
 
 static struct Test : Widget {
+    Scene scene;
+
+    const float lightSize = 4;
+    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 1/*lightSize/sq(lightSize)*/};
+
+    Random random;
+
+    vec3 viewPosition = vec3(-1./2,0,0);
+
     unique<Window> window = ::window(this, 2048, mainThread, 0);
     Test() {
-        window->show();
-    }
-    void render(RenderTarget2D& target_, vec2, vec2) override {
-        const Image& target = (ImageRenderTarget&)target_;
 
-        const float near = 3;
-        const mat4 view = mat4().translate({0,0,-near-1}).rotateX(-π/4);
-        const vec3 O = view.inverse() * vec3(0,0,0);
-
-        Scene scene;
         scene.planes.append(Scene::Plane{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, Image3f(512)});
         scene.spheres.append(Scene::Sphere{{-1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, true});
         scene.spheres.append(Scene::Sphere{{+1./2,0,1./2}, sq(1./2), 1/*{1,0,0}*/, false});
-
-        const float lightSize = 4;
-        Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 1/*lightSize/sq(lightSize)*/};
-
-        Random random;
 
         {
             Time time (true);
@@ -132,6 +127,16 @@ static struct Test : Widget {
             log(time);
         }
 
+        window->show();
+    }
+    void render(RenderTarget2D& target_, vec2, vec2) override {
+        const Image& target = (ImageRenderTarget&)target_;
+
+        const float near = 3;
+        const mat4 view = mat4().translate({0,0,-near-1}).rotateX(-π/4);
+        const vec3 O = view.inverse() * viewPosition;
+        viewPosition += vec3(1./30,0,0);
+
         {
             Time time {true};
             for(uint y: range(target.size.y)) {
@@ -154,7 +159,7 @@ static struct Test : Widget {
                             const uint y = (1+v)/2*(texSize.y-1);
                             assert_(x<texSize.x && y<texSize.y, x, y, u, v);
                             differentialOutgoingRadiance = plane.differentialOutgoingRadiance(x, y); // FIXME: bilinear
-                            const uint sampleCount = 16;
+                            const uint sampleCount = 1;
                             bgr3f realOutgoingRadianceSum = 0;
                             for(uint unused i: range(sampleCount)) {
                                 bgr3f realIncomingRadiance;
@@ -225,6 +230,7 @@ static struct Test : Widget {
             }
             log(time);
         }
+        window->render();
     }
 } test;
 
