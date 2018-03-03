@@ -161,5 +161,6 @@ struct byte4 : vec<bgra,uint8,4> {
 };
 
 template<template<Type> class V, Type T> inline vec<V,T,3> cross(vec<V,T,3> a, vec<V,T,3> b) { return vec<V,T,3>(a.y*b.z - b.y*a.z, a.z*b.x - b.z*a.x, a.x*b.y - b.x*a.y); }
+template<template<Type> class V, Type T> inline vec<V,T,3> _cross(vec<V,T,3> a, vec<V,T,3> b) { return vec<V,T,3>(b.y*a.z - a.y*b.z, b.z*a.x - a.z*b.x, b.x*a.y - a.x*b.y); }
 
 inline String strx(uint2 N) { return str(N.x)+'x'+str(N.y); }
