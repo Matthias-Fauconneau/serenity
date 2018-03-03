@@ -63,7 +63,7 @@ inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 O,
     return intersect(N, e1, e2, v0-O, D, t, u, v, rcpDet);
 }
 
-bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+bool intersect(const vec3 vA, const vec3 vB, const vec3 vC, const vec3 vD, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
 #if 0
     float rcpDet, t;
     if(intersect(a, b, c, O, D, N, u, v, rcpDet, t) && t < nearestT) {
@@ -82,22 +82,23 @@ bool intersect(const vec3 a, const vec3 b, const vec3 c, const vec3 d, const vec
     }
     return false;
 #else
-    const vec3 vA = a-O, vB = b-O, vC = c-O, vD = d-O;
     const vec3 eAC = vC-vA;
-    const float W = dot(cross(vA,eAC), D);
+    const float W = dot(-cross(eAC, vA-O), D);
     const vec3 v0 = select(W>0, vB, vD);
     const vec3 v1 = select(W>0, vC, vA);
     const vec3 v2 = select(W>0, vA, vC);
     const vec3 e1 = v2-v0;
     const vec3 e2 = v0-v1;
     N = cross(e2,e1);
-    const float U = dot(cross(v0,e1), D);
-    const float V = dot(cross(v0,e2), D);
+    const float Nv0 = dot(N, vA-O);
+    const vec3 v0O = v0 - O;
+    const float U = dot(cross(v0O,e1), D);
+    const float V = dot(cross(v0O,e2), D);
     if(!(min(U,V) > 0)) return false;
     const float det = dot(N, D);
     if(!(det > 0)) return false;
     const float rcpDet = rcp( det );
-    const float t = rcpDet * dot(N, v0);
+    const float t = Nv0 * rcpDet;
     if(!(t < nearestT)) return false;
     nearestT = t;
     const float triU = rcpDet * U;
