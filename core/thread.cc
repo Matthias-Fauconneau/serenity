@@ -75,7 +75,7 @@ void Thread::run() {
     if(revents && !unregistered.contains(poll)) {
      poll->revents = revents;
      Locker lock(runLock);
-     try { poll->event(); } catch(...) { error("Uncaught exception"); }
+     try { poll->event(); } catch(...) { log("Uncaught exception"); exit_group(-1); }
     }
    }
   }
@@ -169,9 +169,9 @@ template<> void __attribute((noreturn)) error(const string& message) {
   log(trace(3,0));
   reentrant = false;
  }
- log(message);
- __builtin_trap(); //TODO: detect if running under debugger
- exit_group(-1); // Exits this group (process)
+ //__builtin_trap(); //TODO: detect if running under debugger
+ //exit_group(-1); // Exits this group (process)
+ throw "";
 }
 
 static Semaphore jobs __attribute((init_priority(102)));
