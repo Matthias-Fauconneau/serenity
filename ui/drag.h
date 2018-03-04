@@ -9,6 +9,8 @@ struct Drag : virtual Widget {
 
     vec2 value = vec2(0, 0);
 
+    Drag(vec2 value) : value(value) {}
+
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
         if(event == Press) dragStart = {cursor, value};
         if(event==Motion && button==LeftButton) {

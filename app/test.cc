@@ -6,51 +6,51 @@
 #include "algorithm.h"
 #include "drag.h"
 
+generic T rcp(T x) { return 1/x; }
+generic T select(bool mask, T t, T f) { return mask ? t : f; }
 generic T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
 
 generic inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
 generic inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-struct Scene {
-    struct Quad {
-        uint4 quad;
-        Image3f outgoingRadiance; // for real surfaces: differential
-        bool real = true;
-        //Image3f realOutgoingRadiance; // Faster rendering of synthetic real surfaces for synthetic test
-        //const bgr3f albedo = 1;
-    };
+struct Quad { vec3 _[4]; };
 
-    array<vec3> vertices;
-    array<Quad> quads;
+bool allVerticesInsidePlane(Quad A, Quad B) {
+    const vec3 N = cross(B._[1]-B._[0], B._[3]-B._[0]);
+    const float d = dot(N, B._[0]);
+    for(vec3 v: A._) if(dot(N, v) < d) return false;
+    return true;
+}
 
-    struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
+bool operator <(Quad A, Quad B) {
+    const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
+    const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
+    if(maxA.z < minB.z) return true;
+    if(maxB.z < minA.z) return false;
+    if(allVerticesInsidePlane(A, B)) return true;
+    if(allVerticesInsidePlane(B, A)) return false;
+    log(A._);
+    log(B._);
+    error("");
+}
 
-    const float lightSize = 1;
-    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 2/*lightSize/sq(lightSize)*/};
-};
+bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+    const vec3 e01 = v1-v0;
+    const vec3 e12 = v2-v1;
+    const vec3 e23 = v3-v2;
+    const vec3 e30 = v0-v3;
+    N = cross(e01, e12);
 
-template<> String str(const Scene::Quad& q) { return str(q.quad); }
+    const float Nv0 = dot(N, v0-O);
+    const vec3 e01v0O = _cross(e01,v0-O);
+    const vec3 e12v2O = _cross(e12,v2-O);
+    const vec3 e23v2O = _cross(e23,v2-O);
+    const vec3 e30v0O = _cross(e30,v0-O);
 
-generic T select(bool mask, T t, T f) { return mask ? t : f; }
-generic T rcp(T x) { return 1/x; }
-
-bool intersect(const vec3 vA, const vec3 vB, const vec3 vC, const vec3 vD, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
-    const vec3 eAB = vB-vA;
-    const vec3 eBC = vC-vB;
-    const vec3 eCD = vD-vC;
-    const vec3 eDA = vA-vD;
-    N = cross(eAB, eBC);
-
-    const float Nv0 = dot(N, vA-O);
-    const vec3 eABvAO = _cross(eAB,vA-O);
-    const vec3 eBCvCO = _cross(eBC,vC-O);
-    const vec3 eCDvCO = _cross(eCD,vC-O);
-    const vec3 eDAcAO = _cross(eDA,vA-O);
-
-    const float V0 = dot(eABvAO, D);
-    const float U1 = dot(eBCvCO, D);
-    const float V1 = dot(eCDvCO, D);
-    const float U0 = dot(eDAcAO, D);
+    const float V0 = dot(e01v0O, D);
+    const float U1 = dot(e12v2O, D);
+    const float V1 = dot(e23v2O, D);
+    const float U0 = dot(e30v0O, D);
     if(!(max(max(max(U0,V1),U1),V0) <= 0)) return false;
     const float det = dot(N, D);
     if(!(det < 0)) return false;
@@ -67,6 +67,25 @@ bool intersect(const vec3 vA, const vec3 vB, const vec3 vC, const vec3 vD, const
 bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, N, nearestT, u, v);
 }
+
+struct Scene {
+    struct Quad {
+        uint4 quad;
+        Image3f outgoingRadiance; // for real surfaces: differential
+        bool real = true;
+        Image3f realOutgoingRadiance; // Faster rendering of synthetic real surfaces for synthetic test
+        //const bgr3f albedo = 1;
+    };
+
+    array<vec3> vertices;
+    array<Quad> quads;
+
+    struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
+
+    const float lightSize = 1;
+    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 2/*lightSize/sq(lightSize)*/};
+};
+
 bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
 }
@@ -115,7 +134,8 @@ void importSTL(Scene& scene, string path, vec3 origin, bool real) {
                 else if(A[0] == e0 && A[2] == e1) {}
                 else continue;
                 const uint32 A3 = B[(edgeIndex+2)%3];
-                scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3), Image3f(256), real/*, real?Image3f(4):Image3f()*/});
+                const uint2 size = uint2(256); // FIXME: auto resolution
+                scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3), Image3f(size), real, real?Image3f(size):Image3f()});
             }
         }
     }
@@ -132,16 +152,18 @@ void step(Scene& scene, Random& random) {
         const vec3 v3 = scene.vertices[quad.quad[3]];
         const vec3 N = normalize(cross(v1-v0, v3-v0));
 
-        const Image3f& target = quad.outgoingRadiance;
-        for(uint y: range(target.size.y)) {
-            const float v = float(y)/float(target.size.y-1);
-            for(uint x: range(target.size.x)) {
-                const float u = float(x)/float(target.size.x-1);
+        const uint2 size = quad.outgoingRadiance.size;
+        for(uint y: range(size.y)) {
+            const float v = float(y)/float(size.y-1);
+            for(uint x: range(size.x)) {
+                const float u = float(x)/float(size.x-1);
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                bgr3f differentialOutgoingRadianceSum = 0; // Directional light
-                const uint sampleCount = 3;
+                bgr3f differentialOutgoingRadianceSum = 0;
+                bgr3f realOutgoingRadianceSum = 0; // Synthetic test case
+                const uint sampleCount = 1;
                 for(uint unused i: range(sampleCount)) {
                     bgr3f differentialIncomingRadiance;
+                    bgr3f realIncomingRadiance;
                     {
                         v8sf random8 = random.next();
                         const vec2 uv (random8[0], random8[1]);
@@ -158,10 +180,15 @@ void step(Scene& scene, Random& random) {
 
                         if(quad.real) {
                             float nearestRealT = inff, nearestVirtualT = inff;
+                            realIncomingRadiance = incomingRadiance;
                             for(const Scene::Quad& quad: scene.quads) {
                                 vec3 N; float u,v;
                                 if(!quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
-                                if( quad.real) intersect(scene, quad, O, D, N, nearestRealT, u, v);
+                                if( quad.real) {
+                                    if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) {
+                                        realIncomingRadiance = 0;
+                                    }
+                                }
                             }
                             differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
                         } else {
@@ -175,12 +202,14 @@ void step(Scene& scene, Random& random) {
                     }
                     const bgr3f albedo = 1;
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
+                    realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
-                target(x, y) = (1/float(sampleCount)) * differentialOutgoingRadianceSum;
+                quad.outgoingRadiance(x, y) = (1/float(sampleCount)) * differentialOutgoingRadianceSum;
+                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = (1/float(sampleCount)) * realOutgoingRadianceSum;
             }
         }
     }
-    log(time);
+    log(time.milliseconds(),"ms");
 }
 
 static struct Test : Drag {
@@ -192,11 +221,14 @@ static struct Test : Drag {
 
     unique<Window> window = ::window(this, 2048, mainThread, 0);
 
-    Test() {
-        if(1) scene.quads.append(Scene::Quad{uint4(
-                                       scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
-                                       scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
-                                       Image3f(512), true/*, Image3f(4)*/});
+    Test() : Drag(vec2(0,-π/3)) {
+        {
+            const uint2 size = uint2(512); // FIXME: auto resolution
+            scene.quads.append(Scene::Quad{uint4(
+                                           scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
+                                           scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
+                                           Image3f(size), true, Image3f(size)});
+        }
 
         importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4), true );
         importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4), false);
@@ -224,7 +256,62 @@ static struct Test : Drag {
                 .translate(vec3(1)); // -1, 1 -> 0, 2
         const mat4 M = NDC * projection * view;
 
-        for(const Scene::Quad& quad: scene.quads) { // TODO: Z-Order
+        // Transform
+        buffer<vec3> transformedVertices (scene.vertices.size);
+        for(const uint i: range(scene.vertices.size)) transformedVertices[i] = (M * vec4(scene.vertices[i], 1)).xyw();
+
+        buffer<uint> quads (scene.quads.size, 0);
+        for(const uint i: range(scene.quads.size)) {
+            vec3 A[4]; for(const uint v: ::range(4)) A[v] = transformedVertices[scene.quads[i].quad[v]];
+            const vec3 N = cross(A[1]-A[0], A[3]-A[0]);
+            if(N.z >= 0) continue; // Back facing
+            quads.append(i);
+        }
+
+        { // Z-Order polygon quick sort
+            typedef uint T;
+            const mref<T> at = quads;
+
+            int2 stack[32];
+            stack[0] = {0, int(at.size)-1};
+            int top = 0;
+            while(top >= 0) {
+                const int2 range = stack[top];
+                top--;
+
+                const int left  = range[0];
+                const int right = range[1];
+
+                if(left < right) { // If the list has 2 or more items
+                    swap(at[(left + right)/2], at[right]);
+                    const T& pivot = at[right];
+                    int pivotIndex = left;
+                    for(const uint i: ::range(left,right)) { // Split
+                        Quad A; for(const uint v: ::range(4)) A._[v] = transformedVertices[scene.quads[at[i]].quad[v]];
+                        Quad B; for(const uint v: ::range(4)) B._[v] = transformedVertices[scene.quads[pivot].quad[v]];
+                        if(A < B) {
+                            swap(at[pivotIndex], at[i]);
+                            pivotIndex++;
+                        }
+                    }
+                    swap(at[pivotIndex], at[right]);
+                    // Push larger partition first to start with smaller partition and guarantee stack < log2 N
+                    if(pivotIndex-left > right-pivotIndex) {
+                        top++;
+                        stack[top] = {left, pivotIndex-1};
+                        top++;
+                        stack[top] = {pivotIndex+1, right};
+                    } else {
+                        top++;
+                        stack[top] = {pivotIndex+1, right};
+                        top++;
+                        stack[top] = {left, pivotIndex-1};
+                    }
+                }
+            }
+        }
+
+        for(const Scene::Quad& quad: scene.quads) {
             int2 V[4];
             float iw[4]; // FIXME: float
             for(const uint i: range(4)) {
@@ -236,10 +323,10 @@ static struct Test : Drag {
             const int2 min = ::min<int2>(V);
             const int2 max = ::max<int2>(V);
 
-            for(const uint y: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
-                const uint Y = pixel*y + pixel/2;
-                for(const uint x: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
-                    const uint X = pixel*x + pixel/2;
+            for(const uint targetY: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
+                const uint Y = pixel*targetY + pixel/2;
+                for(const uint targetX: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
+                    const uint X = pixel*targetX + pixel/2;
 
                     int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
                     int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
@@ -286,64 +373,20 @@ static struct Test : Drag {
                         const float u = A.x;
                         const float v = A.y;
 
-                        bgr3f realOutgoingRadiance; // FIXME: synthetic
-                        if(!quad.real) realOutgoingRadiance = bgr3f(0, 0, 0);
-                        else { // Synthetic real
-                            const uint sampleCount = 1;
-                            bgr3f outgoingRadianceSum = 0;
-                            for(uint unused i: range(sampleCount)) {
-                                bgr3f realIncomingRadiance;
-                                {
-                                    const vec3 v0 = scene.vertices[quad.quad[0]];
-                                    const vec3 v1 = scene.vertices[quad.quad[1]];
-                                    const vec3 v3 = scene.vertices[quad.quad[3]];
-                                    const vec3 N = normalize(cross(v1-v0, v3-v0));
-                                    const vec3 O = v0 + (v1-v0) * u + (v3-v0) * v;
+                        // FIXME: fold texSize in UV vertex attributes
+                        const uint2 texSize = quad.outgoingRadiance.size;
+                        const uint texX = u*(texSize.x-1);
+                        const uint texY = v*(texSize.y-1);
 
-                                    v8sf random8 = random.next();
-                                    const vec2 uv (random8[0], random8[1]);
-                                    const Scene::QuadLight light = scene.light;
-                                    const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
-
-                                    const float dotNL = dot(N, D);
-                                    if(dotNL <= 0) continue;
-                                    const float dotAreaL = - dot(light.N, D);
-                                    if(dotAreaL <= 0) continue;
-
-                                    realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
-
-                                    float nearestRealT = inff;
-                                    for(const Scene::Quad& quad: scene.quads) {
-                                        float u,v; vec3 N;
-                                        if( quad.real) {
-                                            if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
-                                        }
-                                    }
-                                }
-                                const bgr3f albedo = 1;
-                                outgoingRadianceSum += albedo * realIncomingRadiance;
-                            }
-                            const bgr3f outgoingRadiance = (1/float(sampleCount)) * outgoingRadianceSum;
-                            realOutgoingRadiance = outgoingRadiance;
-                        }
-
-                        bgr3f differentialOutgoingRadiance; // or virtual outgoing radiance
-                        {
-                            // FIXME: fold texSize in UV vertex attributes
-                            const uint2 texSize = quad.outgoingRadiance.size;
-                            const uint x = u*(texSize.x-1);
-                            const uint y = v*(texSize.y-1);
-                            assert_(x<texSize.x && y<texSize.y, x, y, u, v);
-                            differentialOutgoingRadiance = quad.outgoingRadiance(x, y); // FIXME: bilinear
-                        }
-
+                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : 0; // FIXME: synthetic test case
+                        const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
-                        target(x, target.size.y-1-y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
+                        target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
                     }
                 }
             }
         }
-        log(time);
+        if(time.milliseconds()>100) log(time.milliseconds(),"ms");
         //viewPosition += vec3(1./30,0,0);
         //window->render();
     }
