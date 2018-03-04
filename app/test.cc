@@ -18,26 +18,6 @@ struct Quad { vec3 _[4]; };
 bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
 template<> String str(const Quad& A) { return str(A._); }
 
-int allVerticesSameSidePlaneNoCheck(Quad A, Quad B) {
-    const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
-    static constexpr float ε = 0x1p-20;
-    int sign = 0;
-    for(vec3 v: A._) {
-        const vec3 OP = v-B._[0];
-        const float t = dot(N, OP);
-        const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
-        if(t > +εOP) {
-            if(sign<0) return 0;
-            sign = +1;
-        }
-        if(t < -εOP) {
-            if(sign>0) return 0;
-            sign = -1;
-        }
-    }
-    return sign;
-}
-
 int allVerticesSameSidePlane(Quad A, Quad B) {
     const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
     static constexpr float ε = 0x1p-20;
@@ -55,101 +35,16 @@ int allVerticesSameSidePlane(Quad A, Quad B) {
             sign = -1;
         }
     }
-#if 0
-    if(allVerticesSameSidePlaneNoCheck(B, A) && allVerticesSameSidePlaneNoCheck(B, A) != -sign) {
-        log(A);
-        log(B);
-        {
-            int sign = 0;
-            for(vec3 v: A._) {
-                const vec3 OP = v-B._[0];
-                const float t = dot(N, OP);
-                const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
-                if(t > +εOP) {
-                    log("+");
-                    sign = +1;
-                }
-                else
-                if(t < -εOP) {
-                    log("-", t/length(OP));
-                    sign = -1;
-                }
-                else log("0", t);
-            }
-        }
-        log("vB pA");
-        {
-            int sign = 0;
-            for(vec3 v: B._) {
-                const vec3 OP = v-A._[0];
-                const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
-                const float t = dot(Na, OP);
-                const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
-                if(t > +εOP) {
-                    log("+");
-                    sign = +1;
-                }
-                else
-                if(t < -εOP) {
-                    log("-", t/length(OP));
-                    sign = -1;
-                }
-                else log("0", t);
-            }
-        }
-        error(sign, allVerticesSameSidePlaneNoCheck(B, A));
-    }
-#endif
     return sign;
-}
-
-int opCmpNoCheck(Quad A, Quad B) {
-    const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
-    const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
-    if(-minA.z < -maxB.z) { return -1; }
-    if(-minB.z < -maxA.z) { return +1; }
-    if(allVerticesSameSidePlane(A, B) > 0) return -1;
-    if(allVerticesSameSidePlane(B, A) > 0) return +1;
-
-    //{const int sign = allVerticesSameSidePlane(A, B); if(sign) return +sign;}
-    //{const int sign = allVerticesSameSidePlane(B, A); if(sign) return -sign;}
-#if 0 // Coplanar
-    const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
-    const float da = dot(Na, A._[0]);
-    const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
-    const float db = dot(Nb, B._[0]);
-    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))));
-    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)));
-#endif
-    return 0; // ==
 }
 
 int opCmp(Quad A, Quad B) {
     const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
     const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
-    if(-minA.z < -maxB.z) { assert_(opCmpNoCheck(B,A)==+1); return -1; }
-    if(-minB.z < -maxA.z) { assert_(opCmpNoCheck(B,A)==-1); return +1; }
+    if(-minA.z < -maxB.z) return -1;
+    if(-minB.z < -maxA.z) return +1;
     if(allVerticesSameSidePlane(A, B) > 0) return -1;
     if(allVerticesSameSidePlane(B, A) > 0) return +1;
-
-    /*{const int sign = allVerticesSameSidePlane(A, B);
-        if(sign==+1) assert_(opCmpNoCheck(B,A)==-1, "B");
-        if(sign==-1) assert_(opCmpNoCheck(B,A)==+1);
-        if(sign) return sign;
-    }
-    {const int sign = allVerticesSameSidePlane(B, A);
-        if(sign==-1) assert_(opCmpNoCheck(B,A)==-1);
-        if(sign==+1) assert_(opCmpNoCheck(B,A)==+1, "C", opCmpNoCheck(B,A), A, B);
-        if(sign) return -sign;
-    }*/
-#if 0 // Coplanar
-    const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
-    const float da = dot(Na, A._[0]);
-    const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
-    const float db = dot(Nb, B._[0]);
-    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))));
-    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)));
-#endif
     return 0; // ==
 }
 
@@ -403,15 +298,8 @@ static struct Test : Drag {
                     const T& pivot = at[right];
                     int pivotIndex = left;
                     for(const uint i: ::range(left,right)) { // Split
-#if 1
                         Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A._[v] = viewVertices[a[v]]; }
                         Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B._[v] = viewVertices[b[v]]; }
-#else
-                        const uint4 a = scene.quads[at[i]].quad;
-                        const float A = -(viewVertices[a[0]]+viewVertices[a[1]]+viewVertices[a[2]]+viewVertices[a[3]]).z;
-                        const uint4 b = scene.quads[pivot].quad;
-                        const float B = -(viewVertices[b[0]]+viewVertices[b[1]]+viewVertices[b[2]]+viewVertices[b[3]]).z;
-#endif
                         if(A < B) {
                             swap(at[pivotIndex], at[i]);
                             pivotIndex++;
@@ -430,24 +318,6 @@ static struct Test : Drag {
                         top++;
                         stack[top] = {left, pivotIndex-1};
                     }
-                }
-            }
-        }
-
-        if(0) { // Asserts sort
-            for(uint i: range(quads.size)) {
-                Quad A; { const uint4 a = scene.quads[quads[i]].quad; for(const uint v: ::range(4)) A._[v] = viewVertices[a[v]]; }
-                for(uint j: range(quads.size)) {
-                    Quad B; { const uint4 b = scene.quads[quads[j]].quad; for(const uint v: ::range(4)) B._[v] = viewVertices[b[v]]; }
-                    const int sign = opCmp(A, B);
-                    if(opCmp(A, B) != -opCmp(B, A)) {
-                        log(A);
-                        log(B);
-                        error(opCmp(A, B), opCmp(B, A));
-                    }
-                    if(i < j) assert_(sign <= 0, i,j, sign, A, B);
-                    if(i == j) assert_(sign == 0, sign);
-                    if(i > j) assert_(sign >= 0);
                 }
             }
         }
