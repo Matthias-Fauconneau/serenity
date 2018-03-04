@@ -15,16 +15,13 @@ generic inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t
 
 struct Quad { vec3 _[4]; };
 
-static float maxε = 0;
-
 int allVerticesSameSidePlane(Quad A, Quad B) {
     const vec3 N = cross(B._[1]-B._[0], B._[3]-B._[0]);
     const float d = dot(N, B._[0]);
+    const float ε = 0x1p-20*abs(d);
     int sign = 0;
     for(vec3 v: A._) {
         float t = dot(N, v) - d;
-        const float ε = 0x1p-20*abs(d);
-        maxε = ::max(maxε, ε);
         if(t > +ε) {
             if(sign<0) return 0;
             sign = +1;
@@ -37,29 +34,6 @@ int allVerticesSameSidePlane(Quad A, Quad B) {
     return sign;
 }
 
-void quadPlaneDistances(Quad A, Quad B) {
-    const vec3 N = cross(B._[1]-B._[0], B._[3]-B._[0]);
-    const float d = dot(N, B._[0]);
-    int sign = 0;
-    for(vec3 v: A._) {
-        float t = dot(N, v) - d;
-        const float ε = 0x1p-20*abs(d);
-        maxε = ::max(maxε, ε);
-        if(t>+ε) {
-            if(sign<0) { log("-", dot(N, v)-d, __builtin_log2(abs(d/(dot(N, v)-d)))); return; }
-            log(dot(N, v)-d, __builtin_log2(abs(d/(dot(N, v)-d))));
-            sign = +1;
-        }
-        if(t<-ε) {
-            if(sign>0) { log("+", dot(N, v)-d, __builtin_log2(abs(d/(dot(N, v)-d)))); return; }
-            log(dot(N, v)-d, __builtin_log2(abs(d/(dot(N, v)-d))));
-            sign = -1;
-        }
-    }
-    assert_(!sign, maxε);
-    for(vec3 v: A._) log("O", dot(N, v)-d, __builtin_log2(abs(d/(dot(N, v)-d))));
-}
-
 bool operator<(Quad A, Quad B) {
     const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
     const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
@@ -67,20 +41,14 @@ bool operator<(Quad A, Quad B) {
     if(maxB.z < minA.z) return false;
     {const int sign = allVerticesSameSidePlane(A, B); if(sign) return sign>0; }
     {const int sign = allVerticesSameSidePlane(B, A); if(sign) return sign<0; }
-    { // Coplanar
-        const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
-        const float da = dot(Na, A._[0]);
-        const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
-        const float db = dot(Nb, B._[0]);
-        try {
-            assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))), maxε);
-            assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)), maxε);
-        } catch(...) {
-            quadPlaneDistances(A, B);
-            quadPlaneDistances(B, A);
-            throw;
-        }
-    }
+#if 0 // Coplanar
+    const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
+    const float da = dot(Na, A._[0]);
+    const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
+    const float db = dot(Nb, B._[0]);
+    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))), maxε);
+    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)), maxε);
+#endif
     // FIXME: could assert non overlapping to prevent Z-fighting with unstable quicksort
     return false; // ==
 }
@@ -340,17 +308,9 @@ static struct Test : Drag {
                     for(const uint i: ::range(left,right)) { // Split
                         Quad A; for(const uint v: ::range(4)) A._[v] = transformedVertices[scene.quads[at[i]].quad[v]];
                         Quad B; for(const uint v: ::range(4)) B._[v] = transformedVertices[scene.quads[pivot].quad[v]];
-                        try {
-                            if(A < B) {
-                                swap(at[pivotIndex], at[i]);
-                                pivotIndex++;
-                            }
-                        } catch(...) {
-                            vec3 A[4]; for(const uint v: ::range(4)) A[v] = scene.vertices[scene.quads[at[i]].quad[v]];
-                            vec3 B[4]; for(const uint v: ::range(4)) B[v] = scene.vertices[scene.quads[pivot].quad[v]];
-                            log(A);
-                            log(B);
-                            throw;
+                        if(A < B) {
+                            swap(at[pivotIndex], at[i]);
+                            pivotIndex++;
                         }
                     }
                     swap(at[pivotIndex], at[right]);
@@ -446,8 +406,8 @@ static struct Test : Drag {
             }
         }
         if(time.milliseconds()>100) log(time.milliseconds(),"ms");
-        value.x = __builtin_fmod(value.x + π*(3-sqrt(5.)), 2*π);
-        value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
+        //value.x = __builtin_fmod(value.x + π*(3-sqrt(5.)), 2*π);
+        //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
         window->render();
     }
     virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
