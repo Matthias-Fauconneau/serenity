@@ -186,7 +186,7 @@ static struct Test : Widget {
                                        scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
                                        Image3f(4),Image3f(4)});
 
-        //importSTL(scene, "Cube.stl");
+        importSTL(scene, "Cube.stl");
 
         // FIXME: front to back, coverage buffer
 
@@ -213,10 +213,11 @@ static struct Test : Widget {
         const mat4 M = NDC * projection * view;
 
         for(const Scene::Quad& quad: scene.quads) { // TODO: Z-Order
-            int2 V[4]; float iw[4];
+            int2 V[4];
+            float iw[4]; // FIXME: float
             for(const uint i: range(4)) {
                 vec3 xyw = (M * vec4(scene.vertices[quad.quad[i]], 1)).xyw();
-                iw[i] = 1 / xyw[2];
+                iw[i] = 1 / xyw[2]; // FIXME: float
                 V[i] = int2(iw[i] * xyw.xy());
             }
 
@@ -247,22 +248,10 @@ static struct Test : Widget {
 
                     const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
 
-                    /*const vecN e01a = a1 - a0;
-                    const vecN e03a = a3 - a0;
-                    const vecN e013x = T(e01x)*e01a + T(e30x)*e03a;
-                    const vecN e013y = T(e01y)*e01a + T(e30y)*e03a;
-                    const vecN e013z = T(e01z)*e01a + T(e30z)*e03a;*/
-                    //const int area013 = e01z + e13z + e30z;
                     const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
                     const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
                     const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
 
-                    /*const vecN e23a = a3 - a2;
-                    const vecN e21a = a1 - a2;
-                    const vecN e123x = T(e23x)*e23a + T(e12x)*e21a;
-                    const vecN e123y = T(e23y)*e23a + T(e12y)*e21a;
-                    const vecN e123z = T(e23z)*e23a + T(e12z)*e21a;*/
-                    //const int area123 = e12z + e23z - e13z;
                     const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
                     const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
                     const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
@@ -279,12 +268,55 @@ static struct Test : Widget {
 
                     if(step01>0 && step12>0 && step23>0 && step30>0) {
                         const int step13 = e13z + e13x*X + e13y*Y;
-                        const vecN a = step13>0 ? /*vecN(a0) +*/ vecN(e013z + e013x*T(X) + e013y*T(Y)) /*/ float(area013)*/ : // FIXME: float, perspective
-                                                  /*vecN(a2) +*/ vecN(e123z + e123x*T(X) + e123y*T(Y)) /*/ float(area123)*/ ;
-                        const vecN A = a / a[2];
-                        //target(x, target.size.y-1-y) = byte4(0,0xFF*A.y,0xFF*A.x,0xFF);
-                        const int c = 0xFF*((int(16*A.x)%2)^(int(16*A.y)%2));
-                        target(x, target.size.y-1-y) = byte4(c,c,c,0xFF);
+                        const vecN a = step13>0 ? /*vecN(a0) +*/ vecN(e013z + e013x*T(X) + e013y*T(Y)) :
+                                                  /*vecN(a2) +*/ vecN(e123z + e123x*T(X) + e123y*T(Y)) ;
+                        const vecN A = a / a[2]; // FIXME: float
+                        const float u = A.x;
+                        const float v = A.y;
+                        /*const int c = 0xFF*((int(16*A.x)%2)^(int(16*A.y)%2));
+                        target(x, target.size.y-1-y) = byte4(c,c,c,0xFF);*/
+
+                        const uint sampleCount = 1;
+                        bgr3f outgoingRadianceSum = 0;
+                        for(uint unused i: range(sampleCount)) {
+                            bgr3f realIncomingRadiance;
+                            {
+                                const vec3 v0 = scene.vertices[quad.quad[0]];
+                                const vec3 v1 = scene.vertices[quad.quad[1]];
+                                const vec3 v3 = scene.vertices[quad.quad[3]];
+                                const vec3 N = normalize(cross(v1-v0, v3-v0));
+                                const vec3 O = v0 + (v1-v0) * u + (v3-v0) * v;
+
+                                v8sf random8 = random();
+                                const vec2 uv (random8[0], random8[1]);
+                                const Scene::QuadLight light = scene.light;
+                                const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
+
+                                const float dotAreaL = - dot(light.N, D);
+                                //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
+                                const float dotNL = dot(D, N);
+                                //if(dotNL <= 0) return {false,0,0};
+
+                                realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
+
+                                float nearestRealT = inff;
+                                for(const Scene::Quad& quad: scene.quads) {
+                                    float u,v; vec3 N;
+                                    if( quad.real) if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
+                                }
+                            }
+                            const bgr3f albedo = 1;
+                            outgoingRadianceSum += albedo * realIncomingRadiance;
+                        }
+                        const bgr3f outgoingRadiance = (1/float(sampleCount)) * outgoingRadianceSum;
+                        bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
+                        bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
+                        bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
+                        bool virtualHit = 0;
+                        if(!quad.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
+                        else { realOutgoingRadiance = outgoingRadiance; differentialOutgoingRadiance = 0; /*FIXME*/ }
+                        const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
+                        target(x, target.size.y-1-y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
                     }
                 }
             }
