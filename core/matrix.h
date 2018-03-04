@@ -166,7 +166,7 @@ inline String str(const mat3x2& M) { return str<3,2>(M.data); }
 inline String str(const mat3& M) { return str<3,3>(M.data); }
 inline String str(const mat4& M) { return str<4,4>(M.data); }
 
-inline mat4 shearedPerspective(const float s, const float t, const float near, const float far) { // Sheared perspective (rectification)
+inline mat4 perspective(const float near, const float far, const float s=0, const float t=0) { // Sheared perspective (rectification)
     const float left = (-1-s), right = (1-s);
     const float bottom = (-1-t), top = (1-t);
     mat4 M;

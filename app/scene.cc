@@ -310,7 +310,7 @@ Scene loadScene(string name, map<string,float>) {
 
     Scene _ (quads.size, near, far);
 
-    const mat4 perspective = shearedPerspective(0, 0, near, far);
+    const mat4 projection = ::perspective(near, far);
     const float resolutionFactor = 32; //512;
     const uint outgoingAngleResolution = 40;
     uint samplePositionCount = 0;
@@ -356,10 +356,10 @@ Scene loadScene(string name, map<string,float>) {
         } else
 #endif
         {
-            const vec2 uv00 = (perspective*p00).xy();
-            const vec2 uv01 = (perspective*p01).xy();
-            const vec2 uv11 = (perspective*p11).xy();
-            const vec2 uv10 = (perspective*p10).xy();
+            const vec2 uv00 = (projection*p00).xy();
+            const vec2 uv01 = (projection*p01).xy();
+            const vec2 uv11 = (projection*p11).xy();
+            const vec2 uv10 = (projection*p10).xy();
             const float maxU = ::max(length(uv01-uv00), length(uv11-uv10)); // Maximum projected edge length along quad's u axis
             const float maxV = ::max(length(uv10-uv00), length(uv11-uv01)); // Maximum projected edge length along quad's v axis
             X = uint(ceil(maxU*resolutionFactor));
