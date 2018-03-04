@@ -122,7 +122,7 @@ void importSTL(Scene& scene, string path, vec3 origin, bool real) {
     scene.vertices.append(vertices);
 }
 
-void step(Scene& scene) {
+void step(Scene& scene, Random& random) {
     Time time (true);
     for(const Scene::Quad& quad: scene.quads) {
         const vec3 v0 = scene.vertices[quad.quad[0]];
@@ -136,18 +136,17 @@ void step(Scene& scene) {
             const float v = float(y)/float(target.size.y-1);
             for(uint x: range(target.size.x)) {
                 const float u = float(x)/float(target.size.x-1);
-                //if(u+v < 1)
-                //const vec3 O = v0*(1-v)*(1-u) + v1*(1-v)*u + v2*v*u + v3*v*(1-u);
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
                 bgr3f differentialOutgoingRadianceSum = 0; // Directional light
-                const uint sampleCount = 1;
+                const uint sampleCount = 3;
                 for(uint unused i: range(sampleCount)) {
                     bgr3f differentialIncomingRadiance;
                     {
-                        v8sf random8 = random();
+                        v8sf random8 = random.next();
                         const vec2 uv (random8[0], random8[1]);
                         const Scene::QuadLight light = scene.light;
-                        const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
+                        const vec3 L = light.O + uv[0] * light.T + uv[1] * light.B;
+                        const vec3 D = L - O;
 
                         const float dotNL = dot(D, N);
                         if(dotNL <= 0) continue;
@@ -166,7 +165,7 @@ void step(Scene& scene) {
                             differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
                         } else {
                             differentialIncomingRadiance = incomingRadiance;
-                            if(0) for(const Scene::Quad& quad: scene.quads) {
+                            for(const Scene::Quad& quad: scene.quads) {
                                 float t = inff;
                                 vec3 N; float u,v;
                                 if(intersect(scene, quad, O, D, N, t, u, v)) { differentialIncomingRadiance = 0; break; };
@@ -177,7 +176,6 @@ void step(Scene& scene) {
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                 }
                 target(x, y) = (1/float(sampleCount)) * differentialOutgoingRadianceSum;
-                //target(x, y) = bgr3f(O.z, O.y, O.x);
             }
         }
     }
@@ -204,7 +202,7 @@ static struct Test : Widget {
 
         // FIXME: front to back, coverage buffer
 
-        step(scene);
+        step(scene, random);
 
         window->show();
     }
@@ -288,7 +286,7 @@ static struct Test : Widget {
                         const float v = A.y;
 
                         bgr3f realOutgoingRadiance; // FIXME: synthetic
-                        if(!quad.real || 1) realOutgoingRadiance = bgr3f(0, 0, 0);
+                        if(!quad.real) realOutgoingRadiance = bgr3f(0, 0, 0);
                         else { // Synthetic real
                             const uint sampleCount = 1;
                             bgr3f outgoingRadianceSum = 0;
@@ -301,7 +299,7 @@ static struct Test : Widget {
                                     const vec3 N = normalize(cross(v1-v0, v3-v0));
                                     const vec3 O = v0 + (v1-v0) * u + (v3-v0) * v;
 
-                                    v8sf random8 = random();
+                                    v8sf random8 = random.next();
                                     const vec2 uv (random8[0], random8[1]);
                                     const Scene::QuadLight light = scene.light;
                                     const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
