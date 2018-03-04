@@ -4,6 +4,7 @@
 #include "image-render.h"
 #include "mwc.h"
 #include "algorithm.h"
+#include "drag.h"
 
 generic T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
 
@@ -182,7 +183,7 @@ void step(Scene& scene, Random& random) {
     log(time);
 }
 
-static struct Test : Widget {
+static struct Test : Drag {
     Scene scene;
 
     Random random;
@@ -210,7 +211,7 @@ static struct Test : Widget {
         const Image& target = (ImageRenderTarget&)target_;
 
         const float near = 3, far = near + 3; // FIXME: fit far
-        const mat4 view = mat4().translate({0,0,-near-1}).rotateX(-π/4);
+        const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
 
         Time time {true};
 
@@ -345,5 +346,10 @@ static struct Test : Widget {
         log(time);
         //viewPosition += vec3(1./30,0,0);
         //window->render();
+    }
+    virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
+        vec2 value = dragStartValue + float(2*π)*normalizedDragOffset;
+        value.y = clamp<float>(-π/2, value.y, 0);
+        return value;
     }
 } test;

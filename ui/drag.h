@@ -1,11 +1,7 @@
 #pragma once
 #include "widget.h"
-#include "function.h"
 
 struct Drag : virtual Widget {
-    function<void()> onDragStart;
-    function<void(vec2)> valueChanged;
-
     struct {
         vec2 cursor;
         vec2 value;
@@ -14,15 +10,14 @@ struct Drag : virtual Widget {
     vec2 value = vec2(0, 0);
 
     virtual bool mouseEvent(vec2 cursor, vec2 size, Event event, Button button, Widget*&) override {
-        if(event == Press) {
-            dragStart = {cursor, value};
-            if(onDragStart) onDragStart();
-        }
+        if(event == Press) dragStart = {cursor, value};
         if(event==Motion && button==LeftButton) {
-            value = dragStart.value + (cursor - dragStart.cursor) / size;
-            if(valueChanged) valueChanged(value);
-            return true;
+            vec2 newValue = drag(dragStart.value, (cursor - dragStart.cursor) / size);
+            if(newValue != value) { value = newValue; return true; }
+            return false;
         }
         return false;
     }
+
+    virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) { return dragStartValue + normalizedDragOffset; }
 };

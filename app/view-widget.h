@@ -1,6 +1,5 @@
 #pragma once
 #include "drag.h"
-#include "function.h"
 
 struct ViewWidget : Drag {
     vec2 angles = 0;
