@@ -75,7 +75,7 @@ void Thread::run() {
     if(revents && !unregistered.contains(poll)) {
      poll->revents = revents;
      Locker lock(runLock);
-     poll->event();
+     try { poll->event(); } catch(...) { error("Uncaught exception"); }
     }
    }
   }
