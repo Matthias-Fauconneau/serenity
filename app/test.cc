@@ -236,14 +236,14 @@ static struct Test : Widget {
                     const int2 e03a = a3 - a0;
                     const int2 e013x = e01x*e01a + e30x*e03a;
                     const int2 e013y = e01y*e01a + e30y*e03a;
-                    const int2 e013z = e01z*e01a + e30z*e03a + a0;
+                    const int2 e013z = e01z*e01a + e30z*e03a;
                     const int area013 = e01z + e13z + e30z;
 
                     const int2 e23a = a3 - a2;
                     const int2 e21a = a1 - a2;
                     const int2 e123x = e23x*e23a + e12x*e21a;
                     const int2 e123y = e23y*e23a + e12y*e21a;
-                    const int2 e123z = e23z*e23a + e12z*e21a + a0;
+                    const int2 e123z = e23z*e23a + e12z*e21a;
                     const int area123 = e12z + e23z - e13z;
 
                     e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
@@ -261,10 +261,10 @@ static struct Test : Widget {
                         //e13z += (e13x>0/*dy<0*/ || (e13x==0/*dy=0*/ && e13y<0/*dx<0*/));
                         const int step13 = e13z + e13x*X + e13y*Y;
                         if(step13>0) {
-                            const vec2 a = vec2(e013z + e013x*int(X) + e013y*int(Y)) / float(area013); // FIXME: float, perspective
+                            const vec2 a = vec2(a0) + vec2(e013z + e013x*int(X) + e013y*int(Y)) / float(area013); // FIXME: float, perspective
                             target(x, target.size.y-1-y) = byte4(0,0xFF*a.x,0xFF*a.y,0xFF);
                         } else {
-                            const vec2 a = vec2(e123z + e123x*int(X) + e123y*int(Y)) / float(area123); // FIXME: float, perspective
+                            const vec2 a = vec2(a2) + vec2(e123z + e123x*int(X) + e123y*int(Y)) / float(area123); // FIXME: float, perspective
                             target(x, target.size.y-1-y) = byte4(0,0xFF*a.x,0xFF*a.y,0xFF);
                         }
                     }
