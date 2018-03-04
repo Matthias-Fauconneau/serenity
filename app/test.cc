@@ -222,28 +222,37 @@ static struct Test : Widget {
 
                     int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
                     e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
-                    //const int reject01 = min(e01x, 0) + min(e01y, 0);
                     const int step01 = e01z + e01x*X + e01y*Y;
                     int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
                     e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
-                    //const int reject12 = min(e12x, 0) + min(e12y, 0);
                     const int step12 = e12z + e12x*X + e12y*Y;
                     int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
                     e23z += (e23x>0/*dy<0*/ || (e23x==0/*dy=0*/ && e23y<0/*dx<0*/));
-                    //const int reject23 = min(e23x, 0) + min(e23y, 0);
                     const int step23 = e23z + e23x*X + e23y*Y;
                     int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
                     e30z += (e30x>0/*dy<0*/ || (e30x==0/*dy=0*/ && e30y<0/*dx<0*/));
-                    //const int reject30 = min(e30x, 0) + min(e30y, 0);
                     const int step30 = e30z + e30x*X + e30y*Y;
 
-
-                    //v16si area = eABz + eBCz + eCDz + eDAz;
-                    //if(test01<0 && test12<0 && test23<0 && test30<0)
-                    //if(step01+reject01<0 && step12+reject12<0 && step23+reject23<0 && test30>0)
-                    //if(step01<0 && step12<0 && step23<0 && step30<0)
-                    if(step01>0 && step12>0 && step23>0 && step30>0)
-                        target(x, target.size.y-1-y) = 0xFF;
+                    if(step01>0 && step12>0 && step23>0 && step30>0) {
+                        int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
+                        const int step13 = e13z + e13x*X + e13y*Y;
+                        const int2 a0 = int2(0, 0);
+                        const int2 a1 = int2(1, 0);
+                        const int2 a2 = int2(1, 1);
+                        const int2 a3 = int2(0, 1);
+                        if(step13>0) {
+                            const int2 e01a = a1 - a0;
+                            const int2 e03a = a3 - a0;
+                            const int2 Ex = e01x*e01a + e30x*e03a; // - ?
+                            const int2 Ey = e01y*e01a + e30y*e03a;
+                            const int2 Ez = e01z*e01a + e30z*e03a + a0;
+                            const int area013 = e01z + e13z + e30z;
+                            const vec2 a = vec2(Ez + Ex*int(X) + Ey*int(Y)) / float(area013); // FIXME
+                            target(x, target.size.y-1-y) = byte4(0,0xFF*a.x,0xFF*a.y,0xFF);
+                        } else {
+                            target(x, target.size.y-1-y) = byte4(0xFF,0,0,0xFF);
+                        }
+                    }
                 }
             }
         }
