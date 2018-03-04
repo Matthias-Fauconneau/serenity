@@ -15,18 +15,22 @@ generic inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t
 
 struct Quad { vec3 _[4]; };
 
-int allVerticesSameSidePlane(Quad A, Quad B) {
-    const vec3 N = cross(B._[1]-B._[0], B._[3]-B._[0]);
-    const float d = dot(N, B._[0]);
-    const float ε = 0x1p-20*abs(d);
+bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
+template<> String str(const Quad& A) { return str(A._); }
+
+int allVerticesSameSidePlaneNoCheck(Quad A, Quad B) {
+    const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
+    static constexpr float ε = 0x1p-20;
     int sign = 0;
     for(vec3 v: A._) {
-        float t = dot(N, v) - d;
-        if(t > +ε) {
+        const vec3 OP = v-B._[0];
+        const float t = dot(N, OP);
+        const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
+        if(t > +εOP) {
             if(sign<0) return 0;
             sign = +1;
         }
-        if(t < -ε) {
+        if(t < -εOP) {
             if(sign>0) return 0;
             sign = -1;
         }
@@ -34,24 +38,122 @@ int allVerticesSameSidePlane(Quad A, Quad B) {
     return sign;
 }
 
-bool operator<(Quad A, Quad B) {
+int allVerticesSameSidePlane(Quad A, Quad B) {
+    const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
+    static constexpr float ε = 0x1p-20;
+    int sign = 0;
+    for(vec3 v: A._) {
+        const vec3 OP = v-B._[0];
+        const float t = dot(N, OP);
+        const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
+        if(t > +εOP) {
+            if(sign<0) return 0;
+            sign = +1;
+        }
+        if(t < -εOP) {
+            if(sign>0) return 0;
+            sign = -1;
+        }
+    }
+#if 0
+    if(allVerticesSameSidePlaneNoCheck(B, A) && allVerticesSameSidePlaneNoCheck(B, A) != -sign) {
+        log(A);
+        log(B);
+        {
+            int sign = 0;
+            for(vec3 v: A._) {
+                const vec3 OP = v-B._[0];
+                const float t = dot(N, OP);
+                const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
+                if(t > +εOP) {
+                    log("+");
+                    sign = +1;
+                }
+                else
+                if(t < -εOP) {
+                    log("-", t/length(OP));
+                    sign = -1;
+                }
+                else log("0", t);
+            }
+        }
+        log("vB pA");
+        {
+            int sign = 0;
+            for(vec3 v: B._) {
+                const vec3 OP = v-A._[0];
+                const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
+                const float t = dot(Na, OP);
+                const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
+                if(t > +εOP) {
+                    log("+");
+                    sign = +1;
+                }
+                else
+                if(t < -εOP) {
+                    log("-", t/length(OP));
+                    sign = -1;
+                }
+                else log("0", t);
+            }
+        }
+        error(sign, allVerticesSameSidePlaneNoCheck(B, A));
+    }
+#endif
+    return sign;
+}
+
+int opCmpNoCheck(Quad A, Quad B) {
     const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
     const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
-    if(maxA.z < minB.z) return true;
-    if(maxB.z < minA.z) return false;
-    {const int sign = allVerticesSameSidePlane(A, B); if(sign) return sign>0; }
-    {const int sign = allVerticesSameSidePlane(B, A); if(sign) return sign<0; }
+    if(-minA.z < -maxB.z) { return -1; }
+    if(-minB.z < -maxA.z) { return +1; }
+    if(allVerticesSameSidePlane(A, B) > 0) return -1;
+    if(allVerticesSameSidePlane(B, A) > 0) return +1;
+
+    //{const int sign = allVerticesSameSidePlane(A, B); if(sign) return +sign;}
+    //{const int sign = allVerticesSameSidePlane(B, A); if(sign) return -sign;}
 #if 0 // Coplanar
     const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
     const float da = dot(Na, A._[0]);
     const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
     const float db = dot(Nb, B._[0]);
-    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))), maxε);
-    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)), maxε);
+    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))));
+    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)));
 #endif
-    // FIXME: could assert non overlapping to prevent Z-fighting with unstable quicksort
-    return false; // ==
+    return 0; // ==
 }
+
+int opCmp(Quad A, Quad B) {
+    const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
+    const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
+    if(-minA.z < -maxB.z) { assert_(opCmpNoCheck(B,A)==+1); return -1; }
+    if(-minB.z < -maxA.z) { assert_(opCmpNoCheck(B,A)==-1); return +1; }
+    if(allVerticesSameSidePlane(A, B) > 0) return -1;
+    if(allVerticesSameSidePlane(B, A) > 0) return +1;
+
+    /*{const int sign = allVerticesSameSidePlane(A, B);
+        if(sign==+1) assert_(opCmpNoCheck(B,A)==-1, "B");
+        if(sign==-1) assert_(opCmpNoCheck(B,A)==+1);
+        if(sign) return sign;
+    }
+    {const int sign = allVerticesSameSidePlane(B, A);
+        if(sign==-1) assert_(opCmpNoCheck(B,A)==-1);
+        if(sign==+1) assert_(opCmpNoCheck(B,A)==+1, "C", opCmpNoCheck(B,A), A, B);
+        if(sign) return -sign;
+    }*/
+#if 0 // Coplanar
+    const vec3 Na = normalize(cross(A._[1]-A._[0], A._[3]-A._[0]));
+    const float da = dot(Na, A._[0]);
+    const vec3 Nb = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
+    const float db = dot(Nb, B._[0]);
+    assert_(sq(cross(Na,Nb)) <= 0x1p-21, __builtin_log2(sq(cross(Na,Nb))));
+    assert_(sq(da-db)/(da*db) <= 0x1p-31, Na, Nb, A._[0], da, B._[0], db, __builtin_log2(sq(da-db)/(da*db)));
+#endif
+    return 0; // ==
+}
+
+bool operator <(Quad A, Quad B) { return opCmp(A, B) < 0; }
 
 bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     const vec3 e01 = v1-v0;
@@ -251,6 +353,8 @@ static struct Test : Drag {
 
         importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4), true );
         importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4), false);
+        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4), false);
+        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4), false);
 
         // FIXME: front to back, coverage buffer
 
@@ -268,22 +372,15 @@ static struct Test : Drag {
 
         target.clear(byte4(0,0,0,0xFF));
 
-        const mat4 projection = perspective(near, far); // .scale(vec3(1, W/H, 1))
-        static constexpr int32 pixel = 16; // 11.4
-        const mat4 NDC = mat4()
-                .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
-                .translate(vec3(1)); // -1, 1 -> 0, 2
-        const mat4 M = NDC * projection * view;
-
         // Transform
-        buffer<vec3> transformedVertices (scene.vertices.size);
-        for(const uint i: range(scene.vertices.size)) transformedVertices[i] = (M * vec4(scene.vertices[i], 1)).xyw();
+        buffer<vec3> viewVertices (scene.vertices.size);
+        for(const uint i: range(scene.vertices.size)) viewVertices[i] = view * scene.vertices[i];
 
         buffer<uint> quads (scene.quads.size, 0);
         for(const uint i: range(scene.quads.size)) {
-            vec3 A[4]; for(const uint v: ::range(4)) A[v] = transformedVertices[scene.quads[i].quad[v]];
+            vec3 A[4]; for(const uint v: ::range(4)) A[v] = viewVertices[scene.quads[i].quad[v]];
             const vec3 N = cross(A[1]-A[0], A[3]-A[0]);
-            if(N.z >= 0) continue; // Back facing
+            if(dot(N, A[0]) >= 0) continue; // Back facing
             quads.append(i);
         }
 
@@ -306,8 +403,15 @@ static struct Test : Drag {
                     const T& pivot = at[right];
                     int pivotIndex = left;
                     for(const uint i: ::range(left,right)) { // Split
-                        Quad A; for(const uint v: ::range(4)) A._[v] = transformedVertices[scene.quads[at[i]].quad[v]];
-                        Quad B; for(const uint v: ::range(4)) B._[v] = transformedVertices[scene.quads[pivot].quad[v]];
+#if 1
+                        Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A._[v] = viewVertices[a[v]]; }
+                        Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B._[v] = viewVertices[b[v]]; }
+#else
+                        const uint4 a = scene.quads[at[i]].quad;
+                        const float A = -(viewVertices[a[0]]+viewVertices[a[1]]+viewVertices[a[2]]+viewVertices[a[3]]).z;
+                        const uint4 b = scene.quads[pivot].quad;
+                        const float B = -(viewVertices[b[0]]+viewVertices[b[1]]+viewVertices[b[2]]+viewVertices[b[3]]).z;
+#endif
                         if(A < B) {
                             swap(at[pivotIndex], at[i]);
                             pivotIndex++;
@@ -330,11 +434,41 @@ static struct Test : Drag {
             }
         }
 
-        for(const Scene::Quad& quad: scene.quads) {
+        if(0) { // Asserts sort
+            for(uint i: range(quads.size)) {
+                Quad A; { const uint4 a = scene.quads[quads[i]].quad; for(const uint v: ::range(4)) A._[v] = viewVertices[a[v]]; }
+                for(uint j: range(quads.size)) {
+                    Quad B; { const uint4 b = scene.quads[quads[j]].quad; for(const uint v: ::range(4)) B._[v] = viewVertices[b[v]]; }
+                    const int sign = opCmp(A, B);
+                    if(opCmp(A, B) != -opCmp(B, A)) {
+                        log(A);
+                        log(B);
+                        error(opCmp(A, B), opCmp(B, A));
+                    }
+                    if(i < j) assert_(sign <= 0, i,j, sign, A, B);
+                    if(i == j) assert_(sign == 0, sign);
+                    if(i > j) assert_(sign >= 0);
+                }
+            }
+        }
+
+        const mat4 projection = perspective(near, far); // .scale(vec3(1, W/H, 1))
+        static constexpr int32 pixel = 16; // 11.4
+        const mat4 NDC = mat4()
+                .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
+                .translate(vec3(1)); // -1, 1 -> 0, 2
+        const mat4 M = NDC * projection;
+
+        buffer<uint64> coverageBuffer (target.ref::size/64); // Bitmask of covered samples
+        coverageBuffer.clear(0);
+
+        for(const uint quadIndex: quads) { // Z-sorted
+            Scene::Quad& quad = scene.quads[quadIndex];
+
             int2 V[4];
             float iw[4]; // FIXME: float
             for(const uint i: range(4)) {
-                vec3 xyw = (M * vec4(scene.vertices[quad.quad[i]], 1)).xyw();
+                vec3 xyw = (M * vec4(viewVertices[quad.quad[i]], 1)).xyw();
                 iw[i] = 1 / xyw[2]; // FIXME: float
                 V[i] = int2(iw[i] * xyw.xy());
             }
@@ -342,42 +476,46 @@ static struct Test : Drag {
             const int2 min = ::min<int2>(V);
             const int2 max = ::max<int2>(V);
 
+            // Setup
+            int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
+            int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
+            int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
+            int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
+
+            typedef float T;
+            typedef vec3 vecN;
+            const vecN A0 = vecN(0, 0, 1);
+            const vecN A1 = vecN(1, 0, 1);
+            const vecN A2 = vecN(1, 1, 1);
+            const vecN A3 = vecN(0, 1, 1);
+
+            const vecN a0 = iw[0] * A0;
+            const vecN a1 = iw[1] * A1;
+            const vecN a2 = iw[2] * A2;
+            const vecN a3 = iw[3] * A3;
+
+            const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
+
+            const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
+            const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
+            const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
+
+            const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
+            const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
+            const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
+
+            e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
+            e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
+            e23z += (e23x>0/*dy<0*/ || (e23x==0/*dy=0*/ && e23y<0/*dx<0*/));
+            e30z += (e30x>0/*dy<0*/ || (e30x==0/*dy=0*/ && e30y<0/*dx<0*/));
+
             for(const uint targetY: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
                 const uint Y = pixel*targetY + pixel/2;
                 for(const uint targetX: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
+                    const uint targetI = targetY*target.size.x+targetX;
+                    if(coverageBuffer[targetI/64]&(1ull<<(targetI%64))) continue;
+
                     const uint X = pixel*targetX + pixel/2;
-
-                    int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
-                    int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
-                    int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
-                    int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
-
-                    typedef float T;
-                    typedef vec3 vecN;
-                    const vecN A0 = vecN(0, 0, 1);
-                    const vecN A1 = vecN(1, 0, 1);
-                    const vecN A2 = vecN(1, 1, 1);
-                    const vecN A3 = vecN(0, 1, 1);
-
-                    const vecN a0 = iw[0] * A0;
-                    const vecN a1 = iw[1] * A1;
-                    const vecN a2 = iw[2] * A2;
-                    const vecN a3 = iw[3] * A3;
-
-                    const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
-
-                    const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
-                    const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
-                    const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
-
-                    const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
-                    const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
-                    const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
-
-                    e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
-                    e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
-                    e23z += (e23x>0/*dy<0*/ || (e23x==0/*dy=0*/ && e23y<0/*dx<0*/));
-                    e30z += (e30x>0/*dy<0*/ || (e30x==0/*dy=0*/ && e30y<0/*dx<0*/));
 
                     const int step01 = e01z + e01x*X + e01y*Y;
                     const int step12 = e12z + e12x*X + e12y*Y;
@@ -394,13 +532,15 @@ static struct Test : Drag {
 
                         // FIXME: fold texSize in UV vertex attributes
                         const uint2 texSize = quad.outgoingRadiance.size;
-                        const uint texX = u*(texSize.x-1);
-                        const uint texY = v*(texSize.y-1);
+                        const uint texX = u*(texSize.x-1)+1.f/2;
+                        const uint texY = v*(texSize.y-1)+1.f/2;
 
                         const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : 0; // FIXME: synthetic test case
                         const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                         target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
+
+                        coverageBuffer[targetI/64] |= (1ull<<targetI%64);
                     }
                 }
             }
@@ -408,7 +548,7 @@ static struct Test : Drag {
         if(time.milliseconds()>100) log(time.milliseconds(),"ms");
         //value.x = __builtin_fmod(value.x + π*(3-sqrt(5.)), 2*π);
         //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
-        window->render();
+        //window->render();
     }
     virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
         vec2 value = dragStartValue + float(2*π)*normalizedDragOffset;
