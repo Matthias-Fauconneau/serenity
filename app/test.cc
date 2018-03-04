@@ -14,9 +14,9 @@ struct Scene {
     struct Quad {
         uint4 quad;
         Image3f outgoingRadiance; // for real surfaces: differential
-        Image3f realOutgoingRadiance; // Faster rendering of synthetic real surfaces
-        bgr3f albedo = 1;
         bool real = true;
+        //Image3f realOutgoingRadiance; // Faster rendering of synthetic real surfaces for synthetic test
+        //const bgr3f albedo = 1;
     };
 
     array<vec3> vertices;
@@ -24,8 +24,8 @@ struct Scene {
 
     struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
 
-    const float lightSize = 4;
-    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 1/*lightSize/sq(lightSize)*/};
+    const float lightSize = 1;
+    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 2/*lightSize/sq(lightSize)*/};
 };
 
 template<> String str(const Scene::Quad& q) { return str(q.quad); }
@@ -55,6 +55,7 @@ bool intersect(const vec3 vA, const vec3 vB, const vec3 vC, const vec3 vD, const
     if(!(det < 0)) return false;
     const float rcpDet = rcp( det );
     const float t = Nv0 * rcpDet;
+    if(!(t > 0)) return false;
     if(!(t < nearestT)) return false;
     nearestT = t;
     u = select(U0+V0 < 1, rcpDet * U0, 1 - (rcpDet * U1));
@@ -69,7 +70,7 @@ bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const 
     return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
 }
 
-void importSTL(Scene& scene, string path) {
+void importSTL(Scene& scene, string path, vec3 origin, bool real) {
     TextData s (readFile(path));
     s.skip("solid "); s.line(); // name
     array<uint3> triangles;
@@ -97,7 +98,7 @@ void importSTL(Scene& scene, string path) {
         const vec3 max = ::max(vertices);
         for(vec3& v: vertices) v = (v-min)/(max-min)*2.f-vec3(1); // -> [-1, 1]
         for(vec3& v: vertices) v /= 4;
-        for(vec3& v: vertices) v = v + vec3(-1./2, 0, +1./2);
+        for(vec3& v: vertices) v += origin;
     }
 
     const uint base = scene.vertices.size;
@@ -113,7 +114,7 @@ void importSTL(Scene& scene, string path) {
                 else if(A[0] == e0 && A[2] == e1) {}
                 else continue;
                 const uint32 A3 = B[(edgeIndex+2)%3];
-                scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3),Image3f(4),Image3f(4)});
+                scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3), Image3f(256), real/*, real?Image3f(4):Image3f()*/});
             }
         }
     }
@@ -132,12 +133,14 @@ void step(Scene& scene) {
 
         const Image3f& target = quad.outgoingRadiance;
         for(uint y: range(target.size.y)) {
-            const float v = -(float(y)/float(target.size.y-1)*2-1);
+            const float v = float(y)/float(target.size.y-1);
             for(uint x: range(target.size.x)) {
-                const float u = float(x)/float(target.size.x-1)*2-1;
-                const vec3 O = v0*(1-v)*(1-u) + v1*(1-v)*u + v2*v*u + v3*v*(1-u);
+                const float u = float(x)/float(target.size.x-1);
+                //if(u+v < 1)
+                //const vec3 O = v0*(1-v)*(1-u) + v1*(1-v)*u + v2*v*u + v3*v*(1-u);
+                const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
                 bgr3f differentialOutgoingRadianceSum = 0; // Directional light
-                const uint sampleCount = 64;
+                const uint sampleCount = 1;
                 for(uint unused i: range(sampleCount)) {
                     bgr3f differentialIncomingRadiance;
                     {
@@ -146,25 +149,35 @@ void step(Scene& scene) {
                         const Scene::QuadLight light = scene.light;
                         const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
 
-                        const float dotAreaL = - dot(light.N, D);
-                        //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
                         const float dotNL = dot(D, N);
-                        //if(dotNL <= 0) return {false,0,0};
+                        if(dotNL <= 0) continue;
+                        const float dotAreaL = - dot(light.N, D);
+                        if(dotAreaL <= 0) continue;
 
                         bgr3f incomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
 
-                        float nearestRealT = inff, nearestVirtualT = inff;
-                        for(const Scene::Quad& quad: scene.quads) {
-                            float u,v; vec3 N;
-                            if(!quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
-                            if( quad.real) intersect(scene, quad, O, D, N, nearestRealT, u, v);
+                        if(quad.real) {
+                            float nearestRealT = inff, nearestVirtualT = inff;
+                            for(const Scene::Quad& quad: scene.quads) {
+                                vec3 N; float u,v;
+                                if(!quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
+                                if( quad.real) intersect(scene, quad, O, D, N, nearestRealT, u, v);
+                            }
+                            differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
+                        } else {
+                            differentialIncomingRadiance = incomingRadiance;
+                            if(0) for(const Scene::Quad& quad: scene.quads) {
+                                float t = inff;
+                                vec3 N; float u,v;
+                                if(intersect(scene, quad, O, D, N, t, u, v)) { differentialIncomingRadiance = 0; break; };
+                            }
                         }
-                        differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
                     }
                     const bgr3f albedo = 1;
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                 }
                 target(x, y) = (1/float(sampleCount)) * differentialOutgoingRadianceSum;
+                //target(x, y) = bgr3f(O.z, O.y, O.x);
             }
         }
     }
@@ -184,13 +197,14 @@ static struct Test : Widget {
         if(1) scene.quads.append(Scene::Quad{uint4(
                                        scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
                                        scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
-                                       Image3f(4),Image3f(4)});
+                                       Image3f(512), true/*, Image3f(4)*/});
 
-        importSTL(scene, "Cube.stl");
+        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4), true );
+        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4), false);
 
         // FIXME: front to back, coverage buffer
 
-        //step(scene);
+        step(scene);
 
         window->show();
     }
@@ -201,9 +215,8 @@ static struct Test : Widget {
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(-π/4);
 
         Time time {true};
-#if 1
-        if(0) target.clear(byte4(0xFF,0xFF,0xFF,0xFF));
-        else target.clear(byte4(0,0,0,0xFF));
+
+        target.clear(byte4(0,0,0,0xFF));
 
         const mat4 projection = perspective(near, far); // .scale(vec3(1, W/H, 1))
         static constexpr int32 pixel = 16; // 11.4
@@ -268,120 +281,69 @@ static struct Test : Widget {
 
                     if(step01>0 && step12>0 && step23>0 && step30>0) {
                         const int step13 = e13z + e13x*X + e13y*Y;
-                        const vecN a = step13>0 ? /*vecN(a0) +*/ vecN(e013z + e013x*T(X) + e013y*T(Y)) :
-                                                  /*vecN(a2) +*/ vecN(e123z + e123x*T(X) + e123y*T(Y)) ;
+                        const vecN a = step13>0 ? vecN(e013z + e013x*T(X) + e013y*T(Y)) :
+                                                  vecN(e123z + e123x*T(X) + e123y*T(Y)) ;
                         const vecN A = a / a[2]; // FIXME: float
                         const float u = A.x;
                         const float v = A.y;
-                        /*const int c = 0xFF*((int(16*A.x)%2)^(int(16*A.y)%2));
-                        target(x, target.size.y-1-y) = byte4(c,c,c,0xFF);*/
 
-                        const uint sampleCount = 1;
-                        bgr3f outgoingRadianceSum = 0;
-                        for(uint unused i: range(sampleCount)) {
-                            bgr3f realIncomingRadiance;
-                            {
-                                const vec3 v0 = scene.vertices[quad.quad[0]];
-                                const vec3 v1 = scene.vertices[quad.quad[1]];
-                                const vec3 v3 = scene.vertices[quad.quad[3]];
-                                const vec3 N = normalize(cross(v1-v0, v3-v0));
-                                const vec3 O = v0 + (v1-v0) * u + (v3-v0) * v;
+                        bgr3f realOutgoingRadiance; // FIXME: synthetic
+                        if(!quad.real || 1) realOutgoingRadiance = bgr3f(0, 0, 0);
+                        else { // Synthetic real
+                            const uint sampleCount = 1;
+                            bgr3f outgoingRadianceSum = 0;
+                            for(uint unused i: range(sampleCount)) {
+                                bgr3f realIncomingRadiance;
+                                {
+                                    const vec3 v0 = scene.vertices[quad.quad[0]];
+                                    const vec3 v1 = scene.vertices[quad.quad[1]];
+                                    const vec3 v3 = scene.vertices[quad.quad[3]];
+                                    const vec3 N = normalize(cross(v1-v0, v3-v0));
+                                    const vec3 O = v0 + (v1-v0) * u + (v3-v0) * v;
 
-                                v8sf random8 = random();
-                                const vec2 uv (random8[0], random8[1]);
-                                const Scene::QuadLight light = scene.light;
-                                const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
+                                    v8sf random8 = random();
+                                    const vec2 uv (random8[0], random8[1]);
+                                    const Scene::QuadLight light = scene.light;
+                                    const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
 
-                                const float dotAreaL = - dot(light.N, D);
-                                //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
-                                const float dotNL = dot(D, N);
-                                //if(dotNL <= 0) return {false,0,0};
+                                    const float dotNL = dot(N, D);
+                                    if(dotNL <= 0) continue;
+                                    const float dotAreaL = - dot(light.N, D);
+                                    if(dotAreaL <= 0) continue;
 
-                                realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
+                                    realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
 
-                                float nearestRealT = inff;
-                                for(const Scene::Quad& quad: scene.quads) {
-                                    float u,v; vec3 N;
-                                    if( quad.real) if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
+                                    float nearestRealT = inff;
+                                    for(const Scene::Quad& quad: scene.quads) {
+                                        float u,v; vec3 N;
+                                        if( quad.real) {
+                                            if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
+                                        }
+                                    }
                                 }
+                                const bgr3f albedo = 1;
+                                outgoingRadianceSum += albedo * realIncomingRadiance;
                             }
-                            const bgr3f albedo = 1;
-                            outgoingRadianceSum += albedo * realIncomingRadiance;
+                            const bgr3f outgoingRadiance = (1/float(sampleCount)) * outgoingRadianceSum;
+                            realOutgoingRadiance = outgoingRadiance;
                         }
-                        const bgr3f outgoingRadiance = (1/float(sampleCount)) * outgoingRadianceSum;
-                        bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
-                        bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
-                        bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
-                        bool virtualHit = 0;
-                        if(!quad.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
-                        else { realOutgoingRadiance = outgoingRadiance; differentialOutgoingRadiance = 0; /*FIXME*/ }
-                        const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
+
+                        bgr3f differentialOutgoingRadiance; // or virtual outgoing radiance
+                        {
+                            // FIXME: fold texSize in UV vertex attributes
+                            const uint2 texSize = quad.outgoingRadiance.size;
+                            const uint x = u*(texSize.x-1);
+                            const uint y = v*(texSize.y-1);
+                            assert_(x<texSize.x && y<texSize.y, x, y, u, v);
+                            differentialOutgoingRadiance = quad.outgoingRadiance(x, y); // FIXME: bilinear
+                        }
+
+                        const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                         target(x, target.size.y-1-y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
                     }
                 }
             }
         }
-#else
-        const vec3 O = view.inverse() * viewPosition;
-        for(uint y: range(target.size.y)) {
-            const float Dy = -(float(y)/float(target.size.y-1)*2-1);
-            for(uint x: range(target.size.x)) {
-                const float Dx = float(x)/float(target.size.x-1)*2-1;
-                const vec3 D = normalize((mat3)(view.transpose()) * vec3(Dx, Dy, -near)); // Needs to be normalized for sphere intersection
-                bgr3f realOutgoingRadiance = bgr3f(0, 0, 0); // FIXME: synthetic
-                bgr3f differentialOutgoingRadiance = bgr3f(0, 0, 0);
-                bgr3f virtualOutgoingRadiance = bgr3f(0, 0, 0);
-                bool virtualHit = 0;
-                float nearestRealT = inff;
-                for(const Scene::Quad& quad: scene.quads) {
-                    float u, v; vec3 N;
-                    if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) {
-                        realOutgoingRadiance = bgr3f(0,v,u);
-                        N = normalize(N);
-                        const vec3 hitO = O + nearestRealT*D;
-                        const uint2 texSize = quad.outgoingRadiance.size;
-                        const uint x = (1+u)/2*(texSize.x-1);
-                        const uint y = (1+v)/2*(texSize.y-1);
-                        assert_(x<texSize.x && y<texSize.y, x, y, u, v);
-                        differentialOutgoingRadiance = 0; //quad.outgoingRadiance(x, y); // FIXME: bilinear
-                        const uint sampleCount = 1;
-                        bgr3f outgoingRadianceSum = 0;
-                        for(uint unused i: range(sampleCount)) {
-                            bgr3f realIncomingRadiance;
-                            {
-                                const vec3 O = hitO;
-
-                                v8sf random8 = random();
-                                const vec2 uv (random8[0], random8[1]);
-                                const Scene::QuadLight light = scene.light;
-                                const vec3 D = (light.O + uv[0] * light.T + uv[1] * light.B) - O;
-
-                                const float dotAreaL = - dot(light.N, D);
-                                //if(dotAreaL <= 0) return {false,0,0}; // Light sample behind face
-                                const float dotNL = dot(D, N);
-                                //if(dotNL <= 0) return {false,0,0};
-
-                                realIncomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
-
-                                float nearestRealT = inff;
-                                for(const Scene::Quad& quad: scene.quads) {
-                                    float u,v; vec3 N;
-                                    if( quad.real) if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) realIncomingRadiance = 0;
-                                }
-                            }
-                            const bgr3f albedo = 1;
-                            outgoingRadianceSum += albedo * realIncomingRadiance;
-                        }
-                        const bgr3f outgoingRadiance = (1/float(sampleCount)) * outgoingRadianceSum;
-                        if(!quad.real) { virtualHit=true; virtualOutgoingRadiance = outgoingRadiance; }
-                        else { realOutgoingRadiance = outgoingRadiance; differentialOutgoingRadiance = 0; /*FIXME*/ }
-                    }
-                }
-                const bgr3f finalOutgoingRadiance = mix(realOutgoingRadiance + differentialOutgoingRadiance, virtualOutgoingRadiance, virtualHit);
-                target(x, y) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
-            }
-        }
-#endif
         log(time);
         //viewPosition += vec3(1./30,0,0);
         //window->render();
