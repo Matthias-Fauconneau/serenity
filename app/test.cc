@@ -96,7 +96,8 @@ void importSTL(Scene& scene, string path) {
         const vec3 min = ::min(vertices);
         const vec3 max = ::max(vertices);
         for(vec3& v: vertices) v = (v-min)/(max-min)*2.f-vec3(1); // -> [-1, 1]
-        for(vec3& v: vertices) v /= 2;
+        for(vec3& v: vertices) v /= 4;
+        for(vec3& v: vertices) v = v + vec3(-1./2, 0, +1./2);
     }
 
     const uint base = scene.vertices.size;
@@ -180,12 +181,14 @@ static struct Test : Widget {
     unique<Window> window = ::window(this, 2048, mainThread, 0);
 
     Test() {
-        scene.quads.append(Scene::Quad{uint4(
+        if(1) scene.quads.append(Scene::Quad{uint4(
                                        scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
                                        scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
                                        Image3f(4),Image3f(4)});
 
         //importSTL(scene, "Cube.stl");
+
+        // FIXME: front to back, coverage buffer
 
         //step(scene);
 
@@ -199,7 +202,8 @@ static struct Test : Widget {
 
         Time time {true};
 #if 1
-        target.clear(byte4(0,0,0,0xFF));
+        if(0) target.clear(byte4(0xFF,0xFF,0xFF,0xFF));
+        else target.clear(byte4(0,0,0,0xFF));
 
         const mat4 projection = perspective(near, far); // .scale(vec3(1, W/H, 1))
         static constexpr int32 pixel = 16; // 11.4
@@ -209,15 +213,19 @@ static struct Test : Widget {
         const mat4 M = NDC * projection * view;
 
         for(const Scene::Quad& quad: scene.quads) { // TODO: Z-Order
-            int2 V[4];
-            for(const uint i: range(4)) V[i] = int2((M * scene.vertices[quad.quad[i]]).xy());
+            int2 V[4]; float iw[4];
+            for(const uint i: range(4)) {
+                vec3 xyw = (M * vec4(scene.vertices[quad.quad[i]], 1)).xyw();
+                iw[i] = 1 / xyw[2];
+                V[i] = int2(iw[i] * xyw.xy());
+            }
 
             const int2 min = ::min<int2>(V);
             const int2 max = ::max<int2>(V);
 
-            for(const uint y: range(::max(0, min.y/pixel), ::min<uint>(target.size.y, max.y/pixel))) {
+            for(const uint y: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
                 const uint Y = pixel*y + pixel/2;
-                for(const uint x: range(::max(0, min.x/pixel), ::min<uint>(target.size.x, max.x/pixel))) {
+                for(const uint x: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
                     const uint X = pixel*x + pixel/2;
 
                     int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
@@ -225,26 +233,39 @@ static struct Test : Widget {
                     int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
                     int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
 
-                    const int2 a0 = int2(0, 0);
-                    const int2 a1 = int2(1, 0);
-                    const int2 a2 = int2(1, 1);
-                    const int2 a3 = int2(0, 1);
+                    typedef float T;
+                    typedef vec3 vecN;
+                    const vecN A0 = vecN(0, 0, 1);
+                    const vecN A1 = vecN(1, 0, 1);
+                    const vecN A2 = vecN(1, 1, 1);
+                    const vecN A3 = vecN(0, 1, 1);
 
-                    const int e13z = V[1].x * V[3].y - V[3].x * V[1].y;
+                    const vecN a0 = iw[0] * A0;
+                    const vecN a1 = iw[1] * A1;
+                    const vecN a2 = iw[2] * A2;
+                    const vecN a3 = iw[3] * A3;
 
-                    const int2 e01a = a1 - a0;
-                    const int2 e03a = a3 - a0;
-                    const int2 e013x = e01x*e01a + e30x*e03a;
-                    const int2 e013y = e01y*e01a + e30y*e03a;
-                    const int2 e013z = e01z*e01a + e30z*e03a;
-                    const int area013 = e01z + e13z + e30z;
+                    const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
 
-                    const int2 e23a = a3 - a2;
-                    const int2 e21a = a1 - a2;
-                    const int2 e123x = e23x*e23a + e12x*e21a;
-                    const int2 e123y = e23y*e23a + e12y*e21a;
-                    const int2 e123z = e23z*e23a + e12z*e21a;
-                    const int area123 = e12z + e23z - e13z;
+                    /*const vecN e01a = a1 - a0;
+                    const vecN e03a = a3 - a0;
+                    const vecN e013x = T(e01x)*e01a + T(e30x)*e03a;
+                    const vecN e013y = T(e01y)*e01a + T(e30y)*e03a;
+                    const vecN e013z = T(e01z)*e01a + T(e30z)*e03a;*/
+                    //const int area013 = e01z + e13z + e30z;
+                    const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
+                    const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
+                    const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
+
+                    /*const vecN e23a = a3 - a2;
+                    const vecN e21a = a1 - a2;
+                    const vecN e123x = T(e23x)*e23a + T(e12x)*e21a;
+                    const vecN e123y = T(e23y)*e23a + T(e12y)*e21a;
+                    const vecN e123z = T(e23z)*e23a + T(e12z)*e21a;*/
+                    //const int area123 = e12z + e23z - e13z;
+                    const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
+                    const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
+                    const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
 
                     e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
                     e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
@@ -257,16 +278,13 @@ static struct Test : Widget {
                     const int step30 = e30z + e30x*X + e30y*Y;
 
                     if(step01>0 && step12>0 && step23>0 && step30>0) {
-                        const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x;
-                        //e13z += (e13x>0/*dy<0*/ || (e13x==0/*dy=0*/ && e13y<0/*dx<0*/));
                         const int step13 = e13z + e13x*X + e13y*Y;
-                        if(step13>0) {
-                            const vec2 a = vec2(a0) + vec2(e013z + e013x*int(X) + e013y*int(Y)) / float(area013); // FIXME: float, perspective
-                            target(x, target.size.y-1-y) = byte4(0,0xFF*a.x,0xFF*a.y,0xFF);
-                        } else {
-                            const vec2 a = vec2(a2) + vec2(e123z + e123x*int(X) + e123y*int(Y)) / float(area123); // FIXME: float, perspective
-                            target(x, target.size.y-1-y) = byte4(0,0xFF*a.x,0xFF*a.y,0xFF);
-                        }
+                        const vecN a = step13>0 ? /*vecN(a0) +*/ vecN(e013z + e013x*T(X) + e013y*T(Y)) /*/ float(area013)*/ : // FIXME: float, perspective
+                                                  /*vecN(a2) +*/ vecN(e123z + e123x*T(X) + e123y*T(Y)) /*/ float(area123)*/ ;
+                        const vecN A = a / a[2];
+                        //target(x, target.size.y-1-y) = byte4(0,0xFF*A.y,0xFF*A.x,0xFF);
+                        const int c = 0xFF*((int(16*A.x)%2)^(int(16*A.y)%2));
+                        target(x, target.size.y-1-y) = byte4(c,c,c,0xFF);
                     }
                 }
             }
