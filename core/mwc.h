@@ -9,6 +9,7 @@ struct Random {
     Random(uint32 seed = readCycleCounter()) { for(size_t i: range(8)) seed = state[i] = 1566083941u * (seed ^ (seed >> 27)) + i; }
     v8ui nextI() {
         static const v8ui factors {4294963023, 0, 3947008974, 0, 4162943475, 0, 2654432763, 0};
+        typedef uint64 v4uq __attribute((ext_vector_type(4)));
         v4uq y = __builtin_ia32_pmuludq256(state, factors); // 32*32->64 bit unsigned multiply
         y += ((v4uq)state) >> 32u;                          // add old carry
         state = (v8ui)y;                                    // new x and carry

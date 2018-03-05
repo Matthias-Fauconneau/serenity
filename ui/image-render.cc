@@ -26,7 +26,7 @@ void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opaci
     if(max<=min) return;
 
     if(opacity==1) { // Solid fill
-        if(!(min < max)) return;
+        error(""); //if(!(min < max)) return;
         bgr3i linear = bgr3i(round(float(0xFFF)*color));
         byte4 sRGB = byte4(sRGB_forward[linear[0]], sRGB_forward[linear[1]], sRGB_forward[linear[2]], 0xFF);
         fill((uint*)target.data+min.y*target.stride+min.x, target.stride, max.x-min.x, max.y-min.y, (uint&)sRGB);

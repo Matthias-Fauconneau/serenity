@@ -6,21 +6,29 @@
 #include "algorithm.h"
 #include "drag.h"
 
-generic T rcp(T x) { return 1/x; }
-generic T select(bool mask, T t, T f) { return mask ? t : f; }
-generic T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
+generic static inline T rcp(T x) { return 1/x; }
+generic static inline T select(bool c, T t, T f) { return c ? t : f; }
+generic static inline T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
 
-generic inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
-generic inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
+generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
+generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-struct Quad { vec3 _[4]; };
+#define genericVecT1 template<template<Type> /*Type*/class V, Type T, uint N, Type T1> static inline /*constexpr*/
+genericVecT1 Vec and(const T1& c, const Vec& t) { Vec r; for(uint i: range(N)) r[i] = and(c, t[i]); return r; }
+genericVecT1 Vec select(const T1& c, const Vec& t, const Vec& f) { Vec r; for(uint i: range(N)) r[i] = select(c, t[i], f[i]); return r; }
+
+genericVec vec<V,decltype(T()[0]),N> hsum(const Vec& x) { vec<V,decltype(T()[0]),N> r; for(uint i: range(N)) r[i] = hsum(x[i]); return r; }
+
+template<Type T, uint N> struct VecT { T _[N]; };
+typedef VecT<vec3, 4> Quad;
 
 bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
 template<> String str(const Quad& A) { return str(A._); }
 
+static constexpr float ε = 0x1p-20;
+
 int allVerticesSameSidePlane(Quad A, Quad B) {
     const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
-    static constexpr float ε = 0x1p-20;
     int sign = 0;
     for(vec3 v: A._) {
         const vec3 OP = v-B._[0];
@@ -174,54 +182,48 @@ void step(Scene& scene, Random& random) {
             for(uint x: range(size.x)) {
                 const float u = float(x)/float(size.x-1);
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                bgr3f differentialOutgoingRadianceSum = 0;
-                bgr3f realOutgoingRadianceSum = 0; // Synthetic test case
-                const uint sampleCount = 1;
-                for(uint unused i: range(sampleCount)) {
-                    bgr3f differentialIncomingRadiance;
-                    bgr3f realIncomingRadiance;
-                    {
-                        v8sf random8 = random.next();
-                        const vec2 uv (random8[0], random8[1]);
-                        const Scene::QuadLight light = scene.light;
-                        const vec3 L = light.O + uv[0] * light.T + uv[1] * light.B;
-                        const vec3 D = L - O;
+                typedef vec<bgr, v8sf, 3> bgr3fv8;
+                bgr3fv8 differentialOutgoingRadianceSum = 0;
+                bgr3fv8 realOutgoingRadianceSum = 0; // Synthetic test case
+                const uint sampleCount = 8;
+                for(uint unused i: range(sampleCount/8)) {
+                    const Scene::QuadLight light = scene.light;
+                    typedef vec<xyz, v8sf, 3> vec3v8;
+                    const vec3v8 L = vec3v8(light.O) + random.next() * vec3v8(light.T) + random.next() * vec3v8(light.B);
+                    const vec3v8 D = L - vec3v8(O);
 
-                        const float dotNL = dot(D, N);
-                        if(dotNL <= 0) continue;
-                        const float dotAreaL = - dot(light.N, D);
-                        if(dotAreaL <= 0) continue;
+                    const v8sf dotNL = max(0, dot(vec3v8(N), D));
+                    //if all(dotNL <= 0) continue;
+                    const v8sf dotAreaL = max(0, - dot(vec3v8(light.N), D));
+                    //if all(dotAreaL <= 0) continue;
 
-                        bgr3f incomingRadiance = dotNL * dotAreaL / sq(sq(D)) * light.emissiveFlux; // Directional light
+                    bgr3fv8 incomingRadiance = bgr3fv8(light.emissiveFlux) * dotNL * dotAreaL / sq(sq(D)); // Directional light
 
-                        if(quad.real) {
-                            float nearestRealT = inff, nearestVirtualT = inff;
-                            realIncomingRadiance = incomingRadiance;
-                            for(const Scene::Quad& quad: scene.quads) {
-                                vec3 N; float u,v;
-                                if(!quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
-                                if( quad.real) {
-                                    if(intersect(scene, quad, O, D, N, nearestRealT, u, v)) {
-                                        realIncomingRadiance = 0;
-                                    }
-                                }
-                            }
-                            differentialIncomingRadiance = nearestVirtualT < nearestRealT ? - incomingRadiance : 0;
+                    bool differential = quad.real;
+                    v8sf nearestRealT = inff, nearestVirtualT = inff;
+                    bgr3fv8 realIncomingRadiance = incomingRadiance;
+                    for(const Scene::Quad& quad: scene.quads) for(uint k: range(8)) { // FIXME: SIMD ray, SIMD setup
+                        vec3 N; float u,v;
+                        if(!differential || !quad.real) {
+                            float t = nearestVirtualT[k];
+                            intersect(scene, quad, O, vec3(D.x[k],D.y[k],D.z[k]), N, t/*nearestVirtualT*/, u, v);
+                            nearestVirtualT[k] = t;
                         } else {
-                            differentialIncomingRadiance = incomingRadiance;
-                            for(const Scene::Quad& quad: scene.quads) {
-                                float t = inff;
-                                vec3 N; float u,v;
-                                if(intersect(scene, quad, O, D, N, t, u, v)) { differentialIncomingRadiance = 0; break; };
+                            float t = nearestRealT[k];
+                            if(intersect(scene, quad, O, vec3(D.x[k],D.y[k],D.z[k]), N, t/*nearestRealT*/, u, v)) {
+                                realIncomingRadiance[k] = 0;
                             }
+                            nearestRealT[k] = t;
                         }
                     }
-                    const bgr3f albedo = 1;
+                    const bgr3fv8 differentialIncomingRadiance = differential ? and(nearestVirtualT < nearestRealT, -incomingRadiance)
+                                                                              : and(nearestVirtualT == inff, incomingRadiance);
+                    const bgr3fv8 albedo = 1;
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
-                quad.outgoingRadiance(x, y) = (1/float(sampleCount)) * differentialOutgoingRadianceSum;
-                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = (1/float(sampleCount)) * realOutgoingRadianceSum;
+                quad.outgoingRadiance(x, y) = (1/float(sampleCount)) * hsum(differentialOutgoingRadianceSum);
+                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = (1/float(sampleCount)) * hsum(realOutgoingRadianceSum);
             }
         }
     }
@@ -246,12 +248,10 @@ static struct Test : Drag {
                                            Image3f(size), true, Image3f(size)});
         }
 
-        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4), true );
-        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4), false);
-        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4), false);
-        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4), false);
-
-        // FIXME: front to back, coverage buffer
+        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), true );
+        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
+        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
+        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
 
         step(scene, random);
 
