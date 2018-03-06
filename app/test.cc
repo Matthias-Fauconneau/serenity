@@ -17,37 +17,38 @@ generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c;
 generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
 generic T hsum(const T& x) { return x; }
-genericVec vec<V,decltype(T()[0]),N> hsum(const Vec& x) { vec<V,decltype(T()[0]),N> r; for(uint i: range(N)) r[i] = hsum(x[i]); return r; }
+generic T mask(bool c, const T& t) { return c ? t : 0; }
 
-generic T and(bool c, const T& t) { return c ? t : 0; }
+template<Type Function, template<Type> Type V0, Type T0, uint N, template<Type> Type... V, Type... T> static inline constexpr
+auto apply(Function function, vec<V,T,N>... sources) {
+    vec<V0,T0,N> target;
+    for(size_t index: range(N)) target[index] = function(sources[index]...);
+    return target;
+}
 
-#define genericVecT1 template<template<Type> Type V, Type T, uint N, Type T1> static inline /*constexpr*/
-genericVecT1 Vec and(const vec<V,T1,N>& c, const Vec& t) { Vec r; for(uint i: range(N)) r[i] = and(c[i], t[i]); return r; }
-genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { Vec r; for(uint i: range(N)) r[i] = select(c[i], t[i], f[i]); return r; }
-
-// (C & Mᵀ)ᵀ
-template<template<Type> Type V, Type T, uint N, Type T1, template<Type> Type V2, uint N2> static inline auto and(const vec<V,T1,N>& c, const vec<V2,Vec,N2>& t) {
-    vec<V2,Vec,N2> r; for(uint i: range(N)) r[i] = and(c[i], t[i]); return r; }
+#define genericVecT1 template<template<Type> Type V, Type T, uint N, Type T1> static inline constexpr
+genericVecT1 Vec mask(const vec<V,T1,N>& c, const Vec& t) { return apply(mask, c, t); }
+genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { return apply(select, c, t, f); }
+genericVecT1 auto hsum(const Vec& x) { return apply(hsum, x); }
 
 template<Type T, uint N> struct VecT { T _[N]; };
 
-template<template<Type> class V, uint N, Type T, decltype(T()[0]) = 0> auto transpose(const Vec& M) {
-    static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
-    VecT<vec<V,decltype(T()[0]),N>,N1> Mt;
+template<template<Type> class V, uint N, Type T/*, decltype(T()[0]) = 0*/> auto transpose(const Vec& M) {
+    vec<vec<V,Type remove_reference<decltype(T()[0])>::type,N>,T::N> Mt;
     for(uint i: range(N1)) for(uint j: range(N)) Mt[j][i] = M[i][j];
     return Mt;
 }
 
-genericVec vec<x,Vec,1> transpose(const vec<V,vec<x,T,1>,N>& M) { return M; }
+//genericVec vec<x,Vec,1> transpose(const vec<V,vec<x,T,1>,N>& M) { return M; }
 
 typedef VecT<vec3, 4> Quad;
 
-bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
+static inline bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
 template<> String str(const Quad& A) { return str(A._); }
 
 static constexpr float ε = 0x1p-20;
 
-int allVerticesSameSidePlane(Quad A, Quad B) {
+static inline int allVerticesSameSidePlane(Quad A, Quad B) {
     const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
     int sign = 0;
     for(vec3 v: A._) {
@@ -66,7 +67,7 @@ int allVerticesSameSidePlane(Quad A, Quad B) {
     return sign;
 }
 
-int opCmp(Quad A, Quad B) {
+static inline int opCmp(Quad A, Quad B) {
     const vec3 minA = ::min<vec3>(A._), maxA = ::max<vec3>(A._);
     const vec3 minB = ::min<vec3>(B._), maxB = ::max<vec3>(B._);
     if(-minA.z < -maxB.z) return -1;
@@ -76,9 +77,9 @@ int opCmp(Quad A, Quad B) {
     return 0; // ==
 }
 
-bool operator <(Quad A, Quad B) { return opCmp(A, B) < 0; }
+static inline bool operator <(Quad A, Quad B) { return opCmp(A, B) < 0; }
 
-bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     const vec3 e01 = v1-v0;
     const vec3 e12 = v2-v1;
     const vec3 e23 = v3-v2;
@@ -108,7 +109,7 @@ bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const
     return true;
 }
 
-bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static inline bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, N, nearestT, u, v);
 }
 

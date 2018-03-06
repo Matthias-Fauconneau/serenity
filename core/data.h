@@ -14,6 +14,7 @@ struct Data {
  ::buffer<byte> buffer;
 
  Data(){}
+ virtual ~Data() {}
  /// Creates a Data interface to a \a ref
  explicit Data(ref<byte> data) : data(data) {}
  /// Creates a Data interface to a \a buffer
@@ -96,7 +97,7 @@ struct BinaryData : Data {
  void align(uint width) { index=::align(width,index); }
 
  /// Reads one raw \a T element
- generic const T& read() { return *(T*)Data::read(sizeof(T)).data; }
+ generic const T read() { return *reinterpret_cast<const T*>(Data::read(sizeof(T)).data); }
  int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
  int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
  int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }

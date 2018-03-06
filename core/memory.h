@@ -3,17 +3,9 @@
 #include "core.h"
 
 // C runtime memory allocation
-#if 0
-#include <stdlib.h>
-#else
 extern "C" void* malloc(size_t size) noexcept;
 extern "C" int posix_memalign(void** buffer, size_t alignment, size_t size) noexcept;
 extern "C" void free(void* buffer) noexcept;
-#endif
-
-#ifdef __INTEL_COMPILER
-#define __atomic_fetch_add __atomic_fetch_add_explicit
-#endif
 
 /// Managed fixed capacity mutable reference to an array of elements
 /// \note Data is either an heap allocation managed by this object or a reference to memory managed by another object.
@@ -201,9 +193,10 @@ generic shared<T> share(const shared<T>& o) { return shared<T>(o); }
 
 /// Reference counter to be inherited by shared objects
 struct shareable {
- virtual void addUser() { ++userCount; }
- virtual uint removeUser() { return --userCount; }
- uint userCount = 1;
+    virtual ~shareable() {}
+    virtual void addUser() { ++userCount; }
+    virtual uint removeUser() { return --userCount; }
+    uint userCount = 1;
 };
 
 /// Aligns \a offset to \a width (only for power of two \a width)

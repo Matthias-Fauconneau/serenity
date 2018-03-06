@@ -18,7 +18,7 @@ template<template<Type> Type V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T
 #else
 template<Type V> V parseVec(TextData& s) {
     V value;
-    for(uint index: range(V::_N)) { value[index] = parse<Type V::_T>(s); if(index<V::_N-1) s.whileAny(' '); }
+    for(uint index: range(V::N)) { value[index] = parse<Type V::T>(s); if(index<V::_N-1) s.whileAny(' '); }
     return value;
 }
 #endif

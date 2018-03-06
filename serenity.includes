@@ -1,8 +1,6 @@
 .
-/usr/lib/clang/5.0.0/include
-/usr/include/freetype2
+/usr/include/c++/7
 core
 io
 ui
-video
 app

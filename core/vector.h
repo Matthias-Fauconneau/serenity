@@ -4,10 +4,10 @@
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
-template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
+template<template<Type> Type V, Type _T, uint _N> struct vec : V<_T> {
+ typedef _T T;
+ static constexpr uint N = _N;
  static_assert(sizeof(V<T>)==N*sizeof(T));
- typedef T _T;
- static constexpr uint _N = N;
 
  /// Defaults initializes to zero
  inline constexpr vec() /*: vec(0)*/ {}
@@ -82,7 +82,7 @@ genericVec T sum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; retur
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 genericVec T dot(const Vec& a, const Vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 //genericVec T sq(const Vec& a) { return dot(a,a); }
-genericVec float length(const Vec& a) { return __builtin_sqrtf(sq(a)); }
+genericVec float length(const Vec& a) { return __builtin_sqrtf(dot(a, a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }
 genericVec bool isNaN(const Vec& v) { for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 genericVec bool isNumber(const Vec& v) { for(uint i: range(N)) if(v[i]!=v[i] || v[i] == __builtin_inff() || v[i] == -__builtin_inff()) return false; return true; }

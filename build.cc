@@ -108,11 +108,11 @@ bool Build::compileModule(string target) {
         }
         Folder(tmp+"/"+join(flags,string("-"_))+"/"+section(target,'/',0,-2), currentWorkingDirectory(), true);
         Stream stdout;
-        int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-operator-names", //"-stdlib=libc++",
+        int pid = execute(CXX, ref<string>{"-c", "-pipe", "-std=c++1z","-fno-operator-names",
                                            "-Wall", "-Wextra", "-Wno-overloaded-virtual", "-Wno-strict-aliasing",
                                            "-I/usr/include/freetype2","-I/usr/include/ffmpeg", "-iquote.",
                                            "-o", object, fileName} + toRefs(args),
-                          false, currentWorkingDirectory(), 0, &stdout);
+                          false, currentWorkingDirectory(), nullptr, &stdout);
         jobs.append(copyRef(target), pid, move(stdout));
         needLink = true;
     }
@@ -165,7 +165,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
     }
     for(string flag: flags) if(startsWith(flag,"O")) args.append("-"+flag);
     //args.append( "-DARGS=\""+str(args)+"\"");
-    args.append(apply(folder.list(Folders), [this](string subfolder)->String{ return "-iquote"+subfolder; }));
+    args.append(apply(folder.list(Folders), [](string subfolder)->String{ return "-iquote"+subfolder; }));
     for(string flag: flags) args.append( "-D"+toUpper(flag)+"=1" );
     /*Stream stdout;
     execute(which("git"), {"describe"_,"--long"_,"--tags"_,"--dirty"_,"--always"_}, true,
@@ -194,7 +194,7 @@ Build::Build(ref<string> arguments, function<void(string)> log) : log(log) {
         array<String> args = (buffer<String>)(
                     move(files) +
                     mref<String>{"-o"__, unsafeRef(binary)} + // , "-stdlib=libc++"__
-                    apply(libraries, [this](const String& library)->String{ return "-l"+library; }) );
+                    apply(libraries, [](const String& library)->String{ return "-l"+library; }) );
         if(execute(CXX, toRefs(args)+toRefs(linkArgs))) { ::log("Failed to link\n", CXX, args); return; }
         //else log(target);
     }

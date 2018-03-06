@@ -6,7 +6,7 @@
 // -- String
 
 /// Returns const reference to a static string literal
-inline String operator "" __(const char* data, size_t size) { return String((char*)data, size, 0); }
+inline String operator "" __(const char* data, size_t size) { return String(const_cast<char*>(data), size, 0); }
 
 // -- str()
 
@@ -21,7 +21,7 @@ template<size_t N> string str(const char (&source)[N]) { return string(source); 
 /// Returns boolean as "true"/"false"
 inline string str(bool value) { return value ? "true"_ : "false"_; }
 /// Returns a reference to the character
-inline string str(const char& character) { return string((char*)&character,1); }
+inline string str(const char& character) { return string(&character,1); }
 
 /// Returns a bounded reference to the null-terminated String pointer
 string str(const char* source);

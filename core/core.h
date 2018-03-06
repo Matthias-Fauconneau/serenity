@@ -139,7 +139,7 @@ generic struct ref : Ref<T> { using Ref<T>::Ref; };
 /// Unmanaged fixed-size const reference to an array of elements
 generic struct Ref {
  typedef T type;
- const T* data = 0;
+ const T* data = nullptr;
  size_t size = 0;
 
  /// Default constructs an empty reference
@@ -208,12 +208,12 @@ void log(string message);
 // -- Debug
 
 /// Logs a message to standard output and signals all threads to log their stack trace and abort
-template<Type... Args> void  __attribute((noreturn)) error(const Args&... args);
+template<Type... Args> inline void  __attribute((noreturn)) error(const Args&... args);
 template<> void __attribute((noreturn)) error(const string& message);
 
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message (even in release)
 #define assert_(expr, message...) ({ if(!(expr)) ::error(#expr ""_, ## message); })
-#if DEBUG
+#ifdef DEBUG
 /// Aborts if \a expr evaluates to false and logs \a expr and \a message
 #define assert(expr, message...) assert_(expr, ## message)
 #else
