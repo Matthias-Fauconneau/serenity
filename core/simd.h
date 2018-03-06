@@ -4,11 +4,11 @@
 
 typedef uint8 mask8;
 
-typedef int32 v8si __attribute((ext_vector_type(8)));
-typedef uint32 v8ui __attribute((ext_vector_type(8)));
+typedef int32 __attribute((ext_vector_type(8))) v8si;
+typedef uint32 __attribute((ext_vector_type(8))) v8ui;
 
-typedef float32 v4sf __attribute((ext_vector_type(4)));
-typedef float32 v8sf __attribute((ext_vector_type(8)));
+typedef float32 __attribute((ext_vector_type(4))) v4sf;
+typedef float32 __attribute((ext_vector_type(8))) v8sf;
 
 static constexpr v8si int32x8(int32 x) { return (v8si){x,x,x,x,x,x,x,x}; }
 static constexpr v8sf float32x8(float32 f) { return (v8sf){f,f,f,f,f,f,f,f}; }

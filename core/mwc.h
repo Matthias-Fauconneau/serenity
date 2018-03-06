@@ -18,11 +18,15 @@ struct Random {
         y ^= y << 13;
         return v8ui(y);
     }
-    v8sf /*operator()*/next() {
-        v8ui const one = 0x3F800000;       // Binary representation of 1.0f
-        v8ui randomBits = nextI();          // Get random bits
-        v8ui r1 = one - ((randomBits >> 8) & 1); // 1.0 if bit8 is 0, or 1.0-2^-24 = 0.99999994f if bit8 is 1
-        v8ui r2 = (randomBits >> 9) | one;       // bits 9 - 31 inserted as mantissa
-        return (v8sf)r2 - (v8sf)r1;        // 0 <= x < 1
-    }
+    generic T next();
 };
+
+template<> inline v8sf Random::next<v8sf>() {
+    v8ui const one = 0x3F800000;       // Binary representation of 1.0f
+    v8ui randomBits = nextI();          // Get random bits
+    v8ui r1 = one - ((randomBits >> 8) & 1); // 1.0 if bit8 is 0, or 1.0-2^-24 = 0.99999994f if bit8 is 1
+    v8ui r2 = (randomBits >> 9) | one;       // bits 9 - 31 inserted as mantissa
+    return (v8sf)r2 - (v8sf)r1;        // 0 <= x < 1
+}
+template<> inline vec<x,float,1> Random::next<vec<x,float,1>>() { return next<v8sf>()[0]; }
+//template<> inline float Random::next<float>() { return next<v8sf>()[0]; }

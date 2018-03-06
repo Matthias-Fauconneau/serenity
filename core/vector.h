@@ -4,7 +4,7 @@
 
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
-template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
+template<template<Type> Type V, Type T, uint N> struct vec : V<T> {
  static_assert(sizeof(V<T>)==N*sizeof(T));
  typedef T _T;
  static constexpr uint _N = N;
@@ -24,7 +24,7 @@ template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
  template<Type S> inline explicit vec(const vec<V,S,N>& o) { for(uint i: range(N)) at(i)=(T)o[i]; }
 
  /// Initializes first components from another vec \a o and initializes remaining components with args...
- template<template<Type> /*Type*/class W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
+ template<template<Type> Type W, Type... Args> vec(const vec<W,T,N-sizeof...(Args)>& o, Args... args){
   for(int i: range(N-sizeof...(Args))) at(i)=o[i];
   T unpacked[]={T(args)...}; for(int i: range(sizeof...(Args))) at(N-sizeof...(Args)+i)=unpacked[i];
  }
@@ -47,7 +47,7 @@ template<template<Type> /*Type*/class V, Type T, uint N> struct vec : V<T> {
  /// \}
 };
 
-#define genericVec template<template<Type> /*Type*/class V, Type T, uint N> static inline /*constexpr*/
+#define genericVec template<template<Type> Type V, Type T, uint N> static inline constexpr
 #define Vec vec<V,T,N>
 
 genericVec Vec rotate(const Vec& u) { Vec r=u; for(uint i: range(N-1)) swap(r[i],r[i+1]); return r; }
@@ -81,19 +81,21 @@ genericVec T min(const Vec& v) { return min((ref<T>)v); }
 genericVec T sum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 genericVec T dot(const Vec& a, const Vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
-genericVec T sq(const Vec& a) { return dot(a,a); }
+//genericVec T sq(const Vec& a) { return dot(a,a); }
 genericVec float length(const Vec& a) { return __builtin_sqrtf(sq(a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }
 genericVec bool isNaN(const Vec& v) { for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 genericVec bool isNumber(const Vec& v) { for(uint i: range(N)) if(v[i]!=v[i] || v[i] == __builtin_inff() || v[i] == -__builtin_inff()) return false; return true; }
 
-genericVec String str(const Vec& v) {
+template<template<Type> Type V, Type T, uint N> String str(const Vec& v) {
  buffer<char> s(16*N, 0);
  s.append('(');
  for(uint i: range(N)) { s.append(str(v[i],2u)); if(i<N-1) s.append(" "); }
  s.append(')');
  return move(s);
 }
+
+generic struct x { T x; };
 
 generic struct xy {
  T x, y;

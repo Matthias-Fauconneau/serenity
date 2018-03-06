@@ -6,6 +6,9 @@
 #include "algorithm.h"
 #include "drag.h"
 
+template<bool B, class T, class F> struct conditional { typedef T type; };
+template<class T, class F> struct conditional<false, T, F> { typedef F type; };
+
 generic static inline T rcp(T x) { return 1/x; }
 generic static inline T select(bool c, T t, T f) { return c ? t : f; }
 generic static inline T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
@@ -13,13 +16,30 @@ generic static inline T mix(const T& a, const T& b, const float t) { return (1-t
 generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
 generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-#define genericVecT1 template<template<Type> /*Type*/class V, Type T, uint N, Type T1> static inline /*constexpr*/
-genericVecT1 Vec and(const T1& c, const Vec& t) { Vec r; for(uint i: range(N)) r[i] = and(c, t[i]); return r; }
-genericVecT1 Vec select(const T1& c, const Vec& t, const Vec& f) { Vec r; for(uint i: range(N)) r[i] = select(c, t[i], f[i]); return r; }
-
+generic T hsum(const T& x) { return x; }
 genericVec vec<V,decltype(T()[0]),N> hsum(const Vec& x) { vec<V,decltype(T()[0]),N> r; for(uint i: range(N)) r[i] = hsum(x[i]); return r; }
 
+generic T and(bool c, const T& t) { return c ? t : 0; }
+
+#define genericVecT1 template<template<Type> Type V, Type T, uint N, Type T1> static inline /*constexpr*/
+genericVecT1 Vec and(const vec<V,T1,N>& c, const Vec& t) { Vec r; for(uint i: range(N)) r[i] = and(c[i], t[i]); return r; }
+genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { Vec r; for(uint i: range(N)) r[i] = select(c[i], t[i], f[i]); return r; }
+
+// (C & Mᵀ)ᵀ
+template<template<Type> Type V, Type T, uint N, Type T1, template<Type> Type V2, uint N2> static inline auto and(const vec<V,T1,N>& c, const vec<V2,Vec,N2>& t) {
+    vec<V2,Vec,N2> r; for(uint i: range(N)) r[i] = and(c[i], t[i]); return r; }
+
 template<Type T, uint N> struct VecT { T _[N]; };
+
+template<template<Type> class V, uint N, Type T, decltype(T()[0]) = 0> auto transpose(const Vec& M) {
+    static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
+    VecT<vec<V,decltype(T()[0]),N>,N1> Mt;
+    for(uint i: range(N1)) for(uint j: range(N)) Mt[j][i] = M[i][j];
+    return Mt;
+}
+
+genericVec vec<x,Vec,1> transpose(const vec<V,vec<x,T,1>,N>& M) { return M; }
+
 typedef VecT<vec3, 4> Quad;
 
 bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
@@ -182,43 +202,47 @@ void step(Scene& scene, Random& random) {
             for(uint x: range(size.x)) {
                 const float u = float(x)/float(size.x-1);
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                typedef vec<bgr, v8sf, 3> bgr3fv8;
-                bgr3fv8 differentialOutgoingRadianceSum = 0;
-                bgr3fv8 realOutgoingRadianceSum = 0; // Synthetic test case
+                static constexpr uint K = 1;
+                typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))), vec<::x, float32, 1>>::type vsf;
+                /*typedef vec<bgr, v8sf, 3> bgr3fv8;
+                typedef vec<xyz, v8sf, 3> vec3v8;*/
+                typedef vec<bgr, vsf, 3> bgr3fv;
+                typedef vec<xyz, vsf, 3> vec3v;
+                bgr3fv differentialOutgoingRadianceSum = bgr3fv(0);
+                bgr3fv realOutgoingRadianceSum = bgr3fv(0); // Synthetic test case
                 const uint sampleCount = 8;
                 for(uint unused i: range(sampleCount/8)) {
                     const Scene::QuadLight light = scene.light;
-                    typedef vec<xyz, v8sf, 3> vec3v8;
-                    const vec3v8 L = vec3v8(light.O) + random.next() * vec3v8(light.T) + random.next() * vec3v8(light.B);
-                    const vec3v8 D = L - vec3v8(O);
+                    const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
+                    const vec3v D = L - vec3v(O);
 
-                    const v8sf dotNL = max(0, dot(vec3v8(N), D));
+                    const vsf dotNL = max<vsf>(0, dot(vec3v(N), D));
                     //if all(dotNL <= 0) continue;
-                    const v8sf dotAreaL = max(0, - dot(vec3v8(light.N), D));
+                    const vsf dotAreaL = max<vsf>(0, - dot(vec3v(light.N), D));
                     //if all(dotAreaL <= 0) continue;
 
-                    bgr3fv8 incomingRadiance = bgr3fv8(light.emissiveFlux) * dotNL * dotAreaL / sq(sq(D)); // Directional light
+                    bgr3fv incomingRadiance = bgr3fv(light.emissiveFlux) * dotNL * dotAreaL / sq(dot(D, D)); // Directional light
 
                     bool differential = quad.real;
-                    v8sf nearestRealT = inff, nearestVirtualT = inff;
-                    bgr3fv8 realIncomingRadiance = incomingRadiance;
+                    vsf nearestRealT = inff, nearestVirtualT = inff;
+                    bgr3fv realIncomingRadiance = incomingRadiance;
                     for(const Scene::Quad& quad: scene.quads) for(uint k: range(8)) { // FIXME: SIMD ray, SIMD setup
                         vec3 N; float u,v;
                         if(!differential || !quad.real) {
                             float t = nearestVirtualT[k];
-                            intersect(scene, quad, O, vec3(D.x[k],D.y[k],D.z[k]), N, t/*nearestVirtualT*/, u, v);
+                            intersect(scene, quad, O, transpose(D)[k], N, t/*nearestVirtualT*/, u, v);
                             nearestVirtualT[k] = t;
                         } else {
                             float t = nearestRealT[k];
-                            if(intersect(scene, quad, O, vec3(D.x[k],D.y[k],D.z[k]), N, t/*nearestRealT*/, u, v)) {
+                            if(intersect(scene, quad, O, transpose(D)[k], N, t/*nearestRealT*/, u, v)) {
                                 realIncomingRadiance[k] = 0;
                             }
                             nearestRealT[k] = t;
                         }
                     }
-                    const bgr3fv8 differentialIncomingRadiance = differential ? and(nearestVirtualT < nearestRealT, -incomingRadiance)
-                                                                              : and(nearestVirtualT == inff, incomingRadiance);
-                    const bgr3fv8 albedo = 1;
+                    const bgr3fv differentialIncomingRadiance = differential ? and(nearestVirtualT < nearestRealT, -incomingRadiance)
+                                                                             : and(nearestVirtualT == vsf(inff), incomingRadiance);
+                    const bgr3fv albedo = 1;
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }

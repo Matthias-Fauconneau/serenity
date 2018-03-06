@@ -9,7 +9,7 @@ generic T parse(string str) { TextData s(str); T t = parse<T>(s); assert_(!s, st
 template<> inline uint parse<uint>(TextData& s) { return s.integer(false); }
 template<> inline float parse<float>(TextData& s) { return s.decimal(); }
 #if 0
-template<template<Type> /*Type*/class V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T,N>>*/(TextData& s) {
+template<template<Type> Type V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T,N>>*/(TextData& s) {
     vec<V,T,N> value;
     value[0] = parse<T>(s); // Assigns a single value to all components
     for(uint index: range(1, N)) { assert_(s.matchAny("x, ")); value[index] = parse<T>(s); }
