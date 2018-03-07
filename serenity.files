@@ -1,11 +1,12 @@
 app/quad.h
+app/render.cc
+app/test.cc
 build.sh
 build.cc
 build.h
 
 app/box.h
 app/ggx.h
-app/test.cc
 core/parse.h
 serenity.config
 serenity.files

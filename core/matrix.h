@@ -58,7 +58,7 @@ struct mat3 {
         return C;
     }
     mat3 adjugate() const { return cofactor().transpose(); }
-    mat3 inverse() const { return 1/det() * adjugate() ; }
+    mat3 ¯¹() const { return 1/det() * adjugate() ; }
 
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
     mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
@@ -121,15 +121,15 @@ struct mat4 {
         C(3,0) = -minor(1, 2, 3, 0, 1, 2), C(3,1) =  minor(0, 2, 3, 0, 1, 2), C(3,2) = -minor(0, 1, 3, 0, 1, 2), C(3,3) =  minor(0, 1, 2, 0, 1, 2);
         return C;
     }
-    mat4 transpose() const {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
-    mat4 adjugate() const { return cofactor().transpose(); }
-    mat4 inverse() const { return 1/det() * adjugate() ; }
+    mat4 ᵀ() const {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}
+    mat4 adjugate() const { return cofactor().ᵀ(); }
+    mat4 ¯¹() const { return 1/det() * adjugate() ; }
     explicit operator mat3() const {
         mat3 r;
         for(int i=0;i<3;i++) for(int j=0;j<3;j++) r(i,j)=M(i,j);
         return r;
     }
-    mat3 normalMatrix() const { return (mat3)(inverse().transpose()); }
+    mat3 normalMatrix() const { return (mat3)(¯¹().ᵀ()); }
 
     mat4& translate(vec3 v) { for(int i=0;i<4;i++) M(i,3) += M(i,0)*v.x + M(i,1)*v.y + M(i,2)*v.z; return *this; }
     mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) M(i,j)*=v[j]; return *this; }
