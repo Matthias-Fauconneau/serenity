@@ -15,8 +15,7 @@ generic static inline T mix(const T& a, const T& b, const float t) { return (1-t
 generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
 generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-// error: function template partial specialization is not allowed (will be supported by concept maps)
-//genericVec T hsum<Vec>(const Vec& t) { return hsum<V,T,N>(t); }
+//genericVec T hsum<Vec>(const Vec& t) { return hsum<V,T,N>(t); } function template partial specialization is not allowed
 template<> float hsum<vec<x,float,1>>(vec<x,float,1> t) { return hsum<x,float,1>(t); }
 
 generic T mask(bool c, T t) { return c ? t : T(); }
@@ -172,7 +171,7 @@ static inline void importSTL(Scene& scene, string path, vec3 origin, bool real) 
     }
     s.line(); // name
     assert_(!s);
-    assert_(vertices.size==8);
+    assert_(vertices.size==8, vertices.size);
 
     { // Rescale
         const vec3 min = ::min(vertices);
