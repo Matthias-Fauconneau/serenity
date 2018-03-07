@@ -75,13 +75,13 @@ typedef float float32;
 constexpr size_t invalid = ~0ull; // Invalid index
 
 // -- Number arithmetic
-template<Type A, Type B> bool operator >(const A& a, const B& b) { return b<a; }
-template<Type A, Type B> bool operator >=(const A& a, const B& b) { return b<=a; }
-generic inline constexpr T min(T a, T b) { return a<b ? a : b; }
-generic inline constexpr T max(T a, T b) { return a>b ? a : b; }
-generic  T clamp(T min, T x, T max) { return ::min(::max(min, x), max); }
-generic T abs(T x) { return x>=0 ? x : -x; }
-generic inline constexpr T sq(const T x) { return x*x; }
+template<Type A, Type B> static inline bool operator >(const A& a, const B& b) { return b<a; }
+template<Type A, Type B> static inline bool operator >=(const A& a, const B& b) { return b<=a; }
+generic static inline constexpr T min(T a, T b) { return a<b ? a : b; }
+generic static inline constexpr T max(T a, T b) { return a>b ? a : b; }
+generic static inline T clamp(T min, T x, T max) { return ::min(::max(min, x), max); }
+generic static inline T abs(T x) { return x>=0 ? x : -x; }
+generic static inline constexpr T sq(const T x) { return x*x; }
 
 /// Numeric range
 struct range {

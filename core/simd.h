@@ -65,6 +65,9 @@ static inline v8si cvt(const v8sf v) { return __builtin_ia32_cvtps2dq256(v); }
 static inline v8si cvtt(const v8sf v) { return __builtin_ia32_cvttps2dq256(v); }
 static inline v8sf toFloat(const v8si v) { return __builtin_ia32_cvtdq2ps256(v); }
 
+static inline auto vecLt(const v8sf a, const v8sf b) { return a< b; }
+static inline auto vecEq(const v8sf a, const v8sf b) { return a==b; }
+
 generic decltype(T()[0]+T()[1]) hsum(T);
 template<> inline float32 hsum(v8sf x) {
     const v4sf sumQuad = __builtin_shufflevector(x, x, 0, 1, 2, 3) + __builtin_shufflevector(x, x, 4, 5, 6, 7); // 0 + 4, 1 + 5, 2 + 6, 3 + 7

@@ -108,7 +108,7 @@ genericVec Vec clamp(const Vec& min, const Vec& x, const Vec& max) { Vec r; for(
 genericVec T min(const Vec& v) { return min((ref<T>)v); }
 genericVec T hsum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
-genericVec T dot(const Vec& a, const Vec& b) { T ssq (0_); for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
+genericVec T dot(const Vec& a, const Vec& b) { T ssq (0); for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 //genericVec T sq(const Vec& a) { return dot(a,a); }
 genericVec float length(const Vec& a) { return __builtin_sqrtf(dot(a, a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }

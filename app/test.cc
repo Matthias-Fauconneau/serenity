@@ -6,6 +6,8 @@
 #include "algorithm.h"
 #include "drag.h"
 
+template<> inline vec<x,float,1> Random::next<vec<x,float,1>>() { return vec<x,float,1>(next<float>()); }
+
 template<bool B, Type T, Type F> struct conditional { typedef T type; };
 template<Type T, Type F> struct conditional<false, T, F> { typedef F type; };
 
@@ -220,7 +222,7 @@ static inline void step(Scene& scene, Random& random) {
                 //const float u = (float(x)+0.5f)/float(size.x); // Uniform
                 const float u = float(x)/float(size.x-1); // Duplicate edges
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                static constexpr uint K = 1;
+                static constexpr uint K = 8;
                 /*if constexpr(K>1) typedef float32 __attribute((ext_vector_type(K))) vsf;
                   else              typedef vec<::x, float32, 1>                      vsf;*/
                 typedef conditional< (K>1), float32 __attribute((ext_vector_type(K))),
