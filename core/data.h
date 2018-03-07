@@ -133,9 +133,6 @@ struct BinaryData : Data {
  };
  ArrayReadOperator read(size_t size) { return {this,size}; }
 
- /// Reads \a size \a T elements (swap as needed)
- //generic void read(T buffer[], size_t size) { for(size_t i: range(size)) buffer[i]=(T)read(); }
-
  /// Advances while input doesn't match \a key.
  ref<byte> whileNot(uint8 key);
 };

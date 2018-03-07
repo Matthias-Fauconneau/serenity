@@ -18,11 +18,11 @@ template<template<Type> Type V, Type T, uint N> vec<V,T,N> parseVector/*<vec<V,T
 #else
 template<Type V> V parseVec(TextData& s) {
     V value;
-    for(uint index: range(V::N)) { value[index] = parse<Type V::T>(s); if(index<V::_N-1) s.whileAny(' '); }
+    for(uint index: range(V::N)) { value[index] = parse<Type V::T>(s); if(index<V::N-1) s.whileAny(' '); }
     return value;
 }
 #endif
-//generic T parseVector(TextData& s) { return parseVector<T::_V, T::_T, T::_N>(s); } // Undefined function template partial specialization
+//generic T parseVector(TextData& s) { return parseVector<T::_V, T::_T, T::4>(s); } // Undefined function template partial specialization
 //template<> inline uint2 parse<uint2>(TextData& s) { return parseVector<xy, uint, 2>(s); }
 //template<> inline uint3 parse<uint3>(TextData& s) { return parseVector<xyz, uint, 3>(s); }
 template<> inline uint4 parse<uint4>(TextData& s) { return parseVec<uint4>(s); }

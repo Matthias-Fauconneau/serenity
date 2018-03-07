@@ -9,6 +9,7 @@ void trapezoidY(const Image& target, Span a, Span b, bgr3f color = 0, float opac
 
 struct ImageRenderTarget : Image, RenderTarget2D {
     ImageRenderTarget(Image&& image) : Image(::move(image)), RenderTarget2D(vec2(image.size)) {}
+    virtual ~ImageRenderTarget() {}
     virtual void fill(vec2 origin, vec2 size, bgr3f color, float opacity) override {
         ::fill(*this, int2(origin), uint2(size), color, opacity);
     }

@@ -44,10 +44,10 @@ generic ImageT<T> unsafeShare(const ImageT<T>& o) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
+/*generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
  assert_(int2(size) >= int2(0) && offset+int2(size) <= int2(o.size), offset, size, o.size);
  return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)), size, o.stride, o.alpha);
-}
+}*/
 
 // -- Types --
 

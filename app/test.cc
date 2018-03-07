@@ -6,8 +6,8 @@
 #include "algorithm.h"
 #include "drag.h"
 
-template<bool B, class T, class F> struct conditional { typedef T type; };
-template<class T, class F> struct conditional<false, T, F> { typedef F type; };
+template<bool B, Type T, Type F> struct conditional { typedef T type; };
+template<Type T, Type F> struct conditional<false, T, F> { typedef F type; };
 
 generic static inline T rcp(T x) { return 1/x; }
 generic static inline T select(bool c, T t, T f) { return c ? t : f; }
@@ -16,34 +16,44 @@ generic static inline T mix(const T& a, const T& b, const float t) { return (1-t
 generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
 generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-generic T hsum(const T& x) { return x; }
-generic T mask(bool c, const T& t) { return c ? t : 0; }
+//generic auto /*decltype(T()[0]+T()[1])*/ hsum(const T& t);
+generic decltype(T()[0]+T()[1]) hsum(const T&);
+// error: function template partial specialization is not allowed (will be supported by concept maps)
+//genericVec T hsum<Vec>(const Vec& t) { return hsum<V,T,N>(t); }
+template<> float hsum<vec<x,float,1>>(const vec<x,float,1>& t) { return hsum<x,float,1>(t); }
 
-template<Type Function, template<Type> Type V0, Type T0, uint N, template<Type> Type... V, Type... T> static inline constexpr
+generic T mask(const bool& c, const T& t) { return c ? t : T(); }
+
+template<template<Type> Type V, uint N, Type Function, Type... T> static inline constexpr
 auto apply(Function function, vec<V,T,N>... sources) {
-    vec<V0,T0,N> target;
+    vec<V,decltype(function(sources[0]...)),N> target;
     for(size_t index: range(N)) target[index] = function(sources[index]...);
     return target;
 }
 
 #define genericVecT1 template<template<Type> Type V, Type T, uint N, Type T1> static inline constexpr
-genericVecT1 Vec mask(const vec<V,T1,N>& c, const Vec& t) { return apply(mask, c, t); }
+
+genericVecT1 Vec mask(const vec<V,T1,N>& c, const Vec& t) { return apply(mask<T>, c, t); }
 genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { return apply(select, c, t, f); }
-genericVecT1 auto hsum(const Vec& x) { return apply(hsum, x); }
 
-template<Type T, uint N> struct VecT { T _[N]; };
 
-template<template<Type> class V, uint N, Type T/*, decltype(T()[0]) = 0*/> auto transpose(const Vec& M) {
-    vec<vec<V,Type remove_reference<decltype(T()[0])>::type,N>,T::N> Mt;
-    for(uint i: range(N1)) for(uint j: range(N)) Mt[j][i] = M[i][j];
+template<template<Type> Type V, Type T, uint N, Type T1, decltype(sizeof(T1)/T1()[0]==N) = 0> static inline constexpr
+ Vec mask(const T1& c, const Vec& t) { return apply([c](const T& t){return ::mask(c, t);}, t); }
+
+template<Type T, uint N> struct VecT {
+    T _[N];
+    T& operator[](size_t i) { return _[i]; }
+};
+
+template<template<Type> Type V, uint N, Type T> auto transpose(const vec<V,T,N>& M) {
+    static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
+    VecT< vec<V,Type remove_reference<decltype(T()[0])>::type,N>, N1> Mt;
+    for(uint i: range(T::N)) for(uint j: range(N)) Mt[j][i] = M[i][j];
     return Mt;
 }
 
-//genericVec vec<x,Vec,1> transpose(const vec<V,vec<x,T,1>,N>& M) { return M; }
-
 typedef VecT<vec3, 4> Quad;
 
-static inline bool operator==(Quad A, Quad B) { return ref<vec3>(A._) == ref<vec3>(B._); }
 template<> String str(const Quad& A) { return str(A._); }
 
 static constexpr float ε = 0x1p-20;
@@ -131,11 +141,11 @@ struct Scene {
     Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 2/*lightSize/sq(lightSize)*/};
 };
 
-bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static inline bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
     return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
 }
 
-void importSTL(Scene& scene, string path, vec3 origin, bool real) {
+static inline void importSTL(Scene& scene, string path, vec3 origin, bool real) {
     TextData s (readFile(path));
     s.skip("solid "); s.line(); // name
     array<uint3> triangles;
@@ -188,7 +198,7 @@ void importSTL(Scene& scene, string path, vec3 origin, bool real) {
     scene.vertices.append(vertices);
 }
 
-void step(Scene& scene, Random& random) {
+static inline void step(Scene& scene, Random& random) {
     Time time (true);
     for(const Scene::Quad& quad: scene.quads) {
         const vec3 v0 = scene.vertices[quad.quad[0]];
@@ -203,16 +213,20 @@ void step(Scene& scene, Random& random) {
             for(uint x: range(size.x)) {
                 const float u = float(x)/float(size.x-1);
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                static constexpr uint K = 1;
-                typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))), vec<::x, float32, 1>>::type vsf;
+                static constexpr uint K = 8;
+                /*if constexpr(K>1) typedef float32 __attribute((ext_vector_type(K))) vsf;
+                  else              typedef vec<::x, float32, 1>                      vsf;*/
+                typedef conditional< (K>1), float32 __attribute((ext_vector_type(K))),
+                                            vec<::x, float32, 1>                       >::type vsf;
                 /*typedef vec<bgr, v8sf, 3> bgr3fv8;
                 typedef vec<xyz, v8sf, 3> vec3v8;*/
                 typedef vec<bgr, vsf, 3> bgr3fv;
                 typedef vec<xyz, vsf, 3> vec3v;
-                bgr3fv differentialOutgoingRadianceSum = bgr3fv(0);
-                bgr3fv realOutgoingRadianceSum = bgr3fv(0); // Synthetic test case
+
+                bgr3fv differentialOutgoingRadianceSum = bgr3fv(0.f);
+                bgr3fv realOutgoingRadianceSum = bgr3fv(0.f); // Synthetic test case
                 const uint sampleCount = 8;
-                for(uint unused i: range(sampleCount/8)) {
+                for(uint unused i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
                     const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
                     const vec3v D = L - vec3v(O);
@@ -227,7 +241,7 @@ void step(Scene& scene, Random& random) {
                     bool differential = quad.real;
                     vsf nearestRealT = inff, nearestVirtualT = inff;
                     bgr3fv realIncomingRadiance = incomingRadiance;
-                    for(const Scene::Quad& quad: scene.quads) for(uint k: range(8)) { // FIXME: SIMD ray, SIMD setup
+                    for(const Scene::Quad& quad: scene.quads) for(uint k: range(K)) { // FIXME: SIMD ray, SIMD setup
                         vec3 N; float u,v;
                         if(!differential || !quad.real) {
                             float t = nearestVirtualT[k];
@@ -241,14 +255,14 @@ void step(Scene& scene, Random& random) {
                             nearestRealT[k] = t;
                         }
                     }
-                    const bgr3fv differentialIncomingRadiance = differential ? and(nearestVirtualT < nearestRealT, -incomingRadiance)
-                                                                             : and(nearestVirtualT == vsf(inff), incomingRadiance);
-                    const bgr3fv albedo = 1;
+                    const bgr3fv differentialIncomingRadiance = differential ? mask(nearestVirtualT < nearestRealT, -incomingRadiance)
+                                                                             : mask(nearestVirtualT == vsf(inff), incomingRadiance);
+                    const bgr3fv albedo = bgr3fv(1);
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
-                quad.outgoingRadiance(x, y) = (1/float(sampleCount)) * hsum(differentialOutgoingRadianceSum);
-                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = (1/float(sampleCount)) * hsum(realOutgoingRadianceSum);
+                quad.outgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, differentialOutgoingRadianceSum);
+                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, realOutgoingRadianceSum);
             }
         }
     }
