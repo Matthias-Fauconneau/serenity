@@ -33,21 +33,30 @@ auto apply(Function function, vec<V,T,N>... sources) {
 genericVecT1 Vec mask(const vec<V,T1,N>& c, const Vec& t) { return apply(mask<T>, c, t); }
 genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { return apply(select, c, t, f); }
 
-
 template<template<Type> Type V, Type T, uint N, Type T1, decltype(sizeof(T1)/T1()[0]==N) = 0> static inline constexpr
  Vec mask(const T1& c, const Vec& t) { return apply([c](const T& t){return ::mask(c, t);}, t); }
+
+template<template<Type> Type V, uint N, Type T> auto getᵀ(const vec<V,T,N>& M, uint i) {
+    vec<V,Type remove_reference<decltype(T()[0])>::type, N> v;
+    for(uint j: range(N)) v[i] = M[j][i];
+    return v;
+}
+
+template<template<Type> Type V, uint N, Type T> void setᵀ(vec<V,T,N>& M, uint i, const vec<V,Type remove_reference<decltype(T()[0])>::type, N>& v) {
+    for(uint j: range(N)) M[j][i] = v[i];
+}
 
 template<Type T, uint N> struct VecT {
     T _[N];
     T& operator[](size_t i) { return _[i]; }
 };
 
-template<template<Type> Type V, uint N, Type T> auto transpose(const vec<V,T,N>& M) {
+/*template<template<Type> Type V, uint N, Type T> auto ᵀ(const vec<V,T,N>& M) {
     static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
-    VecT< vec<V,Type remove_reference<decltype(T()[0])>::type,N>, N1> Mt;
-    for(uint i: range(N)) for(uint j: range(N1)) Mt[j][i] = M[i][j];
+    VecT< vec<V,Type remove_reference<decltype(T()[0])>::type, N>, N1> Mt;
+    for(uint j: range(N)) for(uint i: range(N1)) Mt[i][j] = M[j][i];
     return Mt;
-}
+}*/
 
 typedef VecT<vec3, 4> Quad;
 
@@ -186,7 +195,7 @@ static inline void importSTL(Scene& scene, string path, vec3 origin, bool real) 
                 else if(A[0] == e0 && A[2] == e1) {}
                 else continue;
                 const uint32 A3 = B[(edgeIndex+2)%3];
-                const uint2 size = uint2(1/*256*/); // FIXME: auto resolution
+                const uint2 size = uint2(2/*256*/); // FIXME: auto resolution
                 scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3), Image3f(size), real, real?Image3f(size):Image3f()});
             }
         }
@@ -206,11 +215,13 @@ static inline void step(Scene& scene, Random& random) {
 
         const uint2 size = quad.outgoingRadiance.size;
         for(uint y: range(size.y)) {
-            const float v = float(y)/float(size.y-1);
+            //const float v = (float(y)+0.5f)/float(size.y); // Uniform
+            const float v = float(y)/float(size.y-1); // Duplicate edges
             for(uint x: range(size.x)) {
-                const float u = float(x)/float(size.x-1);
+                //const float u = (float(x)+0.5f)/float(size.x); // Uniform
+                const float u = float(x)/float(size.x-1); // Duplicate edges
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                static constexpr uint K = 8;
+                static constexpr uint K = 1;
                 /*if constexpr(K>1) typedef float32 __attribute((ext_vector_type(K))) vsf;
                   else              typedef vec<::x, float32, 1>                      vsf;*/
                 typedef conditional< (K>1), float32 __attribute((ext_vector_type(K))),
@@ -218,8 +229,8 @@ static inline void step(Scene& scene, Random& random) {
                 typedef vec<bgr, vsf, 3> bgr3fv;
                 typedef vec<xyz, vsf, 3> vec3v;
 
-                bgr3fv differentialOutgoingRadianceSum = bgr3fv(0.f);
-                bgr3fv realOutgoingRadianceSum = bgr3fv(0.f); // Synthetic test case
+                bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
+                bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
                 const uint sampleCount = 8;
                 for(uint unused i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
@@ -240,19 +251,19 @@ static inline void step(Scene& scene, Random& random) {
                         vec3 N; float u,v;
                         if(!differential || !quad.real) {
                             float t = nearestVirtualT[k];
-                            intersect(scene, quad, O, transpose(D)[k], N, t/*nearestVirtualT*/, u, v);
+                            intersect(scene, quad, O, getᵀ(D, k), N, t/*nearestVirtualT*/, u, v);
                             nearestVirtualT[k] = t;
                         } else {
                             float t = nearestRealT[k];
-                            if(intersect(scene, quad, O, transpose(D)[k], N, t/*nearestRealT*/, u, v)) {
-                                realIncomingRadiance[k] = 0;
+                            if(intersect(scene, quad, O, getᵀ(D, k), N, t/*nearestRealT*/, u, v)) {
+                                setᵀ(realIncomingRadiance, k, bgr3f(0));
                             }
                             nearestRealT[k] = t;
                         }
                     }
                     const bgr3fv differentialIncomingRadiance = differential ? mask(nearestVirtualT < nearestRealT, -incomingRadiance)
                                                                              : mask(nearestVirtualT == vsf(inff), incomingRadiance);
-                    const bgr3fv albedo = bgr3fv(1);
+                    const bgr3fv albedo = bgr3fv(vsf(1));
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
