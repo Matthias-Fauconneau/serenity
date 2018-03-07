@@ -102,8 +102,8 @@ void XDisplay::event() {
   for(;;) { // Process any queued events
    array<byte> e;
    {Locker lock(this->lock);
-    if(!events) break;
-    e = events.take(0);
+    if(!xEvents) break;
+    e = xEvents.take(0);
    }
    event(e);
   }
@@ -178,7 +178,7 @@ array<byte> XDisplay::readReply(uint16 sequence, uint elementSize, buffer<int>& 
   array<byte> o;
   o.append(raw(e));
   if(e.type==GenericEvent) o.append(read(e.genericEvent.size*4));
-  events.append(move(o));
+  xEvents.append(move(o));
   queue(); // Queues event to process after unwinding back to event loop
  }
 }
@@ -196,7 +196,7 @@ void XDisplay::waitEvent(uint8 type) {
   }
   if(e.type==SelectionRequest) event(o); // Prevent deadlock waiting for SelectionNotify owned on this connection
   else {
-   events.append(move(o));
+   xEvents.append(move(o));
    queue(); // Queues event to process event queue after unwinding back to main event loop
   }
  }

@@ -144,7 +144,7 @@ struct Scene {
     struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
 
     const float lightSize = 1;
-    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, 2/*lightSize/sq(lightSize)*/};
+    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, bgr3f(2)/*lightSize/sq(lightSize)*/};
 };
 
 static inline bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
@@ -231,21 +231,21 @@ static inline void step(Scene& scene, Random& random) {
 
                 bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
                 bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
-                const uint sampleCount = 8;
+                const uint sampleCount = 256;
                 for(uint unused i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
                     const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
                     const vec3v D = L - vec3v(O);
 
-                    const vsf dotNL = max<vsf>(0, dot(vec3v(N), D));
+                    const vsf dotNL = max(vsf(0), dot(vec3v(N), D));
                     //if all(dotNL <= 0) continue;
-                    const vsf dotAreaL = max<vsf>(0, - dot(vec3v(light.N), D));
+                    const vsf dotAreaL = max(vsf(0), - dot(vec3v(light.N), D));
                     //if all(dotAreaL <= 0) continue;
 
                     bgr3fv incomingRadiance = bgr3fv(light.emissiveFlux) * dotNL * dotAreaL / sq(dot(D, D)); // Directional light
 
                     bool differential = quad.real;
-                    vsf nearestRealT = inff, nearestVirtualT = inff;
+                    vsf nearestRealT (inff), nearestVirtualT (inff);
                     bgr3fv realIncomingRadiance = incomingRadiance;
                     for(const Scene::Quad& quad: scene.quads) for(uint k: range(K)) { // FIXME: SIMD ray, SIMD setup
                         vec3 N; float u,v;
@@ -282,7 +282,7 @@ static struct Test : Drag {
 
     vec3 viewPosition = vec3(0,0,0); //vec3(-1./2,0,0);
 
-    unique<Window> window = ::window(this, 2048, mainThread, 0);
+    unique<Window> window = ::window(this, int2(2048), mainThread, 0);
 
     Test() : Drag(vec2(0,-π/3)) {
         {
@@ -450,7 +450,7 @@ static struct Test : Drag {
                         const uint texX = u*(texSize.x-1)+1.f/2;
                         const uint texY = v*(texSize.y-1)+1.f/2;
 
-                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : 0; // FIXME: synthetic test case
+                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0); // FIXME: synthetic test case
                         const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                         target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);

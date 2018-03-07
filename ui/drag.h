@@ -5,7 +5,7 @@ struct Drag : virtual Widget {
     struct {
         vec2 cursor;
         vec2 value;
-    } dragStart {0, 0};
+    } dragStart {0_, 0_};
 
     vec2 value = vec2(0, 0);
 

@@ -16,9 +16,9 @@ struct Widget {
  virtual String title() const { return {}; }
  /// Preferred size (positive means preferred, negative means expanding (i.e benefit from extra space))
  /// \note space is first allocated to preferred widgets, then to expanding widgets.
- virtual vec2 sizeHint(vec2) { error("sizeHint"); return 0; }
+ virtual vec2 sizeHint(vec2) { error("sizeHint"); return 0_0; }
  /// Renders graphic elements representing this widget to \a target.
- virtual void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) abstract;
+ virtual void render(RenderTarget2D& target, vec2 offset=0_0, vec2 size=0_0) abstract;
  /// Returns stop position for scrolling
  /// \arg direction Direction of requested stop (-1: previous, 0: nearest, 1: next)
  /// \note Defaults to discrete uniform coarse stops

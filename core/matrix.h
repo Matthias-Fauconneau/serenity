@@ -29,7 +29,7 @@ struct mat3; inline mat3 operator*(float s, mat3 M);
 struct mat3 {
     float data[3*3];
 
-    explicit mat3(vec3 d=1) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
+    explicit mat3(vec3 d=1_) { for(int i=0;i<3*3;i++) data[i]=0; for(int i=0;i<3;i++) M(i,i)=d[i]; }
     mat3(vec3 e0, vec3 e1, vec3 e2){for(int i=0;i<3;i++) M(i,0)=e0[i], M(i,1)=e1[i], M(i,2)=e2[i]; }
 
     float M(int i, int j) const { return data[j*3+i]; }
@@ -41,7 +41,7 @@ struct mat3 {
 
     vec2 operator*(vec2 v) const {vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
     vec3 operator*(vec3 v) const {vec3 r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }
-    mat3 operator*(mat3 b) const { mat3 r(0); for(int j: range(3)) for(int i: range(3)) for(int k: range(3)) r.M(i,j)+=M(i,k)*b.M(k,j); return r; }
+    mat3 operator*(mat3 b) const { mat3 r(0_); for(int j: range(3)) for(int i: range(3)) for(int k: range(3)) r.M(i,j)+=M(i,k)*b.M(k,j); return r; }
 
     float det() const {
         return
@@ -92,8 +92,8 @@ struct mat4; inline mat4 operator*(float s, mat4 M);
 struct mat4 {
     float data[4*4];
 
-    mat4(vec4 d=1) { for(int i=0;i<4*4;i++) data[i]=0; for(int i=0;i<4;i++) M(i,i)=d[i]; }
-    mat4(mat3 m):mat4(1){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
+    mat4(vec4 d=1_) { for(int i=0;i<4*4;i++) data[i]=0; for(int i=0;i<4;i++) M(i,i)=d[i]; }
+    mat4(mat3 m):mat4(1_){for(int i=0;i<3;i++) for(int j=0;j<3;j++) M(i,j)=m(i,j); }
 
     float M(int i, int j) const { return data[j*4+i]; }
     float& M(int i, int j) { return data[j*4+i]; }
@@ -104,7 +104,7 @@ struct mat4 {
 
     vec3 operator*(vec3 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+1*M(i,3); return r.xyz()/r.w; }
     vec4 operator*(vec4 v) const { vec4 r; for(int i=0;i<4;i++) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2)+v.w*M(i,3); return r; }
-    mat4 operator*(mat4 b) const{mat4 r(0); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
+    mat4 operator*(mat4 b) const { mat4 r(0_); for(int j=0;j<4;j++) for(int i=0;i<4;i++) for(int k=0;k<4;k++) r.M(i,j) += M(i,k)*b.M(k,j); return r; }
 #undef minor
     float minor(int j0, int j1, int j2, int i0, int i1, int i2) const {
         return

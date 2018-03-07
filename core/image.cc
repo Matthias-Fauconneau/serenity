@@ -40,7 +40,7 @@ void sRGB(const Image& target, const Image3f& source) {
     assert_(target.size == source.size);
     for(size_t y : range(target.size.y)) {
         mref<byte4> dst = target.slice(y*target.stride, target.size.x);
-        ref<rgb3f> src = source.slice(y*source.stride, source.size.x);
+        ref<bgr3f> src = source.slice(y*source.stride, source.size.x);
         for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b), sRGB(src[x].g), sRGB(src[x].r), 0xFF);
     }
 }
@@ -222,15 +222,18 @@ static void bilinear(const Image& target, const Image& source) {
             uint ix = fx/256, iy = fy/256;
             uint u = fx%256, v = fy%256;
             const ref<byte4> span = source.slice(iy*stride+ix);
-            byte4 d = 0;
-            uint a  = ((uint(span[      0][3]) * (256-u) + uint(span[           1][3])  * u) * (256-v)
+            const uint a  = ((uint(span[      0][3]) * (256-u) + uint(span[           1][3])  * u) * (256-v)
                     + (uint(span[stride][3]) * (256-u) + uint(span[stride+1][3]) * u) * (       v) ) / (256*256);
-            if(a) for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
-                d[i] = ((uint(span[      0][3]) * uint(span[      0][i]) * (256-u) + uint(span[           1][3]) * uint(span[           1][i]) * u) * (256-v)
-                        + (uint(span[stride][3]) * uint(span[stride][i]) * (256-u) + uint(span[stride+1][3]) * uint(span[stride+1][i]) * u) * (       v) )
-                        / (a*256*256);
+            byte4 d;
+            if(!a) d = byte4(0,0,0,0);
+            else {
+                for(int i=0; i<3; i++) { // Interpolates values as if in linear space (not sRGB)
+                    d[i] = ((uint(span[      0][3]) * uint(span[      0][i]) * (256-u) + uint(span[           1][3]) * uint(span[           1][i]) * u) * (256-v)
+                            + (uint(span[stride][3]) * uint(span[stride][i]) * (256-u) + uint(span[stride+1][3]) * uint(span[stride+1][i]) * u) * (       v) )
+                            / (a*256*256);
+                }
+                d[3] = a;
             }
-            d[3] = a;
             target(x, y) = d;
         }
     }

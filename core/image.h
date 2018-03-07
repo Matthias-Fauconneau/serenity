@@ -4,7 +4,7 @@
 
 /// 2D array of pixels
 generic struct ImageT : buffer<T> {
- uint2 size = 0;
+ uint2 size = 0_0;
  uint stride = 0;
  bool alpha = false;
 
@@ -70,7 +70,7 @@ typedef ImageT<uint16> Image16;
 typedef ImageT<uint32> Image32;
 
 /// 2D array of RGB 32bit floating-point samples
-typedef ImageT<rgb3f> Image3f;
+typedef ImageT<bgr3f> Image3f;
 
 /// 2D array of BGRA 32bit floating-point samples
 typedef ImageT<bgra4f> Image4f;

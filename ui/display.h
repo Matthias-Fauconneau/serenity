@@ -21,7 +21,7 @@ struct XDisplay : Socket, Poll {
  /// Synchronizes access to connection and event queue
  Lock lock;
  /// Event queue
- array<array<byte>> events;
+ array<array<byte>> xEvents;
  /// Signals events
  signal<const ref<byte>> onEvent;
  // Write
@@ -36,9 +36,9 @@ struct XDisplay : Socket, Poll {
  /// Root visual
  uint visual = 0;
  /// Screen size
- uint2 size = 0;
+ uint2 size = 0_0;
 #if GL
- struct _XDisplay* glDisplay = 0;
+ struct _XDisplay* glDisplay = nullptr;
 #endif
 
  // Keyboard

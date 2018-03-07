@@ -28,5 +28,5 @@ template<> inline v8sf Random::next<v8sf>() {
     v8ui r2 = (randomBits >> 9) | one;       // bits 9 - 31 inserted as mantissa
     return (v8sf)r2 - (v8sf)r1;        // 0 <= x < 1
 }
-template<> inline vec<x,float,1> Random::next<vec<x,float,1>>() { return next<v8sf>()[0]; }
+template<> inline vec<x,float,1> Random::next<vec<x,float,1>>() { return vec<x,float,1>(next<v8sf>()[0]); }
 //template<> inline float Random::next<float>() { return next<v8sf>()[0]; }

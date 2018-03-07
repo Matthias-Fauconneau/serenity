@@ -14,9 +14,9 @@ struct Window : Poll {
 
  // Display
  /// Window size
- uint2 size = 0;
+ uint2 size = 0_0;
  /// Background color
- bgr3f backgroundColor = 0;
+ bgr3f backgroundColor = 0_;
  /// Current cursor
  MouseCursor cursor = MouseCursor::Arrow;
 
@@ -36,7 +36,7 @@ struct Window : Poll {
  virtual void setIcon(const Image& icon) abstract;
  virtual void setCursor(MouseCursor cursor) abstract;
  /// Resizes window to \a size
- virtual void setSize(int2 size=-1) abstract;
+ virtual void setSize(int2 size=int2(-1)) abstract;
 
  // Input
  /// Actions triggered when a key is pressed
@@ -44,13 +44,13 @@ struct Window : Poll {
  /// Current widget that has the keyboard input focus
  Widget* focus = widget;
  /// Current widget that has the drag focus
- Widget* drag = 0;
+ Widget* drag = nullptr;
 
  function<void()> presentComplete;
 
  Time swapTime {false};
 
- Window(Widget* widget, Thread& thread, int2 size = 0) : Poll(0,0,thread), widget(widget), size(size) {}
+ Window(Widget* widget, Thread& thread, int2 size = 0_0) : Poll(0,0,thread), widget(widget), size(size) {}
  virtual ~Window() {}
 
  // Display
@@ -99,7 +99,7 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
 
  /// Creates an initially hidden window for \a widget, use \a show to display
  /// \note size admits special values: 0 means fullscreen and negative \a size creates an expanding window)
- XWindow(Widget* widget=0, Thread& thread=mainThread, int2 size=0, int useGL_samples=0);
+ XWindow(Widget* widget=0, Thread& thread=mainThread, int2 size=0_0, int useGL_samples=0);
  /// Frees the graphics context and destroys the window
  ~XWindow();
 
@@ -137,4 +137,4 @@ struct XWindow : Window, XDisplay /*should reference but inherits for convenienc
  void setSelection(string selection, bool clipboard) override;
 };
 
-unique<Window> window(Widget* widget, int2 size=-1, Thread& thread=mainThread, int useGL_samples=1, string title={});
+unique<Window> window(Widget* widget, int2 size=int2(-1), Thread& thread=mainThread, int useGL_samples=1, string title={});

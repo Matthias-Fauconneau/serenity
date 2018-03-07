@@ -2,6 +2,18 @@
 /// \file vector.h Vector definitions and operations
 #include "string.h"
 
+struct initializer {
+    int value;
+    explicit operator float() { return value; }
+};
+static constexpr initializer _0 {0};
+template <char...> initializer operator""_();
+template<> inline constexpr initializer operator""_<'0'>() { return {0}; }
+template <char...> struct initializer operator""_0();
+template<> inline constexpr initializer operator""_0<'0'>() { return {0}; }
+static constexpr initializer _1 {1};
+template<> inline constexpr initializer operator""_<'1'>() { return {1}; }
+
 /// Provides vector operations on \a N packed values of type \a T stored in struct \a V<T>
 /// \note statically inheriting the data type allows to provide vector operations to new types and to access named components directly
 template<template<Type> Type V, Type _T, uint _N> struct vec : V<_T> {
@@ -13,7 +25,10 @@ template<template<Type> Type V, Type _T, uint _N> struct vec : V<_T> {
     /// Defaults initializes to zero
     inline constexpr vec() /*: vec(0)*/ {}
     /// Initializes all components to the same value \a v
-    inline vec(T v) { for(uint i: range(N)) at(i)=v; }
+    inline explicit constexpr vec(T v) { for(uint i: range(N)) at(i)=v; }
+    /// Initializes all components to \a initializer
+    inline constexpr vec(initializer initializer) { for(uint i: range(N)) at(i) = initializer.value; }
+    //inline constexpr vec(T v) { assert(v==0); for(uint i: range(N)) at(i)=v; }
     /// Initializes components separately
     template<Type... Args> inline /*explicit*/ constexpr vec(T a, T b, Args... args) : V<T>{a,b,T(args)...} {
         static_assert(sizeof...(args) == N-2, "Invalid number of arguments");
@@ -64,10 +79,15 @@ genericVec Vec operator /(T s, const Vec& u) { Vec r; for(uint i: range(N)) r[i]
 genericVec Vec operator /(const Vec& u, T s) { Vec r; for(uint i: range(N)) r[i]=u[i]/s; return r; }
 genericVec Vec operator /(const Vec& u, const Vec& v) { Vec r; for(uint i: range(N)) r[i]=u[i]/v[i]; return r; }
 genericVec auto operator <(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] < v[i]; return r; }
-genericVec bool operator <=(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
+genericVec auto operator <=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] <= v[i]; return r; }
+genericVec auto operator ==(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] == v[i]; return r; }
+genericVec auto operator >=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
+genericVec auto operator >(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
+
+/*genericVec bool operator <=(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
 genericVec bool operator ==(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]!=v[i]) return false; return true; }
 genericVec bool operator >=(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return false; return true; }
-genericVec bool operator >(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }
+genericVec bool operator >(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }*/
 
 genericVec Vec abs(const Vec& v) { Vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
 genericVec Vec floor(const Vec& v) { Vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }
@@ -81,7 +101,7 @@ genericVec Vec clamp(const Vec& min, const Vec& x, const Vec& max) { Vec r; for(
 genericVec T min(const Vec& v) { return min((ref<T>)v); }
 genericVec T hsum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
-genericVec T dot(const Vec& a, const Vec& b) { T ssq=0; for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
+genericVec T dot(const Vec& a, const Vec& b) { T ssq (0_); for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 //genericVec T sq(const Vec& a) { return dot(a,a); }
 genericVec float length(const Vec& a) { return __builtin_sqrtf(dot(a, a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }
