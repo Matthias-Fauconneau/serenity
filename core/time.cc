@@ -52,19 +52,20 @@ int Date::localTimeOffset(int64 utc) const {
     static buffer<byte> localtime = readFile("/etc/localtime");
     BinaryData s (localtime, true);
     s.advance(20);
-    uint unused gmtCount = s.read(), unused stdCount = s.read(), unused leapCount = s.read(), transitionCount = s.read(), infoCount = s.read(), nameCount = s.read();
+    unused const uint gmtCount = s.read(), stdCount = s.read(), leapCount = s.read();
+    const uint transitionCount = s.read(), infoCount = s.read(), unused nameCount = s.read();
     ref<int> transitionTimes = s.read<int>(transitionCount);
     uint i = 0; for(; i < transitionCount; i++) if(utc < (int)big32(transitionTimes[i])) break; i--;
     ref<uint8> transitionIndices = s.read<uint8>(transitionCount);
     uint index = transitionIndices[i];
-    struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; } _packed;
+    struct ttinfo { int32 gmtOffset; uint8 isDST, nameIndex; };
     ref<ttinfo> infos = s.read<ttinfo>(infoCount);
     return big32(infos[index].gmtOffset);
 }
 
 Date::Date(int64 time) {
     const int64 utc = time;
-    for(uint i unused: range(2)) { // First pass computes UTC date to determine DST, second pass computes local date
+    for(auto_: range(2)) { // First pass computes UTC date to determine DST, second pass computes local date
         seconds = time;
         minutes=seconds/60; seconds %= 60;
         hours=minutes/60; minutes %= 60;

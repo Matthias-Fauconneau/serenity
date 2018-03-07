@@ -245,7 +245,7 @@ uint64 GLTexture::handle() const {
 void GLTexture::upload(uint3 size, ref<rgb3f> data) const {
     glTextureSubImage3D(id, 0, 0,0,0, size.x,size.y,size.z, GL_RGB, GL_FLOAT, data.begin());
 }
-void GLTexture::upload(uint3 size, const GLBuffer& buffer, size_t data, size_t unused bufferSize) const {
+void GLTexture::upload(uint3 size, const GLBuffer& buffer, size_t data, unused size_t bufferSize) const {
     assert_(buffer.id);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer.id);
     assert_(data+size.z*size.y*size.x*sizeof(rgb3f) <= buffer.elementCount*buffer.elementSize);

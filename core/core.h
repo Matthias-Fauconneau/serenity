@@ -10,6 +10,8 @@
 #define inline inline
 #endif
 #define unused __attribute((unused))
+#define parameter unused
+#define auto_ unused auto _
 #define _packed __attribute((packed))
 #define Type typename
 #define generic template<typename T>

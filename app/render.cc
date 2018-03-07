@@ -233,7 +233,7 @@ static inline void step(Scene& scene, Random& random) {
                 bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
                 bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
                 const uint sampleCount = 16;
-                for(uint unused i: range(sampleCount/K)) {
+                for(unused uint i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
                     const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
                     const vec3v D = L - vec3v(O);

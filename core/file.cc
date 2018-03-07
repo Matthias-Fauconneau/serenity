@@ -88,7 +88,7 @@ bool existsFolder(const string folder, const Folder& at) { return Handle( openat
 int64 Stream::readUpTo(mref<byte> target) { return check( ::read(fd, target.begin(), target.size), (int)fd); }
 
 void Stream::read(mref<byte> target) {
- int unused read=check( ::read(fd, target.begin(), target.size) ); assert(read==(int)target.size,"Expected", target.size, "got", read);
+ unused int read=check( ::read(fd, target.begin(), target.size) ); assert(read==(int)target.size,"Expected", target.size, "got", read);
 }
 
 buffer<byte> Stream::readUpTo(size_t capacity) {

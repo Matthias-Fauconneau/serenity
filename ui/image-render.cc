@@ -13,7 +13,7 @@ static void blend(const Image& target, uint x, uint y, bgr3f source_linear, floa
 
 
 static void fill(uint* target, uint stride, uint w, uint h, uint value) {
-    for(uint unused y: range(h)) {
+    for(auto_: range(h)) {
         for(uint x: range(w)) target[x] = value;
         target += stride;
     }

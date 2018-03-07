@@ -13,7 +13,7 @@
 #include <sys/syscall.h>
 
 // Log
-void log_(string message) { ssize_t unused written = ::write(2, message.data, message.size); }
+void log_(string message) { unused ssize_t written = ::write(2, message.data, message.size); }
 void log(string message) { log_(message+'\n');  }
 
 // Poll

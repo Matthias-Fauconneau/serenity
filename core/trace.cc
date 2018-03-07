@@ -137,7 +137,7 @@ Symbol findSymbol(void* find) {
 		/*Array*/array<string/*, 1024*/> files;
         while(s.peek()) {
             files.append( cast<char>(s.whileNot(0)) ); s.skip('\0');
-            int unused index = readLEV(s), unused time = readLEV(s), unused file_length=readLEV(s);
+            unused int index = readLEV(s), time = readLEV(s), file_length=readLEV(s);
         }
         s.advance(1);
         byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;

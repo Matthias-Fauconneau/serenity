@@ -23,7 +23,7 @@ struct ImageRenderTarget : Image, RenderTarget2D {
     virtual void blit(vec2 origin, vec2 size, Image&& image, bgr3f color, float opacity) override {
         ::blit(*this, int2(origin), uint2(size), image, color, opacity);
     }
-    virtual void glyph(vec2 origin, float fontSize, FontData& font, uint unused code, uint index, bgr3f color, float opacity) override {
+    virtual void glyph(vec2 origin, float fontSize, FontData& font, unused uint code, uint index, bgr3f color, float opacity) override {
         ::glyph(*this, int2(origin), fontSize, font, index, color, opacity);
     }
     virtual void line(vec2 p0, vec2 p1, bgr3f color, float opacity, bool hint) override {

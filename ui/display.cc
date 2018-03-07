@@ -53,23 +53,23 @@ XDisplay::XDisplay(Thread& thread) : Socket(PF_LOCAL, SOCK_STREAM), Poll(Socket:
   if(existsFile(".Xauthority",home()) && File(".Xauthority",home()).size()) {
    BinaryData s (readFile(".Xauthority",home()), true);
    string name, data;
-   uint16 family unused = s.read();
-   {uint16 length = s.read(); string host unused = s.read<byte>(length); }
-   {uint16 length = s.read(); string port unused = s.read<byte>(length); }
+   unused uint16 family = s.read();
+   {uint16 length = s.read(); unused string host = s.read<byte>(length); }
+   {uint16 length = s.read(); unused string port = s.read<byte>(length); }
    {uint16 length = s.read(); name = s.read<byte>(length); r.nameSize=uint16(name.size); }
    {uint16 length = s.read(); data = s.read<byte>(length); r.dataSize=uint16(data.size); }
    write(raw(r)+pad(name)+pad(data));
   } else write(raw(r));
  }
- {ConnectionSetupReply1 unused r=read<ConnectionSetupReply1>(); assert(r.status==1);}
+ {unused ConnectionSetupReply1 r=read<ConnectionSetupReply1>(); assert(r.status==1);}
  {ConnectionSetupReply2 r=read<ConnectionSetupReply2>();
   read(align(4,r.vendorLength));
   read<XFormat>(r.numFormats);
 #if GL
   glDisplay = XOpenDisplay(strz(environmentVariable("DISPLAY"_,":0"_)));
 #endif
-  for(int64 unused i: range(r.numScreens)){ Screen screen=read<Screen>();
-      for(int64 unused i: range(screen.numDepths)) { XDepth depth = read<XDepth>();
+  for(auto_: range(r.numScreens)){ Screen screen=read<Screen>();
+      for(auto_: range(screen.numDepths)) { XDepth depth = read<XDepth>();
           buffer<VisualType> visualTypes = read<VisualType>(depth.numVisualTypes);
           if(visual) continue; // Visual already found, cannot break as we still need to parse to end of variable length structure
           if(depth.depth!=32) continue;

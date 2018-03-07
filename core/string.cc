@@ -64,7 +64,7 @@ String toUpper(string source) { return apply(source, upperCase); }
 
 String repeat(string s, uint times) {
  String r (times*s.size, 0);
- for(uint unused i: range(times)) r.append(s);
+ for(unused uint i: range(times)) r.append(s);
  return r;
 }
 
@@ -164,7 +164,7 @@ static inline float round(float x) { return __builtin_round(x); }
 static inline bool isNaN(float x) { return x!=x; }
 static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 
-String str(double n, uint precision, uint exponent, uint unused pad) {
+String str(double n, uint precision, uint exponent, unused uint pad) {
  bool sign = n<0; n=abs(n);
  if(__builtin_isnan(n)) return "NaN"__; //::right("NaN", pad);
  if(n==-__builtin_inf()) return "-∞"__; //::right("-∞", pad+2);
@@ -180,8 +180,8 @@ String str(double n, uint precision, uint exponent, uint unused pad) {
  if(precision && n!=round(n)) {
   double integer=1, fract=__builtin_modf(n, &integer);
   uint64 decimal = round(fract*exp10(precision));
-  uint exp10=1; for(uint i unused: range(precision)) exp10*=10; // Integer exp10(precision)
-  if(decimal==exp10) integer++, decimal=0; // Rounds to ceiling integer
+  uint exp10=1; for(unused uint i: range(precision)) exp10*=10; // Integer exp10(precision)
+  if(decimal==exp10) { integer++; decimal=0; } // Rounds to ceiling integer
   assert_(isNumber(integer));
   s.append( str(uint64(integer)) );
   s.append('.');

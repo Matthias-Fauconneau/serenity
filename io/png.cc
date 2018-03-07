@@ -22,16 +22,16 @@ void unpredict(byte4* target, const byte* source, size_t width, int height, size
  typedef vec<T, uint8, N> U;
  typedef vec<T, int, N> V;
  buffer<U> prior(width); prior.clear(0);
- for(int unused y: range(height)) {
+ for(auto_: range(height)) {
   Predictor predictor = Predictor(*source++);
   const U* src = reinterpret_cast<const U*>(source);
-  U a = 0;
+  U a (0);
   /**/  if(predictor==Predictor::None) for(size_t x: range(width)) target[x*xStride]= prior[x]=     src[x];
   else if(predictor==Predictor::Left) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= a+src[x];
   else if(predictor==Predictor::Up) for(size_t x: range(width)) target[x*xStride]= prior[x]=       prior[x]+src[x];
   else if(predictor==Predictor::Average) for(size_t x: range(width)) target[x*xStride]= prior[x]= a= U((V(prior[x])+V(a))/2)+src[x];
   else if(predictor==Predictor::Paeth) {
-   V b=0;
+   V b (0);
    for(size_t x: range(width)) {
     V c = b;
     b = V(prior[x]);
@@ -54,12 +54,14 @@ Image decodePNG(const ref<byte> file) {
   uint32 size = s.read();
   string tag = s.read<byte>(4);
   if(tag == "IHDR") {
-   width = s.read(), height = s.read();
-   bitDepth = s.read(); assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
-   type = s.read(); depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
+   width = s.read();
+   height = s.read();
+   bitDepth = s.read();                  assert(bitDepth==8 || bitDepth == 4 || bitDepth == 1);
+   type = s.read();
+   depth = (int[]){1,0,3,1,2,0,4}[type]; assert(depth>0&&depth<=4,type);
    alpha = depth==2||depth==4;
-   uint8 unused compression = s.read(); assert(compression==0);
-   uint8 unused filter = s.read(); assert(filter==0);
+   unused uint8 compression = s.read();  assert(compression==0);
+   unused uint8 filter = s.read();       assert(filter==0);
    interlace = s.read();
   } else if(tag == "IDAT") {
    /*if(!buffer) buffer.data=s.read<byte>(size).data, buffer.size=size; // References first chunk to avoid copy
@@ -92,7 +94,7 @@ Image decodePNG(const ref<byte> file) {
   const byte* source = predicted.data;
   ::buffer<byte> unpackedBytes(height*(1+width*depth));
   byte* target = unpackedBytes.begin();
-  for(size_t unused y: range(height)) {
+  for(unused size_t y: range(height)) {
    target[0] = source[0]; source++; target++;
    if(bitDepth==1) for(size_t x: range(width/8)) for(size_t b: range(8)) target[8*x+b] = (source[x]&(1<<(7-b))) ? 1 : 0;
    if(bitDepth==4) for(size_t x: range(width/2)) target[2*x+0]=source[x]>>4, target[2*x+1]=source[x]&0b1111;
@@ -131,21 +133,22 @@ Image decodePNG(const ref<byte> file) {
  return image;
 }
 
-uint32 crc32(const ref<byte> data) {
+static uint32 crc32(const ref<byte> data) {
  static uint crc_table[256];
- static int unused once = ({ for(uint n: range(256)) { uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
+ static unused int once = ({ for(uint n: range(256)) { uint c=n; for(uint unused k: range(8)) { if(c&1) c=0xedb88320L^(c>>1); else c=c>>1; } crc_table[n] = c; } 0;});
  uint crc = 0xFFFFFFFF;
  for(byte b: data) crc = crc_table[(crc ^ b) & 0xff] ^ (crc >> 8);
  return ~crc;
 }
 
-uint adler32(const ref<byte> data) {
+static uint adler32(const ref<byte> data) {
  const byte* ptr=data.data; uint len=data.size;
  uint a=1, b=0;
  while(len > 0) {
   uint tlen = len > 5552 ? 5552 : len; len -= tlen;
   do { a += *ptr; ptr++; b += a; } while (--tlen);
-  a %= 65521, b %= 65521;
+  a %= 65521;
+  b %= 65521;
  }
  return a | (b << 16);
 }
@@ -159,8 +162,8 @@ template<template<Type> class T, int N> buffer<byte> predict(const byte4* source
  for(size_t unused y: range(height)) {
   *target++ = byte(Predictor::Paeth);
   U* dst = (U*)target;
-  U a = 0;
-  V b=0;
+  U a (0);
+  V b (0);
   for(size_t x: range(width)) {
    V c = b;
    b = V(prior[x]);
