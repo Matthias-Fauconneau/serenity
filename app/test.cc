@@ -9,20 +9,17 @@
 template<bool B, Type T, Type F> struct conditional { typedef T type; };
 template<Type T, Type F> struct conditional<false, T, F> { typedef F type; };
 
-generic static inline T rcp(T x) { return 1/x; }
 generic static inline T select(bool c, T t, T f) { return c ? t : f; }
 generic static inline T mix(const T& a, const T& b, const float t) { return (1-t)*a + t*b; }
 
 generic static inline void rotateLeft(T& a, T& b, T& c) { T t = a; a = b; b = c; c = t; }
 generic static inline void rotateRight(T& a, T& b, T& c) { T t = c; c = b; b = a; a = t; }
 
-//generic auto /*decltype(T()[0]+T()[1])*/ hsum(const T& t);
-generic decltype(T()[0]+T()[1]) hsum(const T&);
 // error: function template partial specialization is not allowed (will be supported by concept maps)
 //genericVec T hsum<Vec>(const Vec& t) { return hsum<V,T,N>(t); }
-template<> float hsum<vec<x,float,1>>(const vec<x,float,1>& t) { return hsum<x,float,1>(t); }
+template<> float hsum<vec<x,float,1>>(vec<x,float,1> t) { return hsum<x,float,1>(t); }
 
-generic T mask(const bool& c, const T& t) { return c ? t : T(); }
+generic T mask(bool c, T t) { return c ? t : T(); }
 
 template<template<Type> Type V, uint N, Type Function, Type... T> static inline constexpr
 auto apply(Function function, vec<V,T,N>... sources) {
@@ -48,7 +45,7 @@ template<Type T, uint N> struct VecT {
 template<template<Type> Type V, uint N, Type T> auto transpose(const vec<V,T,N>& M) {
     static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
     VecT< vec<V,Type remove_reference<decltype(T()[0])>::type,N>, N1> Mt;
-    for(uint i: range(T::N)) for(uint j: range(N)) Mt[j][i] = M[i][j];
+    for(uint i: range(N)) for(uint j: range(N1)) Mt[j][i] = M[i][j];
     return Mt;
 }
 
@@ -189,7 +186,7 @@ static inline void importSTL(Scene& scene, string path, vec3 origin, bool real) 
                 else if(A[0] == e0 && A[2] == e1) {}
                 else continue;
                 const uint32 A3 = B[(edgeIndex+2)%3];
-                const uint2 size = uint2(256); // FIXME: auto resolution
+                const uint2 size = uint2(1/*256*/); // FIXME: auto resolution
                 scene.quads.append({uint4(base+A[0],base+A[1],base+A[2],base+A3), Image3f(size), real, real?Image3f(size):Image3f()});
             }
         }
@@ -218,8 +215,6 @@ static inline void step(Scene& scene, Random& random) {
                   else              typedef vec<::x, float32, 1>                      vsf;*/
                 typedef conditional< (K>1), float32 __attribute((ext_vector_type(K))),
                                             vec<::x, float32, 1>                       >::type vsf;
-                /*typedef vec<bgr, v8sf, 3> bgr3fv8;
-                typedef vec<xyz, v8sf, 3> vec3v8;*/
                 typedef vec<bgr, vsf, 3> bgr3fv;
                 typedef vec<xyz, vsf, 3> vec3v;
 
@@ -280,7 +275,7 @@ static struct Test : Drag {
 
     Test() : Drag(vec2(0,-π/3)) {
         {
-            const uint2 size = uint2(512); // FIXME: auto resolution
+            const uint2 size = uint2(16/*512*/); // FIXME: auto resolution
             scene.quads.append(Scene::Quad{uint4(
                                            scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
                                            scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
