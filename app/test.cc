@@ -171,7 +171,7 @@ static inline void importSTL(Scene& scene, string path, vec3 origin, bool real) 
     }
     s.line(); // name
     assert_(!s);
-    assert_(vertices.size==8, vertices.size);
+    assert_(vertices.size==8, vertices.size, vertices);
 
     { // Rescale
         const vec3 min = ::min(vertices);
@@ -230,7 +230,7 @@ static inline void step(Scene& scene, Random& random) {
 
                 bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
                 bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
-                const uint sampleCount = 256;
+                const uint sampleCount = 16;
                 for(uint unused i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
                     const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
@@ -260,8 +260,8 @@ static inline void step(Scene& scene, Random& random) {
                             nearestRealT[k] = t;
                         }
                     }
-                    const bgr3fv differentialIncomingRadiance = differential ? mask(nearestVirtualT < nearestRealT, -incomingRadiance)
-                                                                             : mask(nearestVirtualT == vsf(inff), incomingRadiance);
+                    const bgr3fv differentialIncomingRadiance = differential ? mask(vecLt(nearestVirtualT,/* <*/ nearestRealT), -incomingRadiance)
+                                                                             : mask(vecEq(nearestVirtualT,/*==*/ vsf(inff)), incomingRadiance);
                     const bgr3fv albedo = bgr3fv(vsf(1));
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
@@ -285,7 +285,7 @@ static struct Test : Drag {
 
     Test() : Drag(vec2(0,-π/3)) {
         {
-            const uint2 size = uint2(16/*512*/); // FIXME: auto resolution
+            const uint2 size = uint2(128/*512*/); // FIXME: auto resolution
             scene.quads.append(Scene::Quad{uint4(
                                            scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
                                            scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),

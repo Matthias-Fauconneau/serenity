@@ -10,6 +10,13 @@ void trapezoidY(const Image& target, Span a, Span b, bgr3f color = 0_, float opa
 struct ImageRenderTarget : Image, RenderTarget2D {
     ImageRenderTarget(Image&& image) : Image(::move(image)), RenderTarget2D(vec2(image.size)) {}
     virtual ~ImageRenderTarget() {}
+#if 1
+    virtual void fill(vec2, vec2, bgr3f, float) override { error("UNIMPL fill"); }
+    virtual void blit(vec2, vec2, Image&&, bgr3f, float) override { error("UNIMPL blit"); }
+    virtual void glyph(vec2, float, FontData&, uint, uint, bgr3f, float) override { error("UNIMPL glyph"); }
+    virtual void line(vec2, vec2, bgr3f, float, bool) override { error("UNIMPL line"); }
+    virtual void trapezoidY(Span, Span, bgr3f, float) override { error("UNIMPL trapezoidY"); }
+#else
     virtual void fill(vec2 origin, vec2 size, bgr3f color, float opacity) override {
         ::fill(*this, int2(origin), uint2(size), color, opacity);
     }
@@ -25,4 +32,5 @@ struct ImageRenderTarget : Image, RenderTarget2D {
     virtual void trapezoidY(Span s0, Span s1, bgr3f color, float opacity) override {
         ::trapezoidY(*this, s0, s1, color, opacity);
     }
+#endif
 };

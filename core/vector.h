@@ -78,16 +78,23 @@ genericVec Vec operator *(T s, const Vec& u) { Vec r; for(uint i: range(N)) r[i]
 genericVec Vec operator /(T s, const Vec& u) { Vec r; for(uint i: range(N)) r[i]=s/u[i]; return r; }
 genericVec Vec operator /(const Vec& u, T s) { Vec r; for(uint i: range(N)) r[i]=u[i]/s; return r; }
 genericVec Vec operator /(const Vec& u, const Vec& v) { Vec r; for(uint i: range(N)) r[i]=u[i]/v[i]; return r; }
-genericVec auto operator <(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] < v[i]; return r; }
-genericVec auto operator <=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] <= v[i]; return r; }
-genericVec auto operator ==(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] == v[i]; return r; }
-genericVec auto operator >=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
-genericVec auto operator >(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
 
-/*genericVec bool operator <=(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
+genericVec auto vecLt(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] < v[i]; return r; }
+//genericVec auto vecLE(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] <= v[i]; return r; }
+genericVec auto vecEq(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] == v[i]; return r; }
+//genericVec auto >=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
+//genericVec auto >(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
+
+genericVec bool anyLt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return true; return false; }
+genericVec bool anyLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return true; return false; }
+genericVec bool anyGE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return true; return false; }
+genericVec bool anyGt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return true; return false; }
+
+//genericVec bool operator allLT(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return false; return true; }
+//genericVec bool operator allLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
 genericVec bool operator ==(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]!=v[i]) return false; return true; }
-genericVec bool operator >=(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return false; return true; }
-genericVec bool operator >(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }*/
+//genericVec bool operator allGE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return false; return true; }
+//genericVec bool operator allGT(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return false; return true; }*/
 
 genericVec Vec abs(const Vec& v) { Vec r; for(uint i: range(N)) r[i]=abs(v[i]); return r;  }
 genericVec Vec floor(const Vec& v) { Vec r; for(uint i: range(N)) r[i]=floor(v[i]); return r;  }

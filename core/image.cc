@@ -36,6 +36,7 @@ uint8 sRGB(float v) {
  return sRGB_forward[linear12];
 }
 
+#if 0
 void sRGB(const Image& target, const Image3f& source) {
     assert_(target.size == source.size);
     for(size_t y : range(target.size.y)) {
@@ -244,3 +245,4 @@ void resize(const Image& target, const Image& source) {
     if(target.size > source.size/2u) bilinear(target, source); // Bilinear resample
     else error("resize", target.size, source.size);
 }
+#endif

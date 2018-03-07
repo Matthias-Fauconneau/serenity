@@ -206,7 +206,7 @@ bool XWindow::processEvent(const X11::Event& e) {
     else if(type==UnmapNotify) mapped=false;
     else if(type==MapNotify) { mapped=true; render(); }
     else if(type==ReparentNotify) {}
-    else if(type==ConfigureNotify) { uint2 size(uint(e.configure.w), uint(e.configure.h)); if(size!=Window::size) { Window::size=size; /*render();*/ } }
+    else if(type==ConfigureNotify) { Window::size = uint2(uint(e.configure.w), uint(e.configure.h)); }
     else if(type==GravityNotify) {}
     else if(type==ClientMessage) {
         function<void()>* action = Window::actions.find(Escape);

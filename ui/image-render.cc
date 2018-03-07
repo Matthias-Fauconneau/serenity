@@ -1,4 +1,5 @@
 #include "image-render.h"
+#if 0
 #include "font.h"
 #include "math.h"
 
@@ -23,7 +24,7 @@ void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opaci
 
     int2 min = ::max(int2(0), origin);
     int2 max = ::min(int2(target.size), origin+int2(size));
-    if(max<=min) return;
+    if(anyLT(max,min)) return;
 
     if(opacity==1) { // Solid fill
         error(""); //if(!(min < max)) return;
@@ -140,3 +141,4 @@ void trapezoidY(const Image& target, Span s0, Span s1, bgr3f color, float opacit
         if(uint(i1)<target.size.y) blend(target, x, i1, color, opacity*(y1-f1));
     }
 }
+#endif
