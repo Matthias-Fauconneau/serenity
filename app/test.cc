@@ -4,7 +4,7 @@
 #include "math.h"
 #include "algorithm.h"
 
-static inline Image3f circle(int size) {
+static inline Image3f disk(int size) {
     Image3f target = Image3f(uint2(size));
     const float R = (size-1.f)/2, R2 = sq(R);
     for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
@@ -38,31 +38,24 @@ inline SSE_count SSE(const Image3f& A, const Image3f& B, int2 centerOffset=0_0, 
  return {SSE, count};
 }
 
-#if 0
-static ImageF similarity(const Image3f& image, const Image3f& pattern) {
-    int2 size = int2(image.size-pattern.size);
-    ImageF similarity = ImageF( uint2(size) );
-    for(int y: range(-size.y/2, size.y/2)) for(int x: range(-size.x/2, size.x/2)) {
-        auto sse = SSE(image, pattern, int2(x,y));
-        assert_(sse.count == uint(pattern.size.y*pattern.size.x), sse.count, pattern.size, x,y);
-        similarity(size.x/2+x,size.y/2+y) = -sse.SSE;
-    }
-    return similarity;
-}
-#else
-static int2 argmaxSimilarity(const Image3f& image, const Image3f& pattern) {
-    int2 size = abs(int2(image.size-pattern.size));
+static int2 argmaxSimilarity(const Image3f& A, const Image3f& B, int2 window=0_0, const int2 initialOffset=0_0) {
+    if(!window) window = abs(int2(A.size-B.size)); // Full search
     int2 bestOffset = 0_0; float bestSimilarity = -inff; //-SSE..0
-    for(int y: range(-size.y/2, size.y/2)) for(int x: range(-size.x/2, size.x/2)) {
-        const int2 offset(x, y);
-        const double similarity = -SSE(image, pattern, offset).SSE;
+    for(int y: range(-window.y/2, window.y/2)) for(int x: range(-window.x/2, window.x/2)) {
+        const int2 offset = initialOffset + int2(x, y);
+        const double similarity = -SSE(A, B, offset).SSE;
         assert_(similarity < inff);
         if(similarity > bestSimilarity) { bestSimilarity = similarity; bestOffset = offset; }
     }
-    log(bestSimilarity, bestOffset, size);
     return bestOffset;
 }
-#endif
+
+// Low resolution search and refine
+static int2 align(const Image3f& A, const Image3f& B) {
+    const int D = 8;
+    const int2 offset = ::argmaxSimilarity(downsample(downsample(downsample(A))), downsample(downsample(downsample(B))))*int(D);
+    return offset; //::argmaxSimilarity(A, B, int2(D), offset);
+}
 
 generic void apply(const Image3f& A, const Image3f& B, int2 centerOffset, T f) {
  const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
@@ -91,21 +84,36 @@ inline Image3f multiply(const Image3f& A, const Image3f& B, int2 centerOffset=0_
     return Y;
 }
 
+inline void threshold(const Image3f& Y, const Image3f& X, bgr3f threshold) { for(uint i: range(Y.ref::size)) Y[i] = bgr3f(vecGE(X[i], threshold)); }
+inline Image3f threshold(const Image3f& X, bgr3f threshold=bgr3f(1)) { Image3f Y(X.size); ::threshold(Y,X,threshold); return Y; }
+
 struct Test : Widget {
     Time time {true};
-    const Image3f source = linear(decodeImage(Map("test.jpg")));
-    //const Image3f detH = ::detH(image);
-    //const Image image = sRGB(detH, max(max(detH)));
-    const uint R = source.size.y/4;
-    const uint D = 8;
-    const Image3f image = downsample(downsample(downsample(source)));
-    const Image3f circle = ::circle(R/D);
-    const int2 center = ::argmaxSimilarity(negate(circle), image)*int(D);
-    const Image preview = sRGB(multiply(::circle(R), source, center));
+    const Image3f image = linear(decodeImage(Map("test.jpg")));
+    const Image3f templateDisk = ::disk(image.size.y/4);
+    const int2 center = ::align(negate(templateDisk), image);
+    const Image3f disk = threshold(multiply(templateDisk, image, center), bgr3f(1));
+    Image preview = sRGB(disk);
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 
     Test() {
+        vec3 μ = 0_;
+        for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
+            const float x = (float(ix)/disk.size.x)*2-1;
+            const float y = (float(iy)/disk.size.y)*2-1;
+            const float z = 1-sqrt(x*x+y*y);
+            if(z < 0) continue;
+            const float ρ = 1; // FIXME
+            const float w = 1/ρ;
+            //const float I = hsum(disk(ix, iy))/3; // FIXME
+            const float I = hsum(disk(ix, iy))==3; // Only saturated pixels
+            μ += w*I*vec3(x,y,z);
+        }
+        μ = normalize(μ);
+        int2 μ_xy = int2((μ.xy()+vec2(1))/vec2(2)*vec2(disk.size));
+        log(μ, μ_xy, disk.size);
+        const int r=1; for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
         log(time);
         window->show();
     }

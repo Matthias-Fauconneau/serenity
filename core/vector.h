@@ -81,9 +81,9 @@ genericVec Vec operator /(const Vec& u, const Vec& v) { Vec r; for(uint i: range
 
 genericVec auto vecLt(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] < v[i]; return r; }
 //genericVec auto vecLE(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] <= v[i]; return r; }
-genericVec auto vecEq(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] == v[i]; return r; }
-//genericVec auto >=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
-//genericVec auto >(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
+genericVec auto vecEq(const Vec& u, const Vec& v) { vec<V,decltype(T()==T()),N> r; for(uint i: range(N)) r[i] = u[i] == v[i]; return r; }
+genericVec auto vecGE(const Vec& u, const Vec& v) { vec<V,decltype(T()>=T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
+//genericVec auto vecGt(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
 
 genericVec bool anyLt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return true; return false; }
 genericVec bool anyLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return true; return false; }
