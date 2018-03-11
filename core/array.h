@@ -89,7 +89,8 @@ generic struct array : buffer<T> {
  /// Removes one element at \a index and returns its value
  T take(size_t index) { T value = move(at(index)); removeAt(index); return value; }
  /// Removes the last element and returns its value
- T pop() { return take(size-1); }
+ T takeLast() { return take(size-1); }
+ T pop() { return takeLast(); }
 
  /// Removes one matching element and returns an index to its successor, or invalid if none match
  template<Type K> size_t tryRemove(const K& key) { size_t i=ref<T>::indexOf(key); if(i!=invalid) removeAt(i); return i; }

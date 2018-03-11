@@ -214,6 +214,6 @@ String trace(int skip, void* ip) {
         if(s.function||s.file||s.line) log.append(left(s.file+':'+str(s.line),16)+'\t'+s.function+'\n');
         //else log.append("0x"+hex(ptr(ip))+'\n');
     }
-    log.pop(); // Pops last \n
+    log.takeLast(); // Removes last \n
     return move(log);
 }

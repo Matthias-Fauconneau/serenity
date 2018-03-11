@@ -1,6 +1,6 @@
+app/lens.cc
 app/quad.h
 app/render.cc
-app/test.cc
 build.sh
 build.cc
 build.h

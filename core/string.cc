@@ -186,8 +186,8 @@ String str(double n, uint precision, uint exponent, unused uint pad) {
   s.append( str(uint64(integer)) );
   s.append('.');
   s.append( str(decimal, precision) );
-  while(s.last()=='0') s.pop(); // Trim trailing zeroes
-  if(s.last()=='.') s.pop(); // Trim trailing dot
+  while(s.last()=='0') s.takeLast(); // Trim trailing zeroes
+  if(s.last()=='.') s.takeLast(); // Trim trailing dot
  } else s.append( str(uint64(round(n))) );
  if(exponent==3 && e==3) s.append('K');
  else if(exponent==3 && e==6) s.append('M');

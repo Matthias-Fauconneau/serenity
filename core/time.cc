@@ -112,7 +112,7 @@ String str(Date date, const string format) {
         else if(s.match("TZD")) r.append("GMT"); //FIXME
         else r.append( s.next() );
     }
-    if(endsWith(r,",") || endsWith(r,":")) r.pop(); //prevent dangling separator when last valid part is week day or seconds
+    if(endsWith(r,",") || endsWith(r,":")) r.takeLast(); // Prevents dangling separator when last valid part is week day or seconds
     return move(r);
 }
 
