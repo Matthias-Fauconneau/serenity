@@ -1,6 +1,7 @@
 app/lens.cc
 app/quad.h
 app/render.cc
+app/test.cc
 build.sh
 build.cc
 build.h
@@ -8,9 +9,6 @@ build.h
 app/box.h
 app/ggx.h
 core/parse.h
-serenity.config
-serenity.files
-serenity.includes
 
 core/algorithm.h
 core/array.h

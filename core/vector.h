@@ -85,10 +85,10 @@ genericVec auto vecEq(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r
 //genericVec auto >=(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] >= v[i]; return r; }
 //genericVec auto >(const Vec& u, const Vec& v) { vec<V,decltype(T()<T()),N> r; for(uint i: range(N)) r[i] = u[i] > v[i]; return r; }
 
-genericVec bool anyLt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return true; return false; }
-genericVec bool anyLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return true; return false; }
-genericVec bool anyGE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return true; return false; }
-genericVec bool anyGt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return true; return false; }
+genericVec bool anyLt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<v[i]) return true; return false; }
+genericVec bool anyLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]<=v[i]) return true; return false; }
+genericVec bool anyGE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return true; return false; }
+genericVec bool anyGt(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return true; return false; }
 
 //genericVec bool operator allLT(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>=v[i]) return false; return true; }
 //genericVec bool operator allLE(const Vec& u, const Vec& v) { for(uint i: range(N)) if(u[i]>v[i]) return false; return true; }
@@ -106,10 +106,11 @@ genericVec Vec max(const Vec& a, const Vec& b) { Vec r; for(uint i: range(N)) r[
 genericVec Vec clamp(const Vec& min, const Vec& x, const Vec& max) { Vec r; for(uint i: range(N)) r[i]=clamp(min[i],x[i],max[i]); return r;}
 
 genericVec T min(const Vec& v) { return min((ref<T>)v); }
+genericVec T max(const Vec& v) { return max((ref<T>)v); }
 genericVec T hsum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; return sum; }
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 genericVec T dot(const Vec& a, const Vec& b) { T ssq (0); for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
-//genericVec T sq(const Vec& a) { return dot(a,a); }
+genericVec T dotSq(const Vec& a) { return dot(a,a); }
 genericVec float length(const Vec& a) { return __builtin_sqrtf(dot(a, a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }
 genericVec bool isNaN(const Vec& v) { for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }

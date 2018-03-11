@@ -36,16 +36,25 @@ uint8 sRGB(float v) {
  return sRGB_forward[linear12];
 }
 
-#if 0
-void sRGB(const Image& target, const Image3f& source) {
+void sRGB(const Image& BGR, const ImageF& Z) {
+    float min = inff, max = -inff;
+    for(float v: Z) {
+        min = ::min(min, v);
+        if(v < inff) max = ::max(max, v);
+    }
+    for(uint i: range(Z.ref::size)) BGR[i] = byte4(byte3(sRGB(Z[i] <= max ? (Z[i]-min)/(max-min) : 1)), 0xFF);
+}
+
+void sRGB(const Image& target, const Image3f& source, const float max) {
     assert_(target.size == source.size);
     for(size_t y : range(target.size.y)) {
         mref<byte4> dst = target.slice(y*target.stride, target.size.x);
         ref<bgr3f> src = source.slice(y*source.stride, source.size.x);
-        for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b), sRGB(src[x].g), sRGB(src[x].r), 0xFF);
+        for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b/max), sRGB(src[x].g/max), sRGB(src[x].r/max), 0xFF);
     }
 }
 
+#if 0
 void sRGB(const Image& target, const Image4f& source) {
     assert_(target.size == source.size);
     for(size_t y : range(target.size.y)) {
@@ -88,17 +97,17 @@ void sRGB(const Image& BGR, const Image16& N) {
     const uint max = ::max(N);
     for(uint i: range(N.ref::size)) BGR[i] = byte4(byte3(0xFF*uint(N[i])/max), 0xFF);
 }
-void sRGB(const Image& BGR, const ImageF& Z) {
-    float min = inff, max = -inff;
-    for(float v: Z) {
-        min = ::min(min, v);
-        if(v < inff) max = ::max(max, v);
-    }
-    for(uint i: range(Z.ref::size)) BGR[i] = byte4(byte3(sRGB(Z[i] <= max ? (Z[i]-min)/(max-min) : 1)), 0xFF);
+#endif
+
+Image3f linear(const Image& source) {
+    Image3f target (source.size);
+    for(uint i: range(target.ref::size)) target[i] = bgr3f(sRGB_reverse[source[i].b], sRGB_reverse[source[i].g], sRGB_reverse[source[i].r]);
+    return target;
 }
 
 // -- Decode --
 
+#if 0
 string imageFileFormat(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8"_)) return "JPEG"_;
     else if(startsWith(file,"\x89PNG\r\n\x1A\n"_)) return "PNG"_;
@@ -107,6 +116,7 @@ string imageFileFormat(const ref<byte> file) {
     else if(startsWith(file,"BM"_)) return "BMP"_;
     else return ""_;
 }
+
 
 int2 imageSize(const ref<byte> file) {
     BinaryData s(file, true);
@@ -148,24 +158,20 @@ int2 imageSize(const ref<byte> file) {
     }
     error("Unknown image format");
 }
+#endif
 
+Image decodePNG(const ref<byte>);
 __attribute((weak)) Image decodePNG(const ref<byte>) { error("PNG support not linked"); }
+Image decodeJPEG(const ref<byte>);
 __attribute((weak)) Image decodeJPEG(const ref<byte>) { log("JPEG support not linked"); return {}; }
-__attribute((weak)) Image decodeICO(const ref<byte>) { error("ICO support not linked"); }
-__attribute((weak)) Image decodeTIFF(const ref<byte>) { error("TIFF support not linked"); }
-__attribute((weak)) Image decodeBMP(const ref<byte>) { error("BMP support not linked"); }
-__attribute((weak)) Image decodeTGA(const ref<byte>) { error("TGA support not linked"); }
 
 Image decodeImage(const ref<byte> file) {
     if(startsWith(file,"\xFF\xD8"_)) return decodeJPEG(file);
     else if(startsWith(file,"\x89PNG"_)) return decodePNG(file);
-    else if(startsWith(file,"\x00\x00\x01\x00"_)) return decodeICO(file);
-    else if(startsWith(file,"\x00\x00\x02\x00"_)||startsWith(file,"\x00\x00\x0A\x00"_)) return decodeTGA(file);
-    else if(startsWith(file,"\x49\x49\x2A\x00"_) || startsWith(file,"\x4D\x4D\x00\x2A"_)) return decodeTIFF(file);
-    else if(startsWith(file,"BM"_)) return decodeBMP(file);
     else error("Unknown image format");
 }
 
+#if 0
 // -- Rotate --
 
 void flip(const Image& target, const Image& source) {
@@ -204,6 +210,16 @@ void negate(const Image& target, const Image& source) {
         target(x,y) = byte4(sRGB_forward[negate[0]], sRGB_forward[negate[1]], sRGB_forward[negate[2]], BGRA.a);
     }
 }
+#endif
+
+// -- Downsample --
+
+Image3f downsample(Image3f&& target, const Image3f& source) {
+    assert_(target.size == source.size/2u);
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x))
+        target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / bgr3f(4);
+    return move(target);
+}
 
 // -- Resample (3x8bit) --
 
@@ -214,6 +230,7 @@ void upsample(const Image& target, const Image& source) {
     }
 }
 
+#if 0
 static void bilinear(const Image& target, const Image& source) {
     //assert_(!source.alpha, source.size, target.size);
     const uint stride = source.stride;

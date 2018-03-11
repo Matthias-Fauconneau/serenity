@@ -170,8 +170,8 @@ template<> void __attribute((noreturn)) error(const string& message) {
   reentrant = false;
  }
  //__builtin_trap(); //TODO: detect if running under debugger
- //exit_group(-1); // Exits this group (process)
- throw "";
+ exit_group(-1); // Exits this group (process)
+ //throw "";
 }
 
 static Semaphore jobs __attribute((init_priority(102)));

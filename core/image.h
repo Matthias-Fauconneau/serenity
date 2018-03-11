@@ -83,9 +83,13 @@ extern float sRGB_reverse[0x100];
 uint8 sRGB(float v);
 
 /// Converts linear float pixels for each component to color sRGB pixels
-void sRGB(const Image& target, const Image3f& source);
-inline Image sRGB(const Image3f& source) { Image target(source.size); ::sRGB(target, source); return target; }
+void sRGB(const Image& target, const ImageF& source);
+inline Image sRGB(const ImageF& source) { Image target(source.size); ::sRGB(target, source); return target; }
 
+void sRGB(const Image& target, const Image3f& source, const float max=1);
+inline Image sRGB(const Image3f& source, const float max=1) { Image target(source.size); ::sRGB(target, source, max); return target; }
+
+#if 0
 /// Converts linear float pixels for each component to color sRGB pixels
 void sRGB(const Image& target, const Image4f& source);
 inline Image sRGB(const Image4f& source) { Image target(source.size); ::sRGB(target, source); return target; }
@@ -100,7 +104,9 @@ inline Image sRGB(const Image16& N, const ImageF& B, const ImageF& G, const Imag
 
 void sRGB(const Image& BGR, const Image8& M);
 void sRGB(const Image& BGR, const Image16& N);
-void sRGB(const Image& BGR, const ImageF& Z);
+#endif
+
+Image3f linear(const Image& source);
 
 // -- Decode --
 
@@ -128,6 +134,11 @@ Image flip(Image&& image);
 
 void negate(const Image& target, const Image& source);
 inline Image negate(const Image& source) { Image target(source.size); ::negate(target, source); return target; }
+
+// -- Downsample --
+
+Image3f downsample(Image3f&& target, const Image3f& source);
+inline Image3f downsample(const Image3f& source) { return downsample(source.size/2u, source); }
 
 // -- Resample (3x8bit) --
 
