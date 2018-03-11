@@ -4,6 +4,20 @@
 #include "math.h"
 #include "algorithm.h"
 
+inline Image3f downsample(const Image3f& source, int times) {
+    assert_(times>0);
+    Image3f target = unsafeShare(source);
+    for(auto_: range(times)) target=downsample(target);
+    return target;
+}
+
+inline Image3f upsample(const Image3f& source, int times) {
+    assert_(times>0);
+    Image3f target = unsafeShare(source);
+    for(auto_: range(times)) target=upsample(target);
+    return target;
+}
+
 static inline Image3f dxx(const Image3f& I) {
     Image3f dxx (I.size);
     for(int y: range(dxx.size.y))
@@ -85,21 +99,13 @@ template<Type F, Type... Args> int2 argmax(F similarityFunction, const Image3f& 
     return ::argmax(A.size, B.size, [&](const int2 offset){ return similarityFunction(offset, A, B, args...); });
 }
 
-inline Image3f downsample(const Image3f& source, int times) {
-    assert_(times>0);
-    Image3f target = unsafeShare(source);
-    for(auto_: range(times)) target=downsample(target);
-    return target;
-}
-
 // Low resolution search and refine
-template<Type F, Type... Images> int2 argmaxCoarse(F similarityFunction, const Images&... images) {
-    const int L = 3;
+template<Type F, Type... Images> int2 argmaxCoarse(const int L, F similarityFunction, const Images&... images) {
     return ::argmax(similarityFunction, downsample(images, L)...)*int(1<<L);
 }
 
-static int2 argmaxSSE(const Image3f& A, const Image3f& B, int2 window=0_0, const int2 initialOffset=0_0) {
-     return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); }, window, initialOffset);
+static int2 argmaxSSE(const Image3f& A, const Image3f& B, const int L=0) {
+     return argmaxCoarse(L, [&](const int2 offset, const Image3f& A, const Image3f& B){ return -SSE(A, B, offset); }, A, B);
 }
 
 generic void apply(const Image3f& A, const Image3f& B, int2 centerOffset, T f) {
@@ -158,10 +164,13 @@ struct Sphere : Widget {
     Time time {true};
     const Image3f image = linear(decodeImage(Map("test.jpg")));
 
-    const Image3f detH = ::detH(downsample(downsample(downsample(image))));
+    const uint L = 3;
+    const Image3f detH = upsample(::detH(downsample(image, L)), L);
 
-    const Image3f templateDisk = ::disk(image.size.y/4);
-    const int2 center = argmaxCoarse([&](const int2 offset, const Image3f& A, const Image3f& B){ return -SSE(A, B, offset); }, image, templateDisk);
+    const Image3f templateDisk = ::disk(image.size.x/8);
+    const int2 center = argmaxCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
+                                                              return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset)); },
+                                                                           image, negate(templateDisk), detH, templateDisk);
     const Image3f disk = multiply(templateDisk, image, center);
     const vec3 lightDirection = principalDirection(disk == bgr3f(1));
     Image preview = sRGB(disk);
