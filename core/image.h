@@ -44,10 +44,10 @@ generic ImageT<T> unsafeShare(const ImageT<T>& o) {
 }
 
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
-/*generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
- assert_(int2(size) >= int2(0) && offset+int2(size) <= int2(o.size), offset, size, o.size);
+generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
+ //assert_(int2(size) >= int2(0) && offset+int2(size) <= int2(o.size), offset, size, o.size);
  return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)), size, o.stride, o.alpha);
-}*/
+}
 
 // -- Types --
 
@@ -86,8 +86,8 @@ uint8 sRGB(float v);
 void sRGB(const Image& target, const ImageF& source);
 inline Image sRGB(const ImageF& source) { Image target(source.size); ::sRGB(target, source); return target; }
 
-void sRGB(const Image& target, const Image3f& source, const float max=1);
-inline Image sRGB(const Image3f& source, const float max=1) { Image target(source.size); ::sRGB(target, source, max); return target; }
+void sRGB(const Image& target, const Image3f& source, bgr3f max=0_);
+inline Image sRGB(const Image3f& source, const bgr3f max=0_) { Image target(source.size); ::sRGB(target, source, max); return target; }
 
 #if 0
 /// Converts linear float pixels for each component to color sRGB pixels
@@ -137,12 +137,12 @@ inline Image negate(const Image& source) { Image target(source.size); ::negate(t
 
 // -- Resample --
 
-Image3f downsample(Image3f&& target, const Image3f& source);
-inline Image3f downsample(const Image3f& source) { return downsample(source.size/2u, source); }
+generic void downsample(const ImageT<T>& target, const ImageT<T>& source);
+generic ImageT<T> downsample(const ImageT<T>& source) { ImageT<T> target(source.size/2u); downsample(target, source); return target; }
 
 /// Upsamples an image by duplicating samples
-void upsample(const Image3f& target, const Image3f& source);
-inline Image3f upsample(const Image3f& source) { Image3f target(source.size*2u); ::upsample(target, source); return target; }
+generic void upsample(const ImageT<T>& target, const ImageT<T>& source);
+generic ImageT<T> upsample(const ImageT<T>& source) { ImageT<T> target(source.size*2u); ::upsample(target, source); return target; }
 
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);

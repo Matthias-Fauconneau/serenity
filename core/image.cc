@@ -45,12 +45,13 @@ void sRGB(const Image& BGR, const ImageF& Z) {
     for(uint i: range(Z.ref::size)) BGR[i] = byte4(byte3(sRGB(Z[i] <= max ? (Z[i]-min)/(max-min) : 1)), 0xFF);
 }
 
-void sRGB(const Image& target, const Image3f& source, const float max) {
+void sRGB(const Image& target, const Image3f& source, bgr3f max) {
+    if(!max) max = bgr3f(::max(::max(source)));
     assert_(target.size == source.size);
     for(size_t y : range(target.size.y)) {
         mref<byte4> dst = target.slice(y*target.stride, target.size.x);
         ref<bgr3f> src = source.slice(y*source.stride, source.size.x);
-        for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b/max), sRGB(src[x].g/max), sRGB(src[x].r/max), 0xFF);
+        for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b/max.b), sRGB(src[x].g/max.g), sRGB(src[x].r/max.r), 0xFF);
     }
 }
 
@@ -214,19 +215,22 @@ void negate(const Image& target, const Image& source) {
 
 // -- Resample --
 
-Image3f downsample(Image3f&& target, const Image3f& source) {
+generic void downsample(const ImageT<T>& target, const ImageT<T>& source) {
     assert_(target.size == source.size/2u);
     for(uint y: range(target.size.y)) for(uint x: range(target.size.x))
-        target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / bgr3f(4);
-    return move(target);
+        target(x,y) = (source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1)) / T(4);
 }
+template void downsample(const ImageF& target, const ImageF&);
+template void downsample(const Image3f& target, const Image3f&);
 
-void upsample(const Image3f& target, const Image3f& source) {
+generic void upsample(const ImageT<T>& target, const ImageT<T>& source) {
     assert_(target.size == source.size*2u);
     for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
         target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);
     }
 }
+template void upsample(const ImageF& target, const ImageF&);
+template void upsample(const Image3f& target, const Image3f&);
 
 #if 0
 static void bilinear(const Image& target, const Image& source) {

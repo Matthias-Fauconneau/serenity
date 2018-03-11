@@ -4,43 +4,53 @@
 #include "math.h"
 #include "algorithm.h"
 
-inline Image3f downsample(const Image3f& source, int times) {
+generic ImageT<T> downsample(const ImageT<T>& source, int times) {
     assert_(times>0);
-    Image3f target = unsafeShare(source);
+    ImageT<T> target = unsafeShare(source);
     for(auto_: range(times)) target=downsample(target);
     return target;
 }
 
-inline Image3f upsample(const Image3f& source, int times) {
+generic ImageT<T> upsample(const ImageT<T>& source, int times) {
     assert_(times>0);
-    Image3f target = unsafeShare(source);
+    ImageT<T> target = unsafeShare(source);
     for(auto_: range(times)) target=upsample(target);
     return target;
 }
 
 static inline Image3f dxx(const Image3f& I) {
     Image3f dxx (I.size);
-    for(int y: range(dxx.size.y))
-        for(int x: range(dxx.size.x))
+    for(int y: range(dxx.size.y)) {
+        dxx(0, y) = bgr3f(0);
+        for(int x: range(1, dxx.size.x-1))
             dxx(x,y) = (1.f/4)*I(::max(0,x-1),y) + (-2.f/4)*I(x,y) + (1.f/4)*I(::min(int(I.size.x)-1,x+1),y);
+        dxx(dxx.size.x-1, y) = bgr3f(0);
+    }
     return dxx;
 }
 
 static inline Image3f dyy(const Image3f& I) {
     Image3f dyy (I.size);
-    for(int y: range(dyy.size.y))
+    for(int x: range(dyy.size.x)) dyy(x, 0) = bgr3f(0);
+    for(int y: range(1, dyy.size.y-1))
         for(int x: range(dyy.size.x))
             dyy(x,y) = (1.f/4)*I(x,::max(0,y-1)) + (-2.f/4)*I(x,y) + (1.f/4)*I(x,::min(int(I.size.y)-1,y+1));
+    for(int x: range(dyy.size.x)) dyy(x, dyy.size.y-1) = bgr3f(0);
     return dyy;
 }
 
 static inline Image3f dxy(const Image3f& I) {
     Image3f dxy (I.size);
     const float c = 1/(4*sqrt(2.));
-    for(int y: range(dxy.size.y))
-        for(int x: range(dxy.size.x))
+    for(int x: range(dxy.size.x)) dxy(x, 0) = bgr3f(0);
+    for(int y: range(1, dxy.size.y-1)) {
+        dxy(0, y) = bgr3f(0);
+        for(int x: range(1, dxy.size.x-1))
             dxy(x,y) = +c*I(::max(0,x-1),::max(0,              y-1)) + -c*I(::min(int(I.size.x)-1,x+1),::max(0,              y-1))
                      + -c*I(::max(0,x-1),::min(int(I.size.y)-1,y+1)) + +c*I(::min(int(I.size.x)-1,x+1),::min(int(I.size.y)-1,y+1));
+        dxy(dxy.size.x-1, y) = bgr3f(0);
+    }
+    for(int x: range(dxy.size.x)) dxy(x, dxy.size.y-1) = bgr3f(0);
     return dxy;
 }
 
@@ -49,7 +59,10 @@ static inline Image3f detH(const Image3f& I) {
     Image3f dyy = ::dyy(I);
     Image3f dxy = ::dxy(I);
     Image3f detH (I.size);
-    for(uint i: range(detH.ref::size)) detH[i] = dxy[i]*dyy[i] - dxy[i]*dxy[i];
+    for(uint i: range(detH.ref::size)) {
+        detH[i] = dxx[i]*dyy[i] - dxy[i]*dxy[i];
+        assert_(!anyLt(detH[i],bgr3f(0)));
+    }
     return detH;
 }
 
@@ -84,28 +97,50 @@ inline double SSE(const Image3f& A, const Image3f& B, int2 centerOffset=0_0) {
  return SSE;
 }
 
-generic int2 argmax(const uint2 Asize, const uint2 Bsize, T similarityFunction, int2 window=0_0, const int2 initialOffset=0_0) {
+generic int2 argmax(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
     if(!window) window = abs(int2(Asize-Bsize)); // Full search
     int2 bestOffset = 0_0; float bestSimilarity = -inff; //-SSE..0
     for(int y: range(-window.y/2, window.y/2)) for(int x: range(-window.x/2, window.x/2)) {
         const int2 offset = initialOffset + int2(x, y);
-        const double similarity = similarityFunction(offset);
+        const float similarity = function(offset);
         if(similarity > bestSimilarity) { bestSimilarity = similarity; bestOffset = offset; }
     }
     return bestOffset;
 }
 
-template<Type F, Type... Args> int2 argmax(F similarityFunction, const Image3f& A, const Image3f& B, const Args&... args) {
-    return ::argmax(A.size, B.size, [&](const int2 offset){ return similarityFunction(offset, A, B, args...); });
+template<Type F, Type... Args> int2 argmax(F function, const Image3f& A, const Image3f& B, const Args&... args) {
+    return ::argmax(A.size, B.size, [&](const int2 offset){ return function(offset, A, B, args...); });
 }
 
-// Low resolution search and refine
-template<Type F, Type... Images> int2 argmaxCoarse(const int L, F similarityFunction, const Images&... images) {
-    return ::argmax(similarityFunction, downsample(images, L)...)*int(1<<L);
+template<Type F, Type... Images> int2 argmaxCoarse(const int L, F function, const Images&... images) {
+    return ::argmax(function, downsample(images, L)...)*int(1<<L);
 }
 
-static int2 argmaxSSE(const Image3f& A, const Image3f& B, const int L=0) {
-     return argmaxCoarse(L, [&](const int2 offset, const Image3f& A, const Image3f& B){ return -SSE(A, B, offset); }, A, B);
+/*
+static ImageF similarity(const Image3f& A, const Image3f& B) {
+    int2 size = abs(int2(Asize-Bsize));
+    ImageF similarity = ImageF( uint2(size) );
+    for(int y: range(-size.y/2, size.y/2)) for(int x: range(-size.x/2, size.x/2)) {
+        auto sse = SSE(image, pattern, int2(x,y));
+        assert_(sse.count == uint(pattern.size.y*pattern.size.x), sse.count, pattern.size, x,y);
+        similarity(size.x/2+x,size.y/2+y) = -sse.SSE;
+    }
+    return similarity;
+}*/
+
+generic ImageF apply(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
+    if(!window) window = abs(int2(Asize-Bsize)); // Full search
+    ImageF target = ImageF( uint2(window) );
+    for(int y: range(-window.y/2, (window.y+1)/2)) for(int x: range(-window.x/2, (window.x+1)/2)) target(window.x/2+x, window.y/2+y) = function(initialOffset + int2(x, y));
+    return ::move(target);
+}
+
+template<Type F, Type... Args> ImageF apply(F function, const Image3f& A, const Image3f& B, const Args&... args) {
+    return ::apply(A.size, B.size, [&](const int2 offset){ return function(offset, A, B, args...); });
+}
+
+template<Type F, Type... Images> ImageF applyCoarse(const int L, F function, const Images&... images) {
+    return upsample(::apply(function, downsample(images, L)...), L);
 }
 
 generic void apply(const Image3f& A, const Image3f& B, int2 centerOffset, T f) {
@@ -138,7 +173,6 @@ inline Image3f multiply(const Image3f& A, const Image3f& B, int2 centerOffset=0_
 inline void opEq(const ImageF& Y, const Image3f& X, bgr3f threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]==threshold); }
 inline ImageF operator==(const Image3f& X, bgr3f threshold) { ImageF Y(X.size); ::opEq(Y,X,threshold); return Y; }
 
-
 static inline vec3 principalDirection(ImageF disk) {
     vec3 μ = 0_;
     for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
@@ -160,6 +194,19 @@ static inline vec3 principalDirection(ImageF disk) {
     return μ;
 }
 
+static Image grid(ref<Image> images) {
+    const uint2 imageSize = images[0].size;
+    Image target (uint2(images.size,1)*imageSize);
+    for(int X: range(images.size)) {
+        //assert_(images[X].size <= imageSize);
+        copy(cropShare(target, int2(X*imageSize.x, 0), images[X].size), images[X]);
+    }
+    //Image3f target (uint2(1,images.size)*imageSize);
+    //for(int Y: range(images.size)) copy(cropShare(target, int2(0, Y*imageSize.y), imageSize), images[Y]);
+    return target;
+}
+template<Type... Images> Image grid(const Images&... images) { return grid(ref<Image>{unsafeShare(images)...}); }
+
 struct Sphere : Widget {
     Time time {true};
     const Image3f image = linear(decodeImage(Map("test.jpg")));
@@ -168,13 +215,26 @@ struct Sphere : Widget {
     const Image3f detH = upsample(::detH(downsample(image, L)), L);
 
     const Image3f templateDisk = ::disk(image.size.x/8);
+#if 0
+    Image preview = sRGB(downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
+        return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset)); },
+                     image, negate(templateDisk), detH, templateDisk)));
+#elif 1
+    Image preview = grid(sRGB(downsample(0?image:detH)),
+                         sRGB(downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
+                                                                                 //return -(SSE(A0,    B0, offset) /* * SSE(    A1,   B1, offset)*/);
+        return -SSE(    A1,   B1, offset);
+                                                                      },
+                                                                                              image, negate(templateDisk), detH, templateDisk))));
+    //sRGB(downsample(detH)));
+#else
     const int2 center = argmaxCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
                                                               return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset)); },
                                                                            image, negate(templateDisk), detH, templateDisk);
     const Image3f disk = multiply(templateDisk, image, center);
     const vec3 lightDirection = principalDirection(disk == bgr3f(1));
     Image preview = sRGB(disk);
-    //Image preview = sRGB(upsample(upsample(detH)), max(max(detH)));
+#endif
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 
