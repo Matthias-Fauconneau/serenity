@@ -135,16 +135,14 @@ Image flip(Image&& image);
 void negate(const Image& target, const Image& source);
 inline Image negate(const Image& source) { Image target(source.size); ::negate(target, source); return target; }
 
-// -- Downsample --
+// -- Resample --
 
 Image3f downsample(Image3f&& target, const Image3f& source);
 inline Image3f downsample(const Image3f& source) { return downsample(source.size/2u, source); }
 
-// -- Resample (3x8bit) --
-
 /// Upsamples an image by duplicating samples
-void upsample(const Image& target, const Image& source);
-inline Image upsample(const Image& source) { Image target(source.size*2u); ::upsample(target, source); return target; }
+void upsample(const Image3f& target, const Image3f& source);
+inline Image3f upsample(const Image3f& source) { Image3f target(source.size*2u); ::upsample(target, source); return target; }
 
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);

@@ -212,7 +212,7 @@ void negate(const Image& target, const Image& source) {
 }
 #endif
 
-// -- Downsample --
+// -- Resample --
 
 Image3f downsample(Image3f&& target, const Image3f& source) {
     assert_(target.size == source.size/2u);
@@ -221,9 +221,7 @@ Image3f downsample(Image3f&& target, const Image3f& source) {
     return move(target);
 }
 
-// -- Resample (3x8bit) --
-
-void upsample(const Image& target, const Image& source) {
+void upsample(const Image3f& target, const Image3f& source) {
     assert_(target.size == source.size*2u);
     for(uint y: range(source.size.y)) for(uint x: range(source.size.x)) {
         target(x*2+0,y*2+0) = target(x*2+1,y*2+0) = target(x*2+0,y*2+1) = target(x*2+1,y*2+1) = source(x,y);

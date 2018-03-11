@@ -4,43 +4,6 @@
 #include "math.h"
 #include "algorithm.h"
 
-#if 0
-static inline Image3f dxx(const Image3f& I) {
-    Image3f dxx (I.size);
-    for(int y: range(dxx.size.y))
-        for(int x: range(dxx.size.x))
-            dxx(x,y) = (1.f/4)*I(::max(0,x-1),y) + (-2.f/4)*I(x,y) + (1.f/4)*I(::min(int(I.size.x)-1,x+1),y);
-    return dxx;
-}
-
-static inline Image3f dyy(const Image3f& I) {
-    Image3f dyy (I.size);
-    for(int y: range(dyy.size.y))
-        for(int x: range(dyy.size.x))
-            dyy(x,y) = (1.f/4)*I(x,::max(0,y-1)) + (-2.f/4)*I(x,y) + (1.f/4)*I(x,::min(int(I.size.y)-1,y+1));
-    return dyy;
-}
-
-static inline Image3f dxy(const Image3f& I) {
-    Image3f dxy (I.size);
-    const float c = 1/(4*sqrt(2.));
-    for(int y: range(dxy.size.y))
-        for(int x: range(dxy.size.x))
-            dxy(x,y) = +c*I(::max(0,x-1),::max(0,              y-1)) + -c*I(::min(int(I.size.x)-1,x+1),::max(0,              y-1))
-                     + -c*I(::max(0,x-1),::min(int(I.size.y)-1,y+1)) + +c*I(::min(int(I.size.x)-1,x+1),::min(int(I.size.y)-1,y+1));
-    return dxy;
-}
-
-static inline Image3f detH(const Image3f& I) {
-    Image3f dxx = ::dxx(I);
-    Image3f dyy = ::dyy(I);
-    Image3f dxy = ::dxy(I);
-    Image3f detH (I.size);
-    for(uint i: range(detH.ref::size)) detH[i] = dxy[i]*dyy[i] - dxy[i]*dxy[i];
-    return detH;
-}
-#endif
-
 static inline Image3f circle(int size) {
     Image3f target = Image3f(uint2(size));
     const float R = (size-1.f)/2, R2 = sq(R);
@@ -51,8 +14,8 @@ static inline Image3f circle(int size) {
     return target;
 }
 
-static inline void negate(Image3f& target) { for(size_t i: range(target.ref::size)) target[i] = bgr3f(1)-target[i]; }
-static inline Image3f negate(Image3f&& target) { negate(target); return ::move(target); }
+static inline void negate(const Image3f& Y, const Image3f& X) { for(size_t i: range(Y.ref::size)) Y[i] = bgr3f(1)-X[i]; }
+static inline Image3f negate(const Image3f& X) { Image3f Y(X.size); negate(Y,X); return Y; }
 
 struct SSE_count { double SSE; uint count; };
 inline SSE_count SSE(const Image3f& A, const Image3f& B, int2 centerOffset=0_0, uint64 minCount=0) {
@@ -75,6 +38,7 @@ inline SSE_count SSE(const Image3f& A, const Image3f& B, int2 centerOffset=0_0, 
  return {SSE, count};
 }
 
+#if 0
 static ImageF similarity(const Image3f& image, const Image3f& pattern) {
     int2 size = int2(image.size-pattern.size);
     ImageF similarity = ImageF( uint2(size) );
@@ -85,15 +49,59 @@ static ImageF similarity(const Image3f& image, const Image3f& pattern) {
     }
     return similarity;
 }
+#else
+static int2 argmaxSimilarity(const Image3f& image, const Image3f& pattern) {
+    int2 size = abs(int2(image.size-pattern.size));
+    int2 bestOffset = 0_0; float bestSimilarity = -inff; //-SSE..0
+    for(int y: range(-size.y/2, size.y/2)) for(int x: range(-size.x/2, size.x/2)) {
+        const int2 offset(x, y);
+        const double similarity = -SSE(image, pattern, offset).SSE;
+        assert_(similarity < inff);
+        if(similarity > bestSimilarity) { bestSimilarity = similarity; bestOffset = offset; }
+    }
+    log(bestSimilarity, bestOffset, size);
+    return bestOffset;
+}
+#endif
+
+generic void apply(const Image3f& A, const Image3f& B, int2 centerOffset, T f) {
+ const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
+ const uint2 aOffset (max(int2(0),+offset));
+ const uint2 bOffset (max(int2(0),-offset));
+ const uint2 size = min(A.size-aOffset, B.size-bOffset);
+ const uint a = aOffset.y*A.stride+aOffset.x;
+ const uint b = bOffset.y*B.stride+bOffset.x;
+ for(uint y: range(size.y)) {
+     const uint yLine = y*size.x;
+     const uint aLine = a+y*A.stride;
+     const uint bLine = b+y*B.stride;
+     for(uint x: range(size.x)) {
+         f(yLine+x, aLine+x, bLine+x);
+     }
+ }
+}
+
+inline void multiply(const Image3f& Y, const Image3f& A, const Image3f& B, int2 centerOffset=0_0) {
+    assert_(Y.size == ::min(A.size, B.size));
+    apply(A, B, centerOffset, [&](const uint y, const uint a, const uint b){ Y[y]=A[a]*B[b]; });
+}
+inline Image3f multiply(const Image3f& A, const Image3f& B, int2 centerOffset=0_0) {
+    Image3f Y(::min(A.size, B.size));
+    multiply(Y,A,B,centerOffset);
+    return Y;
+}
 
 struct Test : Widget {
     Time time {true};
-    const Image3f image = downsample(downsample(downsample(linear(decodeImage(Map("test.jpg"))))));
-    //const Image3f detH = ::detH(source);
+    const Image3f source = linear(decodeImage(Map("test.jpg")));
+    //const Image3f detH = ::detH(image);
     //const Image image = sRGB(detH, max(max(detH)));
-    const Image3f circle = negate(::circle(image.size.y/4));
-    const ImageF similarity = ::similarity(image, circle);
-    const Image preview = sRGB(similarity);
+    const uint R = source.size.y/4;
+    const uint D = 8;
+    const Image3f image = downsample(downsample(downsample(source)));
+    const Image3f circle = ::circle(R/D);
+    const int2 center = ::argmaxSimilarity(negate(circle), image)*int(D);
+    const Image preview = sRGB(multiply(::circle(R), source, center));
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 
