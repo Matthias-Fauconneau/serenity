@@ -52,6 +52,9 @@ static int2 argmaxSimilarity(const Image3f& A, const Image3f& B, int2 window=0_0
 
 // Low resolution search and refine
 static int2 align(const Image3f& A, const Image3f& B) {
+#ifdef DEBUG
+    return 0_0;
+#endif
     const int D = 8;
     const int2 offset = ::argmaxSimilarity(downsample(downsample(downsample(A))), downsample(downsample(downsample(B))))*int(D);
     return offset; //::argmaxSimilarity(A, B, int2(D), offset);
@@ -84,15 +87,15 @@ inline Image3f multiply(const Image3f& A, const Image3f& B, int2 centerOffset=0_
     return Y;
 }
 
-inline void threshold(const Image3f& Y, const Image3f& X, bgr3f threshold) { for(uint i: range(Y.ref::size)) Y[i] = bgr3f(vecGE(X[i], threshold)); }
-inline Image3f threshold(const Image3f& X, bgr3f threshold=bgr3f(1)) { Image3f Y(X.size); ::threshold(Y,X,threshold); return Y; }
+inline void opEq(const ImageF& Y, const Image3f& X, bgr3f threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]==threshold); }
+inline ImageF operator==(const Image3f& X, bgr3f threshold) { ImageF Y(X.size); ::opEq(Y,X,threshold); return Y; }
 
 struct Test : Widget {
     Time time {true};
     const Image3f image = linear(decodeImage(Map("test.jpg")));
     const Image3f templateDisk = ::disk(image.size.y/4);
     const int2 center = ::align(negate(templateDisk), image);
-    const Image3f disk = threshold(multiply(templateDisk, image, center), bgr3f(1));
+    const ImageF disk = multiply(templateDisk, image, center) == bgr3f(1);
     Image preview = sRGB(disk);
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
@@ -100,21 +103,19 @@ struct Test : Widget {
     Test() {
         vec3 μ = 0_;
         for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
-            const float x = (float(ix)/disk.size.x)*2-1;
-            const float y = (float(iy)/disk.size.y)*2-1;
-            const float z = 1-sqrt(x*x+y*y);
-            if(z < 0) continue;
-            const float ρ = 1; // FIXME
+            const float x = +((float(ix)/disk.size.x)*2-1);
+            const float y = -((float(iy)/disk.size.y)*2-1);
+            const float z = sqrt(1-(x*x+y*y));
+            if(z <= 0) continue;
+            const float ρ = 1/sq(z);
             const float w = 1/ρ;
-            //const float I = hsum(disk(ix, iy))/3; // FIXME
-            const float I = hsum(disk(ix, iy))==3; // Only saturated pixels
+            const float I = disk(ix, iy);
             μ += w*I*vec3(x,y,z);
         }
         μ = normalize(μ);
-        int2 μ_xy = int2((μ.xy()+vec2(1))/vec2(2)*vec2(disk.size));
-        log(μ, μ_xy, disk.size);
+        int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(disk.size));
         const int r=1; for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
-        log(time);
+        log(time, μ);
         window->show();
     }
     void render(RenderTarget2D& target_, vec2, vec2) override {
