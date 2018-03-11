@@ -36,22 +36,22 @@ uint8 sRGB(float v) {
  return sRGB_forward[linear12];
 }
 
-void sRGB(const Image& BGR, const ImageF& Z) {
+void sRGB(const Image& Y, const ImageF& X) {
     float min = inff, max = -inff;
-    for(float v: Z) {
-        min = ::min(min, v);
-        if(v < inff) max = ::max(max, v);
+    for(float v: X) {
+        if(v > -inff) min = ::min(min, v);
+        if(v < +inff) max = ::max(max, v);
     }
-    for(uint i: range(Z.ref::size)) BGR[i] = byte4(byte3(sRGB(Z[i] <= max ? (Z[i]-min)/(max-min) : 1)), 0xFF);
+    for(uint i: range(X.ref::size)) Y[i] = byte4(byte3(sRGB(X[i] <= max ? (X[i]-min)/(max-min) : 1)), 0xFF);
 }
 
-void sRGB(const Image& target, const Image3f& source, bgr3f max) {
-    if(!max) max = bgr3f(::max(::max(source)));
-    assert_(target.size == source.size);
-    for(size_t y : range(target.size.y)) {
-        mref<byte4> dst = target.slice(y*target.stride, target.size.x);
-        ref<bgr3f> src = source.slice(y*source.stride, source.size.x);
-        for(size_t x : range(target.size.x)) dst[x] = byte4(sRGB(src[x].b/max.b), sRGB(src[x].g/max.g), sRGB(src[x].r/max.r), 0xFF);
+void sRGB(const Image& Y, const Image3f& X, bgr3f max) {
+    if(!max) max = bgr3f(::max(::max(X)));
+    assert_(Y.size == X.size);
+    for(size_t y : range(Y.size.y)) {
+        mref<byte4> dst = Y.slice(y*Y.stride, Y.size.x);
+        ref<bgr3f> src = X.slice(y*X.stride, X.size.x);
+        for(size_t x : range(Y.size.x)) dst[x] = byte4(sRGB(src[x].b/max.b), sRGB(src[x].g/max.g), sRGB(src[x].r/max.r), 0xFF);
     }
 }
 

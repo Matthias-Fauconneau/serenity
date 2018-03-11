@@ -3,10 +3,6 @@
 #include "render.h"
 #include "input.h"
 
-/// User interface colors
-static constexpr bgr3f lightBlue {7./8, 3./4, 1./2};
-static constexpr bgr3f gray {3./4, 3./4, 3./4};
-
 inline String str(Key key) { return str(uint(key)); }
 
 /// Abstract component to compose user interfaces
