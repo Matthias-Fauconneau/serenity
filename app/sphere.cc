@@ -3,6 +3,24 @@
 #include "jpeg.h"
 #include "math.h"
 #include "algorithm.h"
+#include "matrix.h"
+
+//inline vec4 conjugate(vec4 q) { return vec4(-q.xyz(), q.w); }
+/*inline vec4 angleVector(float a, vec3 v) {
+    const float l = length(v);
+    assert_(l); //if(!l) return _0001f;
+    const vec3 b = sin(a/2*l)/l*v;
+    return vec4(b, cos(a/2*l));
+}*/
+//inline vec4 qapply(vec4 q, vec3 v) { return qmul(q, qmul(v, conjugate(q))); }
+inline vec4 rotationFromTo(const vec3 v1, const vec3 v2) { return vec4(cross(v1, v2), sqrt(dotSq(v1)*dotSq(v2)) + dot(v1, v2)); }
+inline vec4 qmul(vec4 p, vec4 q) {
+      return vec4(p.w*q.xyz() + q.w*p.xyz() + cross(p.xyz(), q.xyz()),
+                  p.w*q.w - dot(p.xyz(), q.xyz()));
+}
+inline vec3 mul(vec4 p, vec3 v) {
+    return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz(), p.w))).xyz();
+}
 
 generic ImageT<T> downsample(const ImageT<T>& source, int times) {
     assert_(times>0);
@@ -17,14 +35,6 @@ generic ImageT<T> upsample(const ImageT<T>& source, int times) {
     for(auto_: range(times)) target=upsample(target);
     return target;
 }
-
-static inline Image3f DoG(const Image3f& X) {
-    const Image3f x = upsample(downsample(X));
-    Image3f Y (X.size);
-    for(uint i: range(Y.ref::size)) Y[i] = sq(X[i]-x[i]);
-    return Y;
-}
-
 
 static inline Image3f disk(int size) {
     Image3f target = Image3f(uint2(size));
@@ -163,54 +173,42 @@ struct Sphere : Widget {
     Time time {true};
     const Image3f image = linear(decodeImage(Map("test.jpg")));
 
-    const uint L = 3;
-    const Image3f DoG = upsample(::DoG(downsample(image, L)), L);
-
     const Image3f templateDisk = ::disk(image.size.x/8);
-#if 0
-    ImageF map = downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0){
-            return -SSE(A0,    B0, offset);
-        //    return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset));
-    }, image, negate(templateDisk)));
-    Image preview = sRGB(map);
-#elif 0
-    Image preview = grid(sRGB(downsample(0?image:DoG, 2)),
 
-                         sRGB(downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0){
-                                                                                 return -SSE(A0,    B0, offset);
-                                                                                  },image, negate(templateDisk)), 2)),
-
-                         sRGB(downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0){
-                                                                                 return -SSE(A0,    B0, offset);
-                                                                                  },DoG, templateDisk), 2)),
-
-                         sRGB(downsample(applyCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
-                                                                                 return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset));
-                                                                                  },image, negate(templateDisk), DoG, templateDisk), 2)));
-    //sRGB(downsample(detH)));
-#else
-    const int2 center = argmaxCoarse(L, [&](const int2 offset, const Image3f& A0, const Image3f& B0, const Image3f& A1, const Image3f& B1){
-                                                              return -(SSE(A0,    B0, offset) * SSE(    A1,   B1, offset)); },
-                                                                           image, negate(templateDisk), detH, templateDisk);
+    const int2 center = argmaxSSE(negate(templateDisk), image, 3);
     const Image3f disk = multiply(templateDisk, image, center);
     const vec3 lightDirection = principalDirection(disk == bgr3f(1));
-    Image preview = sRGB(disk);
-#endif
+    Image preview = sRGB(disk == bgr3f(1));
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 
     Sphere() {
         log(time);
 
-        //log(μ);
-        //const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(disk.size));
-
-        const int i = argmax(map);
-        const int2 μ_xy (i%map.size.x, i/map.size.x);
+        const vec3 μ = principalDirection(disk == bgr3f(1));
+        log(μ);
+        const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(disk.size));
         const int r = 1;
         //assert_(μ_xy >= r && μ_xy <= int2(preview.size)-r, μ_xy);
-        log(μ_xy);
-        if(i) for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
+        for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
+
+        log(center);
+        const float dx = 5, f = 4;//, α = 2*atan(2*f, dx)/image.size.x;
+        /*vec2 angles = α*vec2(center);
+        log(angles);
+        log(vec3());
+        //mat3 R = mat3().rotateX(-angles.y) * mat3().rotateY(-angles.x);
+        //log(mat3().rotateX(-angles.y).rotateY(-angles.x));
+        //log(mat3().rotateY(-angles.x).rotateX(-angles.y));
+        //log(mat3().rotateX(-angles.y) * mat3().rotateY(-angles.x));
+        //log(mat3().rotateY(-angles.x) * mat3().rotateX(-angles.y));
+        const mat3 = mat3()
+        log(R*vec3(0,0,1));
+        log(R*μ);*/
+
+        const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(image.size.x) * dx, f));
+        const vec3 R = cross(C, vec3(0,0,1));
+        error(C);
 
         window->show();
     }
