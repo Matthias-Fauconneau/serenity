@@ -5,22 +5,9 @@
 #include "algorithm.h"
 #include "matrix.h"
 
-//inline vec4 conjugate(vec4 q) { return vec4(-q.xyz(), q.w); }
-/*inline vec4 angleVector(float a, vec3 v) {
-    const float l = length(v);
-    assert_(l); //if(!l) return _0001f;
-    const vec3 b = sin(a/2*l)/l*v;
-    return vec4(b, cos(a/2*l));
-}*/
-//inline vec4 qapply(vec4 q, vec3 v) { return qmul(q, qmul(v, conjugate(q))); }
-inline vec4 rotationFromTo(const vec3 v1, const vec3 v2) { return vec4(cross(v1, v2), sqrt(dotSq(v1)*dotSq(v2)) + dot(v1, v2)); }
-inline vec4 qmul(vec4 p, vec4 q) {
-      return vec4(p.w*q.xyz() + q.w*p.xyz() + cross(p.xyz(), q.xyz()),
-                  p.w*q.w - dot(p.xyz(), q.xyz()));
-}
-inline vec3 mul(vec4 p, vec3 v) {
-    return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz(), p.w))).xyz();
-}
+inline vec4 rotationFromTo(const vec3 v1, const vec3 v2) { return normalize(vec4(cross(v1, v2), sqrt(dotSq(v1)*dotSq(v2)) + dot(v1, v2))); }
+inline vec4 qmul(vec4 p, vec4 q) { return vec4(p.w*q.xyz() + q.w*p.xyz() + cross(p.xyz(), q.xyz()), p.w*q.w - dot(p.xyz(), q.xyz())); }
+inline vec3 qapply(vec4 p, vec3 v) { return qmul(p, qmul(vec4(v, 0), vec4(-p.xyz(), p.w))).xyz(); }
 
 generic ImageT<T> downsample(const ImageT<T>& source, int times) {
     assert_(times>0);
@@ -92,8 +79,6 @@ static int2 argmaxSSE(const Image3f& A, const Image3f& B, const int L=0) {
 
 generic ImageF apply(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
     if(!window) window = abs(int2(Asize-Bsize)); // Full search
-    //ImageF target = ImageF( uint2(window) );
-    //for(int y: range(-window.y/2, (window.y+1)/2)) for(int x: range(-window.x/2, (window.x+1)/2)) target(window.x/2+x, window.y/2+y) = function(initialOffset + int2(x, y));
     ImageF target = ImageF( ::max(Asize, Bsize) );
     target.clear(-inff);
     for(int y: range(-window.y/2, (window.y+1)/2)) for(int x: range(-window.x/2, (window.x+1)/2))
@@ -186,29 +171,14 @@ struct Sphere : Widget {
         log(time);
 
         const vec3 μ = principalDirection(disk == bgr3f(1));
-        log(μ);
         const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(disk.size));
         const int r = 1;
-        //assert_(μ_xy >= r && μ_xy <= int2(preview.size)-r, μ_xy);
         for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
 
-        log(center);
-        const float dx = 5, f = 4;//, α = 2*atan(2*f, dx)/image.size.x;
-        /*vec2 angles = α*vec2(center);
-        log(angles);
-        log(vec3());
-        //mat3 R = mat3().rotateX(-angles.y) * mat3().rotateY(-angles.x);
-        //log(mat3().rotateX(-angles.y).rotateY(-angles.x));
-        //log(mat3().rotateY(-angles.x).rotateX(-angles.y));
-        //log(mat3().rotateX(-angles.y) * mat3().rotateY(-angles.x));
-        //log(mat3().rotateY(-angles.x) * mat3().rotateX(-angles.y));
-        const mat3 = mat3()
-        log(R*vec3(0,0,1));
-        log(R*μ);*/
-
+        const float dx = 5, f = 4;
         const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(image.size.x) * dx, f));
-        const vec3 R = cross(C, vec3(0,0,1));
-        error(C);
+        const vec4 Q = rotationFromTo(C, vec3(0,0,1));
+        log(C, μ, qapply(Q,μ));
 
         window->show();
     }

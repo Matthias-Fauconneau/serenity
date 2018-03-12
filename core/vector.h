@@ -111,7 +111,7 @@ genericVec T hsum(const Vec& a) { T sum=0; for(uint i: range(N)) sum+=a[i]; retu
 genericVec T product(const Vec& a) { T product=1; for(uint i: range(N)) product *= a[i]; return product; }
 genericVec T dot(const Vec& a, const Vec& b) { T ssq (0); for(uint i: range(N)) ssq += a[i]*b[i]; return ssq; }
 genericVec T dotSq(const Vec& a) { return dot(a,a); }
-genericVec float length(const Vec& a) { return __builtin_sqrtf(dot(a, a)); }
+genericVec float length(const Vec& a) { return __builtin_sqrtf(dotSq(a)); }
 genericVec Vec normalize(const Vec& a) { return a/length(a); }
 genericVec bool isNaN(const Vec& v) { for(uint i: range(N)) if(isNaN(v[i])) return true; return false; }
 genericVec bool isNumber(const Vec& v) { for(uint i: range(N)) if(v[i]!=v[i] || v[i] == __builtin_inff() || v[i] == -__builtin_inff()) return false; return true; }
