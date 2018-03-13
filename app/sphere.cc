@@ -126,15 +126,21 @@ inline ImageF operator==(const ImageF& X, float threshold) { ImageF Y(X.size); :
 
 static inline vec4 principalCone(const ImageF& disk) {
     float ΣI = 0; vec3 ΣIv = 0_;
+    float min = inff; for(float v: disk) if(v) min=::min(min, v); //error(min);
     for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) { // ∫dA
+        const float I = disk(ix, iy);
+        //if(I == 0) continue; // Mask
         const float x = +((float(ix)/disk.size.x)*2-1);
         const float y = -((float(iy)/disk.size.y)*2-1);
         const float r² = sq(x)+sq(y);
+        if(!(r² < 1)) continue;
+        assert_(r² < 1);
+        if(I == 0) continue; // Mask
+        assert_(I >= min);
         const float z = sqrt(1-r²);
-        if(z <= 0) continue;
+        assert_(z > 0);
         const float dΩ_dA = 1/z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
-        const float I = disk(ix, iy);
-        const float dΩ_dA_I = dΩ_dA*I; // dΩ/dA·I
+        const float dΩ_dA_I = dΩ_dA*(I-min); // dΩ/dA·I
         const vec3 v = vec3(x,y,z);
         ΣI += dΩ_dA_I;
         ΣIv += dΩ_dA_I*v;
@@ -142,21 +148,9 @@ static inline vec4 principalCone(const ImageF& disk) {
     const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
     const float p = length(ΣIv)/ΣI; // Polarisation
     const float Ω = p; // lim[p->0] Ω = p ; Ω=∫dΩ=2π[1-cosθ]~πθ², p=∫dΩv|z=π/2[1-cos2θ]~πθ²
+    log(disk.size, disk.ref::size, ΣI, ΣIv, μ, p, Ω);
     return vec4(μ, Ω);
 }
-
-unused static Image grid(ref<Image> images) {
-    const uint2 imageSize = images[0].size;
-    Image target (uint2(images.size,1)*imageSize);
-    for(int X: range(images.size)) {
-        //assert_(images[X].size <= imageSize);
-        copy(cropShare(target, int2(X*imageSize.x, 0), images[X].size), images[X]);
-    }
-    //ImageF target (uint2(1,images.size)*imageSize);
-    //for(int Y: range(images.size)) copy(cropShare(target, int2(0, Y*imageSize.y), imageSize), images[Y]);
-    return target;
-}
-template<Type... Images> unused Image grid(const Images&... images) { return grid(ref<Image>{unsafeShare(images)...}); }
 
 // Sums CFA RGGB quads together, and normalizes min/max levels, yields RGGB intensity image
 static ImageF sumBGGR(const RAW& source) {
@@ -167,6 +161,7 @@ static ImageF sumBGGR(const RAW& source) {
         const int G2 = ::max(0,source(x*2+0,y*2+1)-source.blackLevel);
         const int R = ::max(0,source(x*2+1,y*2+1)-source.blackLevel);
         target(x,y) = float(B+G1+G2+R)/(4*(4095-source.blackLevel));
+        assert_(0 <= target(x,y) && target(x,y) <= 1);
     }
     return target;
 }
@@ -192,7 +187,7 @@ struct Sphere : Widget {
 #if 1
         const vec3 μ = lightCone.xyz();
         const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
-        if(0) {
+        if(1) {
             const int r = 0;
             if(!anyGE(μ_xy+int2(r),int2(preview.size)) && !anyLE(μ_xy,int2(r)))
                 for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
