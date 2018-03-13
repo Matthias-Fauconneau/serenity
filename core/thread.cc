@@ -43,7 +43,7 @@ Thread mainThread __attribute((init_priority(104))) (0);
 // Flag to cleanly terminate all threads
 static bool terminationRequested = false;
 // Exit status to return for process (group)
-int groupExitStatus = 0;
+static int groupExitStatus = 0;
 
 //generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
@@ -52,8 +52,8 @@ Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priori
  if(spawn) this->spawn();
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }
-static void* run(void* thread) { ((Thread*)thread)->run(); return 0; }
-void Thread::spawn() { assert_(!thread); pthread_create(&thread,0,&::run,this); }
+static void* run(void* thread) { ((Thread*)thread)->run(); return nullptr; }
+void Thread::spawn() { assert_(!thread); pthread_create(&thread, nullptr, &::run, this); }
 
 int32 gettid() { return syscall(SYS_gettid); }
 
@@ -136,21 +136,21 @@ static void handler(int sig, siginfo_t* info, void* ctx) {
 }
 
 // Configures floating-point exceptions
-void setExceptions(uint except) {
+unused static void setExceptions(uint except) {
  int r; asm volatile("stmxcsr %0":"=m"(*&r));
  r|=0b111111<<7; r &= ~((except&0b111111)<<7);
  asm volatile("ldmxcsr %0" : : "m" (*&r));
 }
 
-void __attribute((constructor(102))) setup_signals() {
+static void __attribute((constructor(102))) setup_signals() {
  //{rlimit limit; getrlimit(RLIMIT_CORE,&limit); limit.rlim_cur=0; setrlimit(RLIMIT_CORE,&limit);}
  /// Setup signal handlers to log trace on {ABRT,SEGV,TERM,PIPE}
  struct sigaction sa; sa.sa_sigaction=&handler; sa.sa_flags=SA_SIGINFO|SA_RESTART; sa.sa_mask={{}};
- check(sigaction(SIGABRT, &sa, 0));
- check(sigaction(SIGSEGV, &sa, 0));
- check(sigaction(SIGTERM, &sa, 0));
- check(sigaction(SIGTRAP, &sa, 0));
- check(sigaction(SIGFPE, &sa, 0));
+ check(sigaction(SIGABRT, &sa, nullptr));
+ check(sigaction(SIGSEGV, &sa, nullptr));
+ check(sigaction(SIGTERM, &sa, nullptr));
+ check(sigaction(SIGTRAP, &sa, nullptr));
+ check(sigaction(SIGFPE , &sa, nullptr));
  //check(sigaction(SIGUSR1, &sa, 0));
  enum { Invalid=1<<0, Denormal=1<<1, DivisionByZero=1<<2, Overflow=1<<3, Underflow=1<<4, Precision=1<<5 };
  //setExceptions(/*Invalid|*//*Denormal|*//*DivisionByZero|*//*Overflow*//*|Underflow*//*|Precision*/);
@@ -166,12 +166,11 @@ template<> void __attribute((noreturn)) error(const string& message) {
   reentrant = true;
   traceAllThreads();
   if(threads.size>1) log("Thread #"+str(gettid())+':');
-  log(trace(3,0));
+  log(trace(3,nullptr));
   reentrant = false;
  }
- //__builtin_trap(); //TODO: detect if running under debugger
+ __builtin_trap(); //TODO: detect if running under debugger
  exit_group(-1); // Exits this group (process)
- //throw "";
 }
 
 static Semaphore jobs __attribute((init_priority(102)));
@@ -192,7 +191,7 @@ void requestTermination(int status) {
      for(Thread* thread: threads) thread->post();
      assert_(threadCount);
      jobs.release(threadCount);
-     for(thread& worker: workers) pthread_join(worker.pthread, NULL);
+     for(thread& worker: workers) pthread_join(worker.pthread, nullptr);
  }
 }
 
@@ -203,7 +202,7 @@ inline void* start_routine(thread* t) {
         (*t->delegate)(t->index);
         results.release(1);
     }
-    return 0;
+    return nullptr;
 }
 __attribute((constructor(103))) static inline void spawnWorkers() {
     assert_(threadCount);
@@ -211,7 +210,7 @@ __attribute((constructor(103))) static inline void spawnWorkers() {
     if(OMP_NUM_THREADS) assert_(threadCount==parseInteger(OMP_NUM_THREADS));
     for(uint index: range(threadCount)) {
         workers[index].index = index;
-        pthread_create(&workers[index].pthread, 0, reinterpret_cast<void*(*)(void*)>(start_routine), &workers[index]);
+        pthread_create(&workers[index].pthread, nullptr, reinterpret_cast<void*(*)(void*)>(start_routine), &workers[index]);
     }
 }
 void parallel(function<void(uint)> delegate) {
@@ -245,14 +244,14 @@ String which(string name) {
 
 int execute(const string path, const ref<string> args, bool wait, const Folder& workingDirectory, Handle* stdout, Handle* stderr,
             const ref<string> envs) {
- if(!existsFile(path)) { error("Executable not found",path); return -1; }
+ if(!existsFile(path)) { error("Executable not found"_,path); return -1; }
 
  buffer<String> args0(1+args.size, 0);
  args0.append( path+'\0' );
  for(const auto& arg: args) args0.append( arg+'\0' );
  const char* argv[args0.size+1];
  for(uint i: range(args0.size)) argv[i] = args0[i].data;
- argv[args0.size]=0;
+ argv[args0.size] = nullptr;
 
  array<string> env0;
  static String environ = File("/proc/self/environ").readUpTo(16384);
@@ -262,7 +261,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
 
  const char* envp[env0.size+1];
  for(uint i: range(env0.size)) envp[i]=env0[i].data;
- envp[env0.size]=0;
+ envp[env0.size] = nullptr;
 
  int pipeOut[2], pipeErr[2];
  if(stdout) check( ::pipe(pipeOut) );
@@ -280,7 +279,7 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
    dup2(pipeErr[1], 2); // Redirect stderr to pipe
   }
   if(cwd!=AT_FDCWD) check(fchdir(cwd));
-  if(!execve(strz(path), (char*const*)argv, (char*const*)envp)) exit_group(-1);
+  if(!execve(strz(path), const_cast<char*const*>(argv), const_cast<char*const*>(envp))) exit_group(-1);
   __builtin_unreachable();
  } else {
   if(stdout) {
@@ -295,6 +294,6 @@ int execute(const string path, const ref<string> args, bool wait, const Folder& 
   else { isRunning(pid); return pid; }
  }
 }
-int wait() { return waitpid(-1,0,0); }
-int wait(int pid) { int status=0; waitpid(pid,&status,0); return status; }
+int wait() { return waitpid(-1, nullptr, 0); }
+int wait(int pid) { int status=0; waitpid(pid, &status, 0); return status; }
 bool isRunning(int pid) { int status=0; waitpid(pid,&status,WNOHANG); return (status&0x7f); }

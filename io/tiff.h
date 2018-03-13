@@ -1,4 +1,9 @@
 #pragma once
 #include "core/image.h"
 
-Image16 parseTIF(ref<byte> file);
+struct RAW : Image16 {
+    uint16 blackLevel = -1;
+    using Image16::Image16;
+};
+
+RAW parseTIF(ref<byte> file);

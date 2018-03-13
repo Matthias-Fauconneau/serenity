@@ -158,46 +158,49 @@ static Image grid(ref<Image> images) {
 }
 template<Type... Images> Image grid(const Images&... images) { return grid(ref<Image>{unsafeShare(images)...}); }
 
-// Sums CFA RGGB quads together, yields RGGB intensity image
-static ImageF sumRGGB(const Image16& source) {
-#if 0
+// Sums CFA RGGB quads together, and normalizes min/max levels, yields RGGB intensity image
+static ImageF sumBGGR(const RAW& source, uint min=0xFFFF, uint max=0) {
+    //for(uint i: range(source.ref::size)) if(source[i] == 0) log(i%source.size.x, i/source.size.x);
+    if(!max) {
+        min = ::min(source);
+        max = ::max(source);
+    }
+    log(min, max);
     ImageF target(source.size/2u);
     for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
-        target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
+        const uint B = source(x*2+0,y*2+0)-min;
+        const uint G1 = source(x*2+1,y*2+0)-min;
+        const uint G2 = source(x*2+0,y*2+1)-min;
+        const uint R = source(x*2+1,y*2+1)-min;
+        target(x,y) = float(B+G1+G2+R)/(4*(max-min));
     }
-#else
-    ImageF target(source.size/2u);
-    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
-        target(x,y) = (float(source(x,y)) - 528) / (4095 - 528);
-    }
-#endif
     return target;
 }
 
 struct Sphere : Widget {
     Time time {true};
-    const ImageF image = sumRGGB(parseTIF(readFile("IMG_0658.dng")));
-    //const ImageF low = sumRGGB(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
+    const ImageF image = sumBGGR(parseTIF(readFile("IMG_0658.dng")));
+    const ImageF low = sumBGGR(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
 
-    const ImageF templateDisk = ::disk(image.size.x/4);
+    const ImageF templateDisk = ::disk(image.size.x/7);
 
-    const int2 center = argmaxSSE(negate(templateDisk), image, 3);
+    const int2 center = argmaxSSE(negate(templateDisk), image, 2);
     const ImageF disk = multiply(templateDisk, image, center);
-    //const ImageF light = multiply(templateDisk, low, center);
-    //const vec4 lightCone = principalCone(light);
+    const ImageF light = multiply(templateDisk, low, center);
+    const vec4 lightCone = principalCone(light);
     //Image preview = sRGB(light);
-    //Image preview = sRGB(disk);
     Image preview = sRGB(image);
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 
     Sphere() {
         log(time);
-#if 0
+#if 1
         const vec3 μ = lightCone.xyz();
         const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(disk.size));
         const int r = 1;
-        //for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
+        if(!anyGE(μ_xy+int2(r),int2(preview.size)) && !anyLE(μ_xy,int2(r)))
+            for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
 
         const float dx = 5, f = 4;
         const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(image.size.x) * dx, f));

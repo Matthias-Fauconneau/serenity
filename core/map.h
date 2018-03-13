@@ -13,7 +13,7 @@ template<Type K, Type V> struct map {
  array<V> values;
 
  map(){}
- map(ref<entry<K,V>> entries) : keys(entries.size), values(entries.size) {
+ explicit map(ref<entry<K,V>> entries) : keys(entries.size), values(entries.size) {
      for(entry<K,V> entry: entries ) { keys.append(entry.key); values.append(entry.value); }
  }
  //map(buffer<K>&& keys, const mref<V> values) : keys(move(keys)), values(moveRef(values)) { assert_(keys.size==values.size, keys.size, values.size); }

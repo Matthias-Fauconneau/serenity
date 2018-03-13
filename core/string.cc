@@ -125,36 +125,28 @@ buffer<string> split(const string source, string separator) {
 
 // -- Number conversions
 
-String str(uint64 n, uint pad, char padChar, uint base) {
- assert(base>=2 && base<=16);
- byte buf[64]; uint i=64;
- do {
-  buf[--i] = "0123456789abcdef"[n%base];
-  n /= base;
- } while( n!=0 );
- while(64-i<pad) buf[--i] = padChar;
- return copyRef(string(buf+i,64-i));
+String fmt(uint64 n, uint pad, char padChar, uint base) {
+    assert(base>=2 && base<=16);
+    byte buf[64]; uint i=64;
+    do {
+        buf[--i] = "0123456789abcdef"[n%base];
+        n /= base;
+    } while( n!=0 );
+    while(64-i<pad) buf[--i] = padChar;
+    return copyRef(string(buf+i,64-i));
 }
 
-String str(int64 number, uint pad, char padChar, uint base) {
- assert(base>=2 && base<=16);
- byte buf[64]; uint i=64;
- uint64 n=abs(number);
- do {
-  assert_(i>0);
-  buf[--i] = "0123456789abcdef"[n%base];
-  n /= base;
- } while( n!=0 );
- if(number<0) buf[--i]='-';
-#if __GNUC__
- assert_(i<64); // Fixes wrong 'array subscript is above array bounds' warning given by GCC
-#endif
- while(64<pad+i) {
-  assert_(i>0);
-  buf[--i] = padChar;
- }
- assert_(i>0 && i<64);
- return copyRef(string(buf+i,64-i));
+String fmt(int64 number, uint pad, char padChar, uint base) {
+    assert(base>=2 && base<=16);
+    byte buf[64]; uint i=64;
+    uint64 n=abs(number);
+    do {
+        buf[--i] = "0123456789abcdef"[n%base];
+        n /= base;
+    } while( n!=0 );
+    if(number<0) buf[--i]='-';
+    while(64<pad+i) buf[--i] = padChar;
+    return copyRef(string(buf+i,64-i));
 }
 
 static inline float log10(float x) { return __builtin_log10(x); }
@@ -164,7 +156,7 @@ static inline float round(float x) { return __builtin_round(x); }
 static inline bool isNaN(float x) { return x!=x; }
 static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 
-String str(double n, uint precision, uint exponent, unused uint pad) {
+String fmt(double n, uint precision, uint exponent, unused uint pad) {
  bool sign = n<0; n=abs(n);
  if(__builtin_isnan(n)) return "NaN"__; //::right("NaN", pad);
  if(n==-__builtin_inf()) return "-∞"__; //::right("-∞", pad+2);

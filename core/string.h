@@ -10,18 +10,19 @@ inline String operator "" __(const char* data, size_t size) { return String(cons
 
 // -- str()
 
-// Enforces exact match for overload resolution
-generic String str(const T&) { static_assert(0&&sizeof(T),"No overload for str(const T&)"); error(); }
+// operator String()
+generic String str(const T& t) = delete;
 
 /// Forwards string
-inline String str(string s) { return unsafeRef(s); }
+template<> inline String str(const string& s) { return unsafeRef(s); }
 /// Forwards char[]
-template<size_t N> string str(const char (&source)[N]) { return string(source); }
+/// function template partial specialization is not allowed
+template<size_t N> String str/*<>*/(const char (&source)[N]) { return unsafeRef(source); }
 
 /// Returns boolean as "true"/"false"
-inline string str(bool value) { return value ? "true"_ : "false"_; }
+template<> inline String str(const bool& value) { return value ? "true"__ : "false"__; }
 /// Returns a reference to the character
-inline string str(const char& character) { return string(&character,1); }
+template<> inline String str(const char& character) { return unsafeRef(string(&character,1)); }
 
 /// Returns a bounded reference to the null-terminated String pointer
 string str(const char* source);
@@ -102,29 +103,33 @@ template<Type A, Type B, Type T> String str(const cat<A, B, T>& a) { return a; }
 // -- Number conversions
 
 /// Converts an unsigned integer
-String str(uint64 number, uint pad=0, char padChar='0', uint base=10);
-/// Converts an unsigned integer (implicit conversion)
-inline String str(uint8 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
-/// Converts an unsigned integer (implicit conversion)
-inline String str(uint16 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
-/// Converts an unsigned integer (implicit conversion)
-inline String str(uint32 number, uint pad=0, char padChar='0', uint base=10) { return str(uint64(number), pad, padChar, base); }
+String fmt(uint64 number, uint pad=0, char padChar='0', uint base=10);
+/// Converts an unsigned integer (implicit format)
+inline String str(uint8 number) { return fmt(number); }
+/// Converts an unsigned integer (implicit format)
+inline String str(uint16 number) { return fmt(number); }
+/// Converts an unsigned integer (implicit format)
+inline String str(uint32 number) { return fmt(number); }
+/// Converts an unsigned integer (implicit format)
+inline String str(uint64 number) { return fmt(number); }
 /// Converts an unsigned integer in hexadecimal base
-inline String hex(uint64 n, uint pad=0) { return str(n, pad, '0', 16); }
+inline String hex(uint64 n, uint pad=0) { return fmt(n, pad, '0', 16); }
 /// Converts a memory address in hexadecimal base
 generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 
 /// Converts a signed integer
-String str(int64 number, uint pad=0, char padChar=' ', uint base=10);
-/// Converts a signed integer (implicit conversion)
-inline String str(int16 n, uint pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
-/// Converts a signed integer (implicit conversion)
-inline String str(int32 n, uint pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
+String fmt(int64 number, uint pad=0, char padChar=' ', uint base=10);
+/// Converts a signed integer (implicit format)
+//inline String str(int16 n, uint pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
+/// Converts a signed integer (implicit format)
+inline String str(int32 number) { return fmt(int64(number)); }
+/// Converts a signed integer (implicit format)
+inline String str(int64 number) { return fmt(int64(number)); }
 
 /// Converts a floating-point number
-String str(double n, uint precision=4, uint exponent=0, uint pad=0);
-inline String str(float n, uint precision=4, uint exponent=0, uint pad=0) { return str(double(n), precision, exponent, pad); }
-inline String str(const half& n, uint precision=4, uint exponent=0, uint pad=0) { return str(double(n), precision, exponent, pad); }
+String fmt(double number, uint precision=4, uint exponent=0, uint pad=0);
+inline String str(float number) { return fmt(number); }
+//inline String str(const half& n, uint precision=4, uint exponent=0, uint pad=0) { return str(double(n), precision, exponent, pad); }
 
 /// Converts arrays
 generic String str(const ref<T> source, string separator=" "_, string bracket="[]"_) {

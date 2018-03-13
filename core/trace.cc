@@ -130,7 +130,7 @@ Symbol findSymbol(void* find) {
     }
     for(BinaryData& s = debug_line; s;) {
         uint begin = s.index;
-        struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range,opcode_base; } _packed;
+        struct CU { uint size; uint16 version; uint prolog_size; uint8 min_inst_len, stmt; int8 line_base; uint8 line_range, opcode_base; } _packed;
         const CU& cu = s.read<CU>();
         s.advance(cu.opcode_base-1);
         while(s.next()) { s.whileNot(0); s.skip('\0'); }
@@ -140,12 +140,12 @@ Symbol findSymbol(void* find) {
             unused int index = readLEV(s), time = readLEV(s), file_length=readLEV(s);
         }
         s.advance(1);
-        byte* address = 0; uint file_index = 1, line = 1, is_stmt = cu.stmt;
+        byte* address = nullptr; uint file_index = 1, line = 1, is_stmt = cu.stmt;
 
         while(s.index<begin+cu.size+4) {
             uint8 opcode = s.read();
             enum { extended_op, op_copy, advance_pc, advance_line, set_file, set_column, negate_stmt, set_basic_block, const_add_pc,
-                         fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa };
+                         fixed_advance_pc, set_prologue_end, set_epilogue_begin, set_isa, inlined_call };
             /**/ if(opcode >= cu.opcode_base) {
                 opcode -= cu.opcode_base;
                 int delta = (opcode / cu.line_range) * cu.min_inst_len;
@@ -162,11 +162,11 @@ Symbol findSymbol(void* find) {
                 if (size == 0) continue;
                 opcode = s.read();
                 enum { end_sequence = 1, set_address, define_file, set_discriminator };
-                /**/  if(opcode == end_sequence) { if (cu.stmt) { address = 0; file_index = 1; line = 1; is_stmt = cu.stmt; } }
+                /**/  if(opcode == end_sequence) { if (cu.stmt) { address = nullptr; file_index = 1; line = 1; is_stmt = cu.stmt; } }
                 else if(opcode == set_address) { address = s.read<byte*>(); }
                 else if(opcode == define_file) { readLEV(s); readLEV(s); }
                 else if(opcode == set_discriminator) { readLEV(s); }
-                else error("Unknown opcode");
+                else error("Unknown extended opcode", opcode);
             }
             else if(opcode == op_copy) {}
             else if(opcode == advance_pc) {
@@ -192,7 +192,8 @@ Symbol findSymbol(void* find) {
             else if(opcode == set_prologue_end) {}
             else if(opcode == set_epilogue_begin) {}
             else if(opcode == set_isa) readLEV(s);
-            else error("Unknown opcode");
+            else if(opcode == inlined_call) s.advance(32);
+            else error("Unknown opcode", opcode);
         }
     }
     return symbol;

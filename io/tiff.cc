@@ -3,12 +3,12 @@
 #include "function.h"
 #include "ljpeg.h"
 
-Image16 parseTIF(ref<byte> file) {
+RAW parseTIF(ref<byte> file) {
 	BinaryData s(file);
     s.isBigEndian = (bool)s.match("MM");
     if(!s.isBigEndian) s.skip("II");
     if(s.read16()!=42) error("");
-    Image16 image;
+    RAW image;
     int compression = 0; // 1: raw, 7: jpeg
     uint2 tileSize = 0_0;
     ImageT<ref<byte>> tiles;
@@ -34,7 +34,11 @@ Image16 parseTIF(ref<byte> file) {
                     else error("type", hex(e.type), hex(e.tag));
                 } else {
                     reference = BinaryData(s.data, s.isBigEndian);
-                    reference.index = s.read32();
+                    if(e.type==3 && e.count <= 2) {
+                        reference.index = s.index;
+                        s.advance(4);
+                    }
+                    else reference.index = s.read32();
                 }
                 /**/ if(e.tag == 0xFE) preview = value != 0; // NewSubfileType
                 else if(e.tag == 0x14A) { // SubIFDs
@@ -88,7 +92,7 @@ Image16 parseTIF(ref<byte> file) {
                 else if(e.tag == 0x145) {
                     assert_(e.count == tiles.ref::size && e.type == 4);
                     assert_(compression == 7);
-                    image = Image16(image.size);
+                    image = RAW(image.size);
                     assert_(image.size == tiles.size*tileSize);
                     for(uint i: range(e.count)) {
                         tiles[i].size = reference.read32();
@@ -99,6 +103,20 @@ Image16 parseTIF(ref<byte> file) {
                         ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
                     }
                 }
+                else if(e.tag == 0x828D || e.tag == 0x828E) ; // CFARepeatPatternDim, CFAPattern
+                else if(e.tag == 0xC616) ; // CFAPlaneColor
+                else if(e.tag == 0xC619) assert_(reference.read16() == 1 && reference.read16() == 1); // BlackLevelRepeatDim
+                else if(e.tag == 0xC61A) { // BlackLevel
+                    assert_(e.type == 3 && e.count == 1);
+                    image.blackLevel = value;
+                }
+                else if(e.tag == 0xC61D) { // BlackLevel
+                    assert_(e.type == 3 && e.count == 1);
+                    assert_(value == 4095);
+                }
+                else if(e.tag == 0xC74E) ; // OpcodeList
+                else if(e.tag == 0xC761) ; // NoiseProfile
+                else error(e.tag, hex(e.tag));
                 // 306: DateTime
                 // {DNG 50xxx} 706: Version, Backward, Model; 721: ColorMatrix; 740: Private; 778: CalibrationIlluminant, 827: OriginalName
                 // 931,2: Camera,Profile Calibration Signature; 936: ProfileName; 940-2: Profile Tone Curve, Embed Policy, Copyright
