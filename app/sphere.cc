@@ -55,7 +55,7 @@ struct offset_similarity { int2 offset; float similarity; };
 generic offset_similarity argmax(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
     if(!window) window = abs(int2(Asize-Bsize)); // Full search
     int2 bestOffset = 0_0; float bestSimilarity = -inff; //-SSE..0
-    for(int y: range(-window.y/2, window.y/2)) for(int x: range(-window.x/2, window.x/2)) {
+    for(int y: range(-window.y/2, window.y/2 +1)) for(int x: range(-window.x/2, window.x/2 +1)) {
         const int2 offset = initialOffset + int2(x, y);
         const float similarity = function(offset);
         if(similarity > bestSimilarity) { bestSimilarity = similarity; bestOffset = offset; }
@@ -63,8 +63,8 @@ generic offset_similarity argmax(const uint2 Asize, const uint2 Bsize, T functio
     return {bestOffset, bestSimilarity};
 }
 
-static offset_similarity argmaxSSE(const ImageF& A, const ImageF& B) {
-     return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); });
+static offset_similarity argmaxSSE(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
+     return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); }, window, initialOffset);
 }
 
 template<Type F, Type... Images> int2 argmaxCoarse(const int L, F function, const Images&... images) {
@@ -174,18 +174,29 @@ static CachedImageF loadRaw(const string path) {
     return {ImageF(unsafeRef(cast<float>(map)), image.size/2u), ::move(map)};
 }
 
-static const int3 diskSearch(const ImageF& source, const uint maxR, const uint L=3) {
-    const ImageF image = downsample(source, L);
-    int3 bestTransform = 0_; float bestSimilarity = -inff;
-    for(int radius = maxR>>L; radius>2; radius--) {
-        const auto R = argmaxSSE(::disk(radius, true), image);
-        log(radius, R.similarity);
+static const int3 diskSearch(const ImageF& source, const uint maxRadius, const uint L=1) {
+    int2 offset = argmaxSSE(::disk(maxRadius>>4, true), downsample(source, 4)).offset * (1<<L);
+    int3 bestTransform (offset, maxRadius);
+#if 0
+    log("4");
+    offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(source, 2), int2(maxRadius>>2), offset).offset * (1<<2);
+    log("2");
+    const ImageF image = L ? downsample(source, L) : unsafeShare(source);
+    float bestSimilarity = -inff;
+    //for(int radius = maxRadius>>L; radius>8; radius-=8) {
+    for(int radius = maxRadius>>L; radius>4; radius-=4) {
+        const auto R = argmaxSSE(::disk(radius, true), image, int2(radius), offset);
+        log(radius, R.similarity, offset);
         if(R.similarity > bestSimilarity) {
             bestSimilarity = R.similarity;
-            bestTransform = {R.offset, radius};
+            bestTransform = int3(R.offset, radius)*(1<<L);
         }
+        //break;
+        //offset = R.offset; // Iterative concurrent refinement of offset and radius
     }
-    return bestTransform*(1<<L);
+    log(bestTransform, maxRadius);
+#endif
+    return bestTransform;
 }
 
 struct Sphere : Widget {
@@ -198,7 +209,7 @@ struct Sphere : Widget {
         const CachedImageF image = loadRaw("IMG_0658.dng");
         const CachedImageF low = loadRaw("IMG_0659.dng"); // Low exposure (only highlights)
 
-        const int3 center = diskSearch(image, image.size.x/5);
+        const int3 center = diskSearch(image, image.size.x/6);
         const ImageF templateDisk = ::disk(center[2]);
 
         const ImageF disk = multiply(templateDisk, image, center.xy());
