@@ -53,7 +53,7 @@ struct Time {
 };
 inline uint64 operator+(const Time& a, const Time& b) { return a.nanoseconds()+b.nanoseconds(); }
 inline uint64 operator+(const uint64& a, const Time& b) { return a+b.nanoseconds(); }
-inline String str(const Time& t) { return str(t.seconds(), 1u)+'s'; }
+template<> inline String str(const Time& t) { return fmt(t.seconds(), 1u)+'s'; }
 inline bool operator<(const Time& a, const Time& b) { return a.nanoseconds() < b.nanoseconds(); }
 inline bool operator<(const uint64& a, const Time& b) { return a < b.nanoseconds(); }
 //inline bool operator<(float a, const Time& b) { return a < b.seconds(); }

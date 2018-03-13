@@ -152,10 +152,10 @@ inline mat4 operator*(float s, mat4 M) {mat4 r; for(int j=0;j<4;j++) for(int i=0
 template<int N, int M, Type T> inline String str(const T a[M*N]) {
     array<char> s;
     for(int i=0;i<M;i++) {
-        if(N==1) s.append("\t"+str(a[i], 4u));
+        if(N==1) s.append("\t"+fmt(a[i], 4u));
         else {
             for(int j=0;j<N;j++) {
-                s.append("\t"+str(a[j*M+i], 4u));
+                s.append("\t"+fmt(a[j*M+i], 4u));
             }
             if(i<M-1) s.append('\n');
         }

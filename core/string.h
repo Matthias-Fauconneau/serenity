@@ -104,6 +104,13 @@ template<Type A, Type B, Type T> String str(const cat<A, B, T>& a) { return a; }
 
 /// Converts an unsigned integer
 String fmt(uint64 number, uint pad=0, char padChar='0', uint base=10);
+/// Converts an unsigned integer (implicit conversion)
+inline String fmt(uint8 number, uint pad=0, char padChar='0', uint base=10) { return fmt(uint64(number), pad, padChar, base); }
+/// Converts an unsigned integer (implicit conversion)
+inline String fmt(uint16 number, uint pad=0, char padChar='0', uint base=10) { return fmt(uint64(number), pad, padChar, base); }
+/// Converts an unsigned integer (implicit conversion)
+inline String fmt(uint32 number, uint pad=0, char padChar='0', uint base=10) { return fmt(uint64(number), pad, padChar, base); }
+
 /// Converts an unsigned integer (implicit format)
 inline String str(uint8 number) { return fmt(number); }
 /// Converts an unsigned integer (implicit format)
@@ -112,15 +119,22 @@ inline String str(uint16 number) { return fmt(number); }
 inline String str(uint32 number) { return fmt(number); }
 /// Converts an unsigned integer (implicit format)
 inline String str(uint64 number) { return fmt(number); }
+
 /// Converts an unsigned integer in hexadecimal base
 inline String hex(uint64 n, uint pad=0) { return fmt(n, pad, '0', 16); }
+
 /// Converts a memory address in hexadecimal base
 generic inline String str(T* const& p) { return "0x"+hex(ptr(p)); }
 
 /// Converts a signed integer
 String fmt(int64 number, uint pad=0, char padChar=' ', uint base=10);
+/// Converts a signed integer (implicit conversion)
+inline String fmt(int16 n, uint pad=0, char padChar=' ', uint base=10) { return fmt(int64(n), pad, padChar, base); }
+/// Converts a signed integer (implicit conversion)
+inline String fmt(int32 n, uint pad=0, char padChar=' ', uint base=10) { return fmt(int64(n), pad, padChar, base); }
+
 /// Converts a signed integer (implicit format)
-//inline String str(int16 n, uint pad=0, char padChar=' ', uint base=10) { return str(int64(n), pad, padChar, base); }
+inline String str(int16 number) { return fmt(int64(number)); }
 /// Converts a signed integer (implicit format)
 inline String str(int32 number) { return fmt(int64(number)); }
 /// Converts a signed integer (implicit format)

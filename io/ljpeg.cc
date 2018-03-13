@@ -127,8 +127,6 @@ void LJPEG::decode(const Image16& target, ref<byte> data) {
                 int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1);
                 uint16 value = uint16(predictor[c] + residual);
                 target(x*2+c, y) = value;
-                //log(predictor[c], residual, value);
-                //assert_(value <= 4118, predictor[c], residual, value);
                 predictor[c] = value;
             }
         }

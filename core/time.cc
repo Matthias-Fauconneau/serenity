@@ -99,16 +99,16 @@ bool operator ==(const Date& a, const Date& b) { return a.seconds==b.seconds && 
 String str(Date date, const string format) {
     array<char> r;
     for(TextData s(format);s;) {
-        /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( str(date.seconds,2u,'0') ); else s.until(' '); }
-        else if(s.match("mm")){ if(date.minutes>=0) r.append( str(date.minutes,2u,'0') ); else s.until(' '); }
-        else if(s.match("hh")){ if(date.hours>=0) r.append( str(date.hours,2u,'0') ); else s.until(' '); }
+        /**/ if(s.match("ss")){ if(date.seconds>=0) r.append( fmt(date.seconds,2u,'0') ); else s.until(' '); }
+        else if(s.match("mm")){ if(date.minutes>=0) r.append( fmt(date.minutes,2u,'0') ); else s.until(' '); }
+        else if(s.match("hh")){ if(date.hours>=0) r.append( fmt(date.hours,2u,'0') ); else s.until(' '); }
         else if(s.match("dddd")){ if(date.weekDay>=0) r.append( days[date.weekDay] ); else s.until(' '); }
         else if(s.match("ddd")){ if(date.weekDay>=0) r.append( days[date.weekDay].slice(0,3) ); else s.until(' '); }
-        else if(s.match("dd")){ if(date.day>=0) r.append( str(date.day+1,2u,'0') ); else s.until(' '); }
+        else if(s.match("dd")){ if(date.day>=0) r.append( fmt(date.day+1,2u,'0') ); else s.until(' '); }
         else if(s.match("MMMM")){ if(date.month>=0) r.append( months[date.month] ); else s.until(' '); }
         else if(s.match("MMM")){ if(date.month>=0) r.append( months[date.month].slice(0,3) ); else s.until(' '); }
-        else if(s.match("MM")){ if(date.month>=0) r.append( str(date.month+1,2u,'0') ); else s.until(' '); }
-        else if(s.match("yyyy")){ if(date.year>=0) r.append( str(date.year) ); else s.until(' '); }
+        else if(s.match("MM")){ if(date.month>=0) r.append( fmt(date.month+1,2u,'0') ); else s.until(' '); }
+        else if(s.match("yyyy")){ if(date.year>=0) r.append( fmt(date.year) ); else s.until(' '); }
         else if(s.match("TZD")) r.append("GMT"); //FIXME
         else r.append( s.next() );
     }
