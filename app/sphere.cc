@@ -177,7 +177,7 @@ static CachedImageF loadRaw(const string path) {
     if(!existsFile(path+".raw")) writeFile(path+".raw", cast<byte>(sumBGGR(parseDNG(Map(path), true))));
     DNG image = parseDNG(Map(path), false);
     Map map(path+".raw");
-    return {ImageF(unsafeRef(cast<float>(map)), image.size), ::move(map)};
+    return {ImageF(unsafeRef(cast<float>(map)), image.size/2u), ::move(map)};
 }
 
 static const int3 diskSearch(const ImageF& image, const uint maxR, const uint L=7) {
