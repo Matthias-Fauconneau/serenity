@@ -121,30 +121,29 @@ inline ImageF multiply(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) 
     return Y;
 }
 
-inline void opEq(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]==threshold); }
-inline ImageF operator==(const ImageF& X, float threshold) { ImageF Y(X.size); ::opEq(Y,X,threshold); return Y; }
+inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
+inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
 
 static inline vec4 principalCone(const ImageF& disk) {
-    float ΣI = 0; vec3 ΣIv = 0_;
-    float min = inff; for(float v: disk) if(v) min=::min(min, v); //error(min);
-    for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) { // ∫dA
-        const float I = disk(ix, iy);
-        //if(I == 0) continue; // Mask
-        const float x = +((float(ix)/disk.size.x)*2-1);
-        const float y = -((float(iy)/disk.size.y)*2-1);
-        const float r² = sq(x)+sq(y);
-        if(!(r² < 1)) continue;
-        assert_(r² < 1);
-        if(I == 0) continue; // Mask
-        assert_(I >= min);
-        const float z = sqrt(1-r²);
-        assert_(z > 0);
-        const float dΩ_dA = 1/z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
-        const float dΩ_dA_I = dΩ_dA*(I-min); // dΩ/dA·I
-        const vec3 v = vec3(x,y,z);
-        ΣI += dΩ_dA_I;
-        ΣIv += dΩ_dA_I*v;
-    }
+    auto Ɐ = [&](function<void(float, float, vec3)> f) {
+        for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) { // ∫dA
+            const float I = disk(ix, iy);
+            if(I == 0) continue; // Mask
+            const float x = +((float(ix)/disk.size.x)*2-1);
+            const float y = -((float(iy)/disk.size.y)*2-1);
+            const float r² = sq(x)+sq(y);
+            if(!(r² < 1)) continue;
+            assert_(r² < 1);
+            const float z = sqrt(1-r²);
+            assert_(z > 0);
+            const float dΩ_dA = 1; //1/z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
+            const vec3 v = vec3(x,y,z);
+            f(dΩ_dA, I, v);
+        }
+    };
+    float ΣN = 0, ΣⱯI = 0; Ɐ([&](float dΩ_dA, float I, vec3){ ΣN += dΩ_dA; ΣⱯI += dΩ_dA*I; });
+    const float μI = ΣⱯI/ΣN;
+    float ΣI = 0; vec3 ΣIv = 0_; Ɐ([&](float dΩ_dA, float I, vec3 v){ I-=μI; if(I>0) { ΣI += I; ΣIv += dΩ_dA*I*v; }});
     const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
     const float p = length(ΣIv)/ΣI; // Polarisation
     const float Ω = p; // lim[p->0] Ω = p ; Ω=∫dΩ=2π[1-cosθ]~πθ², p=∫dΩv|z=π/2[1-cos2θ]~πθ²
@@ -161,7 +160,6 @@ static ImageF sumBGGR(const RAW& source) {
         const int G2 = ::max(0,source(x*2+0,y*2+1)-source.blackLevel);
         const int R = ::max(0,source(x*2+1,y*2+1)-source.blackLevel);
         target(x,y) = float(B+G1+G2+R)/(4*(4095-source.blackLevel));
-        assert_(0 <= target(x,y) && target(x,y) <= 1);
     }
     return target;
 }
@@ -176,8 +174,8 @@ struct Sphere : Widget {
     const int2 center = argmaxSSE(negate(templateDisk), image, 2);
     const ImageF disk = multiply(templateDisk, image, center);
     const ImageF light = multiply(templateDisk, low, center);
-    const vec4 lightCone = principalCone(light);
-    Image preview = sRGB(light);
+    const vec4 lightCone = principalCone(light > 0.7f);
+    Image preview = sRGB(light > 0.7f);
     //Image preview = sRGB(image);
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
