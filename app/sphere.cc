@@ -23,18 +23,15 @@ generic ImageT<T> upsample(const ImageT<T>& source, int times) {
     return target;
 }
 
-static inline ImageF disk(int size) {
+static inline ImageF disk(const int size, const bool negate=false) {
     ImageF target = ImageF(uint2(size));
     const float C = (size-1.f)/2, R² = sq(size/2-1.f);
     for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
         const float r² = sq(x-C)+sq(y-C);
-        target(x,y) = float(r²<R²); // FIXME: antialiasing
+        target(x,y) = float(negate^(r²<R²)); // FIXME: antialiasing
     }
     return target;
 }
-
-static inline void negate(const ImageF& Y, const ImageF& X) { for(size_t i: range(Y.ref::size)) Y[i] = 1-X[i]; }
-static inline ImageF negate(const ImageF& X) { ImageF Y(X.size); negate(Y,X); return Y; }
 
 inline double SSE(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
  const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
@@ -51,10 +48,11 @@ inline double SSE(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
          SSE += sq(aLine[x] - bLine[x]);
      }
  }
- return SSE;
+ return SSE / (size.x*size.y);
 }
 
-generic int2 argmax(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
+struct offset_similarity { int2 offset; float similarity; };
+generic offset_similarity argmax(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
     if(!window) window = abs(int2(Asize-Bsize)); // Full search
     int2 bestOffset = 0_0; float bestSimilarity = -inff; //-SSE..0
     for(int y: range(-window.y/2, window.y/2)) for(int x: range(-window.x/2, window.x/2)) {
@@ -62,19 +60,15 @@ generic int2 argmax(const uint2 Asize, const uint2 Bsize, T function, int2 windo
         const float similarity = function(offset);
         if(similarity > bestSimilarity) { bestSimilarity = similarity; bestOffset = offset; }
     }
-    return bestOffset;
+    return {bestOffset, bestSimilarity};
 }
 
-template<Type F, Type... Args> int2 argmax(F function, const ImageF& A, const ImageF& B, const Args&... args) {
-    return ::argmax(A.size, B.size, [&](const int2 offset){ return function(offset, A, B, args...); });
+static offset_similarity argmaxSSE(const ImageF& A, const ImageF& B) {
+     return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); });
 }
 
 template<Type F, Type... Images> int2 argmaxCoarse(const int L, F function, const Images&... images) {
     return ::argmax(function, downsample(images, L)...)*int(1<<L);
-}
-
-static int2 argmaxSSE(const ImageF& A, const ImageF& B, const int L=0) {
-     return argmaxCoarse(L, [&](const int2 offset, const ImageF& A, const ImageF& B){ return -SSE(A, B, offset); }, A, B);
 }
 
 generic ImageF apply(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
@@ -180,12 +174,18 @@ static CachedImageF loadRaw(const string path) {
     return {ImageF(unsafeRef(cast<float>(map)), image.size/2u), ::move(map)};
 }
 
-static const int3 diskSearch(const ImageF& image, const uint maxR, const uint L=7) {
-    for(uint r = maxR;;) {
-        const ImageF templateDisk = ::disk(maxR);
-        const int2 center = argmaxSSE(negate(templateDisk), image, L);
-        return int3(center, r);
+static const int3 diskSearch(const ImageF& source, const uint maxR, const uint L=3) {
+    const ImageF image = downsample(source, L);
+    int3 bestTransform = 0_; float bestSimilarity = -inff;
+    for(int radius = maxR>>L; radius>2; radius--) {
+        const auto R = argmaxSSE(::disk(radius, true), image);
+        log(radius, R.similarity);
+        if(R.similarity > bestSimilarity) {
+            bestSimilarity = R.similarity;
+            bestTransform = {R.offset, radius};
+        }
     }
+    return bestTransform*(1<<L);
 }
 
 struct Sphere : Widget {
@@ -193,14 +193,12 @@ struct Sphere : Widget {
     unique<Window> window = nullptr;
 
     Sphere() {
-        Time decodeTime {true}; // FIXME: mmap cache
-        const CachedImageF image = loadRaw("IMG_0658.dng");
-        const CachedImageF low = loadRaw("IMG_0659.dng"); // Low exposure (only highlights)
-        log(decodeTime);
-
         Time time {true};
 
-        const int3 center = diskSearch(image, image.size.x/4);
+        const CachedImageF image = loadRaw("IMG_0658.dng");
+        const CachedImageF low = loadRaw("IMG_0659.dng"); // Low exposure (only highlights)
+
+        const int3 center = diskSearch(image, image.size.x/5);
         const ImageF templateDisk = ::disk(center[2]);
 
         const ImageF disk = multiply(templateDisk, image, center.xy());
