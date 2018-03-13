@@ -25,9 +25,9 @@ generic ImageT<T> upsample(const ImageT<T>& source, int times) {
 
 static inline ImageF disk(int size) {
     ImageF target = ImageF(uint2(size));
-    const float R = (size-1.f)/2, R² = sq(R);
+    const float C = (size-1.f)/2, R² = sq(size/2-1.f);
     for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
-        const float r² = sq(x-R)+sq(y-R);
+        const float r² = sq(x-C)+sq(y-C);
         target(x,y) = float(r²<R²); // FIXME: antialiasing
     }
     return target;
@@ -125,25 +125,32 @@ inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i
 inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
 
 static inline vec4 principalCone(const ImageF& disk) {
+    auto V = [&](uint ix, uint iy) {
+            const float x = +((float(ix)/disk.size.x)*2-1);
+            const float y = -((float(iy)/disk.size.y)*2-1);
+            const float r² = sq(x)+sq(y);
+            assert_(r² < 1);
+            const float z = sqrt(1-r²);
+            assert_(z > 0);
+            const vec3 v = vec3(x,y,z);
+            return v;
+    };
     auto Ɐ = [&](function<void(float, float, vec3)> f) {
         for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) { // ∫dA
             const float I = disk(ix, iy);
             if(I == 0) continue; // Mask
-            const float x = +((float(ix)/disk.size.x)*2-1);
-            const float y = -((float(iy)/disk.size.y)*2-1);
-            const float r² = sq(x)+sq(y);
-            if(!(r² < 1)) continue;
-            assert_(r² < 1);
-            const float z = sqrt(1-r²);
-            assert_(z > 0);
-            const float dΩ_dA = 1; //1/z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
-            const vec3 v = vec3(x,y,z);
+            const vec3 v = V(ix, iy);
+            const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
             f(dΩ_dA, I, v);
         }
     };
     float ΣN = 0, ΣⱯI = 0; Ɐ([&](float dΩ_dA, float I, vec3){ ΣN += dΩ_dA; ΣⱯI += dΩ_dA*I; });
     const float μI = ΣⱯI/ΣN;
     float ΣI = 0; vec3 ΣIv = 0_; Ɐ([&](float dΩ_dA, float I, vec3 v){ I-=μI; if(I>0) { ΣI += I; ΣIv += dΩ_dA*I*v; }});
+    if(ΣI == 0) {
+        const uint i = argmax(disk);
+        return vec4(V(i%disk.size.x,i/disk.size.y), 0);
+    }
     const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
     const float p = length(ΣIv)/ΣI; // Polarisation
     const float Ω = p; // lim[p->0] Ω = p ; Ω=∫dΩ=2π[1-cosθ]~πθ², p=∫dΩv|z=π/2[1-cos2θ]~πθ²
