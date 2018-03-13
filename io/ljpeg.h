@@ -7,9 +7,9 @@ struct LJPEG {
  struct Table {
      uint8 symbolCountsForLength[16];
      int maxLength = 0;
-     uint8 symbols[256];
+     uint8 symbols[16];
      struct LengthSymbol { uint8 length = 0; uint8 symbol = 0; };
-     LengthSymbol lengthSymbolForCode[836607];
+     LengthSymbol lengthSymbolForCode[512];
  } tables[4];
  uint width = 0, height = 0, sampleSize = 0;
  LJPEG(ref<byte> data);

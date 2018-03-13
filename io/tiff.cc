@@ -17,7 +17,7 @@ Image16 parseTIF(ref<byte> file) {
         if(!s.index) break;
         function<void(BinaryData& s)> readIFD = [&](BinaryData& s) -> void {
             bool preview = false;
-            uint16 entryCount = s.read16();
+            const uint16 entryCount = s.read16();
             for(auto_: range(entryCount)) {
                 struct Entry { uint16 tag, type; uint count; } e = s.read<Entry>();
                 if(s.isBigEndian) e = {big16(e.tag), big16(e.type), big32(e.count)};
@@ -36,12 +36,12 @@ Image16 parseTIF(ref<byte> file) {
                     reference = BinaryData(s.data, s.isBigEndian);
                     reference.index = s.read32();
                 }
-                log(hex(e.tag), hex(e.type), hex(e.count), value);
                 /**/ if(e.tag == 0xFE) preview = value != 0; // NewSubfileType
                 else if(e.tag == 0x14A) { // SubIFDs
                     assert_(e.count == 1, e.type);
                     BinaryData subIFD(s.data, s.isBigEndian);
                     subIFD.index = value;
+                    assert_(subIFD);
                     readIFD(subIFD);
                 }
                 else if(preview) continue;
@@ -93,8 +93,8 @@ Image16 parseTIF(ref<byte> file) {
                     for(uint i: range(e.count)) {
                         tiles[i].size = reference.read32();
                         LJPEG ljpeg(tiles[i]);
-                        const int tileY = i/tiles.size.x;
                         const int tileX = i%tiles.size.x;
+                        const int tileY = i/tiles.size.x;
                         ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
                     }
                 }
@@ -104,6 +104,7 @@ Image16 parseTIF(ref<byte> file) {
                 // 964: ForwardMatrix, 981-2: Look Table
             }
         };
+        assert_(s);
         readIFD(s);
     }
     assert_(image, compression, tiles.size);

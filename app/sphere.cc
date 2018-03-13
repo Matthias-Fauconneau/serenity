@@ -169,7 +169,7 @@ static ImageF sumRGGB(const Image16& source) {
 
 struct Sphere : Widget {
     Time time {true};
-    const ImageF image = sumRGGB(parseTIF(Map("IMG_0658.dng")));
+    const ImageF image = sumRGGB(parseTIF(readFile("IMG_0658.dng")));
     //const ImageF low = sumRGGB(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
 
     const ImageF templateDisk = ::disk(image.size.x/4);
@@ -179,7 +179,8 @@ struct Sphere : Widget {
     //const ImageF light = multiply(templateDisk, low, center);
     //const vec4 lightCone = principalCone(light);
     //Image preview = sRGB(light);
-    Image preview = sRGB(disk);
+    //Image preview = sRGB(disk);
+    Image preview = sRGB(image);
 
     unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
 

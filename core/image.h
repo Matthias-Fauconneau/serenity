@@ -11,7 +11,7 @@ generic struct ImageT : buffer<T> {
  ImageT() {}
  default_move(ImageT);
  ImageT(buffer<T>&& pixels, uint2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
-     assert_(ref<T>::size == size.y*this->stride, ref<T>::size, size.y*this->stride); }
+     assert_(ref<T>::size >= (size.y-1)*this->stride+size.x, ref<T>::size, size.y*this->stride); }
  ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), size(width, height), stride(width), alpha(alpha) {}
  ImageT(uint2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
@@ -46,7 +46,7 @@ generic ImageT<T> unsafeShare(const ImageT<T>& o) {
 /// Returns a weak reference to \a image (unsafe if referenced image is freed)
 generic ImageT<T> cropShare(const ImageT<T>& o, int2 offset, uint2 size) {
  //assert_(int2(size) >= int2(0) && offset+int2(size) <= int2(o.size), offset, size, o.size);
- return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride)), size, o.stride, o.alpha);
+ return ImageT<T>(unsafeRef(o.slice(offset.y*o.stride+offset.x, size.y*o.stride-offset.x)), size, o.stride, o.alpha);
 }
 
 // -- Types --

@@ -19,14 +19,12 @@ LJPEG::LJPEG(ref<byte> data) {
                 unused const uint8 index = s.read8();
                 unused const uint8 HV = s.read8();
                 unused const uint8 quantizationTable = s.read8();
-                log(index, HV, quantizationTable);
             }
         }
         else if(marker == 0xFFC4) { // Define Huffman Table
             while(s.index < start+length) {
                 const uint8 huffmanTableIndex = s.read8();
                 assert_(huffmanTableIndex <= 1, huffmanTableIndex);
-                log(huffmanTableIndex);
                 Table& t = tables[huffmanTableIndex];
                 mref<uint8>(t.symbolCountsForLength).copy(s.read<uint8>(16));
                 t.maxLength=16; for(; t.maxLength && !t.symbolCountsForLength[t.maxLength-1]; t.maxLength--);
@@ -75,17 +73,17 @@ void LJPEG::decode(const Image16& target, ref<byte> data) {
     uint bitbuf = 0;
     int bitLeftCount = 0;
     int predictor[2] = {0,0};
-    for(uint unused y: range(height)) {
-        for(uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
-        for(uint unused x: range(width)) {
-            for(uint c: range(2)) {
+    for(const uint y: range(height)) {
+        for(const uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
+        for(const uint x: range(width)) {
+            for(const uint c: range(2)) {
                 int length; /*readHuffman*/ {
                     const Table& t = tables[c];
                     while(bitLeftCount < t.maxLength) {
                         uint byte = *pointer; pointer++;
                         if(byte == 0xFF) {
                             uint8 v = *pointer; pointer++;
-                            assert_(v!=0xD9); //if(v == 0xD9) { target[0]=0; return; }
+                            if(v == 0xD9) { assert_(x==width-1 && y==height-1); return; }
                             assert_(v == 0x00);
                         }
                         bitbuf <<= 8;
