@@ -1,14 +1,14 @@
-#include "tiff.h"
+#include "dng.h"
 #include "data.h"
 #include "function.h"
 #include "ljpeg.h"
 
-RAW parseTIF(ref<byte> file) {
+DNG parseDNG(ref<byte> file, bool decode) {
 	BinaryData s(file);
     s.isBigEndian = (bool)s.match("MM");
     if(!s.isBigEndian) s.skip("II");
     if(s.read16()!=42) error("");
-    RAW image;
+    DNG image;
     int compression = 0; // 1: raw, 7: jpeg
     uint2 tileSize = 0_0;
     ImageT<ref<byte>> tiles;
@@ -92,15 +92,17 @@ RAW parseTIF(ref<byte> file) {
                 else if(e.tag == 0x145) {
                     assert_(e.count == tiles.ref::size && e.type == 4);
                     assert_(compression == 7);
-                    image = RAW(image.size);
-                    assert_(image.size == tiles.size*tileSize);
-                    for(uint i: range(e.count)) {
-                        tiles[i].size = reference.read32();
-                        LJPEG ljpeg(tiles[i]);
-                        const int tileX = i%tiles.size.x;
-                        const int tileY = i/tiles.size.x;
-                        assert_(ljpeg.width*2 == tileSize.x && ljpeg.height == tileSize.y);
-                        ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
+                    if(decode) {
+                        image = DNG(image.size);
+                        assert_(image.size == tiles.size*tileSize);
+                        for(uint i: range(e.count)) {
+                            tiles[i].size = reference.read32();
+                            LJPEG ljpeg(tiles[i]);
+                            const int tileX = i%tiles.size.x;
+                            const int tileY = i/tiles.size.x;
+                            assert_(ljpeg.width*2 == tileSize.x && ljpeg.height == tileSize.y);
+                            ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
+                        }
                     }
                 }
                 else if(e.tag == 0x828D || e.tag == 0x828E) ; // CFARepeatPatternDim, CFAPattern
@@ -126,6 +128,6 @@ RAW parseTIF(ref<byte> file) {
         assert_(s);
         readIFD(s);
     }
-    assert_(image, compression, tiles.size);
+    assert_((image || (!decode && image.size)) && image.blackLevel);
 	return image;
 }

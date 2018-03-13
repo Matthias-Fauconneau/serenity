@@ -41,6 +41,8 @@ core/vector.h
 
 io/deflate.cc
 io/deflate.h
+io/dng.cc
+io/dng.h
 io/font.cc
 io/font.h
 io/png.cc
@@ -48,8 +50,6 @@ io/png.h
 io/variant.h
 io/jpeg.cc
 io/jpeg.h
-io/tiff.cc
-io/tiff.h
 io/ljpeg.h
 io/ljpeg.cc
 

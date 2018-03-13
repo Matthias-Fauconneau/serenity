@@ -15,9 +15,11 @@ generic String str(const T& t) = delete;
 
 /// Forwards string
 template<> inline String str(const string& s) { return unsafeRef(s); }
+/// Forwards String
+template<> inline String str(const String& s) { return unsafeRef(s); }
 /// Forwards char[]
 /// function template partial specialization is not allowed
-template<size_t N> String str/*<>*/(const char (&source)[N]) { return unsafeRef(source); }
+template<size_t N> String str/* <> */(const char (&source)[N]) { return unsafeRef(source); }
 
 /// Returns boolean as "true"/"false"
 template<> inline String str(const bool& value) { return value ? "true"__ : "false"__; }
@@ -146,7 +148,7 @@ inline String str(float number) { return fmt(number); }
 //inline String str(const half& n, uint precision=4, uint exponent=0, uint pad=0) { return str(double(n), precision, exponent, pad); }
 
 /// Converts arrays
-generic String str(const ref<T> source, string separator=" "_, string bracket="[]"_) {
+generic String fmt(const ref<T> source, string separator=" "_, string bracket="[]"_) {
     array<char> target;
     if(bracket) target.append(bracket[0]);
     for(uint i: range(source.size)) {
@@ -156,12 +158,16 @@ generic String str(const ref<T> source, string separator=" "_, string bracket="[
     if(bracket) target.append(bracket[1]);
     return move(target);
 }
-generic String str(const mref<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
-generic String str(const buffer<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
-generic String str(const array<T>& source, string separator=" "_, string bracket="[]"_) { return str((const ref<T>)source, separator, bracket); }
-inline String str(const array<char>& a) { return str((string)a); }
-inline String str(const ref<char>& a, string b) { return str(a)+" "+str(b); }
-inline String str(const ref<char>& a, string b, string c) { return str(a)+" "+str(b)+" "+str(c); } //?
+template<Type T, Type U> struct is_same_type { static constexpr bool value = false; };
+template<Type T> struct is_same_type<T,T> { static constexpr bool value = true; };
+template<Type T, Type U> static constexpr bool is_same = is_same_type<T, U>::value;
+template<bool B, class T = void> struct enable_if_bool {};
+template<class T> struct enable_if_bool<true, T> { typedef T type; };
+template<bool B, class T = void > using enable_if = typename enable_if_bool<B,T>::type;
+template<Type T, enable_if<!is_same<char, T>>* = nullptr> String str(const ref<T>& source) { return fmt(source); }
+generic String str(const mref<T>& source) { return fmt(source); }
+generic String str(const buffer<T>& source) { return fmt(source); }
+generic String str(const array<T>& source) { return fmt(source); }
 
 /// Converts static arrays
 template<Type T, size_t N> String str(const T (&source)[N], string separator=" ") { return str(ref<T>(source, N), separator); }

@@ -28,7 +28,7 @@ template<Type K, Type V> struct map {
  bool operator ==(const map<K,V>& o) const { return keys==o.keys && values==o.values; }
 
  template<Type KK> bool contains(const KK& key) const { return keys.contains(key); }
- template<Type KK> void assertNo(unused const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in",keys); }
+ template<Type KK> void assertNo(const KK& key) const { assert_(!contains(key), '\''+str(key)+'\'',"already in",keys); }
 
  template<Type KK> size_t indexOf(const KK& key) const {
   size_t i = keys.indexOf(key);

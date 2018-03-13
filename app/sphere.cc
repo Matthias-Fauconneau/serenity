@@ -1,6 +1,6 @@
 #include "window.h"
 #include "image-render.h"
-#include "tiff.h"
+#include "dng.h"
 #include "math.h"
 #include "algorithm.h"
 #include "matrix.h"
@@ -159,7 +159,7 @@ static inline vec4 principalCone(const ImageF& disk) {
 }
 
 // Sums CFA RGGB quads together, and normalizes min/max levels, yields RGGB intensity image
-static ImageF sumBGGR(const RAW& source) {
+static ImageF sumBGGR(const DNG& source) {
     ImageF target(source.size/2u);
     for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
         const int B = ::max(0, source(x*2+0,y*2+0)-source.blackLevel);
@@ -171,7 +171,16 @@ static ImageF sumBGGR(const RAW& source) {
     return target;
 }
 
-const int3 diskSearch(const ImageF& image, const uint maxR, const uint L=7) {
+// Cached
+struct CachedImageF : ImageF { Map map; };
+static CachedImageF loadRaw(const string path) {
+    if(!existsFile(path+".raw")) writeFile(path+".raw", cast<byte>(sumBGGR(parseDNG(Map(path), true))));
+    DNG image = parseDNG(Map(path), false);
+    Map map(path+".raw");
+    return {ImageF(unsafeRef(cast<float>(map)), image.size), ::move(map)};
+}
+
+static const int3 diskSearch(const ImageF& image, const uint maxR, const uint L=7) {
     for(uint r = maxR;;) {
         const ImageF templateDisk = ::disk(maxR);
         const int2 center = argmaxSSE(negate(templateDisk), image, L);
@@ -185,8 +194,8 @@ struct Sphere : Widget {
 
     Sphere() {
         Time decodeTime {true}; // FIXME: mmap cache
-        const ImageF image = sumBGGR(parseTIF(Map("IMG_0658.dng")));
-        const ImageF low = sumBGGR(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
+        const CachedImageF image = loadRaw("IMG_0658.dng");
+        const CachedImageF low = loadRaw("IMG_0659.dng"); // Low exposure (only highlights)
         log(decodeTime);
 
         Time time {true};
