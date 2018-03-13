@@ -19,6 +19,7 @@ struct Data {
  explicit Data(ref<byte> data) : data(data) {}
  /// Creates a Data interface to a \a buffer
  Data(::buffer<byte>&& buffer) : data(buffer), buffer(::move(buffer)) {}
+ default_move(Data);
  /// Slices a reference to the buffer from \a index to \a index + \a size
  inline ref<byte> slice(size_t pos, size_t size) const {
      assert_(pos+size<=data.size, pos, size, data.size);
@@ -99,9 +100,10 @@ struct BinaryData : Data {
  /// Reads one raw \a T element
  generic const T read() { return *reinterpret_cast<const T*>(Data::read(sizeof(T)).data); }
  int64 read64() { return isBigEndian?big64(read<int64>()):read<int64>(); }
+ //float readF() { return read<float>(); }
  int32 read32() { return isBigEndian?big32(read<int32>()):read<int32>(); }
  int16 read16() { return isBigEndian?big16(read<int16>()):read<int16>(); }
- float readF() { return read<float>(); }
+ int8 read8() { return next(); }
 
  /// Provides template overloaded specialization (for swap) and return type overloading through cast operators.
  struct ReadOperator {
@@ -110,7 +112,7 @@ struct BinaryData : Data {
   operator uint64() { return s->read64(); }
   operator int64() { return s->read64(); }
   /// Reads a single precision floating point number
-  operator float() { return s->readF(); }
+  //operator float() { return s->readF(); }
   /// Reads an int32 and if necessary, swaps to host byte order
   operator uint32() { return s->read32(); }
   operator int32() { return s->read32(); }

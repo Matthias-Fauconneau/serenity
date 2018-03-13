@@ -48,6 +48,8 @@ io/png.h
 io/variant.h
 io/jpeg.cc
 io/jpeg.h
+io/tiff.cc
+io/tiff.h
 
 ui/color.h
 ui/display.cc
@@ -69,15 +71,3 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
-
-video/encoder.cc
-video/encoder.h
-video/video.cc
-video/video.h
-
-app/ray.h
-app/scene.cc
-app/scene.h
-app/shader.glsl
-app/view-widget.h
-app/glapp.cc
