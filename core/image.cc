@@ -36,11 +36,14 @@ uint8 sRGB(float v) {
  return sRGB_forward[linear12];
 }
 
-void sRGB(const Image& Y, const ImageF& X) {
-    float min = inff, max = -inff;
-    for(float v: X) {
-        if(v > -inff) min = ::min(min, v);
-        if(v < +inff) max = ::max(max, v);
+void sRGB(const Image& Y, const ImageF& X, float max) {
+    float min = 0;
+    if(max <= 0) {
+        min = inff;
+        for(float v: X) {
+            if(v > -inff) min = ::min(min, v);
+            if(v < +inff) max = ::max(max, v);
+        }
     }
     for(uint i: range(X.ref::size)) Y[i] = byte4(byte3(sRGB(X[i] <= max ? (X[i]-min)/(max-min) : 1)), 0xFF);
 }

@@ -95,6 +95,7 @@ Image16 parseTIF(ref<byte> file) {
                         LJPEG ljpeg(tiles[i]);
                         const int tileX = i%tiles.size.x;
                         const int tileY = i/tiles.size.x;
+                        assert_(ljpeg.width*2 == tileSize.x && ljpeg.height == tileSize.y);
                         ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
                     }
                 }

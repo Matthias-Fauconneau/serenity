@@ -160,10 +160,17 @@ template<Type... Images> Image grid(const Images&... images) { return grid(ref<I
 
 // Sums CFA RGGB quads together, yields RGGB intensity image
 static ImageF sumRGGB(const Image16& source) {
+#if 0
     ImageF target(source.size/2u);
     for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
         target(x,y) = source(x*2+0,y*2+0) + source(x*2+1,y*2+0) + source(x*2+0,y*2+1) + source(x*2+1,y*2+1);
     }
+#else
+    ImageF target(source.size/2u);
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
+        target(x,y) = (float(source(x,y)) - 528) / (4095 - 528);
+    }
+#endif
     return target;
 }
 

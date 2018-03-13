@@ -10,7 +10,7 @@ struct LJPEG {
      uint8 symbols[16];
      struct LengthSymbol { uint8 length = 0; uint8 symbol = 0; };
      LengthSymbol lengthSymbolForCode[512];
- } tables[4];
+ } tables[2];
  uint width = 0, height = 0, sampleSize = 0;
  LJPEG(ref<byte> data);
  void decode(const Image16& target, ref<byte> data);

@@ -10,26 +10,32 @@ LJPEG::LJPEG(ref<byte> data) {
         const uint16 marker = s.read16();
         const uint start = s.index;
         const uint16 length = s.read16(); // 14
-        /**/ if(marker == 0xFFC3) {
+        /**/ if(marker == 0xFFC3) { // Start of Frame Lossless
             sampleSize = s.read8();
+            assert(sampleSize == 16);
             height = s.read16();
             width = s.read16();
             const uint8 componentCount = s.read8();
-            for(auto_: range(componentCount)) {
-                unused const uint8 index = s.read8();
-                unused const uint8 HV = s.read8();
-                unused const uint8 quantizationTable = s.read8();
+            assert_(componentCount == 2);
+            for(const uint i: range(componentCount)) {
+                const uint8 componentIndex = s.read8();
+                assert_(componentIndex == i);
+                const uint8 HV = s.read8();
+                assert_(HV == 0x11);
+                const uint8 quantizationTableSelector = s.read8();
+                assert_(quantizationTableSelector == 0); // Not using quantization in lossless mode
             }
         }
         else if(marker == 0xFFC4) { // Define Huffman Table
-            while(s.index < start+length) {
-                const uint8 huffmanTableIndex = s.read8();
-                assert_(huffmanTableIndex <= 1, huffmanTableIndex);
-                Table& t = tables[huffmanTableIndex];
+            for(;s.index < start+length;) {
+                const uint8 tableClass_Index = s.read8();
+                assert_((tableClass_Index&0xF0) == 0, tableClass_Index);
+                assert_((tableClass_Index&0x0F) < 2, tableClass_Index);
+                Table& t = tables[tableClass_Index];
                 mref<uint8>(t.symbolCountsForLength).copy(s.read<uint8>(16));
                 t.maxLength=16; for(; t.maxLength && !t.symbolCountsForLength[t.maxLength-1]; t.maxLength--);
                 int totalSymbolCount = 0; for(int count: t.symbolCountsForLength) totalSymbolCount += count;
-                assert_(totalSymbolCount < 256, totalSymbolCount, t.symbolCountsForLength);
+                assert_(totalSymbolCount < 16, totalSymbolCount, t.symbolCountsForLength);
                 mref<uint8>(t.symbols).slice(0, totalSymbolCount).copy(s.read<uint8>(totalSymbolCount));
                 {
                     int h=0;
@@ -37,7 +43,7 @@ LJPEG::LJPEG(ref<byte> data) {
                         for(auto_: range(t.symbolCountsForLength[length-1]))
                             for(auto_: range(1 << (t.maxLength-length)))
                                 h++;
-                    assert_(h<=836607);
+                    assert_(h<=512);
                 }
                 int p=0, h=0; for(int length: range(1, t.maxLength+1)) {
                     for(auto_: range(t.symbolCountsForLength[length-1])) {
@@ -51,14 +57,19 @@ LJPEG::LJPEG(ref<byte> data) {
         }
         else if(marker == 0xFFDA) { // Start Of Scan
             const uint8 componentCount = s.read8();
-            for(auto_: range(componentCount)) {
-                unused const uint8 index = s.read8();
-                unused const uint8 DCACindex = s.read8();
+            for(const uint i: range(componentCount)) {
+                const uint8 scanComponentSelector = s.read8();
+                assert_(scanComponentSelector == i);
+                const uint8 DCACindex = s.read8();
+                assert_(DCACindex == scanComponentSelector<<4, scanComponentSelector, DCACindex);
             }
-            unused const uint8 predictor = s.read8();
-            unused const uint8 endOfSpectralSelection = s.read8();
-            const uint8 successiveApproximation = s.read8();
-            assert_(successiveApproximation == 0);
+            const uint8 predictor = s.read8();
+            assert_(predictor == 1, predictor);
+            const uint8 endOfSpectralSelection = s.read8();
+            assert_(endOfSpectralSelection == 0);
+            const uint8 pointTransform = s.read8();
+            assert_(pointTransform == 0);
+            assert_(s.index == start+length, start, length, start+length, s.index, hex(marker));
             break;
         }
         //else if(marker == 0xFFE2) return; // APP2 (ICC?) from JPEG thumbnail (FIXME: skip)
@@ -74,16 +85,20 @@ void LJPEG::decode(const Image16& target, ref<byte> data) {
     int bitLeftCount = 0;
     int predictor[2] = {0,0};
     for(const uint y: range(height)) {
-        for(const uint c: range(2)) predictor[c] = 1<<(sampleSize-1);
+        for(const uint c: range(2)) predictor[c] = y>0 ? target(c, y-1) : 1<<(sampleSize-1);
         for(const uint x: range(width)) {
             for(const uint c: range(2)) {
                 int length; /*readHuffman*/ {
                     const Table& t = tables[c];
                     while(bitLeftCount < t.maxLength) {
-                        uint byte = *pointer; pointer++;
+                        uint8 byte = *pointer; pointer++;
                         if(byte == 0xFF) {
                             uint8 v = *pointer; pointer++;
-                            if(v == 0xD9) { assert_(x==width-1 && y==height-1); return; }
+                            if(v == 0xD9) /*End of Image*/ {
+                                assert_(x==width-1 && y==height-1);
+                                assert_((const ::byte*)pointer == data.end());
+                                return;
+                            }
                             assert_(v == 0x00);
                         }
                         bitbuf <<= 8;
@@ -94,9 +109,10 @@ void LJPEG::decode(const Image16& target, ref<byte> data) {
                     bitLeftCount -= t.lengthSymbolForCode[code].length;
                     length = t.lengthSymbolForCode[code].symbol;
                 }
-                uint signMagnitude;
+                int signMagnitude;
                 if(length==0) signMagnitude = 0;
                 else {
+                    assert_(length<16);
                     while(bitLeftCount < length) {
                         uint byte = *pointer; pointer++;
                         if(byte == 0xFF) { unused uint8 v = *pointer; pointer++; assert(v == 0x00); }
@@ -106,17 +122,20 @@ void LJPEG::decode(const Image16& target, ref<byte> data) {
                     }
                     signMagnitude = (bitbuf << (32-bitLeftCount)) >> (32-length);
                     bitLeftCount -= length;
-                }
+                }  
                 int sign = signMagnitude & (1<<(length-1));
                 int residual = sign ? signMagnitude : signMagnitude-((1<<length)-1);
-                int value = predictor[c] + residual;
-                ///*image(x*2+c, y)*/ *target = value;
+                uint16 value = uint16(predictor[c] + residual);
                 target(x*2+c, y) = value;
-                //target++;
+                //log(predictor[c], residual, value);
+                //assert_(value <= 4118, predictor[c], residual, value);
                 predictor[c] = value;
             }
         }
     }
+    assert_(*pointer == 0xFF); pointer++;
+    assert_(*pointer == 0xD9); pointer++;
+    assert_((const byte*)pointer == data.end(), data.end()-(const byte*)pointer);
 }
 
 #if 0

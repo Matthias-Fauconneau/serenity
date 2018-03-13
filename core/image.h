@@ -1,6 +1,7 @@
 #pragma once
 /// \file image.h Image container and operations
 #include "vector.h"
+#include "math.h"
 
 /// 2D array of pixels
 generic struct ImageT : buffer<T> {
@@ -83,8 +84,8 @@ extern float sRGB_reverse[0x100];
 uint8 sRGB(float v);
 
 /// Converts linear float pixels for each component to color sRGB pixels
-void sRGB(const Image& target, const ImageF& source);
-inline Image sRGB(const ImageF& source) { Image target(source.size); ::sRGB(target, source); return target; }
+void sRGB(const Image& target, const ImageF& source, float max=-inff);
+inline Image sRGB(const ImageF& source, const float max=-inff) { Image target(source.size); ::sRGB(target, source, max); return target; }
 
 void sRGB(const Image& target, const Image3f& source, bgr3f max=0_);
 inline Image sRGB(const Image3f& source, const bgr3f max=0_) { Image target(source.size); ::sRGB(target, source, max); return target; }
