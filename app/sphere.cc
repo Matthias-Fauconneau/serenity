@@ -171,25 +171,38 @@ static ImageF sumBGGR(const RAW& source) {
     return target;
 }
 
+const int3 diskSearch(const ImageF& image, const uint maxR, const uint L=7) {
+    for(uint r = maxR;;) {
+        const ImageF templateDisk = ::disk(maxR);
+        const int2 center = argmaxSSE(negate(templateDisk), image, L);
+        return int3(center, r);
+    }
+}
+
 struct Sphere : Widget {
-    Time time {true};
-    const ImageF image = sumBGGR(parseTIF(Map("IMG_0658.dng")));
-    const ImageF low = sumBGGR(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
-
-    const ImageF templateDisk = ::disk(image.size.x/7);
-
-    const int2 center = argmaxSSE(negate(templateDisk), image, 2);
-    const ImageF disk = multiply(templateDisk, image, center);
-    const ImageF light = multiply(templateDisk, low, center);
-    const vec4 lightCone = principalCone(light > 0.7f);
-    Image preview = sRGB(light > 0.7f);
-    //Image preview = sRGB(image);
-
-    unique<Window> window = ::window(this, int2(preview.size), mainThread, 0);
+    Image preview;
+    unique<Window> window = nullptr;
 
     Sphere() {
+        Time decodeTime {true}; // FIXME: mmap cache
+        const ImageF image = sumBGGR(parseTIF(Map("IMG_0658.dng")));
+        const ImageF low = sumBGGR(parseTIF(Map("IMG_0659.dng"))); // Low exposure (only highlights)
+        log(decodeTime);
+
+        Time time {true};
+
+        const int3 center = diskSearch(image, image.size.x/4);
+        const ImageF templateDisk = ::disk(center[2]);
+
+        const ImageF disk = multiply(templateDisk, image, center.xy());
+        const ImageF light = multiply(templateDisk, low, center.xy());
+        //Image preview = sRGB(light > 0.7f);
+        //Image preview = sRGB(image);
+        preview = sRGB(disk);
+
         log(time);
-#if 1
+#if 0
+        const vec4 lightCone = principalCone(light > 0.7f);
         const vec3 μ = lightCone.xyz();
         const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
         if(1) {
@@ -204,6 +217,7 @@ struct Sphere : Widget {
         const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
         log(C, μ, qapply(Q,μ), Ω, θ*180/π);
 #endif
+        window = ::window(this, int2(preview.size), mainThread, 0);
         window->show();
     }
     void render(RenderTarget2D& target_, vec2, vec2) override {
