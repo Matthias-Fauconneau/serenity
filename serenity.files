@@ -50,6 +50,8 @@ io/jpeg.cc
 io/jpeg.h
 io/tiff.cc
 io/tiff.h
+io/ljpeg.h
+io/ljpeg.cc
 
 ui/color.h
 ui/display.cc

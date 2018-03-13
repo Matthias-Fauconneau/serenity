@@ -1,6 +1,7 @@
 #pragma once
 /// \file data.h Structured data parsers (Data, BinaryData, TextData)
 #include "memory.h"
+#include "string.h"
 
 static inline constexpr uint16 big16(uint16 v) { return __builtin_bswap16(v); }
 static inline constexpr uint32 big32(uint32 v) { return __builtin_bswap32(v); }

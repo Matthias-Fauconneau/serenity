@@ -1,6 +1,7 @@
 #include "tiff.h"
 #include "data.h"
 #include "function.h"
+#include "ljpeg.h"
 
 Image16 parseTIF(ref<byte> file) {
 	BinaryData s(file);
@@ -86,8 +87,16 @@ Image16 parseTIF(ref<byte> file) {
                 }
                 else if(e.tag == 0x145) {
                     assert_(e.count == tiles.ref::size && e.type == 4);
-                    for(uint i: range(e.count)) tiles[i].size = reference.read32();
-                    assert_(compression == 1);
+                    assert_(compression == 7);
+                    image = Image16(image.size);
+                    assert_(image.size == tiles.size*tileSize);
+                    for(uint i: range(e.count)) {
+                        tiles[i].size = reference.read32();
+                        LJPEG ljpeg(tiles[i]);
+                        const int tileY = i/tiles.size.x;
+                        const int tileX = i%tiles.size.x;
+                        ljpeg.decode(cropShare(image,int2(tileX,tileY)*int2(tileSize),tileSize), tiles[i].slice(ljpeg.headerSize));
+                    }
                 }
                 // 306: DateTime
                 // {DNG 50xxx} 706: Version, Backward, Model; 721: ColorMatrix; 740: Private; 778: CalibrationIlluminant, 827: OriginalName
