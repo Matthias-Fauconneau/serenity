@@ -319,23 +319,25 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius/*, const 
         //offset = R.offset * (1<<L);
     }
 #elif 1
-    const uint L = 0;
+    //const uint L = 0;
     float bestSimilarity = 0;
     const ImageF DoG = ::DoG(source);
-    //int3 bestTransform (offset, maxRadius);
-    for(int radius = maxRadius; radius>(maxRadius*2/3); radius-=2) {
-        const auto R = argmaxSDP(::circle(radius), DoG, int2(radius/2), offset); // Fine fixed radius
+    auto test = [&](const int radius) {
+        const auto R = argmaxSDP(::circle(radius), DoG, int2(radius/3), offset); // Fine fixed radius
         float similarity = R.similarity/radius;
         log(radius, radius, R.similarity, offset, R.offset, similarity);
         if(similarity > bestSimilarity) {
             bestSimilarity = similarity;
-            bestTransform = int3(R.offset, radius)*(1<<L);
+            bestTransform = int3(R.offset, radius);
         }
         offset = R.offset;
-    }
+    };
+    const int step = 3;
+    for(int radius = maxRadius; radius>(maxRadius*2/3); radius-=step) test(radius);
+    for(int radius = bestTransform.z+step-1; radius>bestTransform.z-step+1; radius--) test(radius);
 #endif
 #endif
-    log(bestTransform, maxRadius);
+    log(bestTransform);
     return bestTransform;
 }
 
