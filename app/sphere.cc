@@ -64,7 +64,8 @@ inline double SSE(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
  return SSE;// / (size.x*size.y);
 }
 
-inline double SSQ(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
+// Sum of dot product A·B with offset, windowed to valid samples
+inline double SDP(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
  const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
  const uint2 aOffset (max(int2(0),+offset));
  const uint2 bOffset (max(int2(0),-offset));
@@ -100,8 +101,8 @@ static offset_similarity argminSSE(const ImageF& A, const ImageF& B, int2 window
      return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); }, window, initialOffset);
 }
 
-static offset_similarity argmaxSSQ(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
-     return argmax(A.size, B.size, [&](const int2 offset){ return SSQ(A, B, offset); }, window, initialOffset);
+static offset_similarity argmaxSDP(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
+     return argmax(A.size, B.size, [&](const int2 offset){ return SDP(A, B, offset); }, window, initialOffset);
 }
 
 template<Type F, Type... Images> int2 argmaxCoarse(const int L, F function, const Images&... images) {
@@ -224,14 +225,17 @@ static CachedImageF loadRaw(const string path) {
 static inline ImageF DoG(const ImageF& X) {
     const ImageF x = gaussianBlur(X,1);
     ImageF Y (X.size);
-    //for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i]);
-    for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i])/x[i];
+    for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i]);
+    //for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i])/x[i];
     return Y;
 }
 
-static const int3 diskSearch(const ImageF& source, const int maxRadius, const uint L=0) {
-    int2 offset = argminSSE(::disk(maxRadius>>4, true), downsample(source, 4)).offset * (1<<4);
-#if 1
+static const int3 diskSearch(const ImageF& source, const int maxRadius/*, const uint L=1*/) {
+#if 0
+    const int L0 = 3;
+    int2 offset = argminSSE(::disk(maxRadius>>L0, true), downsample(source, L0)).offset * (1<<L0);
+#endif
+#if 0
     int3 bestTransform (offset, maxRadius);
     //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(source, 2), int2(maxRadius>>2), offset).offset * (1<<2);
     //const ImageF image = L ? downsample(source, L) : unsafeShare(source);
@@ -249,7 +253,7 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius, const ui
             bestTransform = int3(R.offset, radius)*(1<<L);
         }
         //break;
-        //offset = R.offset; // Iterative concurrent refinement of offset and radius
+        //offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
     }
 #if 0
     {
@@ -264,7 +268,7 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius, const ui
                 bestTransform = int3(R.offset, radius)*(1<<L);
             }
             //break;
-            offset = R.offset; // Iterative concurrent refinement of offset and radius
+            offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
         }
     }
 #endif
@@ -273,7 +277,7 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius, const ui
     //const ImageF DoG = ::DoG(source);
     //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(DoG, 2), int2(maxRadius>>2), offset).offset * (1<<2);
     int3 bestTransform (offset, maxRadius);
-#else
+#elif 0
     int3 bestTransform (offset, maxRadius);
     //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(source, 2), int2(maxRadius>>2), offset).offset * (1<<2);
     //const ImageF image = L ? downsample(source, L) : unsafeShare(source);
@@ -291,10 +295,47 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius, const ui
             bestTransform = int3(R.offset, radius)*(1<<L);
         }
         //break;
-        offset = R.offset; // Iterative concurrent refinement of offset and radius
+        offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
     }
-    log(bestTransform, maxRadius);
+#else
+    const int L0 = 6;
+    int2 offset = argmaxSDP(::disk(maxRadius>>L0), ::DoG(downsample(source, L0))).offset * (1<<L0); // Coarse
+    const uint L1 = 1;
+    const ImageF DoG1 = ::DoG(downsample(source, L1));
+    offset = argmaxSDP(::disk(maxRadius>>1), DoG1, int2(maxRadius), offset/(1<<L1)).offset * (1<<L1); // Fine fixed radius
+    int3 bestTransform (offset, maxRadius);
+#if 0
+    //const uint L = 1;
+    float bestSimilarity = 0;
+    //int3 bestTransform (offset, maxRadius);
+    for(int radius = maxRadius>>L; radius>(maxRadius/2)>>L; radius--) {
+        const auto R = argmaxSDP(::disk(radius>>L), DoG, int2(/*radius*/maxRadius>>L), offset/(1<<L)); // Fine fixed radius
+        float similarity = R.similarity/sq(radius);
+        log(radius, radius*(1<<L), R.similarity, offset, R.offset*(1<<L), similarity);
+        if(similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestTransform = int3(R.offset, radius)*(1<<L);
+        }
+        //offset = R.offset * (1<<L);
+    }
+#elif 1
+    const uint L = 0;
+    float bestSimilarity = 0;
+    const ImageF DoG = ::DoG(source);
+    //int3 bestTransform (offset, maxRadius);
+    for(int radius = maxRadius; radius>(maxRadius*2/3); radius-=2) {
+        const auto R = argmaxSDP(::circle(radius), DoG, int2(radius/2), offset); // Fine fixed radius
+        float similarity = R.similarity/radius;
+        log(radius, radius, R.similarity, offset, R.offset, similarity);
+        if(similarity > bestSimilarity) {
+            bestSimilarity = similarity;
+            bestTransform = int3(R.offset, radius)*(1<<L);
+        }
+        offset = R.offset;
+    }
 #endif
+#endif
+    log(bestTransform, maxRadius);
     return bestTransform;
 }
 
@@ -308,8 +349,8 @@ struct Sphere : Widget {
     Sphere() {
         Time time {true};
 
-        const CachedImageF source = loadRaw("IMG_0658.dng");
-        const CachedImageF low = loadRaw("IMG_0659.dng"); // Low exposure (only highlights)
+        const CachedImageF source = loadRaw("IMG_0696.dng");
+        const CachedImageF low = loadRaw("IMG_0698.dng"); // Low exposure (only highlights)
 
         const float μ = ::mean(source);
 #if 0
@@ -323,13 +364,15 @@ struct Sphere : Widget {
         const int3 center = diskSearch(image, image.size.x/12);
         const ImageF templateDisk = ::disk(center[2]);
 
-        const ImageF DoG = ::DoG(image);// > 0.001f;
-        //const ImageF DoG = upsample(downsample(::DoG(image),2),2);
+        //const ImageF DoG = ::DoG(image);// > 0.001f;
+        const int L0 = 1;
+        const ImageF DoG = upsample(downsample(::DoG(image),L0),L0);
 
         const ImageF disk = extract(templateDisk, DoG, center.xy());
         const ImageF light = multiply(templateDisk, low, center.xy());
 
-        auto targets = {&disk};
+        auto targets = {&light};
+        //log(center, DoG.size);
         //auto targets = {&DoG};
         log(time);
 #if 0
