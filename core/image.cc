@@ -8,7 +8,7 @@
 // -- sRGB --
 
 uint8 sRGB_forward[0x1000];  // 4K (FIXME: interpolation of a smaller table might be faster)
-__attribute((constructor(1001))) void generate_sRGB_forward() {
+__attribute((constructor(1001))) static void generate_sRGB_forward() {
     for(uint index: range(sizeof(sRGB_forward))) {
         double linear = (double) index / (sizeof(sRGB_forward)-1);
         double sRGB = linear > 0.0031308 ? 1.055*__builtin_pow(linear,1/2.4)-0.055 : 12.92*linear;
@@ -18,22 +18,22 @@ __attribute((constructor(1001))) void generate_sRGB_forward() {
 }
 
 float sRGB_reverse[0x100];
-__attribute((constructor(1002))) void generate_sRGB_reverse() {
- for(uint index: range(0x100)) {
-  double sRGB = (double) index / 0xFF;
-  double linear = sRGB > 0.04045 ? __builtin_pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
-  assert(abs(sRGB-(linear > 0.0031308 ? 1.055*__builtin_pow(linear,1/2.4)-0.055 : 12.92*linear))< 0x1p-50);
-  sRGB_reverse[index] = linear;
-  assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index, sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))], index);
- }
+__attribute((constructor(1002))) static void generate_sRGB_reverse() {
+    for(uint index: range(0x100)) {
+        double sRGB = (double) index / 0xFF;
+        double linear = sRGB > 0.04045 ? __builtin_pow((sRGB+0.055)/1.055, 2.4) : sRGB / 12.92;
+        assert(abs(sRGB-(linear > 0.0031308 ? 1.055*__builtin_pow(linear,1/2.4)-0.055 : 12.92*linear))< 0x1p-50);
+        sRGB_reverse[index] = linear;
+        assert(sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))]==index, sRGB_forward[int(round(0xFFF*sRGB_reverse[index]))], index);
+    }
 }
 
 uint8 sRGB(float v) {
- v = ::min(1.f, v); // Saturates
- v = ::max(0.f, v); // FIXME
- uint linear12 = 0xFFF*v;
- assert_(linear12 < 0x1000, v);
- return sRGB_forward[linear12];
+    v = ::min(1.f, v); // Saturates
+    v = ::max(0.f, v); // FIXME
+    uint linear12 = 0xFFF*v;
+    assert_(linear12 < 0x1000, v);
+    return sRGB_forward[linear12];
 }
 
 void sRGB(const Image& Y, const ImageF& X, float max) {
@@ -234,6 +234,66 @@ generic void upsample(const ImageT<T>& target, const ImageT<T>& source) {
 }
 template void upsample(const ImageF& target, const ImageF&);
 template void upsample(const Image3f& target, const Image3f&);
+
+// -- Convolution --
+
+/// Convolves and transposes (with mirror border conditions)
+static void convolve(float* target, const float* source, const float* kernel, int radius, int width, int height, uint sourceStride, uint targetStride) {
+    int N = radius+1+radius;
+    assert_(N < 1024, N);
+    //chunk_parallel(height, [=](uint, size_t y) {
+    for(size_t y: range(height)) {
+        const float* line = source + y * sourceStride;
+        float* targetColumn = target + y;
+        if(width >= radius+1) {
+            for(int x: range(-radius,0)) {
+                float sum = 0;
+                for(int dx: range(N)) sum += kernel[dx] * line[abs(x+dx)];
+                targetColumn[(x+radius)*targetStride] = sum;
+            }
+            for(int x: range(0,width-2*radius)) {
+                float sum = 0;
+                const float* span = line + x;
+                for(int dx: range(N)) sum += kernel[dx] * span[dx];
+                targetColumn[(x+radius)*targetStride] = sum;
+            }
+            assert_(width >= 2*radius);
+            for(int x: range(width-2*radius,width-radius)){
+                float sum = 0;
+                for(int dx: range(N)) sum += kernel[dx] * line[width-1-abs(x+dx-(width-1))];
+                targetColumn[(x+radius)*targetStride] = sum;
+            }
+        } else {
+            for(int x: range(-radius, width-radius)) {
+                float sum = 0;
+                for(int dx: range(N)) sum += kernel[dx] * line[width-1-abs(abs(x+dx)-(width-1))];
+                targetColumn[(x+radius)*targetStride] = sum;
+            }
+        }
+    }
+}
+
+inline void operator*=(mref<float> values, float factor) { values.apply([factor](float v) { return factor*v; }, values); }
+
+inline float exp(float x) { return __builtin_expf(x); }
+inline float gaussian(float sigma, float x) { return exp(-sq(x/sigma)/2); }
+
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius) {
+    assert_(sigma > 0);
+    if(!radius) radius = ceil(3*sigma);
+    size_t N = radius+1+radius;
+    //assert_(uint2(radius+1) <= source.size, sigma, radius, N, source.size);
+    float kernel[N];
+    for(int dx: range(N))
+      kernel[dx] = gaussian(sigma, dx-radius); // Sampled gaussian kernel (FIXME)
+    float sum = ::sum(ref<float>(kernel,N), 0.);
+    assert_(sum, ref<float>(kernel,N));
+    mref<float>(kernel,N) *= 1/sum;
+    buffer<float> transpose (target.size.y*target.size.x);
+    convolve(transpose.begin(), source.begin(), kernel, radius, source.size.x, source.size.y, source.stride, source.size.y);
+    assert_(source.size == target.size);
+    convolve(target.begin(),  transpose.begin(), kernel, radius, target.size.y, target.size.x, target.size.y, target.stride);
+}
 
 #if 0
 static void bilinear(const Image& target, const Image& source) {

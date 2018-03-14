@@ -145,6 +145,11 @@ generic ImageT<T> downsample(const ImageT<T>& source) { ImageT<T> target(source.
 generic void upsample(const ImageT<T>& target, const ImageT<T>& source);
 generic ImageT<T> upsample(const ImageT<T>& source) { ImageT<T> target(source.size*2u); ::upsample(target, source); return target; }
 
+/// Applies a gaussian blur
+void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius=0);
+inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
+inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
+
 /// Resizes \a source into \a target
 void resize(const Image& target, const Image& source);
 inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
