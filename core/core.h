@@ -228,6 +228,9 @@ generic inline ref<T> Ref<T>::slice(size_t pos, size_t size) const { assert(pos+
 generic inline ref<T> Ref<T>::sliceRange(size_t begin, size_t end) const { assert(end<=this->size); return ref<T>(data+begin, end-begin); }
 generic inline ref<T> Ref<T>::slice(size_t pos) const { assert(pos<=size); return ref<T>(data+pos,size-pos); }
 
+/// Casts raw memory to \a T
+template<Type T> const T& raw(const ref<byte>& a) { assert(a.size==sizeof(T)); return *reinterpret_cast<const T*>(a.data); }
+
 /// Reinterpret casts a const reference to another type
 template<Type T, Type O> ref<T> cast(const ref<O> o) {
  assert((o.size*sizeof(O))%sizeof(T) == 0);

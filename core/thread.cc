@@ -45,10 +45,8 @@ static bool terminationRequested = false;
 // Exit status to return for process (group)
 static int groupExitStatus = 0;
 
-//generic T* addressOf(T& arg)  { return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<const volatile char&>(arg))); }
 Thread::Thread(int priority, bool spawn) : Poll(0,POLLIN,*this), priority(priority) {
  Poll::fd = EventFD::fd; registerPoll();
- //if(this == addressOf(mainThread)) tid = gettid();
  if(spawn) this->spawn();
 }
 void Thread::setPriority(int priority) { setpriority(0,0,priority); }

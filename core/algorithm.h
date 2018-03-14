@@ -14,4 +14,4 @@ template<Type A, Type T> A sum(ref<T> values, A initialValue) {
 }
 generic decltype(T()+T()) sum(ref<T> values) { return sum(values, decltype(T()+T())()); }
 
-generic uint argmax(const ref<T>& a) { uint max=0; for(uint i: range(a.size)) if(a[i] > a[max]) max=i; return max; }
+generic uint argmax(const ref<T>& a) { uint argmax=0; for(uint i: range(a.size)) if(a[i] > a[argmax]) argmax=i; return argmax; }

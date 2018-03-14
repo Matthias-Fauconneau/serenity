@@ -23,67 +23,43 @@ generic ImageT<T> upsample(const ImageT<T>& source, int times) {
     return target;
 }
 
-static inline ImageF disk(const int halfSize, const bool negate=false, const float radius=0) {
+static inline ImageF disk(const int halfSize) {
     ImageF target = ImageF(uint2(2*halfSize));
-    const float C = (2*halfSize-1.f)/2, R² = sq(radius?:C);
+    const float C = (2*halfSize-1.f)/2, R² = sq(C);
     for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
         const float r² = sq(x-C)+sq(y-C);
-        target(x,y) = float(negate^(r²<R²)); // FIXME: antialiasing
+        target(x,y) = float(r²<R²); // FIXME: antialiasing
     }
     return target;
 }
 
-static inline ImageF circle(const int halfSize, const bool negate=false, const float radius=0) {
+static inline ImageF circle(const int halfSize) {
     ImageF target = ImageF(uint2(2*halfSize));
-    const float C = (2*halfSize-1.f)/2, R = radius?:C;
+    const float C = (2*halfSize-1.f)/2, R = C;
     for(int y: range(target.size.y)) for(int x: range(target.size.x)) {
         const float r = sqrt(sq(x-C)+sq(y-C));
-        const float w = 1-::min(abs(r-R), 1.f);
-        target(x,y) = negate?1-w:w;
+        target(x,y) = 1-::min(abs(r-R), 1.f);
     }
     return target;
 }
 
-inline double SSE(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
+// Dot product A·B with offset, windowed to valid samples
+inline double dot(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
  const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
  const uint2 aOffset (max(int2(0),+offset));
  const uint2 bOffset (max(int2(0),-offset));
  const uint2 size = min(A.size-aOffset, B.size-bOffset);
- float SSE = 0;
  const float* a = A.data+aOffset.y*A.stride+aOffset.x;
  const float* b = B.data+bOffset.y*B.stride+bOffset.x;
+ float sum = 0;
  for(uint y: range(size.y)) {
      const float* aLine = a+y*A.stride;
      const float* bLine = b+y*B.stride;
      for(uint x: range(size.x)) {
-         SSE += sq(aLine[x] - bLine[x]);
-         //SSE += abs(aLine[x] - bLine[x]);
-         //if(aLine[x]) SSE -= bLine[x]; else SSE += bLine[x];
+         sum += aLine[x] * bLine[x];
      }
  }
- return SSE;// / (size.x*size.y);
-}
-
-// Sum of dot product A·B with offset, windowed to valid samples
-inline double SDP(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
- const int2 offset = centerOffset + (int2(A.size) - int2(B.size))/2;
- const uint2 aOffset (max(int2(0),+offset));
- const uint2 bOffset (max(int2(0),-offset));
- const uint2 size = min(A.size-aOffset, B.size-bOffset);
- float SSE = 0;
- const float* a = A.data+aOffset.y*A.stride+aOffset.x;
- const float* b = B.data+bOffset.y*B.stride+bOffset.x;
- for(uint y: range(size.y)) {
-     const float* aLine = a+y*A.stride;
-     const float* bLine = b+y*B.stride;
-     for(uint x: range(size.x)) {
-         SSE += aLine[x] * bLine[x];
-         //SSE += sq(aLine[x] - bLine[x]);
-         //SSE += abs(aLine[x] - bLine[x]);
-         //if(aLine[x]) SSE -= bLine[x]; else SSE += bLine[x];
-     }
- }
- return SSE;// / (size.x*size.y);
+ return sum;
 }
 struct offset_similarity { int2 offset; float similarity; };
 generic offset_similarity argmax(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
@@ -97,16 +73,8 @@ generic offset_similarity argmax(const uint2 Asize, const uint2 Bsize, T functio
     return {bestOffset, bestSimilarity};
 }
 
-static offset_similarity argminSSE(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
-     return argmax(A.size, B.size, [&](const int2 offset){ return -SSE(A, B, offset); }, window, initialOffset);
-}
-
-static offset_similarity argmaxSDP(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
-     return argmax(A.size, B.size, [&](const int2 offset){ return SDP(A, B, offset); }, window, initialOffset);
-}
-
-template<Type F, Type... Images> int2 argmaxCoarse(const int L, F function, const Images&... images) {
-    return ::argmax(function, downsample(images, L)...)*int(1<<L);
+static offset_similarity argmaxDot(const ImageF& A, const ImageF& B, int2 window=0_0, const int2 initialOffset=0_0) {
+     return argmax(A.size, B.size, [&](const int2 offset){ return dot(A, B, offset); }, window, initialOffset);
 }
 
 generic ImageF apply(const uint2 Asize, const uint2 Bsize, T function, int2 window=0_0, const int2 initialOffset=0_0) {
@@ -120,10 +88,6 @@ generic ImageF apply(const uint2 Asize, const uint2 Bsize, T function, int2 wind
 
 template<Type F, Type... Args> ImageF apply(F function, const ImageF& A, const ImageF& B, const Args&... args) {
     return ::apply(A.size, B.size, [&](const int2 offset){ return function(offset, A, B, args...); });
-}
-
-template<Type F, Type... Images> ImageF applyCoarse(const int L, F function, const Images&... images) {
-    return upsample(::apply(function, downsample(images, L)...), L);
 }
 
 generic void apply(const ImageF& A, const ImageF& B, int2 centerOffset, T f) {
@@ -153,16 +117,6 @@ inline ImageF multiply(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) 
     return Y;
 }
 
-inline void extract(const ImageF& Y, const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
-    assert_(Y.size == ::min(A.size, B.size));
-    apply(A, B, centerOffset, [&](const uint y, const uint, const uint b){ Y[y]=B[b]; });
-}
-inline ImageF extract(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
-    ImageF Y(::min(A.size, B.size));
-    extract(Y,A,B,centerOffset);
-    return Y;
-}
-
 inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
 inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
 
@@ -171,7 +125,8 @@ static inline vec4 principalCone(const ImageF& disk) {
             const float x = +((float(ix)/disk.size.x)*2-1);
             const float y = -((float(iy)/disk.size.y)*2-1);
             const float r² = sq(x)+sq(y);
-            assert_(r² < 1);
+            if(!(r² <= 1)) return vec3(0);
+            assert_(r² <= 1, ix, iy);
             const float z = sqrt(1-r²);
             assert_(z > 0);
             const vec3 v = vec3(x,y,z);
@@ -182,6 +137,7 @@ static inline vec4 principalCone(const ImageF& disk) {
             const float I = disk(ix, iy);
             if(I == 0) continue; // Mask
             const vec3 v = V(ix, iy);
+            if(!v) continue; // !(r² <= 1)
             const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
             f(dΩ_dA, I, v);
         }
@@ -191,6 +147,7 @@ static inline vec4 principalCone(const ImageF& disk) {
     float ΣI = 0; vec3 ΣIv = 0_; Ɐ([&](float dΩ_dA, float I, vec3 v){ I-=μI; if(I>0) { ΣI += I; ΣIv += dΩ_dA*I*v; }});
     if(ΣI == 0) {
         const uint i = argmax(disk);
+        assert_(i);
         return vec4(V(i%disk.size.x,i/disk.size.y), 0);
     }
     const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
@@ -226,105 +183,23 @@ static inline ImageF DoG(const ImageF& X) {
     const ImageF x = gaussianBlur(X,1);
     ImageF Y (X.size);
     for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i]);
-    //for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i])/x[i];
     return Y;
 }
 
 static const int3 diskSearch(const ImageF& source, const int maxRadius/*, const uint L=1*/) {
-#if 0
-    const int L0 = 3;
-    int2 offset = argminSSE(::disk(maxRadius>>L0, true), downsample(source, L0)).offset * (1<<L0);
-#endif
-#if 0
-    int3 bestTransform (offset, maxRadius);
-    //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(source, 2), int2(maxRadius>>2), offset).offset * (1<<2);
-    //const ImageF image = L ? downsample(source, L) : unsafeShare(source);
-    const ImageF image = L ? downsample(::DoG(source), L) : unsafeShare(::DoG(source));
-    //const ImageF image = ::DoG(source);
-    //const ImageF& image = source;
-    float bestSimilarity = -inff;
-    //for(int radius = maxRadius>>L; radius>8; radius-=8) {
-    for(int radius = maxRadius>>L; radius>(maxRadius>>L)*2/3; radius-=2) {
-        const auto R = argminSSE(::disk(radius, true, radius), image, int2(/*radius/8*/(maxRadius>>L)/4), offset/(1<<L));
-        float similarity = R.similarity/sq(radius);
-        log(radius, radius*(1<<L), R.similarity, offset, R.offset*(1<<L), similarity);
-        if(similarity > bestSimilarity) {
-            bestSimilarity = similarity;
-            bestTransform = int3(R.offset, radius)*(1<<L);
-        }
-        //break;
-        //offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
-    }
-#if 0
-    {
-        const int maxRadius = bestTransform.z;
-        const ImageF& image = source;
-        float bestSimilarity = -inff;
-        for(int radius = maxRadius; radius>maxRadius-8; radius--) {
-            const auto R = argmaxSSE(::disk(2*radius, true, radius), image, int2(/*radius/8*/(maxRadius>>L)/4), offset/(1<<L));
-            log(radius, radius*(1<<L), R.similarity, offset, R.offset*(1<<L));
-            if(R.similarity > bestSimilarity) {
-                bestSimilarity = R.similarity;
-                bestTransform = int3(R.offset, radius)*(1<<L);
-            }
-            //break;
-            offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
-        }
-    }
-#endif
-    log(bestTransform, maxRadius);
-#elif 0 // Break in texture (lower if replaces texture background or higher if replaces uniform background)
-    //const ImageF DoG = ::DoG(source);
-    //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(DoG, 2), int2(maxRadius>>2), offset).offset * (1<<2);
-    int3 bestTransform (offset, maxRadius);
-#elif 0
-    int3 bestTransform (offset, maxRadius);
-    //offset = argmaxSSE(::disk(maxRadius>>2, true), downsample(source, 2), int2(maxRadius>>2), offset).offset * (1<<2);
-    //const ImageF image = L ? downsample(source, L) : unsafeShare(source);
-    const ImageF image = (L ? downsample(::DoG(source), L) : ::DoG(source));// > 0.1f;
-    //const ImageF image = ::DoG(source);
-    //const ImageF& image = source;
-    float bestSimilarity = 0;
-    //for(int radius = maxRadius>>L; radius>8; radius-=8) {
-    for(int radius = maxRadius>>L; radius>(maxRadius>>L)*2/3; radius-=4) {
-        const auto R = argmaxSSQ(::circle(radius), image, int2(/*radius/8*/(maxRadius>>L)/2), offset/(1<<L));
-        float similarity = R.similarity/radius;
-        log(radius, radius*(1<<L), R.similarity, offset, R.offset*(1<<L), similarity);
-        if(similarity > bestSimilarity) {
-            bestSimilarity = similarity;
-            bestTransform = int3(R.offset, radius)*(1<<L);
-        }
-        //break;
-        offset = R.offset * (1<<L); // Iterative concurrent refinement of offset and radius
-    }
-#else
     const int L0 = 6;
-    int2 offset = argmaxSDP(::disk(maxRadius>>L0), ::DoG(downsample(source, L0))).offset * (1<<L0); // Coarse
+    int2 offset = argmaxDot(::disk(maxRadius>>L0), ::DoG(downsample(source, L0))).offset * (1<<L0); // Coarse
     const uint L1 = 1;
     const ImageF DoG1 = ::DoG(downsample(source, L1));
-    offset = argmaxSDP(::disk(maxRadius>>1), DoG1, int2(maxRadius), offset/(1<<L1)).offset * (1<<L1); // Fine fixed radius
+    offset = argmaxDot(::disk(maxRadius>>1), DoG1, int2(maxRadius), offset/(1<<L1)).offset * (1<<L1); // Fine fixed radius
+    // Radius search
     int3 bestTransform (offset, maxRadius);
-#if 0
-    //const uint L = 1;
-    float bestSimilarity = 0;
-    //int3 bestTransform (offset, maxRadius);
-    for(int radius = maxRadius>>L; radius>(maxRadius/2)>>L; radius--) {
-        const auto R = argmaxSDP(::disk(radius>>L), DoG, int2(/*radius*/maxRadius>>L), offset/(1<<L)); // Fine fixed radius
-        float similarity = R.similarity/sq(radius);
-        log(radius, radius*(1<<L), R.similarity, offset, R.offset*(1<<L), similarity);
-        if(similarity > bestSimilarity) {
-            bestSimilarity = similarity;
-            bestTransform = int3(R.offset, radius)*(1<<L);
-        }
-        //offset = R.offset * (1<<L);
-    }
-#elif 1
-    //const uint L = 0;
     float bestSimilarity = 0;
     const ImageF DoG = ::DoG(source);
     auto test = [&](const int radius) {
-        const auto R = argmaxSDP(::circle(radius), DoG, int2(radius/3), offset); // Fine fixed radius
-        float similarity = R.similarity/radius;
+        const ImageF circle = ::circle(radius);
+        const auto R = argmaxDot(circle, DoG, int2(radius/3), offset); // Fine fixed radius
+        float similarity = R.similarity/sum(circle);
         log(radius, radius, R.similarity, offset, R.offset, similarity);
         if(similarity > bestSimilarity) {
             bestSimilarity = similarity;
@@ -335,8 +210,6 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius/*, const 
     const int step = 3;
     for(int radius = maxRadius; radius>(maxRadius*2/3); radius-=step) test(radius);
     for(int radius = bestTransform.z+step-1; radius>bestTransform.z-step+1; radius--) test(radius);
-#endif
-#endif
     log(bestTransform);
     return bestTransform;
 }
@@ -350,50 +223,44 @@ struct Sphere : Widget {
 
     Sphere() {
         Time time {true};
-
-        const CachedImageF source = loadRaw("IMG_0696.dng");
         const CachedImageF low = loadRaw("IMG_0698.dng"); // Low exposure (only highlights)
-
-        const float μ = ::mean(source);
-#if 0
-        ImageF clip (source.size);
-        for(uint i: range(source.ref::size)) clip[i] = ::min(source[i], μ);
-        const ImageF& image = clip;
-#else
-        const ImageF& image = source;
-#endif
-
-        const int3 center = diskSearch(image, image.size.x/12);
+        if(!existsFile("center")) {
+            const CachedImageF image = loadRaw("IMG_0696.dng");
+            const int3 center = diskSearch(image, image.size.x/12);
+            writeFile("center", raw(center));
+        }
+        const int3 center = raw<int3>(readFile("center"));
+        log(center);
         const ImageF templateDisk = ::disk(center[2]);
 
-        //const ImageF DoG = ::DoG(image);// > 0.001f;
-        const int L0 = 1;
-        const ImageF DoG = upsample(downsample(::DoG(image),L0),L0);
-
-        const ImageF disk = extract(templateDisk, DoG, center.xy());
         const ImageF light = multiply(templateDisk, low, center.xy());
+        //const ImageF direct = ::max(0, light - mean(light)); // > 0.7f
 
-        auto targets = {&light};
-        //log(center, DoG.size);
-        //auto targets = {&DoG};
-        log(time);
-#if 0
-        const vec4 lightCone = principalCone(light > 0.7f);
-        const vec3 μ = lightCone.xyz();
-        const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
-        if(1) {
-            const int r = 0;
-            if(!anyGE(μ_xy+int2(r),int2(preview.size)) && !anyLE(μ_xy,int2(r)))
-                for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview(μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0xFF,0,0xFF);
+        const ImageF direct (light.size);
+        {
+            const float μ = mean(light);
+            for(uint i: range(direct.ref::size)) direct[i] = ::max(0.f, light[i]-μ);
         }
 
+        auto targets = {&direct};
+        if(time.seconds()>0.1) log(time);
+#if 1
+        const vec4 lightCone = principalCone(direct);
+        const vec3 μ = lightCone.xyz();
+        const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
+
         const float dx = 5, f = 4;
-        const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(image.size.x) * dx, f));
+        const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(low.size.x) * dx, f));
         const vec4 Q = rotationFromTo(C, vec3(0,0,1));
         const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
         log(C, μ, qapply(Q,μ), Ω, θ*180/π);
 #endif
         preview = apply(ref<const ImageF*>(targets), [](const ImageF* image){ return sRGB(*image); });
+#if 1
+        const int r = 2;
+        if(!anyGE(μ_xy+int2(r),int2(preview[0].size)) && !anyLE(μ_xy,int2(r)))
+            for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview[0](μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0,0xFF,0xFF);
+#endif
         window = ::window(this, int2(preview[0].size), mainThread, 0);
         window->show();
         window->actions[Space] = [this](){ index=(index+1)%preview.size; window->render(); };

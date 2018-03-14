@@ -258,13 +258,13 @@ void XWindow::event() {
             assert_(shm);
             {Shm::Detach r; send(({r.seg=id+Segment; r;}));}
             shmdt(target.data);
-            shmctl(shm, IPC_RMID, 0);
+            shmctl(shm, IPC_RMID, nullptr);
             shm = 0;
         } else assert_(!shm);
 
         const uint stride = (uint)align(16, Window::size.x);
         shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
-        target = Image(buffer<byte4>(reinterpret_cast<byte4*>(check(shmat(shm, 0, 0))), Window::size.y*stride, 0),
+        target = Image(buffer<byte4>(reinterpret_cast<byte4*>(check(shmat(shm, nullptr, 0))), Window::size.y*stride, 0),
                        uint2(Window::size), stride, true);
         target.clear(byte4(0xFF));
         {Shm::Attach r; send(({r.seg=id+Segment; r.shm=shm; r;}));}
@@ -280,8 +280,8 @@ void XWindow::event() {
             RenderTargetGL renderTarget {vec2(Window::size)};
             ::window(Window::size).bind(ClearColor|ClearDepth, rgba4f(backgroundColor, 1));
             //GLFrameBuffer::bindWindow(0, Window::size);
-            widget->render(renderTarget, 0, vec2(Window::size));
-            currentWindow = 0;
+            widget->render(renderTarget, 0_0, vec2(Window::size));
+            currentWindow = nullptr;
             swapTime.start();
             glXSwapBuffers(glDisplay, id+Window);
             swapTime.stop();
