@@ -181,17 +181,18 @@ inline ImageF multiply(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) 
 inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
 inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
 
-uint draw(Random& random, const ref<float> DPD) {
+static uint draw(Random& random, const ref<float> DPD, const float sum) {
     float u = random.next<float>()*sum;
     float p = 0;
     for(const uint i: range(DPD.size)) {
         p += DPD[i];
         if(p > u) return i;
     }
-    error();
+    error("");
 }
 
-static inline buffer<vec4> principalLights(const ImageF& disk) {
+// kmeans++
+static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K) {
     buffer<vec4> samples (disk.ref::size, 0);
     for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
         const float I = disk(ix, iy);
@@ -207,41 +208,54 @@ static inline buffer<vec4> principalLights(const ImageF& disk) {
         const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
         samples.append(vec4(v, dΩ_dA*I));
     }
-    static constexpr uint K = 2;
     buffer<vec4> clusters (K);
     Random random;
     clusters[0] = samples[random.next<uint>()%samples.size];
 #define Array(T, name, N) T name##_[N]; mref<T> name(name##_, N);
     for(int k: range(1, clusters.size)) {
-        Array(float, DPD, samples.size); // FIXME: keep associated weight
+        Array(float, DPD, samples.size); // FIXME: keep associated weight, FIXME: storing cDPD directly would allow to binary search in ::draw
         float sum = 0;
         for(const uint i: range(samples.size)) {
-            const vec3 sample = samples[i].xyz(); // FIXME: account for weight
             float D = inff;
-            for(vec4 cluster: clusters.slice(0,k)) D = ::min(D, sample-cluster.xyz());
+            for(vec4 cluster: clusters.slice(0,k)) D = ::min(D, 1-dot(samples[i].xyz(), cluster.xyz()));
+            D *= samples[i].w;
             DPD[i] = D;
             sum += D;
         }
-        const uint i = draw(random, DPD);
-        clusters[i] = samples[i];
+        const uint i = draw(random, DPD, sum);
+        clusters[k] = samples[i];
     }
-    Array(float, ΣI, K); ΣI.clear();
-    Array(vec3, ΣIv, K); ΣIv.clear();
-    for(const vec4& sample: samples) {
-        float D = inff;
-        for(const uint k: range(clusters.size)) {
-            D = ::min(D, sample-cluster.xyz());
-        }
 
-            ΣIv += dΩ_dA*I*v;
+    for(auto_: range(1)) {
+        Array(vec4, Σwv, clusters.size); Σwv.clear();
+        for(const vec4& vw: samples) {
+            float bestD = inff;
+            uint k = 0;
+            for(const uint ik: range(clusters.size)) {
+                const float D = 1-dot(vw.xyz(), clusters[ik].xyz());
+                if(D < bestD) {
+                    bestD = D;
+                    k = ik;
+                }
+            }
+            assert_(length(vw.xyz())==1, __builtin_log2(abs(1-length(vw.xyz()))));
+            Σwv[k] += vec4(vw.w*vw.xyz(), vw.w);
+        }
+        //log("Σwv", Σwv);
+        for(const uint k: range(clusters.size)) {
+            const vec3 ΣIv = Σwv[k].xyz();
+            const float ΣI = Σwv[k].w;
+            const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
+            const float p = length(ΣIv)/ΣI; // Polarisation
+            assert_(p < 1, p);
+            const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
+            log(μ, p, Ω, 2*acos(1-Ω/(2*π))*180/π);
+            clusters[k] = vec4(μ, Ω);
+        }
+        //log("clusters", clusters);
     }
-}
-const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
-const float p = length(ΣIv)/ΣI; // Polarisation
-const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
-//log(μ, p, acos(1-Ω/(2*π))*180/π);
-return vec4(μ, Ω);
-}
+    return clusters;
+ }
 
 struct Sphere : Widget {
     buffer<Image> preview;
@@ -275,22 +289,26 @@ struct Sphere : Widget {
         auto targets = {&direct};
         if(time.seconds()>0.1) log(time);
 
-        const vec4 lightCone = principalCone(direct);
-        const vec3 μ = lightCone.xyz();
-        const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
-
-        const float dx = 5, f = 4;
-        const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(low.size.x) * dx, f));
-        const vec4 Q = rotationFromTo(C, vec3(0,0,1));
-        const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
-        const float d = 20, D = 220;
-        log(μ, Ω, θ, 2*θ*180/π, C, qapply(Q,μ), 2*atan(d, 2*D)*180/π, (atan(d, 2*D)-θ)*180/π);
+        const buffer<vec4> lightCones = principalLightCones(direct, 2);
 
         preview = apply(ref<const ImageF*>(targets), [](const ImageF* image){ return sRGB(*image); });
 
-        const int r = 2;
-        if(!anyGE(μ_xy+int2(r),int2(preview[0].size)) && !anyLE(μ_xy,int2(r)))
-            for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview[0](μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0,0xFF,0xFF);
+        for(const vec4& lightCone: lightCones) {
+            const vec3 μ = lightCone.xyz();
+            const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
+
+            const float dx = 5, f = 4;
+            const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(low.size.x) * dx, f));
+            const vec4 Q = rotationFromTo(C, vec3(0,0,1));
+            const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
+            //const float d = 20, D = 220;
+            //log(μ, Ω, θ, 2*θ*180/π, C, qapply(Q,μ), 2*atan(d, 2*D)*180/π, (atan(d, 2*D)-θ)*180/π);
+            log(qapply(Q,μ), Ω, 2*θ*180/π);
+
+            const int r = 2;
+            if(!anyGE(μ_xy+int2(r),int2(preview[0].size)) && !anyLE(μ_xy,int2(r)))
+                for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview[0](μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0,0xFF,0xFF);
+        }
 
         window = ::window(this, int2(preview[0].size), mainThread, 0);
         window->show();

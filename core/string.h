@@ -114,13 +114,13 @@ inline String fmt(uint16 number, uint pad=0, char padChar='0', uint base=10) { r
 inline String fmt(uint32 number, uint pad=0, char padChar='0', uint base=10) { return fmt(uint64(number), pad, padChar, base); }
 
 /// Converts an unsigned integer (implicit format)
-inline String str(uint8 number) { return fmt(number); }
+template<> inline String str(const uint8& number) { return fmt(number); }
 /// Converts an unsigned integer (implicit format)
-inline String str(uint16 number) { return fmt(number); }
+template<> inline String str(const uint16& number) { return fmt(number); }
 /// Converts an unsigned integer (implicit format)
-inline String str(uint32 number) { return fmt(number); }
+template<> inline String str(const uint32& number) { return fmt(number); }
 /// Converts an unsigned integer (implicit format)
-inline String str(uint64 number) { return fmt(number); }
+template<> inline String str(const uint64& number) { return fmt(number); }
 
 /// Converts an unsigned integer in hexadecimal base
 inline String hex(uint64 n, uint pad=0) { return fmt(n, pad, '0', 16); }
@@ -136,16 +136,17 @@ inline String fmt(int16 n, uint pad=0, char padChar=' ', uint base=10) { return 
 inline String fmt(int32 n, uint pad=0, char padChar=' ', uint base=10) { return fmt(int64(n), pad, padChar, base); }
 
 /// Converts a signed integer (implicit format)
-inline String str(int16 number) { return fmt(int64(number)); }
+template<> inline String str(const int16& number) { return fmt(int64(number)); }
 /// Converts a signed integer (implicit format)
-inline String str(int32 number) { return fmt(int64(number)); }
+template<> inline String str(const int32& number) { return fmt(int64(number)); }
 /// Converts a signed integer (implicit format)
-inline String str(int64 number) { return fmt(int64(number)); }
+template<> inline String str(const int64& number) { return fmt(int64(number)); }
 
 /// Converts a floating-point number
 String fmt(double number, uint precision=4, uint exponent=0, uint pad=0);
-inline String str(float number) { return fmt(number); }
-//inline String str(const half& n, uint precision=4, uint exponent=0, uint pad=0) { return str(double(n), precision, exponent, pad); }
+template<> inline String str(const double& number) { return fmt(number); }
+template<> inline String str(const float& number) { return fmt(number); }
+template<> inline String str(const half& n) { return fmt(double(n)); }
 
 /// Converts arrays
 generic String fmt(const ref<T> source, string separator=" "_, string bracket="[]"_) {
