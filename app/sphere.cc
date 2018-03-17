@@ -195,8 +195,8 @@ static uint draw(Random& random, const ref<float> DPD, const float sum) {
 static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K) {
     buffer<vec4> samples (disk.ref::size, 0);
     for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
-        const float I = disk(ix, iy);
-        if(I == 0) continue; // Mask
+        const float w = disk(ix, iy);
+        if(w == 0) continue; // Mask
         const float x = +((float(ix)/disk.size.x)*2-1);
         const float y = -((float(iy)/disk.size.y)*2-1);
         const float r² = sq(x)+sq(y);
@@ -204,9 +204,12 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
         assert_(r² <= 1, ix, iy);
         const float z = sqrt(1-r²);
         assert_(z > 0);
-        const vec3 v = vec3(x,y,z);
-        const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
-        samples.append(vec4(v, dΩ_dA*I));
+        const vec3 N = vec3(x,y,z);
+        const vec3 I = vec3(0,0,-1);
+        const vec3 S = 2*dot(N,I)*N - I;
+        assert_(abs(length(S)-1)<=0x1p-22, S, length(S), __builtin_log2(abs(1-length(S))));
+        const float dΩ_dA = 1/N.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
+        samples.append(vec4(-S, dΩ_dA*w));
     }
     buffer<vec4> clusters (K);
     Random random;
@@ -240,7 +243,7 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
                     k = ik;
                 }
             }
-            assert_(abs(length(vw.xyz())-1)<=0x1p-24, vw.xyz(), length(vw.xyz()), __builtin_log2(abs(1-length(vw.xyz()))));
+            assert_(abs(length(vw.xyz())-1)<=0x1p-22, vw.xyz(), length(vw.xyz()), __builtin_log2(abs(1-length(vw.xyz()))));
             Σwv[k] += vec4d(vec3d(vw.w*vw.xyz()), double(vw.w));
         }
         //log("Σwv", Σwv);
