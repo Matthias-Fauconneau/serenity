@@ -52,13 +52,6 @@ template<Type T, uint N> struct VecT {
     T& operator[](size_t i) { return _[i]; }
 };
 
-/*template<template<Type> Type V, uint N, Type T> auto ᵀ(const vec<V,T,N>& M) {
-    static constexpr size_t N1 = sizeof(T) / sizeof(decltype(T()[0]));
-    VecT< vec<V,Type remove_reference<decltype(T()[0])>::type, N>, N1> Mt;
-    for(uint j: range(N)) for(uint i: range(N1)) Mt[i][j] = M[j][i];
-    return Mt;
-}*/
-
 typedef VecT<vec3, 4> Quad;
 
 template<> String str(const Quad& A) { return str(A._); }
@@ -66,10 +59,10 @@ template<> String str(const Quad& A) { return str(A._); }
 static constexpr float ε = 0x1p-20;
 
 static inline int allVerticesSameSidePlane(Quad A, Quad B) {
-    const vec3 N = normalize(cross(B._[1]-B._[0], B._[3]-B._[0]));
+    const vec3 N = normalize(cross(B[1]-B[0], B[3]-B[0]));
     int sign = 0;
     for(vec3 v: A._) {
-        const vec3 OP = v-B._[0];
+        const vec3 OP = v-B[0];
         const float t = dot(N, OP);
         const float εOP = ε*length(OP); // equivalent to t=dot(N, normalize(OP)) without /0
         if(t > +εOP) {
@@ -344,8 +337,8 @@ struct Render : Drag {
                     const T& pivot = at[right];
                     int pivotIndex = left;
                     for(const uint i: ::range(left,right)) { // Split
-                        Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A._[v] = viewVertices[a[v]]; }
-                        Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B._[v] = viewVertices[b[v]]; }
+                        Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A[v] = viewVertices[a[v]]; }
+                        Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B[v] = viewVertices[b[v]]; }
                         if(A < B) {
                             swap(at[pivotIndex], at[i]);
                             pivotIndex++;

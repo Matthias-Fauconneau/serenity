@@ -4,6 +4,8 @@
 #include "math.h"
 #include "algorithm.h"
 #include "matrix.h"
+#include "mwc.h"
+#include "sort.h"
 
 inline vec4 rotationFromTo(const vec3 v1, const vec3 v2) { return normalize(vec4(cross(v1, v2), sqrt(dotSq(v1)*dotSq(v2)) + dot(v1, v2))); }
 inline vec4 qmul(vec4 p, vec4 q) { return vec4(p.w*q.xyz() + q.w*p.xyz() + cross(p.xyz(), q.xyz()), p.w*q.w - dot(p.xyz(), q.xyz())); }
@@ -179,34 +181,66 @@ inline ImageF multiply(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) 
 inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
 inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
 
-static inline vec4 principalCone(const ImageF& disk) {
-    auto V = [&](uint ix, uint iy) {
-            const float x = +((float(ix)/disk.size.x)*2-1);
-            const float y = -((float(iy)/disk.size.y)*2-1);
-            const float r² = sq(x)+sq(y);
-            if(!(r² <= 1)) return vec3(0);
-            assert_(r² <= 1, ix, iy);
-            const float z = sqrt(1-r²);
-            assert_(z > 0);
-            const vec3 v = vec3(x,y,z);
-            return v;
-    };
-    auto Ɐ = [&](function<void(float, float, vec3)> f) {
-        for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) { // ∫dA
-            const float I = disk(ix, iy);
-            if(I == 0) continue; // Mask
-            const vec3 v = V(ix, iy);
-            if(!v) continue; // !(r² <= 1)
-            const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
-            f(dΩ_dA, I, v);
+uint draw(Random& random, const ref<float> DPD) {
+    float u = random.next<float>()*sum;
+    float p = 0;
+    for(const uint i: range(DPD.size)) {
+        p += DPD[i];
+        if(p > u) return i;
+    }
+    error();
+}
+
+static inline buffer<vec4> principalLights(const ImageF& disk) {
+    buffer<vec4> samples (disk.ref::size, 0);
+    for(uint iy: range(disk.size.y)) for(uint ix: range(disk.size.x)) {
+        const float I = disk(ix, iy);
+        if(I == 0) continue; // Mask
+        const float x = +((float(ix)/disk.size.x)*2-1);
+        const float y = -((float(iy)/disk.size.y)*2-1);
+        const float r² = sq(x)+sq(y);
+        if(!(r² <= 1)) continue;
+        assert_(r² <= 1, ix, iy);
+        const float z = sqrt(1-r²);
+        assert_(z > 0);
+        const vec3 v = vec3(x,y,z);
+        const float dΩ_dA = 1/v.z; // dΩ = sinθ dθ dφ, dA = r dr dφ, r=sinθ, dΩ/dA=dθ/dr=1/cosθ, cosθ=z
+        samples.append(vec4(v, dΩ_dA*I));
+    }
+    static constexpr uint K = 2;
+    buffer<vec4> clusters (K);
+    Random random;
+    clusters[0] = samples[random.next<uint>()%samples.size];
+#define Array(T, name, N) T name##_[N]; mref<T> name(name##_, N);
+    for(int k: range(1, clusters.size)) {
+        Array(float, DPD, samples.size); // FIXME: keep associated weight
+        float sum = 0;
+        for(const uint i: range(samples.size)) {
+            const vec3 sample = samples[i].xyz(); // FIXME: account for weight
+            float D = inff;
+            for(vec4 cluster: clusters.slice(0,k)) D = ::min(D, sample-cluster.xyz());
+            DPD[i] = D;
+            sum += D;
         }
-    };
-    float ΣI = 0; vec3 ΣIv = 0_; Ɐ([&](float dΩ_dA, float I, vec3 v){ assert_(I>=0); ΣI += dΩ_dA*I; ΣIv += dΩ_dA*I*v; });
-    const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
-    const float p = length(ΣIv)/ΣI; // Polarisation
-    const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
-    //log(μ, p, acos(1-Ω/(2*π))*180/π);
-    return vec4(μ, Ω);
+        const uint i = draw(random, DPD);
+        clusters[i] = samples[i];
+    }
+    Array(float, ΣI, K); ΣI.clear();
+    Array(vec3, ΣIv, K); ΣIv.clear();
+    for(const vec4& sample: samples) {
+        float D = inff;
+        for(const uint k: range(clusters.size)) {
+            D = ::min(D, sample-cluster.xyz());
+        }
+
+            ΣIv += dΩ_dA*I*v;
+    }
+}
+const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
+const float p = length(ΣIv)/ΣI; // Polarisation
+const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
+//log(μ, p, acos(1-Ω/(2*π))*180/π);
+return vec4(μ, Ω);
 }
 
 struct Sphere : Widget {
@@ -216,13 +250,14 @@ struct Sphere : Widget {
 
     Sphere() {
         Time time {true};
-        const CachedImageF low = loadRaw("IMG_0698.dng"); // Low exposure (only highlights)
-        if(!existsFile("center")) {
-            const CachedImageF image = loadRaw("IMG_0696.dng");
+        const CachedImageF low = loadRaw("IMG_0711.dng"); // Low exposure (only highlights)
+        const string name = "IMG_0710";
+        if(!existsFile(name+".xyr")) {
+            const CachedImageF image = loadRaw(name+".dng");
             const int3 center = diskSearch(image, image.size.x/12);
-            writeFile("center", raw(center));
+            writeFile(name+".xyr", raw(center));
         }
-        const int3 center = raw<int3>(readFile("center"));
+        const int3 center = raw<int3>(readFile(name+".xyr"));
         //log(center);
         const ImageF templateDisk = ::disk(center[2]);
 
