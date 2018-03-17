@@ -1,11 +1,15 @@
 #pragma once
 #include "render.h"
 
+void blend(byte4& target, bgr3f source_linear, float opacity);
+
+#if 0
 void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float alpha);
 void blit(const Image& target, int2 origin, uint2 size, const Image& source, bgr3f color = 1_, float opacity = 1);
 void line(const Image& target, vec2 p0, vec2 p1, bgr3f color = 0_, float opacity = 1, bool hint = false);
 void glyph(const Image& target, int2 origin, float fontSize, FontData& font, uint index, bgr3f color = 0_, float opacity = 1);
 void trapezoidY(const Image& target, Span a, Span b, bgr3f color = 0_, float opacity = 1);
+#endif
 
 struct ImageRenderTarget : Image, RenderTarget2D {
     ImageRenderTarget(Image&& image) : Image(::move(image)), RenderTarget2D(vec2(image.size)) {}

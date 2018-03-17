@@ -1,16 +1,15 @@
 #include "image-render.h"
+
+void blend(byte4& target, bgr3f source_linear, float opacity) {
+    bgr3f target_linear(sRGB_reverse[target[0]], sRGB_reverse[target[1]], sRGB_reverse[target[2]]);
+    bgr3i linearBlend = bgr3i(round((0xFFF*(1-opacity))*target_linear + (0xFFF*opacity)*source_linear));
+    target = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
+            min(0xFF,target.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
+}
+
 #if 0
 #include "font.h"
 #include "math.h"
-
-static void blend(const Image& target, uint x, uint y, bgr3f source_linear, float opacity) {
-    byte4& target_sRGB = target(x,y);
-    bgr3f target_linear(sRGB_reverse[target_sRGB[0]], sRGB_reverse[target_sRGB[1]], sRGB_reverse[target_sRGB[2]]);
-    bgr3i linearBlend = bgr3i(round((0xFFF*(1-opacity))*target_linear + (0xFFF*opacity)*source_linear));
-    target_sRGB = byte4(sRGB_forward[linearBlend[0]], sRGB_forward[linearBlend[1]], sRGB_forward[linearBlend[2]],
-            min(0xFF,target_sRGB.a+int(round(0xFF*opacity)))); // Additive opacity accumulation
-}
-
 
 static void fill(uint* target, uint stride, uint w, uint h, uint value) {
     for(auto_: range(h)) {

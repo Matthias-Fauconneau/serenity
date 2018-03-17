@@ -227,7 +227,9 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
     }
 
     for(auto_: range(1)) {
-        Array(vec4, Σwv, clusters.size); Σwv.clear();
+        typedef vec<xyz,double,3> vec3d;
+        typedef vec<xyzw,double,4> vec4d;
+        Array(vec4d, Σwv, clusters.size); Σwv.clear();
         for(const vec4& vw: samples) {
             float bestD = inff;
             uint k = 0;
@@ -238,15 +240,13 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
                     k = ik;
                 }
             }
-            assert_(length(vw.xyz())==1, __builtin_log2(abs(1-length(vw.xyz()))));
-            Σwv[k] += vec4(vw.w*vw.xyz(), vw.w);
+            assert_(abs(length(vw.xyz())-1)<=0x1p-24, vw.xyz(), length(vw.xyz()), __builtin_log2(abs(1-length(vw.xyz()))));
+            Σwv[k] += vec4d(vec3d(vw.w*vw.xyz()), double(vw.w));
         }
         //log("Σwv", Σwv);
         for(const uint k: range(clusters.size)) {
-            const vec3 ΣIv = Σwv[k].xyz();
-            const float ΣI = Σwv[k].w;
-            const vec3 μ = normalize(ΣIv); // Spherical mean of weighted directions
-            const float p = length(ΣIv)/ΣI; // Polarisation
+            const vec3 μ = normalize(vec3(Σwv[k].xyz())); // Spherical mean of weighted directions
+            const float p = length(Σwv[k].xyz())/Σwv[k].w; // Polarisation
             assert_(p < 1, p);
             const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
             log(μ, p, Ω, 2*acos(1-Ω/(2*π))*180/π);
@@ -294,20 +294,22 @@ struct Sphere : Widget {
         preview = apply(ref<const ImageF*>(targets), [](const ImageF* image){ return sRGB(*image); });
 
         for(const vec4& lightCone: lightCones) {
-            const vec3 μ = lightCone.xyz();
-            const int2 μ_xy = int2((vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size));
-
             const float dx = 5, f = 4;
             const vec3 C = normalize(vec3(vec2(center.x, -center.y) / float(low.size.x) * dx, f));
             const vec4 Q = rotationFromTo(C, vec3(0,0,1));
+            const vec3 μ = lightCone.xyz();
             const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
             //const float d = 20, D = 220;
             //log(μ, Ω, θ, 2*θ*180/π, C, qapply(Q,μ), 2*atan(d, 2*D)*180/π, (atan(d, 2*D)-θ)*180/π);
             log(qapply(Q,μ), Ω, 2*θ*180/π);
 
-            const int r = 2;
-            if(!anyGE(μ_xy+int2(r),int2(preview[0].size)) && !anyLE(μ_xy,int2(r)))
-                for(int dy: range(-r,r+1))for(int dx: range(-r,r+1)) preview[0](μ_xy.x+dx, μ_xy.y+dy) = byte4(0,0,0xFF,0xFF);
+            const vec2 μ_xy = (vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size);
+            const int R = 3;
+            for(int dy: range(-R,R+1))for(int dx: range(-R,R+1)) {
+                const uint2 xy = uint2(int2(μ_xy)+int2(dx,dy));
+                const float r = ::length(vec2(xy)+vec2(1./2)-μ_xy);
+                if(r < R+1./2 && !anyGE(xy, preview[0].size)) blend(preview[0](xy), bgr3f(0,0,1), clamp(0.f,R+1.f/2-r,1.f));
+            }
         }
 
         window = ::window(this, int2(preview[0].size), mainThread, 0);
