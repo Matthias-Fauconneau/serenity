@@ -89,7 +89,16 @@ static inline int opCmp(Quad A, Quad B) {
 
 static inline bool operator <(Quad A, Quad B) { return opCmp(A, B) < 0; }
 
-static inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static constexpr uint K = 8;
+typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))),
+                           vec<::x, float32, 1>                       >::type floatv;
+typedef conditional<(K>1), int32 __attribute((ext_vector_type(K))),
+                           vec<::x, bool, 1>                       >::type boolv;
+typedef vec<bgr, floatv, 3> bgr3fv;
+typedef vec<xyz, floatv, 3> vec3v;
+
+static inline boolv intersect(const vec3 v0, const vec3 v1, const vec3 v2, const vec3 v3, const vec3 O,
+                              const vec3v D, vec3& N, floatv& nearestT, floatv& u, floatv& v) {
     const vec3 e01 = v1-v0;
     const vec3 e12 = v2-v1;
     const vec3 e23 = v3-v2;
@@ -102,24 +111,25 @@ static inline bool intersect(const vec3 v0, const vec3 v1, const vec3 v2, const 
     const vec3 e23v2O = _cross(e23,v2-O);
     const vec3 e30v0O = _cross(e30,v0-O);
 
-    const float V0 = dot(e01v0O, D);
-    const float U1 = dot(e12v2O, D);
-    const float V1 = dot(e23v2O, D);
-    const float U0 = dot(e30v0O, D);
-    if(!(max(max(max(U0,V1),U1),V0) <= 0)) return false;
-    const float det = dot(N, D);
-    if(!(det < 0)) return false;
-    const float det¯¹ = rcp( det );
-    const float t = Nv0 * det¯¹;
-    if(!(t > 0)) return false;
-    if(!(t < nearestT)) return false;
-    nearestT = t;
-    u = select(U0+V0 < 1, det¯¹ * U0, 1 - (det¯¹ * U1));
-    v = select(U0+V0 < 1, det¯¹ * V0, 1 - (det¯¹ * V1));
-    return true;
+    const floatv V0 = dot(vec3v(e01v0O), D);
+    const floatv U1 = dot(vec3v(e12v2O), D);
+    const floatv V1 = dot(vec3v(e23v2O), D);
+    const floatv U0 = dot(vec3v(e30v0O), D);
+    //if(!(max(max(max(U0,V1),U1),V0) <= 0)) return false;
+    const floatv det = dot(vec3v(N), D);
+    //if(!(det < 0)) return false;
+    const floatv det¯¹ = rcp( det );
+    const floatv t = Nv0 * det¯¹;
+    //if(!(t > 0)) return false;
+    //if(!(t < nearestT)) return false;
+    const boolv test = (max(max(max(U0,V1),U1),V0) <= floatv(0)) & (det < floatv(0)) & (t > floatv(0)) & (t < nearestT);
+    nearestT = select(test, t, nearestT);
+    u = select(test, select(U0+V0 < 1, det¯¹ * U0, 1 - (det¯¹ * U1)), u);
+    v = select(test, select(U0+V0 < 1, det¯¹ * V0, 1 - (det¯¹ * V1)), v);
+    return test;
 }
 
-static inline bool intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static inline boolv intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3v D, vec3& N, floatv& nearestT, floatv& u, floatv& v) {
     return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, N, nearestT, u, v);
 }
 
@@ -141,7 +151,7 @@ struct Scene {
     Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, bgr3f(2)/*lightSize/sq(lightSize)*/};
 };
 
-static inline bool intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3 D, vec3& N, float& nearestT, float& u, float& v) {
+static inline boolv intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3v D, vec3& N, floatv& nearestT, floatv& u, floatv& v) {
     return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
 }
 
@@ -215,54 +225,38 @@ static inline void step(Scene& scene, Random& random) {
                 //const float u = (float(x)+0.5f)/float(size.x); // Uniform
                 const float u = float(x)/float(size.x-1); // Duplicate edges
                 const vec3 O = u+v<1 ? v0 + (v1-v0)*u + (v3-v0)*v : v2 + (v3-v2)*(1-u) + (v1-v2)*(1-v);
-                static constexpr uint K = 8;
-                /*if constexpr(K>1) typedef float32 __attribute((ext_vector_type(K))) vsf;
-                  else              typedef vec<::x, float32, 1>                      vsf;*/
-                typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))),
-                                           vec<::x, float32, 1>                       >::type vsf;
-                typedef vec<bgr, vsf, 3> bgr3fv;
-                typedef vec<xyz, vsf, 3> vec3v;
 
-                bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
-                bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
+                bgr3fv differentialOutgoingRadianceSum = bgr3fv(floatv(0.f));
+                bgr3fv realOutgoingRadianceSum = bgr3fv(floatv(0.f)); // Synthetic test case
                 const uint sampleCount = 8;
                 for(unused uint i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
-                    const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
+                    const vec3v L = vec3v(light.O) + random.next<floatv>() * vec3v(light.T) + random.next<floatv>() * vec3v(light.B);
                     const vec3v D = L - vec3v(O);
 
-                    const vsf dotNL = max(vsf(0), dot(vec3v(N), D));
+                    const floatv dotNL = max(floatv(0), dot(vec3v(N), D));
                     //if all(dotNL <= 0) continue;
-                    const vsf dotAreaL = max(vsf(0), - dot(vec3v(light.N), D));
+                    const floatv dotAreaL = max(floatv(0), - dot(vec3v(light.N), D));
                     //if all(dotAreaL <= 0) continue;
 
                     bgr3fv incomingRadiance = bgr3fv(light.emissiveFlux) * dotNL * dotAreaL / sq(dot(D, D)); // Directional light
 
                     bool differential = quad.real;
-                    vsf nearestRealT (inff), nearestVirtualT (inff);
+                    floatv nearestRealT (inff), nearestVirtualT (inff);
                     bgr3fv realIncomingRadiance = incomingRadiance;
-                    for(const Scene::Quad& quad: scene.quads) for(uint k: range(K)) { // FIXME: SIMD ray, SIMD setup
-                        vec3 N; float u,v;
-                        if(!differential || !quad.real) {
-                            float t = nearestVirtualT[k];
-                            intersect(scene, quad, O, getᵀ(D, k), N, t/*nearestVirtualT*/, u, v);
-                            nearestVirtualT[k] = t;
-                        } else {
-                            float t = nearestRealT[k];
-                            if(intersect(scene, quad, O, getᵀ(D, k), N, t/*nearestRealT*/, u, v)) {
-                                setᵀ(realIncomingRadiance, k, bgr3f(0));
-                            }
-                            nearestRealT[k] = t;
-                        }
+                    for(const Scene::Quad& quad: scene.quads) { // FIXME: SIMD ray, SIMD setup
+                        vec3 N; floatv u,v;
+                        if(!differential || !quad.real) intersect(scene, quad, O, D, N, nearestVirtualT, u, v);
+                        else realIncomingRadiance = mask(~intersect(scene, quad, O, D, N, nearestRealT, u, v), realIncomingRadiance);
                     }
                     const bgr3fv differentialIncomingRadiance = differential ? mask(vecLt(nearestVirtualT,/* <*/ nearestRealT), -incomingRadiance)
-                                                                             : mask(vecEq(nearestVirtualT,/*==*/ vsf(inff)), incomingRadiance);
-                    const bgr3fv albedo = bgr3fv(vsf(1));
+                                                                             : mask(vecEq(nearestVirtualT,/*==*/ floatv(inff)), incomingRadiance);
+                    const bgr3fv albedo = bgr3fv(floatv(1));
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
-                //quad.outgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, differentialOutgoingRadianceSum);
-                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, realOutgoingRadianceSum);
+                quad.outgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<floatv>, differentialOutgoingRadianceSum);
+                if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<floatv>, realOutgoingRadianceSum);
             }
         }
     }
@@ -288,9 +282,9 @@ struct Render : Drag {
         }
 
         importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), true );
-        //importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
-        //importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
-        //importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
+        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
+        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
+        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
 
         step(scene, random);
 

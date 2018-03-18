@@ -54,7 +54,7 @@ static inline v8sf sign(v8sf a, v8si b) { return (v8sf)((v8si)a ^ b); }
 
 template<Type C, Type T> T mask(C c, T t);
 template<> inline v8sf mask(v8si C, v8sf T) { return (v8sf)(C & (v8si)T); }
-static inline v8sf select(v8si C, v8sf T, v8sf F) { return __builtin_ia32_blendvps256(T, F, C); }
+static inline v8sf select(v8si C, v8sf T, v8sf F) { return __builtin_ia32_blendvps256(F, T, C); }
 
 template<> inline v8sf min(v8sf a, v8sf b) { return __builtin_ia32_minps256(a, b); }
 template<> inline v8sf max(v8sf a, v8sf b) { return __builtin_ia32_maxps256(a, b); }
