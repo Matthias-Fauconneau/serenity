@@ -252,7 +252,7 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
             const float p = length(Σwv[k].xyz())/Σwv[k].w; // Polarisation
             assert_(p < 1, p);
             const float Ω = 4*π*(1-p); // Ω=∫dΩ=2π[1-cosθ], Ωp=∫dΩv·μ=π/2[1-cos2θ]
-            log(μ, p, Ω, 2*acos(1-Ω/(2*π))*180/π);
+            //log(μ, 2*acos(1-Ω/(2*π))*180/π);
             clusters[k] = vec4(μ, Ω);
         }
         //log("clusters", clusters);
@@ -304,7 +304,7 @@ struct Sphere : Widget {
             const float Ω = lightCone.w, θ = acos(1-Ω/(2*π));
             //const float d = 20, D = 220;
             //log(μ, Ω, θ, 2*θ*180/π, C, qapply(Q,μ), 2*atan(d, 2*D)*180/π, (atan(d, 2*D)-θ)*180/π);
-            log(qapply(Q,μ), Ω, 2*θ*180/π);
+            log(qapply(Q,μ), 2*θ*180/π);
 
             const vec2 μ_xy = (vec2(μ.x,-μ.y)+vec2(1))/vec2(2)*vec2(light.size);
             const int R = 3;

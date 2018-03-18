@@ -37,14 +37,14 @@ genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { retu
 template<template<Type> Type V, Type T, uint N, Type T1, decltype(sizeof(T1)/T1()[0]==N) = 0> static inline constexpr
  Vec mask(const T1& c, const Vec& t) { return apply([c](const T& t){return ::mask(c, t);}, t); }
 
-template<template<Type> Type V, uint N, Type T> auto getᵀ(const vec<V,T,N>& M, uint i) {
+template<template<Type> Type V, uint N, Type T> auto getᵀ(const vec<V,T,N>& M, const uint i) {
     vec<V,Type remove_reference<decltype(T()[0])>::type, N> v;
-    for(uint j: range(N)) v[i] = M[j][i];
+    for(uint j: range(N)) v[j] = M[j][i];
     return v;
 }
 
 template<template<Type> Type V, uint N, Type T> void setᵀ(vec<V,T,N>& M, uint i, const vec<V,Type remove_reference<decltype(T()[0])>::type, N>& v) {
-    for(uint j: range(N)) M[j][i] = v[i];
+    for(uint j: range(N)) M[j][i] = v[j];
 }
 
 template<Type T, uint N> struct VecT {
@@ -218,14 +218,14 @@ static inline void step(Scene& scene, Random& random) {
                 static constexpr uint K = 8;
                 /*if constexpr(K>1) typedef float32 __attribute((ext_vector_type(K))) vsf;
                   else              typedef vec<::x, float32, 1>                      vsf;*/
-                typedef conditional< (K>1), float32 __attribute((ext_vector_type(K))),
-                                            vec<::x, float32, 1>                       >::type vsf;
+                typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))),
+                                           vec<::x, float32, 1>                       >::type vsf;
                 typedef vec<bgr, vsf, 3> bgr3fv;
                 typedef vec<xyz, vsf, 3> vec3v;
 
                 bgr3fv differentialOutgoingRadianceSum = bgr3fv(vsf(0.f));
                 bgr3fv realOutgoingRadianceSum = bgr3fv(vsf(0.f)); // Synthetic test case
-                const uint sampleCount = 16;
+                const uint sampleCount = 8;
                 for(unused uint i: range(sampleCount/K)) {
                     const Scene::QuadLight light = scene.light;
                     const vec3v L = vec3v(light.O) + random.next<vsf>() * vec3v(light.T) + random.next<vsf>() * vec3v(light.B);
@@ -261,7 +261,7 @@ static inline void step(Scene& scene, Random& random) {
                     differentialOutgoingRadianceSum += albedo * differentialIncomingRadiance;
                     realOutgoingRadianceSum += albedo * realIncomingRadiance;
                 }
-                quad.outgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, differentialOutgoingRadianceSum);
+                //quad.outgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, differentialOutgoingRadianceSum);
                 if(quad.realOutgoingRadiance) quad.realOutgoingRadiance(x, y) = bgr3f(1/float(sampleCount)) * apply(hsum<vsf>, realOutgoingRadianceSum);
             }
         }
@@ -288,9 +288,9 @@ struct Render : Drag {
         }
 
         importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), true );
-        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
-        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
-        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
+        //importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
+        //importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
+        //importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
 
         step(scene, random);
 
@@ -447,7 +447,7 @@ struct Render : Drag {
                         const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0); // FIXME: synthetic test case
                         const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
-                        target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance.b), sRGB(finalOutgoingRadiance.g), sRGB(finalOutgoingRadiance.r), 0xFF);
+                        target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance), 0xFF);
 
                         coverageBuffer[targetI/64] |= (1ull<<targetI%64);
                     }
