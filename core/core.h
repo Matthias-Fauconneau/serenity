@@ -83,7 +83,7 @@ generic static inline constexpr T min(T a, T b) { return a<b ? a : b; }
 generic static inline constexpr T max(T a, T b) { return a>b ? a : b; }
 generic static inline T clamp(T min, T x, T max) { return ::min(::max(min, x), max); }
 generic static inline T abs(T x) { return x>=0 ? x : -x; }
-generic static inline constexpr T sq(const T x) { return x*x; }
+generic static inline constexpr T sq(const T& x) { return x*x; }
 
 /// Numeric range
 struct range {

@@ -178,9 +178,6 @@ inline ImageF multiply(const ImageF& A, const ImageF& B, int2 centerOffset=0_0) 
     return Y;
 }
 
-inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
-inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
-
 static uint draw(Random& random, const ref<float> DPD, const float sum) {
     float u = random.next<float>()*sum;
     float p = 0;

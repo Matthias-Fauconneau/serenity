@@ -11,8 +11,10 @@ generic struct ImageT : buffer<T> {
 
  ImageT() {}
  default_move(ImageT);
- ImageT(buffer<T>&& pixels, uint2 size, uint stride=0, bool alpha=false) : buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
-     assert_(ref<T>::size >= (size.y-1)*this->stride+size.x, ref<T>::size, size.y*this->stride); }
+ ImageT(buffer<T>&& pixels, uint2 size, uint stride=0, bool alpha=false) :
+     buffer<T>(::move(pixels)), size(size), stride(stride?:size.x), alpha(alpha) {
+     assert_(ref<T>::size >= (size.y-1)*this->stride+size.x, ref<T>::size, size.y*this->stride);
+ }
  ImageT(uint width, uint height, bool alpha=false) : buffer<T>(height*width), size(width, height), stride(width), alpha(alpha) {}
  ImageT(uint2 size, bool alpha=false) : ImageT(size.x, size.y, alpha) {}
 
@@ -27,7 +29,6 @@ generic struct ImageT : buffer<T> {
 generic void clear(const ImageT<T>& target, T v) {
  for(size_t y: range(target.size.y)) target.slice(y*target.stride, target.size.x).clear(v);
 }
-
 
 generic ImageT<T> copy(const ImageT<T>& o) {
  if(o.width == o.stride) return ImageT<T>(copyRef(o), o.size, o.stride, o.alpha);
@@ -76,6 +77,20 @@ typedef ImageT<bgr3f> Image3f;
 /// 2D array of BGRA 32bit floating-point samples
 typedef ImageT<bgra4f> Image4f;
 
+generic ImageT<T> operator*(const ImageT<T>& a, const ImageT<T>& b) {
+    ImageT<T> y(a.size);
+    for(uint i: range(a.ref::size)) y[i]=a[i]*b[i];
+    return y;
+}
+generic ImageT<T> operator/(const ImageT<T>& a, const ImageT<T>& b) {
+    ImageT<T> y(a.size);
+    for(uint i: range(a.ref::size)) y[i]=a[i]/b[i];
+    return y;
+}
+inline void opGt(const ImageF& Y, const ImageF& X, float threshold) { for(uint i: range(Y.ref::size)) Y[i] = float(X[i]>threshold); }
+inline ImageF operator>(const ImageF& X, float threshold) { ImageF Y(X.size); ::opGt(Y,X,threshold); return Y; }
+
+
 // -- sRGB --
 
 extern uint8 sRGB_forward[0x1000];
@@ -88,54 +103,22 @@ inline byte3 sRGB(bgr3f v) { return byte3(sRGB(v.b),sRGB(v.b),sRGB(v.b)); }
 void sRGB(const Image& target, const ImageF& source, float max=-inff);
 inline Image sRGB(const ImageF& source, const float max=-inff) { Image target(source.size); ::sRGB(target, source, max); return target; }
 
-void sRGB(const Image& target, const Image3f& source, bgr3f max=0_);
-inline Image sRGB(const Image3f& source, const bgr3f max=0_) { Image target(source.size); ::sRGB(target, source, max); return target; }
-
-#if 0
-/// Converts linear float pixels for each component to color sRGB pixels
-void sRGB(const Image& target, const Image4f& source);
-inline Image sRGB(const Image4f& source) { Image target(source.size); ::sRGB(target, source); return target; }
-
-/// Converts linear float pixels for each component to color sRGB pixels
-void sRGB(const Image& BGR, const ImageF& B, const ImageF& G, const ImageF& R);
-inline Image sRGB(const ImageF& B, const ImageF& G, const ImageF& R) { Image target(B.size); ::sRGB(target, B, G, R); return target; }
-
-/// Converts linear float pixels for each component to color sRGB pixels
-void sRGB(const Image& BGR, const Image16& N, const ImageF& B, const ImageF& G, const ImageF& R);
-inline Image sRGB(const Image16& N, const ImageF& B, const ImageF& G, const ImageF& R) { Image target(N.size); ::sRGB(target, N, B, G, R); return target; }
-
-void sRGB(const Image& BGR, const Image8& M);
-void sRGB(const Image& BGR, const Image16& N);
-#endif
+void sRGB(const Image& target, const Image3f& source, bgr3f max=bgr3f(-inff), const bgr3f min=bgr3f(inff));
+inline Image sRGB(const Image3f& source, const bgr3f max=bgr3f(-inff), const bgr3f min=bgr3f(inff)) {
+    Image target(source.size); ::sRGB(target, source, max, min); return target;
+}
 
 Image3f linear(const Image& source);
+ImageF luminance(const Image& source);
 
 // -- Decode --
-
-/// Returns the image file format if valid
-string imageFileFormat(const ref<byte> file);
-
-/// Returns the image size
-int2 imageSize(const ref<byte> file);
 
 /// Decodes \a file to an Image
 Image decodeImage(const ref<byte> file);
 
-/// Declares a function lazily decoding an image embedded using FILE
-#define ICON(name) Image name ## Icon() { \
- extern byte _binary_## name ##_start[]; extern byte _binary_## name ##_end[]; \
- static Image icon = decodeImage(ref<byte>(_binary_## name ##_start, _binary_## name ##_end - _binary_## name ##_start)); \
- return unsafeShare(icon); \
- }
-
 // -- Rotate --
 
-generic void flip(const ImageT<T>& image);
-void flip(const Image& target, const Image& source);
-Image flip(Image&& image);
-
-void negate(const Image& target, const Image& source);
-inline Image negate(const Image& source) { Image target(source.size); ::negate(target, source); return target; }
+Image rotateHalfTurn(Image&& target);
 
 // -- Resample --
 
@@ -150,8 +133,3 @@ generic ImageT<T> upsample(const ImageT<T>& source) { ImageT<T> target(source.si
 void gaussianBlur(const ImageF& target, const ImageF& source, float sigma, int radius=0);
 inline ImageF gaussianBlur(ImageF&& target, const ImageF& source, float sigma) { gaussianBlur(target, source, sigma); return move(target); }
 inline ImageF gaussianBlur(const ImageF& source, float sigma) { return gaussianBlur(source.size, source, sigma); }
-
-/// Resizes \a source into \a target
-void resize(const Image& target, const Image& source);
-inline Image resize(Image&& target, const Image& source) { resize(target, source); return move(target); }
-inline Image resize(uint2 size, const Image& source) { return resize(Image(size, source.alpha), source); }

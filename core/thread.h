@@ -85,7 +85,7 @@ struct Poll : pollfd {
  /// \note May be used without a file descriptor to queue jobs using \a wait, \a event will be called after all system events have been handled
  Poll(int fd=0, int events=POLLIN, Thread& thread=mainThread) : pollfd{fd,(short)events,0}, thread(thread) { if(fd) registerPoll(); }
  no_copy(Poll);
- ~Poll(){ if(fd) unregisterPoll(); }
+ virtual ~Poll(){ if(fd) unregisterPoll(); }
  /// Registers \a fd to the event loop
  void registerPoll();
  /// Unregisters \a fd from the event loop
