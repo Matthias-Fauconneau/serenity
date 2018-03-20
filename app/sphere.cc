@@ -211,7 +211,6 @@ static inline buffer<vec4> principalLightCones(const ImageF& disk, const uint K)
     buffer<vec4> clusters (K);
     Random random;
     clusters[0] = samples[random.next<uint>()%samples.size];
-#define Array(T, name, N) T name##_[N]; mref<T> name(name##_, N);
     for(int k: range(1, clusters.size)) {
         Array(float, DPD, samples.size); // FIXME: keep associated weight, FIXME: storing cDPD directly would allow to binary search in ::draw
         float sum = 0;

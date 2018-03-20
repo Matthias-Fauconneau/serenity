@@ -5,6 +5,7 @@
 #include "jpeg.h"
 #include "algorithm.h"
 
+#if 0
 static inline ImageF dxx(const ImageF& I) {
     ImageF dxx (I.size);
     for(int y: range(dxx.size.y))
@@ -39,6 +40,12 @@ static inline ImageF detH(const ImageF& I) {
     for(uint i: range(detH.ref::size)) detH[i] = dxx[i]*dyy[i] - dxy[i]*dxy[i];
     return detH;
 }
+#endif
+
+struct ratio { uint64 num, den; };
+static inline bool operator <=(ratio a, ratio b) { return a.num*b.den <= b.num*a.den; }
+template<> String str(const ratio& o) { return str(o.num)+'/'+str(o.den); }
+//template<> String str(const ratio& o) { return str(o.num/gcd(o.num,o.den))+'/'+str(o.den/gcd(o.num,o.den)); }
 
 struct Test : Widget {
     Image preview;
@@ -46,29 +53,39 @@ struct Test : Widget {
 
     Test() {
         const ImageF X = luminance(decodeImage(Map("test.jpg")));
+        Array(uint, histogram, 256); histogram.clear(0);
+        const float maxX = ::max(X);
+        for(const float x: X) histogram[int(255*x/maxX)]++;
 
-        /*for(int r: range(1))*/ //{
-            const ImageF x = gaussianBlur(X, 1);
-            //ImageF Y (X.size);
-            //for(uint i: range(Y.ref::size)) Y[i] = abs(X[i]-x[i]);
-            //return Y;
-        //}
-
-        const ImageF detH = ::detH(x);
-
-        ImageF max (detH.size);
-        max.clear(0); // FIXME: borders only
-        for(uint y0: range(1, detH.size.y-1)) {
-            for(uint x0: range(1, detH.size.x-1)) {
-                const float c = detH(x0, y0);
-                for(uint y: range(y0-1, y0+1 +1)) for(uint x: range(x0-1, x0+1 +1)) {
-                        if((y!=y0||x!=x0) && abs(detH(x,y)) >= abs(c)) goto break_;
-                } /*else*/ max(x0, y0) = abs(detH(x0, y0));
-                /**/ break_:;
+        const uint totalCount = X.ref::size;
+        uint64 totalSum = 0;
+        for(uint t: range(histogram.size)) totalSum += t*histogram[t];
+        uint backgroundCount = 0;
+        uint backgroundSum = 0;
+        //ratio maximumVariance {0,1};
+        float maximumVariance = 0;
+        uint thresholdIndex = 0;
+        for(uint t: range(histogram.size)) {
+            backgroundCount += histogram[t];
+            if(backgroundCount == 0) continue;
+            backgroundSum += t*histogram[t];
+            uint foregroundCount = totalCount - backgroundCount;
+            uint64 foregroundSum = totalSum - backgroundSum;
+            if(foregroundCount == 0) break;
+            const float foregroundMean = float(foregroundSum)/float(foregroundCount);
+            const float backgroundMean = float(backgroundSum)/float(backgroundCount);
+            const float variance = float(foregroundCount)*float(backgroundCount)*sq(foregroundMean - backgroundMean);
+            // variance = ω0*ω1*(μ0-μ1)² = ω0*ω1*(Σ0/ω0-Σ1/ω1)² = ω0*ω1*(Σ0*ω1-Σ1*ω0)²/(ω0*ω1)² = (Σ0*ω1-Σ1*ω0)²/(ω0*ω1)
+            //const ratio variance {sq(foregroundSum*backgroundCount-backgroundSum*foregroundCount),(uint64)foregroundCount*backgroundCount};
+            if(variance >= maximumVariance) {
+                maximumVariance=variance;
+                thresholdIndex = t;
             }
         }
-        log(sum((max/x) > 0.0001f));
-        preview = sRGB((max/x) > 0.0001f);
+        log(thresholdIndex);
+        const float threshold = thresholdIndex * maxX;
+
+        preview = sRGB(X > threshold);
         window = ::window(this, int2(preview.size), mainThread, 0);
         window->show();
     }

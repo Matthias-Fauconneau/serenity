@@ -308,10 +308,4 @@ template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
  return mref<T>((T*)o.data, o.size*sizeof(O)/sizeof(T));
 }
 
-// -- FILE
-
-/// Declares a file to be embedded in the binary
-#define FILE(name) static ref<byte> name() { \
- extern char _binary_ ## name ##_start[], _binary_ ## name ##_end[]; \
- return ref<byte>(_binary_ ## name ##_start,(size_t)(_binary_ ## name ##_end - _binary_ ## name ##_start)); \
-}
+#define Array(T, name, N) T name##_[N]; mref<T> name(name##_, N);
