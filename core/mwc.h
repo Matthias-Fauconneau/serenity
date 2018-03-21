@@ -2,6 +2,7 @@
 #include "core.h"
 #include "simd.h"
 #include "time.h"
+#include "vector.h"
 
 struct Random {
     v8ui state;
@@ -32,3 +33,4 @@ template<> inline v8sf Random::next<v8sf>() {
     return (v8sf)r2 - (v8sf)r1;        // 0 <= x < 1
 }
 template<> inline float Random::next<float>() { return next<v8sf>()[0]; }
+template<> inline vec2 Random::next<vec2>() { v8sf v = next<v8sf>(); return vec2(v[0], v[1]); }

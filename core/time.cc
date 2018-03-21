@@ -34,14 +34,14 @@ int Date::days() const {
     for(int month: range(this->month)) days+=daysInMonth(month, year);
     return days+day;
 }
-Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day),weekDay(weekDay) {
+Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day-1),weekDay(weekDay) {
     if(weekDay<0 && day>=0) this->weekDay=(Thursday+days())%7;
     invariant();
 }
 bool Date::summerTime() const { //FIXME: always European Summer Time
     assert(year>=0);
-    int lastMarchSunday = 31-1-(Date(31-1,March,year).weekDay+1)%7; // after 01:00 UTC on the last Sunday in March
-    int lastOctoberSunday = 31-1-(Date(31-1,October,year).weekDay+1)%7; // until 01:00 UTC on the last Sunday in October
+    int lastMarchSunday = 31-1-(Date(31,March,year).weekDay+1)%7; // after 01:00 UTC on the last Sunday in March
+    int lastOctoberSunday = 31-1-(Date(31,October,year).weekDay+1)%7; // until 01:00 UTC on the last Sunday in October
     return    (month>March    || (month==March    && (day>lastMarchSunday    || (day==lastMarchSunday    && hours>=1))))
             && (month<October || (month==October && (day<lastOctoberSunday || (day==lastOctoberSunday && hours<  1))));
 }

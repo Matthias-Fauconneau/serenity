@@ -62,13 +62,13 @@ inline String strD(const Time& num, const Time& div) {
 }
 
 struct Date {
-    int year=-1, month=-1, day=-1, hours=-1, minutes=-1, seconds=-1;
+    int year=-1, month=-1, day=-1 /*0-based*/, hours=-1, minutes=-1, seconds=-1;
     int weekDay=-1;
     void invariant() const;
     /// Default constructs an undetermined date
     Date(){}
     /// Constructs a calendar date (unspecified hour)
-    Date(int monthDay, int month, int year, int weekDay=-1);
+    Date(int monthDayOneBased, int month, int year, int weekDay=-1);
     /// Converts UNIX \a timestamp (in seconds) to a local time calendar date
     Date(int64 time);
     /// Returns days from Thursday, 1st January 1970

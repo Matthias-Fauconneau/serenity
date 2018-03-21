@@ -3,19 +3,19 @@
 #include "image-render.h"
 #include "jpeg.h"
 #include "algorithm.h"
-
+#include "mwc.h"
 
 struct Test : Widget {
     Image preview;
     unique<Window> window = nullptr;
 
     Test() {
-        const ImageF X = luminance(decodeImage(Map("test.jpg")));
+        const ImageF I = luminance(decodeImage(Map("test.jpg")));
         Array(uint, histogram, 256); histogram.clear(0);
-        const float maxX = ::max(X);
-        for(const float x: X) histogram[int((histogram.size-1)*x/maxX)]++;
+        const float maxX = ::max(I);
+        for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;
 
-        const uint totalCount = X.ref::size;
+        const uint totalCount = I.ref::size;
         uint64 totalSum = 0;
         for(uint t: range(histogram.size)) totalSum += t*histogram[t];
         uint backgroundCount = 0;
@@ -39,16 +39,29 @@ struct Test : Widget {
         }
         const float threshold = float(thresholdIndex)/float(histogram.size-1) * maxX;
 
-        preview = Image(X.size);
-        for(const uint y: range(1, X.size.y-1)) for(const uint x: range(1, X.size.x-1)) {
-            bool anyBackground = false;
-            for(const int dy: range(-1, 1 +1)) for(const int dx: range(-1, 1 +1)) {
-                if(X(x+dx, y+dy) < threshold) anyBackground = true;
+        buffer<vec2> X (I.ref::size, 0);
+        vec2 Σ = 0_;
+        for(const uint iy: range(I.size.y)) for(const uint ix: range(I.size.x)) {
+            vec2 x(ix,iy);
+            if(I(ix,iy) > threshold) {
+                X.append(x);
+                Σ += x;
             }
-            if(X(x,y) > threshold && anyBackground) preview(x,y) = byte4(0xFF);
         }
+        const vec2 μ = Σ / float(X.size);
+        for(vec2& x: X) x -= μ;
+        Random random;
+        vec2 r = normalize(random.next<vec2>());
+        for(auto_: range(4)) {
+            vec2 Σ = 0_;
+            for(vec2 x: X) Σ += dot(r,x)*x;
+            r = normalize(Σ);
+        }
+        log(r);
 
-        //preview = sRGB(X > threshold);
+        preview = sRGB(I > threshold);
+        line(preview, vec2(preview.size)/2.f, vec2(preview.size)/2.f+r*vec2(preview.size));
+
         window = ::window(this, int2(preview.size), mainThread, 0);
         window->show();
     }

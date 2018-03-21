@@ -74,14 +74,16 @@ void glyph(const Image& target, int2 origin, float fontSize, FontData& font, uin
     Font::Glyph glyph = font.font(fontSize).render(index);
     if(glyph.image) blit(target, int2(origin)+glyph.offset, glyph.image.size, glyph.image, color, opacity);
 }
+#endif
 
-static void blend(const Image& target, uint x, uint y, bgr3f color, float opacity, bool transpose) {
+static inline void blend(const Image& target, uint x, uint y, bgr3f color, float opacity, bool transpose) {
     if(transpose) swap(x,y);
     if(x >= uint(target.size.x) || y >= uint(target.size.y)) return;
-    blend(target, x,y, color, opacity);
+    blend(target(x,y), color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, bool hint) {
+void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity/*, bool hint*/) {
+#if 0
     //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
     if(hint) { // TODO: preprocess
         if(p1.x == p2.x) fill(target, int2(round(p1)), uint2(1, p2.y-p1.y), color, opacity);
@@ -89,6 +91,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
         else error("");
         return;
     }
+#endif
     //if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
     assert(bgr3f(0) <= color && color <= bgr3f(1));
 
@@ -124,6 +127,7 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity, boo
     }
 }
 
+#if 0
 void trapezoidY(const Image& target, Span s0, Span s1, bgr3f color, float opacity) {
     if(s0.x > s1.x) swap(s0, s1);
     for(uint x: range(max(0, int(s0.x)), min(int(target.size.x), int(s1.x)))) {
