@@ -138,7 +138,13 @@ struct Test : Widget {
         }
 
         const USV usv = SVD(B);
-        log(usv.U, usv.S, usv.V);
+        log(usv.S);
+        log(usv.V);
+        log(usv.V[3]);
+        Matrix A(2,3);
+        for(int i: range(usv.V.M)) A.at(i) = usv.V(i, usv.S.size-1);
+        log(A);
+        for(vec3 y: Y) log(A*y);
 
         preview = sRGB(R);
         mat2 U = V.inverse();
