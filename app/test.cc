@@ -4,6 +4,10 @@
 #include "jpeg.h"
 #include "algorithm.h"
 #include "mwc.h"
+#include "matrix.h"
+
+inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
+inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 
 struct Test : Widget {
     Image preview;
@@ -39,17 +43,36 @@ struct Test : Widget {
         }
         const float threshold = float(thresholdIndex)/float(histogram.size-1) * maxX;
 
-        buffer<vec2> X (I.ref::size, 0);
+        // Floodfill
+        buffer<uint2> stack (I.ref::size, 0);
+        stack.append(I.size/2u); // FIXME: Select largest region: floodfill from every unconnected seeds, keep largest region
+        ImageT</*bool*/float> R (I.size); R.clear(0);
+        while(stack) {
+            const uint2& p0 = stack.pop();
+            for(int2 dp: {int2(0,-1),int2(-1,0),int2(1,0),int2(0,1)}) { // 4-way connectivity
+                uint2 p = uint2(int2(p0)+dp);
+                if(anyGE(p,I.size)) continue;
+                if(I(p) <= threshold) continue;
+                if(R(p)) continue; // Already marked
+                R(p) = 1;
+                stack.append(p);
+            }
+        }
+
+        // Mean
+        buffer<vec2> X (R.ref::size, 0);
         vec2 Σ = 0_;
         for(const uint iy: range(I.size.y)) for(const uint ix: range(I.size.x)) {
             vec2 x(ix,iy);
-            if(I(ix,iy) > threshold) {
+            if(R(ix,iy)) {
                 X.append(x);
                 Σ += x;
             }
         }
         const vec2 μ = Σ / float(X.size);
         for(vec2& x: X) x -= μ;
+
+        // PCA
         Random random;
         vec2 r = normalize(random.next<vec2>());
         for(auto_: range(4)) {
@@ -57,11 +80,41 @@ struct Test : Widget {
             for(vec2 x: X) Σ += dot(r,x)*x;
             r = normalize(Σ);
         }
-        log(r);
+        const vec2 e0 = r;
+        const vec2 e1 = normal(e0);
+        const mat2 V (e0, e1);
 
-        preview = sRGB(I > threshold);
-        line(preview, vec2(preview.size)/2.f, vec2(preview.size)/2.f+r*vec2(preview.size));
+        // Initial corner estimation (maximize area of quadrant in eigenspace)
+        vec2 corners[4] = {0_,0_,0_,0_}; // eigenspace
+        for(const vec2& x : X) {
+            const vec2 Vx = V * x;
+            static constexpr int quadrantToWinding[2][2] = {{0,1},{3,2}};
+            vec2& c = corners[quadrantToWinding[Vx.x>0][Vx.y>0]];
+            if(abs(Vx.x*Vx.y) > abs(c.x*c.y)) c = Vx;
+        }
 
+        // Iterative corner optimization (maximize total area)
+        for(uint i: range(4)) {
+            const vec2 C3 = corners[(i+3)%4];
+            vec2& C0 = corners[(i+0)%4];
+            const vec2 C1 = corners[(i+1)%4];
+            float A0 = cross(C1-C0, C3-C0);
+            for(const vec2& x : X) {
+                const vec2 Vx = V * x;
+                const float A = cross(C1-Vx, C3-Vx);
+                if(A > A0) {
+                    A0 = A;
+                    C0 = Vx;
+                }
+            }
+        }
+
+        preview = sRGB(R);
+        mat2 U = V.inverse();
+        line(preview, μ+U*corners[0], μ+U*corners[1], {0,0,1});
+        line(preview, μ+U*corners[1], μ+U*corners[2], {0,0,1});
+        line(preview, μ+U*corners[2], μ+U*corners[3], {0,0,1});
+        line(preview, μ+U*corners[3], μ+U*corners[0], {0,0,1});
         window = ::window(this, int2(preview.size), mainThread, 0);
         window->show();
     }

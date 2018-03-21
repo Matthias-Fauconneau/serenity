@@ -68,7 +68,7 @@ DNG parseDNG(ref<byte> file, bool decode) {
                         assert_(e.count>1);
                         offset = reference.read32();
                         uint32 lastOffset = offset;
-                        for(uint unused i : range(1, e.count)) {
+                        for(auto_: range(1, e.count)) {
                             uint32 nextOffset = reference.read32();
                             uint32 stride = (nextOffset - lastOffset)/2;
                             if(!image.stride) image.stride = stride; //16bit

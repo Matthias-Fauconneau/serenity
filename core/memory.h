@@ -62,6 +62,10 @@ generic struct buffer : mref<T> {
   slice(__atomic_fetch_add(&size, source.size, 5/*SeqCst*/), source.size).copy(source);
  }
 #define appendAtomic append // atomic by default
+
+ /// Removes the last element and returns its value
+ T takeLast() { T t = at(size-1); size-=1; return t; }
+ T pop() { return takeLast(); }
 };
 
 typedef buffer<char> String;
