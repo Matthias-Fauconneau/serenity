@@ -85,19 +85,19 @@ struct Test : Widget {
         const mat2 V (e0, e1);
 
         // Initial corner estimation (maximize area of quadrant in eigenspace)
-        vec2 corners[4] = {0_,0_,0_,0_}; // eigenspace
+        vec2 C[4] = {0_,0_,0_,0_}; // eigenspace
         for(const vec2& x : X) {
             const vec2 Vx = V * x;
             static constexpr int quadrantToWinding[2][2] = {{0,1},{3,2}};
-            vec2& c = corners[quadrantToWinding[Vx.x>0][Vx.y>0]];
+            vec2& c = C[quadrantToWinding[Vx.x>0][Vx.y>0]];
             if(abs(Vx.x*Vx.y) > abs(c.x*c.y)) c = Vx;
         }
 
         // Iterative corner optimization (maximize total area)
         for(uint i: range(4)) {
-            const vec2 C3 = corners[(i+3)%4];
-            vec2& C0 = corners[(i+0)%4];
-            const vec2 C1 = corners[(i+1)%4];
+            const vec2 C3 = C[(i+3)%4];
+            vec2& C0 = C[(i+0)%4];
+            const vec2 C1 = C[(i+1)%4];
             float A0 = cross(C1-C0, C3-C0);
             for(const vec2& x : X) {
                 const vec2 Vx = V * x;
@@ -109,12 +109,25 @@ struct Test : Widget {
             }
         }
 
+        // DLT: x α Ay => Ba = 0
+        const uint N = 4;
+        float B[N][6];
+        const vec3 Y[4] = {{0,0,0},{210,0,0},{210,297,0},{0,297,0}};
+        for(uint k: range(N)) {
+            B[k][0] = +C[k].y * Y[k].x;
+            B[k][1] = -C[k].x * Y[k].x;
+            B[k][2] = +C[k].y * Y[k].y;
+            B[k][3] = -C[k].x * Y[k].y;
+            B[k][4] = +C[k].y * Y[k].z;
+            B[k][5] = -C[k].x * Y[k].z;
+        }
+
         preview = sRGB(R);
         mat2 U = V.inverse();
-        line(preview, μ+U*corners[0], μ+U*corners[1], {0,0,1});
-        line(preview, μ+U*corners[1], μ+U*corners[2], {0,0,1});
-        line(preview, μ+U*corners[2], μ+U*corners[3], {0,0,1});
-        line(preview, μ+U*corners[3], μ+U*corners[0], {0,0,1});
+        line(preview, μ+U*C[0], μ+U*C[1], {0,0,1});
+        line(preview, μ+U*C[1], μ+U*C[2], {0,0,1});
+        line(preview, μ+U*C[2], μ+U*C[3], {0,0,1});
+        line(preview, μ+U*C[3], μ+U*C[0], {0,0,1});
         window = ::window(this, int2(preview.size), mainThread, 0);
         window->show();
     }
