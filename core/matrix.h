@@ -1,7 +1,6 @@
 #pragma once
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
-#include "math.h"
 
 inline struct mat2 operator*(float s, mat2 M);
 /// 2D linear transformation
@@ -40,6 +39,7 @@ inline mat2 operator*(float s, mat2 M) {
     return r;
 }
 
+#if 0
 struct mat3; inline mat3 operator*(float s, mat3 M);
 /// 2D projective transformation or 3D linear transformation
 struct mat3 {
@@ -200,3 +200,4 @@ inline mat4 perspective(const float near, const float far, const float s=0, cons
     M.translate(vec3(-s,-t,0));
     return M;
 }
+#endif

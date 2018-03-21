@@ -16,6 +16,7 @@ static bool leap(int year) { return (year%4==0)&&((year%100!=0)||(year%400==0));
 int daysInMonth(int month, int year=0) {
     if(month==1 && leap(year)) { assert(year!=0); return 29; }
     static constexpr int daysPerMonth[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    assert_(month<12);
     return daysPerMonth[month];
 }
 
@@ -34,7 +35,7 @@ int Date::days() const {
     for(int month: range(this->month)) days+=daysInMonth(month, year);
     return days+day;
 }
-Date::Date(int day, int month, int year, int weekDay) :year(year),month(month),day(day-1),weekDay(weekDay) {
+Date::Date(int day, int month, int year, int weekDay) : year(year), month(month), day(day-1), weekDay(weekDay) {
     if(weekDay<0 && day>=0) this->weekDay=(Thursday+days())%7;
     invariant();
 }

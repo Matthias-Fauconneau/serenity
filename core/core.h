@@ -74,7 +74,8 @@ typedef __UINT64_TYPE__ uint64;
 typedef __SIZE_TYPE__ size_t;
 typedef __fp16 half;
 typedef float float32;
-constexpr size_t invalid = ~0ull; // Invalid index
+static constexpr size_t invalid = ~0ull; // Invalid index
+static constexpr float inff = __builtin_inff();
 
 // -- Number arithmetic
 template<Type A, Type B> static inline bool operator >(const A& a, const B& b) { return b<a; }

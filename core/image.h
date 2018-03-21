@@ -1,7 +1,6 @@
 #pragma once
 /// \file image.h Image container and operations
 #include "vector.h"
-#include "math.h"
 
 /// 2D array of pixels
 generic struct ImageT : buffer<T> {

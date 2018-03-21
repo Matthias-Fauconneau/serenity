@@ -5,6 +5,21 @@
 #include "algorithm.h"
 #include "mwc.h"
 #include "matrix.h"
+#include "jacobi.h"
+
+template<> inline String str(const Matrix& A) {
+    array<char> s;
+    for(uint i: range(A.M)) {
+        if(A.N==1) s.append("\t"+fmt(A(i,0), 4u));
+        else {
+            for(uint j: range(A.N)) {
+                s.append("\t"+fmt(A(i,j), 4u));
+            }
+            if(i<A.M-1) s.append('\n');
+        }
+    }
+    return move(s);
+}
 
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
@@ -110,17 +125,20 @@ struct Test : Widget {
         }
 
         // DLT: x α Ay => Ba = 0
-        const uint N = 4;
-        float B[N][6];
+        static constexpr uint N = 4;
+        Matrix B(N, 6);
         const vec3 Y[4] = {{0,0,0},{210,0,0},{210,297,0},{0,297,0}};
         for(uint k: range(N)) {
-            B[k][0] = +C[k].y * Y[k].x;
-            B[k][1] = -C[k].x * Y[k].x;
-            B[k][2] = +C[k].y * Y[k].y;
-            B[k][3] = -C[k].x * Y[k].y;
-            B[k][4] = +C[k].y * Y[k].z;
-            B[k][5] = -C[k].x * Y[k].z;
+            B(k, 0) = +C[k].y * Y[k].x;
+            B(k, 1) = -C[k].x * Y[k].x;
+            B(k, 2) = +C[k].y * Y[k].y;
+            B(k, 3) = -C[k].x * Y[k].y;
+            B(k, 4) = +C[k].y * Y[k].z;
+            B(k, 5) = -C[k].x * Y[k].z;
         }
+
+        const USV usv = SVD(B);
+        log(usv.U, usv.S, usv.V);
 
         preview = sRGB(R);
         mat2 U = V.inverse();

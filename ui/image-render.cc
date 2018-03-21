@@ -1,4 +1,5 @@
 #include "image-render.h"
+#include "math.h"
 
 void blend(byte4& target, bgr3f source_linear, float opacity) {
     bgr3f target_linear(sRGB_reverse[target[0]], sRGB_reverse[target[1]], sRGB_reverse[target[2]]);
@@ -9,7 +10,6 @@ void blend(byte4& target, bgr3f source_linear, float opacity) {
 
 #if 0
 #include "font.h"
-#include "math.h"
 
 static void fill(uint* target, uint stride, uint w, uint h, uint value) {
     for(auto_: range(h)) {

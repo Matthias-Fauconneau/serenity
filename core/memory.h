@@ -26,9 +26,8 @@ generic struct buffer : mref<T> {
  /// Allocates an uninitialized buffer for \a capacity elements
  buffer(size_t capacity, size_t size) : mref<T>((T*)0, size), capacity(capacity) {
   assert_(capacity>=size);
-  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T)))
-   error("Out of memory", size, capacity, sizeof(T));
-  assert_(size_t(data)%32==0);
+  if(capacity && posix_memalign((void**)&data, 64, capacity*sizeof(T))) error("Out of memory"_); //, size, capacity, sizeof(T));
+  assert(size_t(data)%32==0);
  }
  /*explicit*/ buffer(size_t size) : buffer(size, size) {}
 
@@ -123,7 +122,7 @@ generic buffer<T> join(ref<ref<T>> list, const ref<T> separator) {
  if(!list) return {};
  size_t size = 0;
  for(auto e: list) {
-  assert_(size < 8192 && e.size < 8192, size, e.size, list.size);
+  assert(size < 8192 && e.size < 8192, size, e.size, list.size);
   size += e.size;
  }
  buffer<T> target (size + (list.size-1)*separator.size, 0);
