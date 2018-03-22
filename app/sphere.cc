@@ -166,8 +166,6 @@ static const int3 diskSearch(const ImageF& source, const int maxRadius/*, const 
     return bestTransform;
 }
 
-inline float mean(const ref<float> v) { return sum(v, 0.)/v.size; }
-
 inline void multiply(const ImageF& Y, const ImageF& A, const ImageF& B, int2 centerOffset=0_0) {
     assert_(Y.size == ::min(A.size, B.size));
     apply(A, B, centerOffset, [&](const uint y, const uint a, const uint b){ Y[y]=A[a]*B[b]; });

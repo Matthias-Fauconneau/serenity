@@ -309,4 +309,8 @@ template<Type T, Type O> mref<T> mcast(const mref<O>& o) {
  return mref<T>((T*)o.data, o.size*sizeof(O)/sizeof(T));
 }
 
+template<Type T, size_t N> struct Array : mref<T> {
+    T _[N];
+    Array() : mref<T>(_, N) {}
+};
 #define Array(T, name, N) T name##_[N]; mref<T> name(name##_, N);

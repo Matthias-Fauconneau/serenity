@@ -30,7 +30,7 @@ struct Test : Widget {
 
     Test() {
         const ImageF I = luminance(decodeImage(Map("test.jpg")));
-        Array(uint, histogram, 256); histogram.clear(0);
+        Array<uint, 256> histogram; histogram.clear(0);
         const float maxX = ::max(I);
         for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;
 
@@ -126,25 +126,51 @@ struct Test : Widget {
 
         // DLT: x α Ay => Ba = 0
         static constexpr uint N = 4;
-        Matrix B(N, 6);
-        const vec3 Y[4] = {{0,0,0},{210,0,0},{210,297,0},{0,297,0}};
-        for(uint k: range(N)) {
-            B(k, 0) = +C[k].y * Y[k].x;
-            B(k, 1) = -C[k].x * Y[k].x;
-            B(k, 2) = +C[k].y * Y[k].y;
-            B(k, 3) = -C[k].x * Y[k].y;
-            B(k, 4) = +C[k].y * Y[k].z;
-            B(k, 5) = -C[k].x * Y[k].z;
+
+        Array<vec2, 4> TX; {
+            const ref<vec2> X = C;
+            const vec2 μ = ::mean(X);
+            TX.apply([=](const vec2 x){ return x-μ; }, X);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
+            TX.apply([=](const vec2 x){ return x/μD; }, TX);
         }
 
-        const USV usv = SVD(B);
+        const ref<vec2> X´ = {{0,0},{210,0},{210,297},{0,297}}; // FIXME: normalize origin and average distance ~ √2
+        log(X´);
+        Array<vec2, 4> TX´; {
+            const ref<vec2> X = X´;
+            const vec2 μ = ::mean<vec2>(X);
+            TX´.apply([=](const vec2 x){ return x-μ; }, X);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
+            TX´.apply([=](const vec2 x){ return x/μD; }, TX´);
+        }
+
+        Matrix A(8, 9);
+        for(uint i: range(N)) {
+            A(i+0, 0) = -TX´[i].x;
+            A(i+0, 1) = -TX´[i].y;
+            A(i+0, 2) = -1;
+            A(i+0, 3) = 0; A(i+0, 4) = 0; A(i+0, 5) = 0;
+            A(i+1, 0) = 0; A(i+1, 1) = 0; A(i+1, 2) = 0;
+            A(i+1, 3) = -TX´[i].x;
+            A(i+1, 4) = -TX´[i].y;
+            A(i+1, 5) = -1;
+            A(i+0, 6) = TX[i].x*TX´[i].x;
+            A(i+0, 7) = TX[i].x*TX´[i].y;
+            A(i+0, 8) = TX[i].x;
+            A(i+1, 6) = TX[i].y*TX´[i].x;
+            A(i+1, 7) = TX[i].y*TX´[i].y;
+            A(i+1, 8) = TX[i].y;
+        }
+
+        const USV usv = SVD(A);
         log(usv.S);
         log(usv.V);
         log(usv.V[3]);
-        Matrix A(2,3);
-        for(int i: range(usv.V.M)) A.at(i) = usv.V(i, usv.S.size-1);
+        mat3 H;
+        for(int i: range(usv.V.M)) H(i/3, i%3) = usv.V(i, usv.S.size-1);
         log(A);
-        for(vec3 y: Y) log(A*y);
+        for(int k: range(N)) log(H*TX´[k], TX[k]);
 
         preview = sRGB(R);
         mat2 U = V.inverse();
