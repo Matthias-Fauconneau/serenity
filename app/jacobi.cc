@@ -1,4 +1,3 @@
-//#define EIGEN_NO_DEBUG 1
 #include <eigen3/Eigen/SVD>
 #undef assert
 

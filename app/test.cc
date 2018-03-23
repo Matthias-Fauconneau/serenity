@@ -24,6 +24,17 @@ template<> inline String str(const Matrix& A) {
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 
+typedef ref<float> vector;
+
+Vector operator*(const Matrix& A, const vector& x) {
+    assert_(A.N == x.size);
+    Vector y(A.M);
+    for(int i: range(A.M)) { y[i]=0; for(int k: range(A.N)) y[i] += A(i,k)*x[k]; }
+    return y;
+}
+
+static inline float length(const vector& x) { float s=0; for(float xi: x) s+=sq(xi); return sqrt(s); }
+
 struct Test : Widget {
     Image preview;
     unique<Window> window = nullptr;
@@ -132,45 +143,53 @@ struct Test : Widget {
             const vec2 μ = ::mean(X);
             TX.apply([=](const vec2 x){ return x-μ; }, X);
             const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
-            TX.apply([=](const vec2 x){ return x/μD; }, TX);
+            TX.apply([=](const vec2 x){ return x*sqrt(2)/μD; }, TX);
         }
+        log(TX);
 
         const ref<vec2> X´ = {{0,0},{210,0},{210,297},{0,297}}; // FIXME: normalize origin and average distance ~ √2
-        log(X´);
         Array<vec2, 4> TX´; {
             const ref<vec2> X = X´;
             const vec2 μ = ::mean<vec2>(X);
             TX´.apply([=](const vec2 x){ return x-μ; }, X);
             const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
-            TX´.apply([=](const vec2 x){ return x/μD; }, TX´);
+            TX´.apply([=](const vec2 x){ return x*sqrt(2)/μD; }, TX´);
         }
+        log(TX´);
 
-        Matrix A(8, 9);
+        Matrix A(N*2, 9);
         for(uint i: range(N)) {
-            A(i+0, 0) = -TX´[i].x;
-            A(i+0, 1) = -TX´[i].y;
-            A(i+0, 2) = -1;
-            A(i+0, 3) = 0; A(i+0, 4) = 0; A(i+0, 5) = 0;
-            A(i+1, 0) = 0; A(i+1, 1) = 0; A(i+1, 2) = 0;
-            A(i+1, 3) = -TX´[i].x;
-            A(i+1, 4) = -TX´[i].y;
-            A(i+1, 5) = -1;
-            A(i+0, 6) = TX[i].x*TX´[i].x;
-            A(i+0, 7) = TX[i].x*TX´[i].y;
-            A(i+0, 8) = TX[i].x;
-            A(i+1, 6) = TX[i].y*TX´[i].x;
-            A(i+1, 7) = TX[i].y*TX´[i].y;
-            A(i+1, 8) = TX[i].y;
+            const uint I = i*2;
+            A(I+0, 0) = -TX[i].x;
+            A(I+0, 1) = -TX[i].y;
+            A(I+0, 2) = -1;
+            A(I+0, 3) = 0; A(I+0, 4) = 0; A(I+0, 5) = 0;
+            A(I+1, 0) = 0; A(I+1, 1) = 0; A(I+1, 2) = 0;
+            A(I+1, 3) = -TX[i].x;
+            A(I+1, 4) = -TX[i].y;
+            A(I+1, 5) = -1;
+            A(I+0, 6) = TX´[i].x*TX[i].x;
+            A(I+0, 7) = TX´[i].x*TX[i].y;
+            A(I+0, 8) = TX´[i].x;
+            A(I+1, 6) = TX´[i].y*TX[i].x;
+            A(I+1, 7) = TX´[i].y*TX[i].y;
+            A(I+1, 8) = TX´[i].y;
         }
-
+        log(A);
         const USV usv = SVD(A);
         log(usv.S);
-        log(usv.V);
-        log(usv.V[3]);
+        log(usv.V,'\n');
+        const vector h = usv.V[usv.V.N-1]; //[usv.S.size-1];
+        log(h);
+        log(::length(h));
+        log(A*h);
+        log(::length(A*h));
+        for(int j: range(A.N)) log(length(A*usv.V[j]));
+        //for(int i: range(A.M)) assert_((A*h)[i]==0.f, (A*h)[i]);
         mat3 H;
-        for(int i: range(usv.V.M)) H(i/3, i%3) = usv.V(i, usv.S.size-1);
-        log(A);
-        for(int k: range(N)) log(H*TX´[k], TX[k]);
+        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];
+        log(H);
+        for(int k: range(N)) log(H*TX[k], TX´[k]);
 
         preview = sRGB(R);
         mat2 U = V.inverse();
@@ -178,8 +197,10 @@ struct Test : Widget {
         line(preview, μ+U*C[1], μ+U*C[2], {0,0,1});
         line(preview, μ+U*C[2], μ+U*C[3], {0,0,1});
         line(preview, μ+U*C[3], μ+U*C[0], {0,0,1});
-        window = ::window(this, int2(preview.size), mainThread, 0);
-        window->show();
+        if(0) {
+            window = ::window(this, int2(preview.size), mainThread, 0);
+            window->show();
+        }
     }
     void render(RenderTarget2D& target_, vec2, vec2) override {
         const Image& target = (ImageRenderTarget&)target_;

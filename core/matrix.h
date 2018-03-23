@@ -56,7 +56,8 @@ struct mat3 {
     vec3& operator[](int j) { return (vec3&)data[j*3]; }
     const vec3& operator[](int j) const { return *reinterpret_cast<const vec3*>(&data[j*3]); }
 
-    vec2 operator*(vec2 v) const { vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+    //vec2 operator*(vec2 v) const { vec2 r; for(int i: range(2)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r; }
+    vec2 operator*(vec2 v) const { vec3 r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+1*M(i,2); return r.xy()/r.z; }
     vec3 operator*(vec3 v) const { vec3 r; for(int i: range(3)) r[i] = v.x*M(i,0)+v.y*M(i,1)+v.z*M(i,2); return r; }
     mat3 operator*(mat3 b) const {
         mat3 r(0_);
@@ -73,19 +74,13 @@ struct mat3 {
     mat3 transpose() {mat3 r; for(int j: range(3)) for(int i: range(3)) r(j,i)=M(i,j); return r;}
     mat3 cofactor() const {
         mat3 C;
-        C(0,0) =  (M(1,1) * M(2,2) - M(2,1) * M(1,2)), C(0,1) = -(M(1,0) * M(2,2) - M(2,0) * M(1,2)), C(0,2) =  (M(1,0) * M(2,1) - M(2,0) * M(1,1));
-        C(1,0) = -(M(0,1) * M(2,2) - M(2,1) * M(0,2)), C(1,1) =  (M(0,0) * M(2,2) - M(2,0) * M(0,2)), C(1,2) = -(M(0,0) * M(2,1) - M(2,0) * M(0,1));
-        C(2,0) =  (M(0,1) * M(1,2) - M(1,1) * M(0,2)), C(2,1) = -(M(0,0) * M(1,2) - M(1,0) * M(0,2)), C(2,2) =  (M(0,0) * M(1,1) - M(0,1) * M(1,0));
+        C(0,0) =  (M(1,1)*M(2,2) - M(2,1)*M(1,2)); C(0,1) = -(M(1,0)*M(2,2) - M(2,0)*M(1,2)); C(0,2) =  (M(1,0)*M(2,1) - M(2,0)*M(1,1));
+        C(1,0) = -(M(0,1)*M(2,2) - M(2,1)*M(0,2)); C(1,1) =  (M(0,0)*M(2,2) - M(2,0)*M(0,2)); C(1,2) = -(M(0,0)*M(2,1) - M(2,0)*M(0,1));
+        C(2,0) =  (M(0,1)*M(1,2) - M(1,1)*M(0,2)); C(2,1) = -(M(0,0)*M(1,2) - M(1,0)*M(0,2)); C(2,2) =  (M(0,0)*M(1,1) - M(0,1)*M(1,0));
         return C;
     }
     mat3 adjugate() const { return cofactor().transpose(); }
     mat3 ¯¹() const { return 1/det() * adjugate() ; }
-
-    mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
-    mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
-    mat3& rotateX(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r(1,1) = c; r(2,2) = c; r(1,2) = -s; r(2,1) = s; return *this = *this * r; }
-    mat3& rotateY(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r(0,0) = c; r(2,2) = c; r(2,0) = -s; r(0,2) = s; return *this = *this * r; }
-    mat3& rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat3 r; r(0,0) = c; r(1,1) = c; r(0,1) = -s; r(1,0) = s; return *this = *this * r; }
 };
 inline mat3 operator*(float s, mat3 M) {
     mat3 r;
@@ -136,10 +131,10 @@ struct mat4 {
     float det() const { return M(0,0)*minor(1,2,3,1,2,3) - M(0,1)*minor(0,2,3,1,2,3)+ M(0,2)*minor(0,1,3,1,2,3) - M(0,3)*minor(0,1,2,1,2,3); }
     mat4 cofactor() const {
         mat4 C;
-        C(0,0) =  minor(1, 2, 3, 1, 2, 3), C(0,1) = -minor(0, 2, 3, 1, 2, 3), C(0,2) =  minor(0, 1, 3, 1, 2, 3), C(0,3) = -minor(0, 1, 2, 1, 2, 3);
-        C(1,0) = -minor(1, 2, 3, 0, 2, 3), C(1,1) =  minor(0, 2, 3, 0, 2, 3), C(1,2) = -minor(0, 1, 3, 0, 2, 3), C(1,3) =  minor(0, 1, 2, 0, 2, 3);
-        C(2,0) =  minor(1, 2, 3, 0, 1, 3), C(2,1) = -minor(0, 2, 3, 0, 1, 3), C(2,2) =  minor(0, 1, 3, 0, 1, 3), C(2,3) = -minor(0, 1, 2, 0, 1, 3);
-        C(3,0) = -minor(1, 2, 3, 0, 1, 2), C(3,1) =  minor(0, 2, 3, 0, 1, 2), C(3,2) = -minor(0, 1, 3, 0, 1, 2), C(3,3) =  minor(0, 1, 2, 0, 1, 2);
+        C(0,0) =  minor(1, 2, 3, 1, 2, 3); C(0,1) = -minor(0, 2, 3, 1, 2, 3); C(0,2) =  minor(0, 1, 3, 1, 2, 3); C(0,3) = -minor(0, 1, 2, 1, 2, 3);
+        C(1,0) = -minor(1, 2, 3, 0, 2, 3); C(1,1) =  minor(0, 2, 3, 0, 2, 3); C(1,2) = -minor(0, 1, 3, 0, 2, 3); C(1,3) =  minor(0, 1, 2, 0, 2, 3);
+        C(2,0) =  minor(1, 2, 3, 0, 1, 3); C(2,1) = -minor(0, 2, 3, 0, 1, 3); C(2,2) =  minor(0, 1, 3, 0, 1, 3); C(2,3) = -minor(0, 1, 2, 0, 1, 3);
+        C(3,0) = -minor(1, 2, 3, 0, 1, 2); C(3,1) =  minor(0, 2, 3, 0, 1, 2); C(3,2) = -minor(0, 1, 3, 0, 1, 2); C(3,3) =  minor(0, 1, 2, 0, 1, 2);
         return C;
     }
     mat4 ᵀ() const {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(j,i)=M(i,j); return r;}

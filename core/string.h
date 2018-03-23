@@ -171,7 +171,8 @@ generic String str(const buffer<T>& source) { return fmt(source); }
 generic String str(const array<T>& source) { return fmt(source); }
 
 /// Converts static arrays
-template<Type T, size_t N> String str(const T (&source)[N], string separator=" ") { return str(ref<T>(source, N), separator); }
+template<Type T, size_t N> String str(const T (&source)[N]) { return fmt(ref<T>(source, N)); }
+template<Type T, size_t N> String str(const Array<T, N> source) { return fmt((ref<T>)source); }
 
 /// Converts and concatenates all arguments separating with spaces
 /// \note Use join({str(args)...}) to convert and concatenate without spaces
