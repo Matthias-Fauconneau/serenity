@@ -33,7 +33,7 @@ Vector operator*(const Matrix& A, const vector& x) {
     return y;
 }
 
-static inline float length(const vector& x) { float s=0; for(float xi: x) s+=sq(xi); return sqrt(s); }
+//static inline float length(const vector& x) { float s=0; for(float xi: x) s+=sq(xi); return sqrt(s); }
 
 struct Test : Widget {
     Image preview;
@@ -138,24 +138,30 @@ struct Test : Widget {
         // DLT: x α Ay => Ba = 0
         static constexpr uint N = 4;
 
+        const ref<vec2> modelC = {{0,0},{210,0},{210,297},{0,297}}; // FIXME: normalize origin and average distance ~ √2
+#if 1
+        const ref<vec2> TX = modelC;
+        mat2 U = V.inverse();
+        const buffer<vec2> TX´ = apply(ref<vec2>(C), [μ,U](vec2 x){ return μ+U*x; });
+#else
         Array<vec2, 4> TX; {
-            const ref<vec2> X = C;
+            const ref<vec2> X = modelC;
             const vec2 μ = ::mean(X);
             TX.apply([=](const vec2 x){ return x-μ; }, X);
-            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
-            TX.apply([=](const vec2 x){ return x*sqrt(2)/μD; }, TX);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
+            TX.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX);
         }
         log(TX);
 
-        const ref<vec2> X´ = {{0,0},{210,0},{210,297},{0,297}}; // FIXME: normalize origin and average distance ~ √2
         Array<vec2, 4> TX´; {
             const ref<vec2> X = X´;
             const vec2 μ = ::mean<vec2>(X);
             TX´.apply([=](const vec2 x){ return x-μ; }, X);
-            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::length(x); }));
-            TX´.apply([=](const vec2 x){ return x*sqrt(2)/μD; }, TX´);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
+            TX´.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX´);
         }
         log(TX´);
+#endif
 
         Matrix A(N*2, 9);
         for(uint i: range(N)) {
@@ -175,29 +181,34 @@ struct Test : Widget {
             A(I+1, 7) = TX´[i].y*TX[i].y;
             A(I+1, 8) = TX´[i].y;
         }
-        log(A);
         const USV usv = SVD(A);
-        log(usv.S);
-        log(usv.V,'\n');
-        const vector h = usv.V[usv.V.N-1]; //[usv.S.size-1];
-        log(h);
-        log(::length(h));
-        log(A*h);
-        log(::length(A*h));
-        for(int j: range(A.N)) log(length(A*usv.V[j]));
-        //for(int i: range(A.M)) assert_((A*h)[i]==0.f, (A*h)[i]);
+        const vector h = usv.V[usv.V.N-1];
         mat3 H;
         for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];
-        log(H);
         for(int k: range(N)) log(H*TX[k], TX´[k]);
 
-        preview = sRGB(R);
+        // Crude approximation
+        mat4 P;
+        P[0] = vec4(H[0], 0);
+        P[1] = vec4(H[1], 0);
+        P[2] = vec4(cross(H[0],H[1]), 0);
+        P[3] = vec4(H[2], 1);
+
+        preview = sRGB(R, 128);
+#if 1
+        line(preview, H*modelC[0], H*modelC[1], bgr3f(1));
+        line(preview, H*modelC[1], H*modelC[2], bgr3f(1));
+        line(preview, H*modelC[2], H*modelC[3], bgr3f(1));
+        line(preview, H*modelC[3], H*modelC[0], bgr3f(1));
+#else
         mat2 U = V.inverse();
         line(preview, μ+U*C[0], μ+U*C[1], {0,0,1});
         line(preview, μ+U*C[1], μ+U*C[2], {0,0,1});
         line(preview, μ+U*C[2], μ+U*C[3], {0,0,1});
         line(preview, μ+U*C[3], μ+U*C[0], {0,0,1});
-        if(0) {
+#endif
+
+        if(1) {
             window = ::window(this, int2(preview.size), mainThread, 0);
             window->show();
         }
