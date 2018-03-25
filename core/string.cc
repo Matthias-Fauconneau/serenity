@@ -156,7 +156,7 @@ static inline float round(float x) { return __builtin_round(x); }
 static inline bool isNaN(float x) { return x!=x; }
 static inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 
-String fmt(double n, uint precision, uint exponent, unused uint pad) {
+String fmt(double n, const uint precision, const uint exponent, const uint pad) {
  bool sign = n<0; n=abs(n);
  if(__builtin_isnan(n)) return "NaN"__; //::right("NaN", pad);
  if(n==-__builtin_inf()) return "-∞"__; //::right("-∞", pad+2);
@@ -185,7 +185,7 @@ String fmt(double n, uint precision, uint exponent, unused uint pad) {
  else if(exponent==3 && e==6) s.append('M');
  else if(exponent==3 && e==9) s.append('G');
  else if(e) { s.append('e'); s.append(str(e)); }
- //if(pad > s.size) return right(s, pad);
+ if(pad > s.size) return right(s, pad);
  return move(s);
 }
 

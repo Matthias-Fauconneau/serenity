@@ -184,8 +184,8 @@ struct Test : Widget {
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
         mat3 H;
-        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];
-        for(int k: range(N)) log(H*TX[k], TX´[k]);
+        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i]/h[8];
+        //for(int k: range(N)) log(H*TX[k], TX´[k]);
 
         // Crude approximation
         mat4 P;
@@ -193,19 +193,21 @@ struct Test : Widget {
         P[1] = vec4(H[1], 0);
         P[2] = vec4(cross(H[0],H[1]), 0);
         P[3] = vec4(H[2], 1);
+        log(H);
+        log(P);
+        //error("");
 
         preview = sRGB(R, 128);
-#if 1
+#if 0
         line(preview, H*modelC[0], H*modelC[1], bgr3f(1));
         line(preview, H*modelC[1], H*modelC[2], bgr3f(1));
         line(preview, H*modelC[2], H*modelC[3], bgr3f(1));
         line(preview, H*modelC[3], H*modelC[0], bgr3f(1));
 #else
-        mat2 U = V.inverse();
-        line(preview, μ+U*C[0], μ+U*C[1], {0,0,1});
-        line(preview, μ+U*C[1], μ+U*C[2], {0,0,1});
-        line(preview, μ+U*C[2], μ+U*C[3], {0,0,1});
-        line(preview, μ+U*C[3], μ+U*C[0], {0,0,1});
+        line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[1], 0)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[2], 0)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[3], 0)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[0], 0)).xy(), bgr3f(1));
 #endif
 
         if(1) {
