@@ -285,20 +285,23 @@ struct Render : Drag {
 
     vec3 viewPosition = vec3(0,0,0); //vec3(-1./2,0,0);
 
-    const Image I = rotateHalfTurn(decodeImage(Map("test.jpg")));
+    const Image I_sRGB = rotateHalfTurn(decodeImage(Map("test.jpg")));
+    const ImageF I = luminance(I_sRGB);
+    const Image sRGB_I = sRGB(I, 1);
 
     unique<Window> window = ::window(this, int2(I.size/2u), mainThread, 0);
 
     Render() : Drag(vec2(0,-π/3)) {
         {
             const uint2 size = uint2(128/*512*/); // FIXME: auto resolution
+            const float s = 3./2;
             scene.quads.append(Scene::Quad{uint4(
-                                           scene.vertices.add(vec3(-1,-1,0)), scene.vertices.add(vec3(1,-1,0)),
-                                           scene.vertices.add(vec3(1,1,0)), scene.vertices.add(vec3(-1,1,0))),
+                                           scene.vertices.add(vec3(-s,-s,0)), scene.vertices.add(vec3(+s,-s,0)),
+                                           scene.vertices.add(vec3(+s,+s,0)), scene.vertices.add(vec3(-s,+s,0))),
                                            Image3f(size), true, Image3f(size)});
         }
 
-        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), true );
+        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), false);
         importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
         importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
         importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
@@ -329,6 +332,9 @@ struct Render : Drag {
         Time time {true};
 
         //target.clear(byte4(0,0,0,0xFF));
+        //target.copy(I_sRGB);
+        //target.copy(sRGB(I, 1));
+        target.copy(sRGB_I);
 
         // Transform
         buffer<vec3> viewVertices (scene.vertices.size);
@@ -524,7 +530,8 @@ struct Render : Drag {
 
                         assert_(texX < texSize.x && texY < texSize.y, texX, texY, texSize, u, v);
                         // FIXME: synthetic test case
-                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0);
+                        //const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0);
+                        const bgr3f realOutgoingRadiance = quad.real ? bgr3f(I(targetX, target.size.y-1-targetY)) : bgr3f(0);
                         const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                         target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance), 0xFF);
@@ -539,10 +546,11 @@ struct Render : Drag {
         //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
         //window->render();
 #endif
-        assert_(I.size == target.size, I.size, target.size);
-        blit(I, target);
-        writeFile("test+.jpg", encodeJPEG(I), currentWorkingDirectory(), true);
-        downsample(renderTarget, I);
+        //assert_(I.size == target.size, I.size, target.size);
+        //blit(I, target);
+        writeFile("test+.jpg", encodeJPEG(target), currentWorkingDirectory(), true);
+        //downsample(renderTarget, I);
+        downsample(renderTarget, target);
     }
     virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
         vec2 value = dragStartValue + float(2*π)*normalizedDragOffset;
