@@ -142,7 +142,15 @@ struct Test : Widget {
 #if 1
         const ref<vec2> TX = modelC;
         mat2 U = V.inverse();
-        const buffer<vec2> TX´ = apply(ref<vec2>(C), [μ,U](vec2 x){ return μ+U*x; });
+
+        mat3 K;
+        const float focalLength = 4.2, pixelPitch = 0.0014, sensorWidth = 4032*pixelPitch;
+        K(0,0) = K(1,1) = I.size.x/(sensorWidth/focalLength);
+        K(0,2) = I.size.x/2;
+        K(1,2) = I.size.y/2;
+        const mat3 K¯¹ = K.¯¹();
+        //log("K¯¹\n"+str(K¯¹));
+        const buffer<vec2> TX´ = apply(ref<vec2>(C), [K¯¹,μ,U](vec2 x){ return K¯¹*(μ+U*x); });
 #else
         Array<vec2, 4> TX; {
             const ref<vec2> X = modelC;
@@ -184,30 +192,77 @@ struct Test : Widget {
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
         mat3 H;
-        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i]/h[8];
-        //for(int k: range(N)) log(H*TX[k], TX´[k]);
-
-        // Crude approximation
-        mat4 P;
-        P[0] = vec4(H[0], 0);
-        P[1] = vec4(H[1], 0);
-        P[2] = vec4(cross(H[0],H[1]), 0);
-        P[3] = vec4(H[2], 1);
+        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];// / h[8];
+        H = mat3(vec3(1/sqrt(::length(H[0])*::length(H[1])))) * H; // Normalizes by geometric mean of the 2 rotation vectors
+        log("H");
         log(H);
-        log(P);
-        //error("");
+        //for(int k: range(N)) log(H*TX[k], TX´[k]);
 
         preview = sRGB(R, 128);
 #if 0
-        line(preview, H*modelC[0], H*modelC[1], bgr3f(1));
-        line(preview, H*modelC[1], H*modelC[2], bgr3f(1));
-        line(preview, H*modelC[2], H*modelC[3], bgr3f(1));
-        line(preview, H*modelC[3], H*modelC[0], bgr3f(1));
+        const mat3 P = K*H;
+        line(preview, P*modelC[0], P*modelC[1], bgr3f(1));
+        line(preview, P*modelC[1], P*modelC[2], bgr3f(1));
+        line(preview, P*modelC[2], P*modelC[3], bgr3f(1));
+        line(preview, P*modelC[3], P*modelC[0], bgr3f(1));
 #else
+        mat4 Rt;
+        Rt[0] = vec4(H[0], 0);
+        Rt[1] = vec4(H[1], 0);
+        Rt[2] = vec4(cross(H[0],H[1]), 0);
+
+        if(0) {
+            Matrix R(3,3);
+            for(uint i: range(3)) for(uint j: range(3)) R(i,j) = Rt(i,j);
+            log("R");
+            log(R);
+            const USV usv = SVD(R);
+            mat3 U, Vt;
+            for(uint i: range(3)) for(uint j: range(3)) U(i,j) = usv.U(i,j);
+            for(uint i: range(3)) for(uint j: range(3)) Vt(i,j) = usv.V(j,i);
+            mat3 r = U*Vt;
+            log("r");
+            log(r);
+            for(uint i: range(3)) for(uint j: range(3)) Rt(i,j) = r(i,j);
+        }
+
+        Rt[3] = vec4(H[2].xy(), 1, 1);
+        Rt[0].w = Rt[0].z;
+        Rt[1].w = Rt[1].z;
+        Rt[2].w = Rt[2].z;
+        Rt[3].w = 1-Rt[2].z;
+        log("Rt");
+        log(Rt);
+
+        mat4 K4;
+        K4[0] = vec4(K[0], 0);
+        K4[1] = vec4(K[1], 0);
+        K4[2] = vec4(0);
+        K4[3] = vec4(K[2].xy(), 0, 1);
+        //K4[2] = vec4(K[2], 1);
+        log("K4");
+        log(K4);
+
+        const mat4 P = K4*Rt;
+        log("P");
+        log(P);
+        //error(P*vec3(modelC[0], 0), P*vec3(modelC[0], 1));
+
+
         line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[1], 0)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[2], 0)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[3], 0)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[0], 0)).xy(), bgr3f(1));
+
+        line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[0], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[1], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[2], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[3], 1)).xy(), bgr3f(1));
+
+        line(preview, (P*vec3(modelC[0], 1)).xy(), (P*vec3(modelC[1], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[1], 1)).xy(), (P*vec3(modelC[2], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[2], 1)).xy(), (P*vec3(modelC[3], 1)).xy(), bgr3f(1));
+        line(preview, (P*vec3(modelC[3], 1)).xy(), (P*vec3(modelC[0], 1)).xy(), bgr3f(1));
 #endif
 
         if(1) {
