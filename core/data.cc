@@ -272,8 +272,7 @@ double TextData::decimal() {
  double significand=0, decimal=0, eSign=1, exponent=0;
  if(match("∞")) return sign*__builtin_inf();
  if(match("NaN")) return __builtin_nan("");
- assert_(isInteger(), lineIndex, line());
- //if(!isInteger()) return nan;
+ assert_(isInteger(), "Expected integer, got '"+escape(slice(index, min(1ul, data.size-index)))+"'", line());
  for(bool gotDot=false, gotE=false; available(1);) {
   /**/  if(!gotDot && match('.')) gotDot=true;
   else if(!gotE && matchAny("eE")) { gotE=true; if(match('-')) eSign=-1; else match('+'); }

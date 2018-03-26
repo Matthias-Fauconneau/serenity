@@ -263,6 +263,20 @@ static inline void step(Scene& scene, Random& random) {
     log(time.milliseconds(),"ms");
 }
 
+template<Type V> V parseMat(TextData& s) {
+    V A;
+    s.whileAny(" \n");
+    for(uint i: range(V::M)) {
+        for(uint j: range(V::N)) {
+            A(i,j) = parse<Type V::T>(s);
+            if(j<V::N-1) s.whileAny(" \t");
+        }
+        s.whileAny(" \n");
+    }
+    return A;
+}
+template<> inline mat4 parse<mat4>(TextData& s) { return parseMat<mat4>(s); }
+
 struct Render : Drag {
     Scene scene;
 
@@ -270,7 +284,7 @@ struct Render : Drag {
 
     vec3 viewPosition = vec3(0,0,0); //vec3(-1./2,0,0);
 
-    unique<Window> window = ::window(this, int2(2048), mainThread, 0);
+    unique<Window> window = ::window(this, int2(3840,2160), mainThread, 0);
 
     Render() : Drag(vec2(0,-π/3)) {
         {
@@ -293,8 +307,17 @@ struct Render : Drag {
     void render(RenderTarget2D& target_, vec2, vec2) override {
         const Image& target = (ImageRenderTarget&)target_;
 
+#if 0
         const float near = 3, far = near + 3; // FIXME: fit far
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
+        log("view\n"+str(view));
+#else
+        const mat4 view = parse<mat4>("\
+                                      0.073	   0.3518	  -0.0395	   0.0057 \
+                                     0.2872	  -0.0203	   0.0565	   0.1354 \
+                                    -0.2926	   0.0614	   0.9294	  -1.1163 \
+                                     0.0359	  -0.0075	  -0.1142	   0.2018 ");
+#endif
 
         Time time {true};
 
@@ -355,7 +378,63 @@ struct Render : Drag {
             }
         }
 
-        const mat4 projection = perspective(near, far); // .scale(vec3(1, W/H, 1))
+#if 0
+        const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
+        log("projection\n"+str(projection));
+#else
+        /*const mat4 projection = parse<mat4>("\
+                                            1.4881	    0	        0	        0 \
+                                            0	   1.4881	        0	        0 \
+                                            0	        0	        0	        0 \
+                                            0	        0	        0	        1 ");*/
+        const float focalLength = 4.2, pixelPitch = 0.0014;
+        const float near = 2/(target.size.y*pixelPitch/focalLength);
+        const float far = 1000/focalLength*near; //mm
+        //const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
+        const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
+        log(projection);
+#endif
+#if 1
+        {
+            const float y = 297./210;
+            const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
+
+
+            const mat4 NDC = mat4()
+                    .scale(vec3(vec2(target.size)/2.f, 1))
+                    .translate(vec3(1)); // -1, 1 -> 0, 2
+            const mat4 flipY = mat4().translate(vec3(0, target.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+            {
+                const mat4 P = projection*view;
+                const mat4 M = flipY*NDC*P;
+
+                line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(1));
+
+                const float z = 0.1;
+                line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
+
+                line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
+                line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
+            }
+
+            const mat4 M = flipY*NDC*projection;
+            for(const uint quadIndex: quads) { // Z-sorted
+                Scene::Quad& quad = scene.quads[quadIndex];
+                vec3 V[4];
+                for(const uint i: range(4)) V[i] = M * viewVertices[quad.quad[i]];
+                for(const uint i: range(4)) line(target, V[i].xy(), V[(i+1)%4].xy(), bgr3f(1));
+            }
+        }
+#endif
+#if 1
         static constexpr int32 pixel = 16; // 11.4
         const mat4 NDC = mat4()
                 .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
@@ -452,6 +531,7 @@ struct Render : Drag {
         //value.x = __builtin_fmod(value.x + π*(3-sqrt(5.)), 2*π);
         //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
         //window->render();
+#endif
     }
     virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
         vec2 value = dragStartValue + float(2*π)*normalizedDragOffset;

@@ -27,7 +27,7 @@ inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
 typedef ref<float> vector;
 
 struct Test : Widget {
-    Image preview;
+    Image target;
     unique<Window> window = nullptr;
 
     Test() {
@@ -80,7 +80,7 @@ struct Test : Widget {
         buffer<vec2> X (R.ref::size, 0);
         vec2 Σ = 0_;
         for(const uint iy: range(I.size.y)) for(const uint ix: range(I.size.x)) {
-            vec2 x(ix,iy);
+            vec2 x(ix, I.size.y-1-iy); // Flips Y axis from Y top down to Y bottom up
             if(R(ix,iy)) {
                 X.append(x);
                 Σ += x;
@@ -133,12 +133,12 @@ struct Test : Widget {
 
         mat2 U = V.inverse();
         mat3 K;
-        const float focalLength = 4.2, pixelPitch = 0.0014, sensorWidth = 4032*pixelPitch;
-        K(0,0) = K(1,1) = I.size.x/(sensorWidth/focalLength);
-        K(0,2) = I.size.x/2;
-        K(1,2) = I.size.y/2;
+        const float focalLength = 4.2, pixelPitch = 0.0014;
+        K(0,0) = 2/(I.size.x*pixelPitch/focalLength);
+        K(1,1) = 2/(I.size.y*pixelPitch/focalLength);
+        const float near = K(1,1);
         const mat3 K¯¹ = K.¯¹();
-        const buffer<vec2> X´ = apply(ref<vec2>(C), [K¯¹,μ,U](vec2 x){ return K¯¹*(μ+U*x); });
+        const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(I.size)-vec2(1)); });
 
 #if 0
         const ref<vec2> TX = modelC;
@@ -194,59 +194,67 @@ struct Test : Widget {
         Rt[2] = vec4(cross(H[0],H[1]), 0);
         Rt[3] = vec4(H[2].xy(), 0, 1);
 
+        // FIXME
         Rt[0].w = Rt[0].z;
         Rt[1].w = Rt[1].z;
         Rt[2].w = Rt[2].z;
         Rt[3].w = H[2].z;
 
-        if(0) { // Enforces proper rotation (orthogonality)
-            Matrix R(3,3);
-            for(uint i: range(3)) for(uint j: range(3)) R(i,j) = Rt(i,j);
-            //log("R\n"+str(R));
-            const USV usv = SVD(R);
-            mat3 U, Vt;
-            for(uint i: range(3)) for(uint j: range(3)) U(i,j) = usv.U(i,j);
-            for(uint i: range(3)) for(uint j: range(3)) Vt(i,j) = usv.V(j,i);
-            mat3 r = U*Vt;
-            //log("r\n"+str(r));
-            //for(uint i: range(3)) for(uint j: range(3)) Rt(i,j) = r(i,j);
-            Rt = mat4(r)*mat4(((mat3)Rt).¯¹())*Rt;
-        }
+        const mat4 view = mat4(T´.¯¹())*Rt*mat4(T);
+        log("view\n"+str(view));
 
+        const float far = 1000/focalLength*near; //mm
+        target = sRGB(R, 128);
+#if 0
         mat4 K4;
         K4[0] = vec4(K[0], 0);
         K4[1] = vec4(K[1], 0);
         K4[2] = vec4(0);
         K4[3] = vec4(K[2].xy(), 0, 1);
+        K4(2,2) = - (far+near) / (far-near);
+        K4(2,3) = - 2*far*near / (far-near);
+        K4(3,2) = - 1;
+        K4(3,3) = 0;
+#else
+        const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
+        const mat4 K4 = projection;
+#endif
+        log("K\n"+str(K));
+        log("K4\n"+str(K4));
+        const mat4 view´ = K4.¯¹()*mat4(K)*view;
+        log("view´\n"+str(view´));
 
-        //const mat4 P = K4*Rt;
-        const mat4 P = K4*mat4(T´.¯¹())*Rt*mat4(T);
+        const mat4 P = K4*view´;
 
-        preview = sRGB(R, 128);
+        const mat4 NDC = mat4()
+                .scale(vec3(vec2(target.size)/2.f, 1))
+                .translate(vec3(1)); // -1, 1 -> 0, 2
+        const mat4 flipY = mat4().translate(vec3(0, target.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        const mat4 M = flipY*NDC*P;
 
-        line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[1], 0)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[2], 0)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[3], 0)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[0], 0)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(1));
 
         const float z = 0.1;
-        line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[0], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[1], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[2], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[3], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
 
-        line(preview, (P*vec3(modelC[0], z)).xy(), (P*vec3(modelC[1], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[1], z)).xy(), (P*vec3(modelC[2], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[2], z)).xy(), (P*vec3(modelC[3], z)).xy(), bgr3f(1));
-        line(preview, (P*vec3(modelC[3], z)).xy(), (P*vec3(modelC[0], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
 
         if(1) {
-            window = ::window(this, int2(preview.size), mainThread, 0);
+            window = ::window(this, int2(target.size), mainThread, 0);
             window->show();
         }
     }
-    void render(RenderTarget2D& target_, vec2, vec2) override {
-        const Image& target = (ImageRenderTarget&)target_;
-        copy(target, preview);
+    void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
+        const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
+        copy(renderTarget, target);
     }
 } static test;
