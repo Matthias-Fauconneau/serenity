@@ -128,9 +128,8 @@ struct Test : Widget {
 
         static constexpr uint N = 4;
 
-        const ref<vec2> modelC = {{0,0},{210,0},{210,297},{0,297}}; // FIXME: normalize origin and average distance ~ √2
-
-        const ref<vec2> TX = modelC;
+        const float y = 297./210;
+        const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
         mat2 U = V.inverse();
         mat3 K;
@@ -139,7 +138,30 @@ struct Test : Widget {
         K(0,2) = I.size.x/2;
         K(1,2) = I.size.y/2;
         const mat3 K¯¹ = K.¯¹();
-        const buffer<vec2> TX´ = apply(ref<vec2>(C), [K¯¹,μ,U](vec2 x){ return K¯¹*(μ+U*x); });
+        const buffer<vec2> X´ = apply(ref<vec2>(C), [K¯¹,μ,U](vec2 x){ return K¯¹*(μ+U*x); });
+
+#if 0
+        const ref<vec2> TX = modelC;
+        const ref<vec2> TX´ = X´;
+#else
+        Array<vec2, 4> TX; mat4 T; {
+            const ref<vec2> X = modelC;
+            const vec2 μ = ::mean(X);
+            TX.apply([=](const vec2 x){ return x-μ; }, X);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
+            TX.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX);
+            T = mat4().scale(vec3(sqrt(3/μD))).translate(vec3(-μ,0));
+        }
+
+        Array<vec2, 4> TX´; mat4 T´; {
+            const ref<vec2> X = X´;
+            const vec2 μ = ::mean<vec2>(X);
+            TX´.apply([=](const vec2 x){ return x-μ; }, X);
+            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
+            TX´.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX´);
+            T´ = mat4().scale(vec3(sqrt(3/μD))).translate(vec3(-μ,0));
+        }
+#endif
 
         // DLT: Ah = 0
         Matrix A(N*2, 9);
@@ -163,19 +185,33 @@ struct Test : Widget {
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
         mat3 H;
-        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];
+        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i] / h[8];
         H = mat3(vec3(1/sqrt(::length(H[0])*::length(H[1])))) * H; // Normalizes by geometric mean of the 2 rotation vectors
 
         mat4 Rt;
         Rt[0] = vec4(H[0], 0);
         Rt[1] = vec4(H[1], 0);
         Rt[2] = vec4(cross(H[0],H[1]), 0);
+        Rt[3] = vec4(H[2].xy(), 0, 1);
 
-        Rt[3] = vec4(H[2].xy(), 1, 1);
         Rt[0].w = Rt[0].z;
         Rt[1].w = Rt[1].z;
         Rt[2].w = Rt[2].z;
-        Rt[3].w = H[2].z-Rt[2].z;
+        Rt[3].w = H[2].z;
+
+        if(0) { // Enforces proper rotation (orthogonality)
+            Matrix R(3,3);
+            for(uint i: range(3)) for(uint j: range(3)) R(i,j) = Rt(i,j);
+            //log("R\n"+str(R));
+            const USV usv = SVD(R);
+            mat3 U, Vt;
+            for(uint i: range(3)) for(uint j: range(3)) U(i,j) = usv.U(i,j);
+            for(uint i: range(3)) for(uint j: range(3)) Vt(i,j) = usv.V(j,i);
+            mat3 r = U*Vt;
+            //log("r\n"+str(r));
+            //for(uint i: range(3)) for(uint j: range(3)) Rt(i,j) = r(i,j);
+            Rt = mat4(r)*mat4(((mat3)Rt).¯¹())*Rt;
+        }
 
         mat4 K4;
         K4[0] = vec4(K[0], 0);
@@ -183,7 +219,8 @@ struct Test : Widget {
         K4[2] = vec4(0);
         K4[3] = vec4(K[2].xy(), 0, 1);
 
-        const mat4 P = K4*Rt;
+        //const mat4 P = K4*Rt;
+        const mat4 P = K4*mat4(T´.¯¹())*Rt*mat4(T);
 
         preview = sRGB(R, 128);
 
@@ -192,7 +229,7 @@ struct Test : Widget {
         line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[3], 0)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[3], 0)).xy(), (P*vec3(modelC[0], 0)).xy(), bgr3f(1));
 
-        const float z = 21;
+        const float z = 0.1;
         line(preview, (P*vec3(modelC[0], 0)).xy(), (P*vec3(modelC[0], z)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[1], 0)).xy(), (P*vec3(modelC[1], z)).xy(), bgr3f(1));
         line(preview, (P*vec3(modelC[2], 0)).xy(), (P*vec3(modelC[2], z)).xy(), bgr3f(1));

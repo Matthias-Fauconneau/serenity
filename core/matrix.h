@@ -81,6 +81,9 @@ struct mat3 {
     }
     mat3 adjugate() const { return cofactor().transpose(); }
     mat3 ¯¹() const { return 1/det() * adjugate() ; }
+
+    mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += M(i,0)*v.x + M(i,1)*v.y; return r; }
+    mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
 };
 inline mat3 operator*(float s, mat3 M) {
     mat3 r;

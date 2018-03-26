@@ -13,9 +13,6 @@ inline bool isNaN(double x) { return x!=x; }
 inline bool isNumber(float x) { return !isNaN(x) && x != __builtin_inff() && x != -__builtin_inff(); }
 inline bool isNumber(double x) { return !isNaN(x) && x != __builtin_inf() && x != -__builtin_inf(); }
 
-//#include <cmath>
-//inline float abs(float x) noexcept { return __builtin_fabsf(x); }
-
 inline float floor(float x) noexcept { return __builtin_floorf(x); }
 //inline double floor(double x) noexcept { return __builtin_floor(x); }
 inline float round(float x) noexcept { return __builtin_roundf(x); }
@@ -29,7 +26,7 @@ inline float sqrt(float f) noexcept { return __builtin_sqrtf(f); }
 inline float rsqrt(float f) noexcept { return 1/__builtin_sqrtf(f); }
 
 inline float cos(float t) noexcept { return __builtin_cosf(t); }
-//inline float acos(float t) noexcept { return __builtin_acosf(t); }
+inline float acos(float t) noexcept { return __builtin_acosf(t); }
 inline float sin(float t) noexcept { return __builtin_sinf(t); }
 
 //inline double pow(double x, double y) noexcept { return __builtin_pow(x,y); }
