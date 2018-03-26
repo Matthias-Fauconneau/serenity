@@ -21,8 +21,9 @@ template<> inline String str(const Matrix& A) {
     return move(s);
 }
 
+// Right handed
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
-inline float cross(vec2 a, vec2 b) { return a.y*b.x - a.x*b.y; }
+inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
 
 typedef ref<float> vector;
 
@@ -91,7 +92,8 @@ struct Test : Widget {
 
         // PCA
         Random random;
-        vec2 r = normalize(random.next<vec2>());
+        vec2 r = normalize(vec2(0.37, 0.93)); //normalize(random.next<vec2>()); // FIXME: unstable
+        //log(r);
         for(auto_: range(4)) {
             vec2 Σ = 0_;
             for(vec2 x: X) Σ += dot(r,x)*x;
@@ -100,12 +102,13 @@ struct Test : Widget {
         const vec2 e0 = r;
         const vec2 e1 = normal(e0);
         const mat2 V (e0, e1);
+        //log(V); // 1 0.02, -0.02 1
 
         // Initial corner estimation (maximize area of quadrant in eigenspace)
         vec2 C[4] = {0_,0_,0_,0_}; // eigenspace
         for(const vec2& x : X) {
             const vec2 Vx = V * x;
-            static constexpr int quadrantToWinding[2][2] = {{0,1},{3,2}};
+            static constexpr int quadrantToWinding[2][2] = {{0,3},{1,2}};
             vec2& c = C[quadrantToWinding[Vx.x>0][Vx.y>0]];
             if(abs(Vx.x*Vx.y) > abs(c.x*c.y)) c = Vx;
         }
@@ -136,33 +139,12 @@ struct Test : Widget {
         const float focalLength = 4.2, pixelPitch = 0.0014;
         K(0,0) = 2/(I.size.x*pixelPitch/focalLength);
         K(1,1) = 2/(I.size.y*pixelPitch/focalLength);
-        K(2,2) = -1; // Z-
-        const float near = K(1,1);
+        K(2,2) = 1;
         const mat3 K¯¹ = K.¯¹();
         const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(I.size)-vec2(1)); });
 
-#if 1
         const ref<vec2> TX = modelC;
         const ref<vec2> TX´ = X´;
-#else
-        Array<vec2, 4> TX; mat4 T; {
-            const ref<vec2> X = modelC;
-            const vec2 μ = ::mean(X);
-            TX.apply([=](const vec2 x){ return x-μ; }, X);
-            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
-            TX.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX);
-            T = mat4().scale(vec3(sqrt(3/μD))).translate(vec3(-μ,0));
-        }
-
-        Array<vec2, 4> TX´; mat4 T´; {
-            const ref<vec2> X = X´;
-            const vec2 μ = ::mean<vec2>(X);
-            TX´.apply([=](const vec2 x){ return x-μ; }, X);
-            const float μD = ::mean<float>(apply(X,[=](const vec2 x){ return ::dotSq(x); }));
-            TX´.apply([=](const vec2 x){ return x*sqrt(3/μD); }, TX´);
-            T´ = mat4().scale(vec3(sqrt(3/μD))).translate(vec3(-μ,0));
-        }
-#endif
 
         // DLT: Ah = 0
         Matrix A(N*2, 9);
@@ -170,113 +152,57 @@ struct Test : Widget {
             const uint I = i*2;
             A(I+0, 0) = -TX[i].x;
             A(I+0, 1) = -TX[i].y;
-            A(I+0, 2) = -1;
+            A(I+0, 2) = -1; // -1
             A(I+0, 3) = 0; A(I+0, 4) = 0; A(I+0, 5) = 0;
             A(I+1, 0) = 0; A(I+1, 1) = 0; A(I+1, 2) = 0;
             A(I+1, 3) = -TX[i].x;
             A(I+1, 4) = -TX[i].y;
-            A(I+1, 5) = -1;
+            A(I+1, 5) = -1; // -1
             A(I+0, 6) = TX´[i].x*TX[i].x;
             A(I+0, 7) = TX´[i].x*TX[i].y;
-            A(I+0, 8) = TX´[i].x;
+            A(I+0, 8) = TX´[i].x; // -1
             A(I+1, 6) = TX´[i].y*TX[i].x;
             A(I+1, 7) = TX´[i].y*TX[i].y;
-            A(I+1, 8) = TX´[i].y;
+            A(I+1, 8) = TX´[i].y; // -1
         }
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
         mat3 H;
-        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i] / h[8];
+        for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];// / h[8];
         H = mat3(vec3(1/sqrt(::length(H[0])*::length(H[1])))) * H; // Normalizes by geometric mean of the 2 rotation vectors
 
         mat4 Rt;
         Rt[0] = vec4(H[0], 0);
         Rt[1] = vec4(H[1], 0);
         Rt[2] = vec4(cross(H[0],H[1]), 0);
-        Rt[3] = vec4(H[2]/*.xy(), 0*/, 1);
+        Rt[3] = vec4(-H[2], 1); // Z-
+        Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well
+        //Rt = Rt * mat4(vec4(1,1,-1,1));
+        log(((mat3)Rt).det());
+        assert_(abs(1-((mat3)Rt).det())<0.04,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
 
-        if(0) { // Enforces proper rotation (orthogonality)
-            Matrix R(3,3);
-            for(uint i: range(3)) for(uint j: range(3)) R(i,j) = Rt(i,j);
-            //log("R\n"+str(R));
-            const USV usv = SVD(R);
-            mat3 U, Vt;
-            for(uint i: range(3)) for(uint j: range(3)) U(i,j) = usv.U(i,j);
-            for(uint i: range(3)) for(uint j: range(3)) Vt(i,j) = usv.V(j,i);
-            mat3 r = U*Vt;
-            //log("r\n"+str(r));
-            for(uint i: range(3)) for(uint j: range(3)) Rt(i,j) = r(i,j);
-            //Rt = mat4(r)*mat4(((mat3)Rt).¯¹())*Rt;
-        }
+        log("Rt\n"+str(Rt));
 
+        const float near = K(1,1);
         const float far = 1000/focalLength*near; //mm
-
-        /*if(1) { // FIXME
-            Rt[0].w = Rt[0].z;
-            Rt[1].w = Rt[1].z;
-            Rt[3].w = H[2].z;
-        }*/
-
-        //mat4 view = mat4(T´.¯¹())*Rt*mat4(T);
-        mat4 view = Rt;
-        log("view\n"+str(view));
-
-#if 0
-        if(1) { // FIXME
-            view[0].w = view[0].z;
-            view[1].w = view[1].z;
-            view[3].w = H[2].z;
-        }
-
         const mat4 projection = perspective(near, far).scale(vec3(float(I.size.y)/float(I.size.x), 1, 1));
-        const mat4 K4 = projection;
-        log("K\n"+str(K));
-        log("K4\n"+str(K4));
-
-        mat4 view´ = K4.¯¹()*mat4(K)*view;
-        log("K4-1K\n"+str(K4.¯¹()*mat4(K)));
-
-        if(0) { // FIXME
-            view´[0].w = view´[0].z;
-            view´[1].w = view´[1].z;
-            view´[3].w = H[2].z;
-        }
-
-        view´ = (1/view´(3,3)) * view´; // Normalizes by V33
-#else
-        const mat4 projection = perspective(near, far).scale(vec3(float(I.size.y)/float(I.size.x), 1, 1));
-        const mat4 K4 = projection;
-        const mat4 view´ = Rt;
-#endif
-        log("view´\n"+str(view´));
-        log("K4*view´\n"+str(K4*view´));
-#if 0
-        // FIXME
-        view´[0].z += K4(2,3)/K4(2,2) * view´[0].w;
-        view´[1].z += K4(2,3)/K4(2,2) * view´[1].w;
-        view´[2].z += K4(2,3)/K4(2,2) * view´[2].w;
-        view´[0].w = 0;
-        view´[1].w = 0;
-        view´[2].w = 0;
-#endif
-        log("view´\n"+str(view´));
-
-        const mat4 P = K4*view´;
-        log("P\n"+str(P));
-
         const mat4 NDC = mat4()
                 .scale(vec3(vec2(I.size)/2.f, 1))
                 .translate(vec3(1)); // -1, 1 -> 0, 2
         const mat4 flipY = mat4().translate(vec3(0, I.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        //const mat4 flipY = mat4().translate(vec3(I.size.x-1, 0, 0)).scale(vec3(-1, 1, 1)); // H22=-1 flips both X,Y
-        const mat4 M = flipY*NDC*P;
+        const mat3 flipY2 = mat3().translate(vec2(0, I.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        const mat4 M = flipY*NDC*projection*Rt;
+        log(M*vec4(modelC[0], 0, 0));
 
         target = sRGB(R, 128);
 
-        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(1));
+        line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
+        line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
+
+        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(0,0,1));
+        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(0,1,0));
+        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1,0,0));
+        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(0,1,1));
 
         const float z = 0.1;
         line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
@@ -284,10 +210,10 @@ struct Test : Widget {
         line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
         line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
 
-        line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(0,0,1));
+        line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(0,1,0));
+        line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1,0,0));
+        line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(0,1,1));
 
         if(1) {
             window = ::window(this, int2(target.size/2u), mainThread, 0);

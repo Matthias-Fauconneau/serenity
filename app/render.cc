@@ -308,19 +308,15 @@ struct Render : Drag {
         const Image& target = (ImageRenderTarget&)target_;
 
 #if 0
-        const float near = 3, far = near + 3; // FIXME: fit far
+        {const float near = 3, far = near + 3; // FIXME: fit far
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
-        log("view\n"+str(view));
+        log("view\n"+str(view));}const mat4 view;
 #else
-        // R R R tx
-        // R R R ty
-        // R R R tz
-        // 0 0 0 1 // FIXME
         const mat4 view = parse<mat4>("\
-                                      0.073	   0.3518	  -0.0395	   0.0057 \
-                                     0.2872	  -0.0203	   0.0565	   0.1354 \
-                                    -0.2926	   0.0614	   0.9294	  -1.1163 \
-                                     0.0359	  -0.0075	  -0.1142	   0.2018 ");
+                                      0.1928	   0.9567	    0.083	   0.0102 \
+                                      0.6842	  -0.0348	  -0.7443	    0.002 \
+                                      -0.7459	   0.1593	  -0.6614	  -2.8795 \
+                                      0	        0	        0	        1");
 #endif
 
         Time time {true};
@@ -396,13 +392,11 @@ struct Render : Drag {
         const float far = 1000/focalLength*near; //mm
         //const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
         const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
-        log(projection);
 #endif
 #if 1
         {
             const float y = 297./210;
             const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
-
 
             const mat4 NDC = mat4()
                     .scale(vec3(vec2(target.size)/2.f, 1))
@@ -434,11 +428,12 @@ struct Render : Drag {
                 Scene::Quad& quad = scene.quads[quadIndex];
                 vec3 V[4];
                 for(const uint i: range(4)) V[i] = M * viewVertices[quad.quad[i]];
-                for(const uint i: range(4)) line(target, V[i].xy(), V[(i+1)%4].xy(), bgr3f(1));
+                log(V);
+                for(const uint i: range(4)) line(target, V[i].xy(), V[(i+1)%4].xy(), bgr3f(i==2,i==1||i==3,i==0||i==3));
             }
         }
 #endif
-#if 1
+#if 0
         static constexpr int32 pixel = 16; // 11.4
         const mat4 NDC = mat4()
                 .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14

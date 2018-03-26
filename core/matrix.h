@@ -88,7 +88,7 @@ struct mat3 {
     mat3 ¯¹() const { return 1/det() * adjugate() ; }
 
     mat3 translate(vec2 v) const { mat3 r=*this; for(int i: range(2)) r(i,2) += A(i,0)*v.x + A(i,1)*v.y; return r; }
-    mat3 scale(float f) const { mat3 r=*this; for(int j: range(2))for(int i: range(3)) r(i,j)*=f; return r; }
+    mat3& scale(vec2 v) { for(int j=0;j<2;j++) for(int i=0;i<3;i++) A(i,j)*=v[j]; return *this; }
 };
 inline mat3 operator*(float s, mat3 A) {
     mat3 r;
@@ -188,6 +188,7 @@ template<int N, int M, Type T> inline String str(const T a[M*N]) {
     }
     return move(s);
 }
+inline String str(const mat2& A) { return str<2,2>(A.data); }
 inline String str(const mat3& A) { return str<3,3>(A.data); }
 inline String str(const mat4& A) { return str<4,4>(A.data); }
 
