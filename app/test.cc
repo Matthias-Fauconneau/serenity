@@ -31,7 +31,7 @@ struct Test : Widget {
     unique<Window> window = nullptr;
 
     Test() {
-        const ImageF I = luminance(decodeImage(Map("test.jpg")));
+        const ImageF I = luminance(rotateHalfTurn(decodeImage(Map("test.jpg"))));
         Array<uint, 256> histogram; histogram.clear(0);
         const float maxX = ::max(I);
         for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;
@@ -136,11 +136,12 @@ struct Test : Widget {
         const float focalLength = 4.2, pixelPitch = 0.0014;
         K(0,0) = 2/(I.size.x*pixelPitch/focalLength);
         K(1,1) = 2/(I.size.y*pixelPitch/focalLength);
+        K(2,2) = -1; // Z-
         const float near = K(1,1);
         const mat3 K¯¹ = K.¯¹();
         const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(I.size)-vec2(1)); });
 
-#if 0
+#if 1
         const ref<vec2> TX = modelC;
         const ref<vec2> TX´ = X´;
 #else
@@ -192,45 +193,85 @@ struct Test : Widget {
         Rt[0] = vec4(H[0], 0);
         Rt[1] = vec4(H[1], 0);
         Rt[2] = vec4(cross(H[0],H[1]), 0);
-        Rt[3] = vec4(H[2].xy(), 0, 1);
+        Rt[3] = vec4(H[2]/*.xy(), 0*/, 1);
 
-        // FIXME
-        Rt[0].w = Rt[0].z;
-        Rt[1].w = Rt[1].z;
-        Rt[2].w = Rt[2].z;
-        Rt[3].w = H[2].z;
-
-        const mat4 view = mat4(T´.¯¹())*Rt*mat4(T);
-        log("view\n"+str(view));
+        if(0) { // Enforces proper rotation (orthogonality)
+            Matrix R(3,3);
+            for(uint i: range(3)) for(uint j: range(3)) R(i,j) = Rt(i,j);
+            //log("R\n"+str(R));
+            const USV usv = SVD(R);
+            mat3 U, Vt;
+            for(uint i: range(3)) for(uint j: range(3)) U(i,j) = usv.U(i,j);
+            for(uint i: range(3)) for(uint j: range(3)) Vt(i,j) = usv.V(j,i);
+            mat3 r = U*Vt;
+            //log("r\n"+str(r));
+            for(uint i: range(3)) for(uint j: range(3)) Rt(i,j) = r(i,j);
+            //Rt = mat4(r)*mat4(((mat3)Rt).¯¹())*Rt;
+        }
 
         const float far = 1000/focalLength*near; //mm
-        target = sRGB(R, 128);
+
+        /*if(1) { // FIXME
+            Rt[0].w = Rt[0].z;
+            Rt[1].w = Rt[1].z;
+            Rt[3].w = H[2].z;
+        }*/
+
+        //mat4 view = mat4(T´.¯¹())*Rt*mat4(T);
+        mat4 view = Rt;
+        log("view\n"+str(view));
+
 #if 0
-        mat4 K4;
-        K4[0] = vec4(K[0], 0);
-        K4[1] = vec4(K[1], 0);
-        K4[2] = vec4(0);
-        K4[3] = vec4(K[2].xy(), 0, 1);
-        K4(2,2) = - (far+near) / (far-near);
-        K4(2,3) = - 2*far*near / (far-near);
-        K4(3,2) = - 1;
-        K4(3,3) = 0;
-#else
-        const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
+        if(1) { // FIXME
+            view[0].w = view[0].z;
+            view[1].w = view[1].z;
+            view[3].w = H[2].z;
+        }
+
+        const mat4 projection = perspective(near, far).scale(vec3(float(I.size.y)/float(I.size.x), 1, 1));
         const mat4 K4 = projection;
-#endif
         log("K\n"+str(K));
         log("K4\n"+str(K4));
-        const mat4 view´ = K4.¯¹()*mat4(K)*view;
+
+        mat4 view´ = K4.¯¹()*mat4(K)*view;
+        log("K4-1K\n"+str(K4.¯¹()*mat4(K)));
+
+        if(0) { // FIXME
+            view´[0].w = view´[0].z;
+            view´[1].w = view´[1].z;
+            view´[3].w = H[2].z;
+        }
+
+        view´ = (1/view´(3,3)) * view´; // Normalizes by V33
+#else
+        const mat4 projection = perspective(near, far).scale(vec3(float(I.size.y)/float(I.size.x), 1, 1));
+        const mat4 K4 = projection;
+        const mat4 view´ = Rt;
+#endif
+        log("view´\n"+str(view´));
+        log("K4*view´\n"+str(K4*view´));
+#if 0
+        // FIXME
+        view´[0].z += K4(2,3)/K4(2,2) * view´[0].w;
+        view´[1].z += K4(2,3)/K4(2,2) * view´[1].w;
+        view´[2].z += K4(2,3)/K4(2,2) * view´[2].w;
+        view´[0].w = 0;
+        view´[1].w = 0;
+        view´[2].w = 0;
+#endif
         log("view´\n"+str(view´));
 
         const mat4 P = K4*view´;
+        log("P\n"+str(P));
 
         const mat4 NDC = mat4()
-                .scale(vec3(vec2(target.size)/2.f, 1))
+                .scale(vec3(vec2(I.size)/2.f, 1))
                 .translate(vec3(1)); // -1, 1 -> 0, 2
-        const mat4 flipY = mat4().translate(vec3(0, target.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        const mat4 flipY = mat4().translate(vec3(0, I.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        //const mat4 flipY = mat4().translate(vec3(I.size.x-1, 0, 0)).scale(vec3(-1, 1, 1)); // H22=-1 flips both X,Y
         const mat4 M = flipY*NDC*P;
+
+        target = sRGB(R, 128);
 
         line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(1));
         line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(1));
@@ -249,12 +290,12 @@ struct Test : Widget {
         line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
 
         if(1) {
-            window = ::window(this, int2(target.size), mainThread, 0);
+            window = ::window(this, int2(target.size/2u), mainThread, 0);
             window->show();
         }
     }
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
         const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
-        copy(renderTarget, target);
+        downsample(renderTarget, target);
     }
 } static test;

@@ -312,6 +312,10 @@ struct Render : Drag {
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
         log("view\n"+str(view));
 #else
+        // R R R tx
+        // R R R ty
+        // R R R tz
+        // 0 0 0 1 // FIXME
         const mat4 view = parse<mat4>("\
                                       0.073	   0.3518	  -0.0395	   0.0057 \
                                      0.2872	  -0.0203	   0.0565	   0.1354 \

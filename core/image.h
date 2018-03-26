@@ -96,7 +96,7 @@ extern uint8 sRGB_forward[0x1000];
 extern float sRGB_reverse[0x100];
 
 uint8 sRGB(float v);
-inline byte3 sRGB(bgr3f v) { return byte3(sRGB(v.b),sRGB(v.b),sRGB(v.b)); }
+inline byte3 sRGB(bgr3f v) { return byte3(sRGB(v.b),sRGB(v.g),sRGB(v.r)); }
 
 /// Converts linear float pixels for each component to color sRGB pixels
 void sRGB(const Image& target, const ImageF& source, float max=-inff);
