@@ -5,8 +5,8 @@ void blend(byte4& target, bgr3f source_linear, float opacity);
 
 #if 0
 void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float alpha);
-void blit(const Image& target, int2 origin, uint2 size, const Image& source, bgr3f color = 1_, float opacity = 1);
 #endif
+void blit(const Image& target, const Image& source, int2 origin= 0_, uint2 size=uint2(-1), bgr3f color = 1_, float opacity = 1);
 void line(const Image& target, vec2 p0, vec2 p1, bgr3f color = 0_, float opacity = 1/*, bool hint = false*/);
 #if 0
 void glyph(const Image& target, int2 origin, float fontSize, FontData& font, uint index, bgr3f color = 0_, float opacity = 1);

@@ -34,10 +34,12 @@ void fill(const Image& target, int2 origin, uint2 size, bgr3f color, float opaci
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) blend(target, x, y, color, opacity);
     }
 }
+#endif
 
-void blit(const Image& target, int2 origin, uint2 size, const Image& source, bgr3f color, float opacity) {
+void blit(const Image& target, const Image& source, int2 origin, uint2 size, bgr3f color, float opacity) {
+    if(size == uint2(-1)) size = source.size;
     assert_(size == source.size);
-    assert_(bgr3f(0) <= color && color <= bgr3f(1));
+    assert_(color == bgr3f(1)); //assert_(bgr3f(0) <= color && color <= bgr3f(1));
     assert_(source);
 
     int2 min = ::max(int2(0), origin);
@@ -61,15 +63,28 @@ void blit(const Image& target, int2 origin, uint2 size, const Image& source, bgr
                     ::min(0xFF,int(target_sRGB.a)+opacity)); // Additive opacity accumulation
         }
     }
+    else if(color==bgr3f(1) && opacity==1) {
+        for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
+            const byte4 s = source(x-origin.x,y-origin.y);
+            if(s.a) {
+                if(s.a==0xFF) target(x,y) = byte4(s[0], s[1], s[2], 0xFF);
+                else {
+                    const bgr3f linear = bgr3f(sRGB_reverse[s[0]], sRGB_reverse[s[1]], sRGB_reverse[s[2]]);
+                    blend(target(x, y), linear, float(s.a)/0xFF);
+                }
+            }
+        }
+    }
     else {
         for(int y: range(min.y, max.y)) for(int x: range(min.x, max.x)) {
-            byte4 BGRA = source(x-origin.x,y-origin.y);
-            bgr3f linear = bgr3f(sRGB_reverse[BGRA[0]], sRGB_reverse[BGRA[1]], sRGB_reverse[BGRA[2]]);
-            blend(target, x, y, color*linear, opacity*BGRA.a/0xFF);
+            const byte4 s = source(x-origin.x,y-origin.y);
+            const bgr3f linear = bgr3f(sRGB_reverse[s[0]], sRGB_reverse[s[1]], sRGB_reverse[s[2]]);
+            blend(target(x, y), color*linear, opacity*s.a/0xFF);
         }
     }
 }
 
+#if 0
 void glyph(const Image& target, int2 origin, float fontSize, FontData& font, uint index, bgr3f color, float opacity) {
     Font::Glyph glyph = font.font(fontSize).render(index);
     if(glyph.image) blit(target, int2(origin)+glyph.offset, glyph.image.size, glyph.image, color, opacity);

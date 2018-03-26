@@ -266,7 +266,7 @@ void XWindow::event() {
         shm = check( shmget(0, Window::size.y*stride*sizeof(byte4) , IPC_CREAT | 0777) );
         target = Image(buffer<byte4>(reinterpret_cast<byte4*>(check(shmat(shm, nullptr, 0))), Window::size.y*stride, 0),
                        uint2(Window::size), stride, true);
-        target.clear(byte4(0xFF));
+        //target.clear(byte4(0xFF));
         {Shm::Attach r; send(({r.seg=id+Segment; r.shm=shm; r;}));}
         {CreatePixmap r; send(({r.pixmap=id+Pixmap; r.window=id+Window; r.w=uint16(Window::size.x); r.h=uint16(Window::size.y); r;}));}
     }
@@ -289,7 +289,7 @@ void XWindow::event() {
         } else
 #endif
         {
-            target.clear(byte4(0xFF));
+            //target.clear(byte4(0xFF));
             render(target);
             {Shm::PutImage r; send(({r.window=id+(Present::EXT?Pixmap:Window);
                                      r.context=id+GraphicContext; r.seg=id+Segment;

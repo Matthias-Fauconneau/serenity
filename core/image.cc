@@ -108,10 +108,15 @@ template void downsample(const Image3f& target, const Image3f&);
 inline bgr3f linear(byte4 v) { return bgr3f(sRGB_reverse[v.b],sRGB_reverse[v.g],sRGB_reverse[v.r]); }
 
 template<> void downsample(const Image& target, const Image& source) {
-    assert_(target.size == source.size/2u);
-    for(uint y: range(target.size.y)) for(uint x: range(target.size.x))
-        target(x,y) = byte4(sRGB((linear(source(x*2+0,y*2+0)) + linear(source(x*2+1,y*2+0)) + linear(source(x*2+0,y*2+1)) + linear(source(x*2+1,y*2+1))) / 4.f),
-                            0xFF);
+    assert_(target.size*2u == source.size);
+    for(uint y: range(target.size.y)) for(uint x: range(target.size.x)) {
+        const byte4 v00 = source(x*2+0,y*2+0);
+        const byte4 v01 = source(x*2+1,y*2+0);
+        const byte4 v10 = source(x*2+0,y*2+1);
+        const byte4 v11 = source(x*2+1,y*2+1);
+        target(x,y) = byte4(sRGB((linear(v00) + linear(v01) + linear(v10) + linear(v11)) / 4.f),
+                            (uint(v00.a) + uint(v01.a) + uint(v10.a) + uint(v11.a)) / 4u);
+    }
 }
 
 generic void upsample(const ImageT<T>& target, const ImageT<T>& source) {

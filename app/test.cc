@@ -131,7 +131,7 @@ struct Test : Widget {
 
         static constexpr uint N = 4;
 
-        const float y = 297./210;
+        const float y = 210./297;
         const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
         mat2 U = V.inverse();

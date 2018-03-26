@@ -5,6 +5,7 @@
 #include "mwc.h"
 #include "algorithm.h"
 #include "drag.h"
+#include "jpeg.h"
 
 template<> inline vec<x,float,1> Random::next<vec<x,float,1>>() { return vec<x,float,1>(next<float>()); }
 
@@ -284,7 +285,9 @@ struct Render : Drag {
 
     vec3 viewPosition = vec3(0,0,0); //vec3(-1./2,0,0);
 
-    unique<Window> window = ::window(this, int2(3840,2160), mainThread, 0);
+    const Image I = rotateHalfTurn(decodeImage(Map("test.jpg")));
+
+    unique<Window> window = ::window(this, int2(I.size/2u), mainThread, 0);
 
     Render() : Drag(vec2(0,-π/3)) {
         {
@@ -304,24 +307,28 @@ struct Render : Drag {
 
         window->show();
     }
-    void render(RenderTarget2D& target_, vec2, vec2) override {
-        const Image& target = (ImageRenderTarget&)target_;
-
+    void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
+        const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
+        Image target(renderTarget.size*2u, true);
+        //const Image& target = (ImageRenderTarget&)renderTarget_;
 #if 0
         {const float near = 3, far = near + 3; // FIXME: fit far
         const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
         log("view\n"+str(view));}const mat4 view;
 #else
-        const mat4 view = parse<mat4>("\
-                                      0.1928	   0.9567	    0.083	   0.0102 \
-                                      0.6842	  -0.0348	  -0.7443	    0.002 \
-                                      -0.7459	   0.1593	  -0.6614	  -2.8795 \
-                                      0	        0	        0	        1");
+        mat4 view = parse<mat4>("\
+                                -0.9567	  -0.1928	   -0.083	   0.0072 \
+                                0.0348	  -0.6842	   0.7443	   0.0014 \
+                                -0.1593	   0.7459	   0.6613	   -2.036 \
+                                0	        0	        0	        1"
+                                );
+        //view = view * mat4().scale(vec3(210./297));
+        view = view * mat4().scale(vec3(1./2));
 #endif
 
         Time time {true};
 
-        target.clear(byte4(0,0,0,0xFF));
+        //target.clear(byte4(0,0,0,0xFF));
 
         // Transform
         buffer<vec3> viewVertices (scene.vertices.size);
@@ -393,9 +400,9 @@ struct Render : Drag {
         //const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
         const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
 #endif
-#if 1
+#if 0
         {
-            const float y = 297./210;
+            const float y = 210./297;
             const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
             const mat4 NDC = mat4()
@@ -428,12 +435,11 @@ struct Render : Drag {
                 Scene::Quad& quad = scene.quads[quadIndex];
                 vec3 V[4];
                 for(const uint i: range(4)) V[i] = M * viewVertices[quad.quad[i]];
-                log(V);
                 for(const uint i: range(4)) line(target, V[i].xy(), V[(i+1)%4].xy(), bgr3f(i==2,i==1||i==3,i==0||i==3));
             }
         }
 #endif
-#if 0
+#if 1
         static constexpr int32 pixel = 16; // 11.4
         const mat4 NDC = mat4()
                 .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
@@ -516,7 +522,9 @@ struct Render : Drag {
                         const uint texX = u*(texSize.x-1)+1.f/2;
                         const uint texY = v*(texSize.y-1)+1.f/2;
 
-                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0); // FIXME: synthetic test case
+                        assert_(texX < texSize.x && texY < texSize.y, texX, texY, texSize, u, v);
+                        // FIXME: synthetic test case
+                        const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0);
                         const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
                         const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
                         target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance), 0xFF);
@@ -531,6 +539,10 @@ struct Render : Drag {
         //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
         //window->render();
 #endif
+        assert_(I.size == target.size, I.size, target.size);
+        blit(I, target);
+        writeFile("test+.jpg", encodeJPEG(I), currentWorkingDirectory(), true);
+        downsample(renderTarget, I);
     }
     virtual vec2 drag(vec2 dragStartValue, vec2 normalizedDragOffset) override {
         vec2 value = dragStartValue + float(2*π)*normalizedDragOffset;
