@@ -45,7 +45,8 @@ void sRGB(const Image& Y, const ImageF& X, float max) {
             if(v < +inff) max = ::max(max, v);
         }
     }
-    for(uint i: range(X.ref::size)) Y[i] = byte4(byte3(sRGB(X[i] <= max ? (X[i]-min)/(max-min) : 1)), 0xFF);
+    if(max==1) for(uint i: range(X.ref::size)) Y[i] = byte4(byte3(sRGB(X[i])), 0xFF);
+    else for(uint i: range(X.ref::size)) Y[i] = byte4(byte3(sRGB(X[i] <= max ? (X[i]-min)/(max-min) : 1)), 0xFF);
 }
 
 void sRGB(const Image& Y, const Image3f& X, bgr3f max, bgr3f min) {

@@ -7,6 +7,9 @@
 #include "matrix.h"
 #include "jacobi.h"
 #include "video.h"
+#include "plot.h"
+#include "png.h"
+#include "sort.h"
 
 template<> inline String str(const Matrix& A) {
     array<char> s;
@@ -28,63 +31,182 @@ inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
 
 typedef ref<float> vector;
 
+static uint draw(Random& random, const ref<uint> DPD, const uint64 sum) {
+    uint64 u = random.next<uint64>()%sum;
+    uint64 p = 0;
+    for(const uint i: range(DPD.size)) {
+        p += DPD[i];
+        if(p > u) return i;
+    }
+    error("");
+}
+
 struct Test : Widget {
     Decoder video {"test.mp4"};
-    Image target;
     unique<Window> window = nullptr;
 
-    Test() {
-        //const ImageF I = luminance(rotateHalfTurn(decodeImage(Map("test.jpg"))));
-        const ImageF I = luminance(video.read());
-        Array<uint, 256> histogram; histogram.clear(0);
-        const float maxX = ::max(I);
-        for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;
+    ImageT</*bool*/float> R;
 
-        const uint totalCount = I.ref::size;
-        uint64 totalSum = 0;
+    const float y = 210./297;
+    const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
+
+    mat4 M;
+
+    uint frameIndex = 0;
+
+    Test() {
+        for(auto_: range(1)) step();
+        //while(step()) {}
+        window = ::window(this, int2(R.size/*/2u*/), mainThread, 0);
+        window->show();
+        //window->actions[Space] = [this]{ step(); window->render(); };
+    }
+
+    bool step() {
+        //log(frameIndex);
+        frameIndex++;
+        //const ImageF I = luminance(rotateHalfTurn(decodeImage(Map("test.jpg"))));
+        Time time {true};
+        if(!video.read()) return false;
+        //const ImageF I = luminance(video.YUV(0));
+        const Image8 Y = video.YUV(0);
+        time.reset(); //log("Decode", fmt(time.reset().milliseconds())+"ms"_);
+        Array<uint, 256> histogram; histogram.clear(0);
+        //const float maxY = ::max(Y);
+        //for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;
+        for(const uint8 y: Y) histogram[y]++;
+        const uint totalCount = Y.ref::size;
+
+#if 1 // K-means++ (FIXME: parameter K (=3))
+        uint threshold;
+        {
+            const uint K = 3;
+            buffer<uint> clusters (K);
+            Random random;
+            clusters[0] = draw(random, histogram, totalCount);
+            for(uint k: range(1, clusters.size)) {
+                Array(uint, DPD, histogram.size); // FIXME: storing cDPD directly would allow to binary search in ::draw
+                uint64 sum = 0;
+                for(const uint i: range(histogram.size)) {
+                    uint D = -1;
+                    for(uint cluster: clusters.slice(0,k)) D = ::min(D, (uint)sq(int(i)-int(cluster)));
+                    D *= histogram[i]; // Samples according to distance x density
+                    DPD[i] = D;
+                    sum += D;
+                }
+                const uint i = draw(random, DPD, sum);
+                assert_(histogram[i], i, DPD[i]);
+                clusters[k] = i;
+            }
+
+            /*for(auto_: range(4))*/ for(;;) {
+                Array(uint64, Σ, clusters.size); Σ.clear();
+                Array(uint, N, clusters.size); N.clear();
+                for(const uint i: range(histogram.size)) {
+                    uint bestD = -1;
+                    uint k = -1;
+                    for(const uint ik: range(clusters.size)) {
+                        const uint D = sq(int(i)-int(clusters[ik]));
+                        if(D < bestD) {
+                            bestD = D;
+                            k = ik;
+                        }
+                    }
+                    assert_(k<clusters.size);
+                    for(const uint ik: range(clusters.size)) if(clusters[ik]==i) assert_(k==ik);
+                    N[k] += histogram[i];
+                    Σ[k] += histogram[i]*i;
+                }
+                bool changed = false;
+                for(const uint k: range(clusters.size)) {
+                    assert_(N[k], clusters, histogram[clusters[0]]);
+                    uint c = Σ[k]/N[k];
+                    if(clusters[k] != c) changed = true;
+                    clusters[k] = c;
+                }
+                //log(Σ, N, clusters);
+                sort(clusters);
+                if(!changed) break;
+            }
+            threshold = ((clusters[K-3]+clusters[K-2])/2+clusters[K-1])/2;
+            log(clusters, threshold);
+        }
+#else // Otsu
+        uint totalSum = 0;
         for(uint t: range(histogram.size)) totalSum += t*histogram[t];
         uint backgroundCount = 0;
         uint backgroundSum = 0;
         float maximumVariance = 0;
         uint thresholdIndex = 0;
-        for(uint t: range(histogram.size)) {
+        map<float, float> σ;
+        for(const uint t: range(histogram.size)) {
             backgroundCount += histogram[t];
             if(backgroundCount == 0) continue;
             backgroundSum += t*histogram[t];
-            uint foregroundCount = totalCount - backgroundCount;
-            uint64 foregroundSum = totalSum - backgroundSum;
+            const uint foregroundCount = totalCount - backgroundCount;
+            const uint foregroundSum = totalSum - backgroundSum;
             if(foregroundCount == 0) break;
-            const float foregroundMean = float(foregroundSum)/float(foregroundCount);
             const float backgroundMean = float(backgroundSum)/float(backgroundCount);
-            const float variance = float(foregroundCount)*float(backgroundCount)*sq(foregroundMean - backgroundMean);
+            const float foregroundMean = float(foregroundSum)/float(foregroundCount);
+            const float variance = float(backgroundCount)*float(foregroundCount)*sq(foregroundMean - backgroundMean);
+            //log(t, histogram[t], variance);
+            //log(backgroundCount, backgroundSum, backgroundMean);
+            //log(foregroundCount, foregroundSum, foregroundMean);
+            log(t, backgroundCount, foregroundCount, backgroundMean, foregroundMean, sqrt(variance));
+            σ.insert(t, sqrt(variance));
             if(variance >= maximumVariance) {
                 maximumVariance=variance;
                 thresholdIndex = t;
             }
         }
-        const float threshold = float(thresholdIndex)/float(histogram.size-1) * maxX;
+        {
+            for(float& s: σ.values) s /= sqrt(maximumVariance);
+            map<float,float> H;
+            for(const uint i: range(histogram.size)) H.insert(i, float(histogram[i])/float(::max(histogram)));
+            Plot plot;
+            plot.dataSets.insert("H"__, move(H));
+            plot.dataSets.insert("σ"__, move(σ));
+            ImageRenderTarget target(uint2(3840,2160));
+            target.clear(byte4(0xFF));
+            plot.render(target);
+            writeFile("plot.png", encodePNG(target), currentWorkingDirectory(), true);
+            error("plot");
+        }
+        error(thresholdIndex);
+        //error(ref<float>(σ, histogram.size));
+        //const float threshold = float(thresholdIndex)/float(histogram.size-1) * maxX;
+        const uint threshold = thresholdIndex;
+#endif
 
         // Floodfill
-        buffer<uint2> stack (I.ref::size, 0);
-        stack.append(I.size/2u); // FIXME: Select largest region: floodfill from every unconnected seeds, keep largest region
-        ImageT</*bool*/float> R (I.size); R.clear(0);
+        buffer<uint2> stack (Y.ref::size, 0);
+        stack.append(Y.size/2u); // FIXME: Select largest region: floodfill from every unconnected seeds, keep largest region
+        R = ImageT</*bool*/float>(Y.size); R.clear(0);
+
+        //for(uint i: range(R.ref::size)) R[i] = Y[i] > threshold; //Y[i]/255.f;
+        //log("K-Means++", fmt(time.reset().milliseconds())+"ms"_);
+
+        time.reset();
         while(stack) {
             const uint2& p0 = stack.pop();
             for(int2 dp: {int2(0,-1),int2(-1,0),int2(1,0),int2(0,1)}) { // 4-way connectivity
                 uint2 p = uint2(int2(p0)+dp);
-                if(anyGE(p,I.size)) continue;
-                if(I(p) <= threshold) continue;
+                if(anyGE(p, R.size)) continue;
+                if(Y(p) <= threshold) continue;
                 if(R(p)) continue; // Already marked
                 R(p) = 1;
                 stack.append(p);
             }
         }
+        return true;
+
+        log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
 
         // Mean
         buffer<vec2> X (R.ref::size, 0);
         vec2 Σ = 0_;
-        for(const uint iy: range(I.size.y)) for(const uint ix: range(I.size.x)) {
-            vec2 x(ix, I.size.y-1-iy); // Flips Y axis from Y top down to Y bottom up
+        for(const uint iy: range(R.size.y)) for(const uint ix: range(R.size.x)) {
+            vec2 x(ix, R.size.y-1-iy); // Flips Y axis from Y top down to Y bottom up
             if(R(ix,iy)) {
                 X.append(x);
                 Σ += x;
@@ -131,20 +253,18 @@ struct Test : Widget {
                 }
             }
         }
+        log("Corner", fmt(time.reset().milliseconds())+"ms"_);
 
         static constexpr uint N = 4;
-
-        const float y = 210./297;
-        const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
         mat2 U = V.inverse();
         mat3 K;
         const float focalLength = 4.2, pixelPitch = 0.0014;
-        K(0,0) = 2/(I.size.x*pixelPitch/focalLength);
-        K(1,1) = 2/(I.size.y*pixelPitch/focalLength);
+        K(0,0) = 2/(R.size.x*pixelPitch/focalLength);
+        K(1,1) = 2/(R.size.y*pixelPitch/focalLength);
         K(2,2) = 1;
         const mat3 K¯¹ = K.¯¹();
-        const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(I.size)-vec2(1)); });
+        const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(R.size)-vec2(1)); });
 
         const ref<vec2> TX = modelC;
         const ref<vec2> TX´ = X´;
@@ -180,27 +300,24 @@ struct Test : Widget {
         Rt[2] = vec4(cross(H[0],H[1]), 0);
         Rt[3] = vec4(-H[2], 1); // Z-
         Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well
-        //Rt = Rt * mat4(vec4(1,1,-1,1));
-        log(((mat3)Rt).det());
-        assert_(abs(1-((mat3)Rt).det())<0.04,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
-
-        log("Rt\n"+str(Rt));
+        assert_(abs(1-((mat3)Rt).det())<0.05,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
 
         const float near = K(1,1);
         const float far = 1000/focalLength*near; //mm
-        const mat4 projection = perspective(near, far).scale(vec3(float(I.size.y)/float(I.size.x), 1, 1));
+        const mat4 projection = perspective(near, far).scale(vec3(float(R.size.y)/float(R.size.x), 1, 1));
         const mat4 NDC = mat4()
-                .scale(vec3(vec2(I.size)/2.f, 1))
+                .scale(vec3(vec2(R.size)/2.f, 1))
                 .translate(vec3(1)); // -1, 1 -> 0, 2
-        const mat4 flipY = mat4().translate(vec3(0, I.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        const mat3 flipY2 = mat3().translate(vec2(0, I.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        const mat4 M = flipY*NDC*projection*Rt;
-        log(M*vec4(modelC[0], 0, 0));
+        const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        M = flipY*NDC*projection*Rt;
+        return true;
+    }
+    void render(const Image& target) {
+        Time time {true};
+        sRGB(target, R, 1);
 
-        target = sRGB(R, 128);
-
-        line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
-        line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
+        //line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
+        //line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
 
         line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(0,0,1));
         line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(0,1,0));
@@ -217,14 +334,13 @@ struct Test : Widget {
         line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(0,1,0));
         line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1,0,0));
         line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(0,1,1));
-
-        if(1) {
-            window = ::window(this, int2(target.size/2u), mainThread, 0);
-            window->show();
-        }
+        //log("Render", fmt(time.reset().milliseconds())+"ms"_);
     }
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
         const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
-        downsample(renderTarget, target);
+        render(renderTarget);
+        //downsample(renderTarget, target);
+        if(!window->actions.contains(Space))
+            if(step()) window->render();
     }
 } static test;

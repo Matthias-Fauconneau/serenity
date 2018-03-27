@@ -29,11 +29,11 @@ struct Plot : virtual Widget {
  map<NaturalString, map<float,float>> dataSets;
  bool plotPoints, plotLines, plotBandsY = false;
  enum LegendPosition { TopLeft, TopRight, BottomLeft, BottomRight } legendPosition;
- vec2 min = inff, max = 0;
+ vec2 min = vec2(inff), max = 0_;
 
  Plot(string title=""_, bool plotLines=true, LegendPosition legendPosition=TopRight) : name(copyRef(title)), plotPoints(!plotLines), plotLines(plotLines), legendPosition(legendPosition) {}
 
  String title() const override { return copyRef(name); }
  vec2 sizeHint(vec2) override;
- void render(RenderTarget2D& target, vec2 offset=0, vec2 size=0) override;
+ void render(RenderTarget2D& target, vec2 offset=0_, vec2 size=0_) override;
 };

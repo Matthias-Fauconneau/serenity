@@ -1,6 +1,7 @@
 #include "plot.h"
-#include "text.h"
 #include "color.h"
+
+//#include "text.h"
 
 static inline double log2(double x) { return __builtin_log2(x); }
 static inline double exp2(double x) { return __builtin_exp2(x); }
@@ -20,7 +21,7 @@ static uint subExponent(float& value) {
 }
 
 vec2 Plot::sizeHint(vec2 size) {
-    if(!dataSets) return 0;
+    if(!dataSets) return 0_;
     else size.y = ::min(size.y, 3*size.x/4);
     return -size; // Expanding
 }
@@ -71,10 +72,17 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
         }
     }
 
-    const float textSize = 16; const string fontName = "DejaVuSans"_;//"latinmodern-math"_;
+#if TEXT
+    const float textSize = 16;
+    const string fontName = "DejaVuSans"_;//"latinmodern-math"_;
     // Configures ticks
-    struct Tick : Text { float value; Tick(float value, string label, float textSize, string fontName, int2 align) : Text(label, textSize, 0,1,0, fontName, true, 1, align), value(value) {} };
-    array<Tick> ticks[2]; vec2 tickLabelSize = 0;
+    struct Tick : Text {
+        float value;
+        Tick(float value, string label, float textSize, string fontName, int2 align)
+            : Text(label, textSize, 0,1,0, fontName, true, 1, align), value(value) {}
+    };
+    array<Tick> ticks[2];
+    vec2 tickLabelSize = 0_;
     for(size_t axis: range(2)) {
         uint precision = ::max(2./*1.*/, ceil(-log10(::max(-min[axis],max[axis])/tickCount[axis])));
         for(size_t i: range(tickCount[axis]+1)) {
@@ -95,8 +103,9 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
     float top = tickLabelSize.y+textSize;
     float bottom = tickLabelSize.y*3/2;
     float right = tickLabelSize.x/2 + Text(xlabel, textSize, 0,1,0, fontName).sizeHint().x;
-
-    const float tickLength = 4;
+#else
+    const float left = 0, top = 0, bottom = 0, right = 0;
+#endif
 
     // Evaluates colors
     buffer<bgr3f> colors(dataSets.size());
@@ -128,8 +137,10 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
         return vec2(left+p.x*(size.x-left-right),/*2**/top+(1-p.y)*(size.y-/*2**/top-bottom));
     };
 
+#if TEXT
+    const float tickLength = 4;
     {
-        int2 pen = 0;
+        int2 pen = 0_;
         /*if(name) { // Title
             Text text(bold(name), textSize, 0,1,0, fontName);
             text.render(target.offset(vec2(pen+int2((size.x-text.sizeHint().x)/2,top))));
@@ -179,11 +190,12 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
             text.render(target, p, 0);
         }
     }
+#endif
 
     // Plots data points
     for(size_t i: range(dataSets.size())) {
         bgr3f color = colors[order.indexOf(i)];
-        assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
+        //assert_(bgr3f(0) <= color && color <= bgr3f(1), color);
         const auto& data = dataSets.values[i];
         buffer<vec2> points = apply(data.size(), [&](size_t i){ return point( vec2(data.keys[i],data.values[i]) ); });
         if(plotPoints || points.size==1 || plotBandsY) for(vec2 p: points) {
@@ -214,6 +226,7 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
             if(!isNumber(points[i]) || !isNumber(points[i+1])) continue;
             target.line(points[i], points[i+1], color);
         }
+#if TRAPEZOIDY
         if(plotBandsY && points) { // Y bands
             Span span[2] = {{points[0].x,points[0].y,points[0].y},{points[0].x,points[0].y,points[0].y}};
             for(vec2 p: points.slice(1)) {
@@ -232,5 +245,6 @@ void Plot::render(RenderTarget2D& target, vec2 offset, vec2 size) {
             target.line(vec2(span[0].x, span[0].max), vec2(span[1].x, span[1].max), color);
             target.trapezoidY(span[0], span[1], color, 1.f/2);
         }
+#endif
     }
 }

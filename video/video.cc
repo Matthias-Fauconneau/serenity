@@ -40,34 +40,36 @@ bool Decoder::read(const Image& image) {
         AVPacket packet = {};
         av_init_packet(&packet); packet.data=0, packet.size=0;
         int e;
-        if((e = av_read_frame(file, &packet)) < 0) { av_free_packet(&packet); error(e); return false; }
+        if((e = av_read_frame(file, &packet)) < 0) { av_free_packet(&packet); return false; }
         if(file->streams[packet.stream_index]==videoStream) {
             int gotFrame=0;
             avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
             assert_(!videoCodec->refcounted_frames);
             if(gotFrame) {
-                if(videoCodec->pix_fmt == AV_PIX_FMT_RGB24) {
-                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
-                        image(x,y).r = frame->data[0][y*frame->linesize[0]+x*3+0];
-                        image(x,y).g = frame->data[0][y*frame->linesize[0]+x*3+1];
-                        image(x,y).b = frame->data[0][y*frame->linesize[0]+x*3+2];
-                        image(x,y).a = 0xFF;
-                    }
-                } else if(videoCodec->pix_fmt == AV_PIX_FMT_GBRP) {
-                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
-                        image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
-                        image(x,y).b = frame->data[1][y*frame->linesize[1]+x];
-                        image(x,y).r = frame->data[2][y*frame->linesize[2]+x];
-                        image(x,y).a = 0xFF;
-                    }
-                } else if(videoCodec->pix_fmt == AV_PIX_FMT_YUV420P) { // FIXME: luminance only
-                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
-                        image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
-                        image(x,y).b = frame->data[0][y*frame->linesize[0]+x];
-                        image(x,y).r = frame->data[0][y*frame->linesize[0]+x];
-                        image(x,y).a = 0xFF;
-                    }
-                } else error(int(videoCodec->pix_fmt));
+                if(image) {
+                    if(videoCodec->pix_fmt == AV_PIX_FMT_RGB24) {
+                        for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
+                            image(x,y).r = frame->data[0][y*frame->linesize[0]+x*3+0];
+                            image(x,y).g = frame->data[0][y*frame->linesize[0]+x*3+1];
+                            image(x,y).b = frame->data[0][y*frame->linesize[0]+x*3+2];
+                            image(x,y).a = 0xFF;
+                        }
+                    } else if(videoCodec->pix_fmt == AV_PIX_FMT_GBRP) {
+                        for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
+                            image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
+                            image(x,y).b = frame->data[1][y*frame->linesize[1]+x];
+                            image(x,y).r = frame->data[2][y*frame->linesize[2]+x];
+                            image(x,y).a = 0xFF;
+                        }
+                    } else if(videoCodec->pix_fmt == AV_PIX_FMT_YUV420P) { // FIXME: luminance only // FIXME: no copy
+                        for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
+                            image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
+                            image(x,y).b = frame->data[0][y*frame->linesize[0]+x];
+                            image(x,y).r = frame->data[0][y*frame->linesize[0]+x];
+                            image(x,y).a = 0xFF;
+                        }
+                    } else error(int(videoCodec->pix_fmt));
+                }
                 int nextTime = frame->pkt_pts;
                 videoTime = nextTime;
                 av_free_packet(&packet);
@@ -76,6 +78,11 @@ bool Decoder::read(const Image& image) {
         }
         av_free_packet(&packet);
     }
+}
+
+Image8 Decoder::YUV(size_t i) const {
+ assert_(frame->linesize[i] == (i ? frame->width/2 : frame->width));
+ return Image8(buffer<uint8>(frame->data[i], frame->linesize[i]*(size.y/(i?2:1)), 0), uint2(frame->width/(i?2:1), frame->height/(i?2:1)), frame->linesize[i]);
 }
 
 void Decoder::seek(uint64 videoTime) { av_seek_frame(file, videoStream->index, videoTime, 0); }

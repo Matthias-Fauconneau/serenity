@@ -28,7 +28,10 @@ struct Decoder {
     explicit operator bool() { return file; }
 
     /// Reads a video frame
-    bool read(const Image& image);
-    Image read() { Image image(size); if(!read(image)) image={}; return image; }
+    bool read(const Image& image={});
+    //Image read() { Image image(size); if(!read(image)) image={}; return image; }
+
+    Image8 YUV(size_t i) const;
+
     void seek(uint64 videoTime);
 };

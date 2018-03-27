@@ -141,18 +141,6 @@ static uint32 crc32(const ref<byte> data) {
  return ~crc;
 }
 
-static uint adler32(const ref<byte> data) {
- const byte* ptr=data.data; uint len=data.size;
- uint a=1, b=0;
- while(len > 0) {
-  uint tlen = len > 5552 ? 5552 : len; len -= tlen;
-  do { a += *ptr; ptr++; b += a; } while (--tlen);
-  a %= 65521;
-  b %= 65521;
- }
- return a | (b << 16);
-}
-
 template<template<Type> class T, int N> buffer<byte> predict(const byte4* source, size_t stride, size_t width, size_t height) {
  typedef vec<T,uint8,N> U;
  typedef vec<T,int,N> V;
