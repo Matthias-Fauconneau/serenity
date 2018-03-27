@@ -6,6 +6,7 @@
 #include "mwc.h"
 #include "matrix.h"
 #include "jacobi.h"
+#include "video.h"
 
 template<> inline String str(const Matrix& A) {
     array<char> s;
@@ -28,11 +29,13 @@ inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
 typedef ref<float> vector;
 
 struct Test : Widget {
+    Decoder video {"test.mp4"};
     Image target;
     unique<Window> window = nullptr;
 
     Test() {
-        const ImageF I = luminance(rotateHalfTurn(decodeImage(Map("test.jpg"))));
+        //const ImageF I = luminance(rotateHalfTurn(decodeImage(Map("test.jpg"))));
+        const ImageF I = luminance(video.read());
         Array<uint, 256> histogram; histogram.clear(0);
         const float maxX = ::max(I);
         for(const float x: I) histogram[int((histogram.size-1)*x/maxX)]++;

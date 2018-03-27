@@ -76,3 +76,6 @@ ui/widget.h
 ui/window.cc
 ui/window.h
 ui/x.h
+
+video/video.h
+video/video.cc

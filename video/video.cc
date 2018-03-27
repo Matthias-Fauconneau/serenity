@@ -18,8 +18,8 @@ Decoder::Decoder(string path) {
             videoCodec = videoStream->codec;
             AVCodec* codec = avcodec_find_decoder(videoCodec->codec_id);
             if(codec && avcodec_open2(videoCodec, codec, 0) >= 0) {
-                width = videoCodec->width; height=videoCodec->height;
-                timeDen = videoStream->time_base.den;
+                size.x = videoCodec->width; size.y = videoCodec->height;
+                framePerSeconds = videoStream->time_base.den;
                 duration = videoStream->duration; //*videoStream->time_base.num/videoStream->time_base.den;
             }
         }
@@ -40,24 +40,31 @@ bool Decoder::read(const Image& image) {
         AVPacket packet = {};
         av_init_packet(&packet); packet.data=0, packet.size=0;
         int e;
-        if((e = av_read_frame(file, &packet)) < 0) { av_free_packet(&packet); log(e); return false; }
+        if((e = av_read_frame(file, &packet)) < 0) { av_free_packet(&packet); error(e); return false; }
         if(file->streams[packet.stream_index]==videoStream) {
             int gotFrame=0;
             avcodec_decode_video2(videoCodec, frame, &gotFrame, &packet);
             assert_(!videoCodec->refcounted_frames);
             if(gotFrame) {
                 if(videoCodec->pix_fmt == AV_PIX_FMT_RGB24) {
-                    for(size_t y: range(height)) for(size_t x: range(width)) {
+                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
                         image(x,y).r = frame->data[0][y*frame->linesize[0]+x*3+0];
                         image(x,y).g = frame->data[0][y*frame->linesize[0]+x*3+1];
                         image(x,y).b = frame->data[0][y*frame->linesize[0]+x*3+2];
                         image(x,y).a = 0xFF;
                     }
                 } else if(videoCodec->pix_fmt == AV_PIX_FMT_GBRP) {
-                    for(size_t y: range(height)) for(size_t x: range(width)) {
+                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
                         image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
                         image(x,y).b = frame->data[1][y*frame->linesize[1]+x];
                         image(x,y).r = frame->data[2][y*frame->linesize[2]+x];
+                        image(x,y).a = 0xFF;
+                    }
+                } else if(videoCodec->pix_fmt == AV_PIX_FMT_YUV420P) { // FIXME: luminance only
+                    for(size_t y: range(size.y)) for(size_t x: range(size.x)) {
+                        image(x,y).g = frame->data[0][y*frame->linesize[0]+x];
+                        image(x,y).b = frame->data[0][y*frame->linesize[0]+x];
+                        image(x,y).r = frame->data[0][y*frame->linesize[0]+x];
                         image(x,y).a = 0xFF;
                     }
                 } else error(int(videoCodec->pix_fmt));

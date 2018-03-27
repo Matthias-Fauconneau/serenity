@@ -8,17 +8,14 @@ struct AVFrame;
 
 /// Generic video/audio decoder (using ffmpeg)
 struct Decoder {
-    union {
-        uint2 size = 0;
-        struct { uint width, height; };
-    };
-    uint timeDen=0;
+    uint2 size = 0_;
+    uint framePerSeconds = 0;
 
     int duration = 0; // in stream time base
 
     handle<AVFormatContext*> file;
     handle<SwsContext*> swsContext;
-    int2 scaledSize = 0;
+    int2 scaledSize = 0_;
     handle<AVStream*> videoStream;
     handle<AVCodecContext*> videoCodec;
     int videoTime = 0; // in stream time base
@@ -32,5 +29,6 @@ struct Decoder {
 
     /// Reads a video frame
     bool read(const Image& image);
+    Image read() { Image image(size); if(!read(image)) image={}; return image; }
     void seek(uint64 videoTime);
 };
