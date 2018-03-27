@@ -47,6 +47,8 @@ struct Test : Widget {
 
     ImageT</*bool*/float> R;
 
+    vec2 μ, e0, e1;
+
     const float y = 210./297;
     const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
@@ -129,7 +131,7 @@ struct Test : Widget {
                 if(!changed) break;
             }
             threshold = ((clusters[K-3]+clusters[K-2])/2+clusters[K-1])/2;
-            log(clusters, threshold);
+            //log(clusters, threshold);
         }
 #else // Otsu
         uint totalSum = 0;
@@ -178,6 +180,29 @@ struct Test : Widget {
         const uint threshold = thresholdIndex;
 #endif
 
+#if 1 // Hull of main region
+        uint2 start = Y.size/2u;
+        while(Y(start+uint2(1,0))>threshold) start.x++; // FIXME: holes
+        buffer<uint2> H (Y.ref::size, 0); // Hull
+        uint2 p = start;
+        R = ImageT</*bool*/float>(Y.size); R.clear(0); //
+        for(;;) { // Walk CCW
+            const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2(0,+1),int2(1,+1),int2(1, 0),int2(1,-1),int2(0,-1)};
+            for(int i: range(8)) { // Searches for a CCW background->foreground transition
+                uint2 bg (int2(p)+CCW[i]);
+                uint2 fg (int2(p)+CCW[(i+1)%8]);
+                if(Y(bg)<=threshold && Y(fg)>threshold) { // Assumes only one Bg->Fg transition (no holes)
+                    R(p) = 1;
+                    //assert_(H.size < H.capacity, H.size, H.capacity, start, p, bg, fg); // Infinite loop
+                    if(!(H.size < H.capacity)) { log(frameIndex, H.size, H.capacity, start, p, bg, fg); return false; }
+                    H.append(p);
+                    p = fg;
+                    break;
+                }
+            }
+            if(p == start) break;
+        }
+#else // PCA
         // Floodfill
         buffer<uint2> stack (Y.ref::size, 0);
         stack.append(Y.size/2u); // FIXME: Select largest region: floodfill from every unconnected seeds, keep largest region
@@ -198,9 +223,21 @@ struct Test : Widget {
                 stack.append(p);
             }
         }
-        return true;
+        time.reset(); //log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
 
-        log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
+        {
+            ImageT</*bool*/float> E(Y.size); E.clear(0);
+            for(const uint y: range(1, R.size.y-1)) for(const uint x: range(1, R.size.x-1)) {
+                if(!R(x,y)) continue;
+                for(const int dy: range(-1, 1 +1)) for(const int dx: range(-1, 1 +1)) {
+                    if(!R(x+dx, y+dy)) goto break_;
+                } /*else*/ continue;
+                break_:
+                E(x,y) = 1;
+            }
+            R = move(E);
+        }
+        time.reset(); //log("Edge", fmt(time.reset().milliseconds())+"ms"_);
 
         // Mean
         buffer<vec2> X (R.ref::size, 0);
@@ -212,7 +249,7 @@ struct Test : Widget {
                 Σ += x;
             }
         }
-        const vec2 μ = Σ / float(X.size);
+        /*const vec2*/ μ = Σ / float(X.size);
         for(vec2& x: X) x -= μ;
 
         // PCA
@@ -224,8 +261,8 @@ struct Test : Widget {
             for(vec2 x: X) Σ += dot(r,x)*x;
             r = normalize(Σ);
         }
-        const vec2 e0 = r;
-        const vec2 e1 = normal(e0);
+        /*const vec2*/ e0 = r;
+        /*const vec2*/ e1 = normal(e0);
         const mat2 V (e0, e1);
         //log(V); // 1 0.02, -0.02 1
 
@@ -253,8 +290,9 @@ struct Test : Widget {
                 }
             }
         }
+#endif
         log("Corner", fmt(time.reset().milliseconds())+"ms"_);
-
+#if 0
         static constexpr uint N = 4;
 
         mat2 U = V.inverse();
@@ -310,14 +348,16 @@ struct Test : Widget {
                 .translate(vec3(1)); // -1, 1 -> 0, 2
         const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
         M = flipY*NDC*projection*Rt;
+#endif
         return true;
     }
     void render(const Image& target) {
         Time time {true};
         sRGB(target, R, 1);
 
-        //line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
-        //line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
+        const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
+        line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
 
         line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(0,0,1));
         line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(0,1,0));
