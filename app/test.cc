@@ -80,7 +80,7 @@ struct Test : Widget {
         for(const uint8 y: Y) histogram[y]++;
         const uint totalCount = Y.ref::size;
 
-#if 1 // K-means++ (FIXME: parameter K (=3))
+        // K-means++ (FIXME: parameter K (=3))
         uint threshold;
         {
             const uint K = 3;
@@ -134,54 +134,7 @@ struct Test : Widget {
             threshold = ((clusters[K-3]+clusters[K-2])/2+clusters[K-1])/2;
             //log(clusters, threshold);
         }
-#else // Otsu
-        uint totalSum = 0;
-        for(uint t: range(histogram.size)) totalSum += t*histogram[t];
-        uint backgroundCount = 0;
-        uint backgroundSum = 0;
-        float maximumVariance = 0;
-        uint thresholdIndex = 0;
-        map<float, float> σ;
-        for(const uint t: range(histogram.size)) {
-            backgroundCount += histogram[t];
-            if(backgroundCount == 0) continue;
-            backgroundSum += t*histogram[t];
-            const uint foregroundCount = totalCount - backgroundCount;
-            const uint foregroundSum = totalSum - backgroundSum;
-            if(foregroundCount == 0) break;
-            const float backgroundMean = float(backgroundSum)/float(backgroundCount);
-            const float foregroundMean = float(foregroundSum)/float(foregroundCount);
-            const float variance = float(backgroundCount)*float(foregroundCount)*sq(foregroundMean - backgroundMean);
-            //log(t, histogram[t], variance);
-            //log(backgroundCount, backgroundSum, backgroundMean);
-            //log(foregroundCount, foregroundSum, foregroundMean);
-            log(t, backgroundCount, foregroundCount, backgroundMean, foregroundMean, sqrt(variance));
-            σ.insert(t, sqrt(variance));
-            if(variance >= maximumVariance) {
-                maximumVariance=variance;
-                thresholdIndex = t;
-            }
-        }
-        {
-            for(float& s: σ.values) s /= sqrt(maximumVariance);
-            map<float,float> H;
-            for(const uint i: range(histogram.size)) H.insert(i, float(histogram[i])/float(::max(histogram)));
-            Plot plot;
-            plot.dataSets.insert("H"__, move(H));
-            plot.dataSets.insert("σ"__, move(σ));
-            ImageRenderTarget target(uint2(3840,2160));
-            target.clear(byte4(0xFF));
-            plot.render(target);
-            writeFile("plot.png", encodePNG(target), currentWorkingDirectory(), true);
-            error("plot");
-        }
-        error(thresholdIndex);
-        //error(ref<float>(σ, histogram.size));
-        //const float threshold = float(thresholdIndex)/float(histogram.size-1) * maxX;
-        const uint threshold = thresholdIndex;
-#endif
 
-#if 1 // Hull of main region
         // Floodfill outside
         buffer<uint2> stack (Y.ref::size, 0);
         // Assumes one of the edge connects to the main background
@@ -228,8 +181,8 @@ struct Test : Widget {
                     p = fg;
                     //if(H.size >= 2 && cross(int2(H[H.size-1])-int2(H[H.size-2]), int2(p)-int2(H[H.size-1])) <= 0) H.last() = fg;
                     //else H.append(fg);
-                    //if(i>=4)
-                        H.append(fg); // FIXME
+                    //if(i>=4) // FIXME
+                    H.append(uint2(fg.x, R.size.y-1-fg.y)); // Flip Y axis from Y top down to Y bottom up
                     previousI = I;
                     break;
                 }
@@ -237,130 +190,81 @@ struct Test : Widget {
             if(p == start) break;
         }
 
-        // Simplifies polygon to 4 corners
-        while(H.size > 4) {
-            float minA = inff; int bestI = -1;
-            for(const uint i: range(H.size)) {
-                int2 p0 (H[i]);
-                int2 p1 (H[(i+1)%H.size]);
-                int2 p2 (H[(i+2)%H.size]);
-                int A = cross(p2-p0, p1-p0);
-                //assert_(A >= 0, A);
-                if(A < minA) { minA = A; bestI = (i+1)%H.size; }
-            }
-            H.removeAt(bestI);
-        }
+        //R = ImageT</*bool*/float>(Y.size);
+        for(float& r: R) r /= 8;
 
-        R = ImageT</*bool*/float>(Y.size); R.clear(0);
-#if 0
-        for(uint2 h: H) R(h) = 1;
-#else
-        for(uint i: range(H.size)) {
-            int2 p0 (H[i]);
-            int2 p1 (H[(i+1)%H.size]);
+        auto line = [this](vec2 p0, vec2 p1) {
+            if(anyGE(uint2(p0), R.size)) return;
+            if(anyGE(uint2(p1), R.size)) return;
             float dx = p1.x - p0.x, dy = p1.y - p0.y;
             bool transpose=false;
             if(abs(dx) < abs(dy)) { swap(p0.x, p0.y); swap(p1.x, p1.y); swap(dx, dy); transpose=true; }
             if(p0.x > p1.x) { swap(p0.x, p1.x); swap(p0.y, p1.y); }
-            float gradient = dy / dx;
-            int i1 = int(round(p0.x));
+            const float gradient = dy / dx;
             float intery = p0.y + gradient * (round(p0.x) - p0.x) + gradient;
-            int i2 = round(p1.x);
-            for(int x: range(i1, i2 +1)) {
+            for(int x: range(p0.x, p1.x +1)) {
                 (transpose ? R(intery, x) : R(x, intery)) = 1;
                 intery += gradient;
             }
+        };
+
+#if 0
+        // Fit OBB
+        float minA = inff; typedef vec2 OBB[4]; OBB obb;
+        for(const uint i: range(H.size)) {
+            const vec2 e0 = normalize(vec2(H[(i+1)%H.size])-vec2(H[i]));
+            const vec2 e1 = normal(e0);
+            vec2 min=vec2(inff), max=vec2(-inff);
+            for(uint2 h: H) {
+                min.x = ::min(min.x, dot(e0, vec2(h)));
+                max.x = ::max(max.x, dot(e0, vec2(h)));
+                min.y = ::min(min.y, dot(e1, vec2(h)));
+                max.y = ::max(max.y, dot(e1, vec2(h)));
+            }
+            float A = dotSq(max-min);
+            if(A < minA) {
+                obb[0] = mat2(e0, e1) * vec2(min.x, min.y);
+                obb[1] = mat2(e0, e1) * vec2(max.x, min.y);
+                obb[2] = mat2(e0, e1) * vec2(max.x, max.y);
+                obb[3] = mat2(e0, e1) * vec2(min.x, max.y);
+            }
         }
+        for(uint i: range(4)) line(obb[i], obb[(i+1)%4]);
 #endif
-#else // PCA
-        // Floodfill
-        buffer<uint2> stack (Y.ref::size, 0);
-        stack.append(Y.size/2u); // FIXME: Select largest region: floodfill from every unconnected seeds, keep largest region
-        R = ImageT</*bool*/float>(Y.size); R.clear(0);
 
-        //for(uint i: range(R.ref::size)) R[i] = Y[i] > threshold; //Y[i]/255.f;
-        //log("K-Means++", fmt(time.reset().milliseconds())+"ms"_);
-
-        time.reset();
-        while(stack) {
-            const uint2& p0 = stack.pop();
-            for(int2 dp: {int2(0,-1),int2(-1,0),int2(1,0),int2(0,1)}) { // 4-way connectivity
-                uint2 p = uint2(int2(p0)+dp);
-                if(anyGE(p, R.size)) continue;
-                if(Y(p) <= threshold) continue;
-                if(R(p)) continue; // Already marked
-                R(p) = 1;
-                stack.append(p);
+        // Simplifies polygon to 4 corners
+        array<uint2> C = copy(H);
+        while(C.size > 4) {
+            float minA = inff; int bestI = -1;
+            for(const uint i: range(C.size)) {
+                int2 p0 (C[i]);
+                int2 p1 (C[(i+1)%C.size]);
+                int2 p2 (C[(i+2)%C.size]);
+                int A = cross(p1-p0, p2-p0);
+                if(A < minA) { minA = A; bestI = (i+1)%C.size; }
             }
-        }
-        time.reset(); //log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
-
-        {
-            ImageT</*bool*/float> E(Y.size); E.clear(0);
-            for(const uint y: range(1, R.size.y-1)) for(const uint x: range(1, R.size.x-1)) {
-                if(!R(x,y)) continue;
-                for(const int dy: range(-1, 1 +1)) for(const int dx: range(-1, 1 +1)) {
-                    if(!R(x+dx, y+dy)) goto break_;
-                } /*else*/ continue;
-                break_:
-                E(x,y) = 1;
-            }
-            R = move(E);
-        }
-        time.reset(); //log("Edge", fmt(time.reset().milliseconds())+"ms"_);
-
-        // Mean
-        buffer<vec2> X (R.ref::size, 0);
-        vec2 Σ = 0_;
-        for(const uint iy: range(R.size.y)) for(const uint ix: range(R.size.x)) {
-            vec2 x(ix, R.size.y-1-iy); // Flips Y axis from Y top down to Y bottom up
-            if(R(ix,iy)) {
-                X.append(x);
-                Σ += x;
-            }
-        }
-        /*const vec2*/ μ = Σ / float(X.size);
-        for(vec2& x: X) x -= μ;
-
-        // PCA
-        Random random;
-        vec2 r = normalize(vec2(0.37, 0.93)); //normalize(random.next<vec2>()); // FIXME: unstable
-        //log(r);
-        for(auto_: range(4)) {
-            vec2 Σ = 0_;
-            for(vec2 x: X) Σ += dot(r,x)*x;
-            r = normalize(Σ);
-        }
-        /*const vec2*/ e0 = r;
-        /*const vec2*/ e1 = normal(e0);
-        const mat2 V (e0, e1);
-        //log(V); // 1 0.02, -0.02 1
-
-        // Initial corner estimation (maximize area of quadrant in eigenspace)
-        vec2 C[4] = {0_,0_,0_,0_}; // eigenspace
-        for(const vec2& x : X) {
-            const vec2 Vx = V * x;
-            static constexpr int quadrantToWinding[2][2] = {{0,3},{1,2}};
-            vec2& c = C[quadrantToWinding[Vx.x>0][Vx.y>0]];
-            if(abs(Vx.x*Vx.y) > abs(c.x*c.y)) c = Vx;
+            C.removeAt(bestI);
         }
 
-        // Iterative corner optimization (maximize total area)
+        // Corner optimization (maximize total area)
         for(uint i: range(4)) {
-            const vec2 C3 = C[(i+3)%4];
-            vec2& C0 = C[(i+0)%4];
-            const vec2 C1 = C[(i+1)%4];
-            float A0 = cross(C1-C0, C3-C0);
-            for(const vec2& x : X) {
-                const vec2 Vx = V * x;
-                const float A = cross(C1-Vx, C3-Vx);
+            const uint2 C3 = C[(i+3)%4];
+            uint2& C0 = C[(i+0)%4];
+            const uint2 C1 = C[(i+1)%4];
+            int A0 = cross(int2(C1)-int2(C0), int2(C3)-int2(C0));
+            for(const uint2& h : H) {
+                const int A = cross(int2(C1)-int2(h), int2(C3)-int2(h));
                 if(A > A0) {
                     A0 = A;
-                    C0 = Vx;
+                    C0 = h;
                 }
             }
         }
-#endif
+
+        //for(uint i: range(H.size)) line(vec2(H[i]), vec2(H[(i+1)%H.size]));
+        const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        for(uint i: range(C.size)) line(flipY2*vec2(C[i]), flipY2*vec2(C[(i+1)%C.size]));
+
         //log("Corner", fmt(time.reset().milliseconds())+"ms"_);
 #if 0
         static constexpr uint N = 4;
