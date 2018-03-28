@@ -19,7 +19,8 @@ Decoder::Decoder(string path) {
             AVCodec* codec = avcodec_find_decoder(videoCodec->codec_id);
             if(codec && avcodec_open2(videoCodec, codec, 0) >= 0) {
                 size.x = videoCodec->width; size.y = videoCodec->height;
-                framePerSeconds = videoStream->time_base.den;
+                videoTimeNum = videoStream->time_base.num;
+                videoTimeDen = videoStream->time_base.den;
                 duration = videoStream->duration; //*videoStream->time_base.num/videoStream->time_base.den;
             }
         }

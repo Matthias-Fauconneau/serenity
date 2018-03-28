@@ -9,7 +9,7 @@ struct AVFrame;
 /// Generic video/audio decoder (using ffmpeg)
 struct Decoder {
     uint2 size = 0_;
-    uint framePerSeconds = 0;
+    uint videoTimeNum = 0, videoTimeDen = 0;
 
     int duration = 0; // in stream time base
 

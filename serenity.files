@@ -80,3 +80,5 @@ ui/x.h
 
 video/video.h
 video/video.cc
+video/encoder.h
+video/encoder.cc

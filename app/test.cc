@@ -11,6 +11,7 @@
 #include "png.h"
 #include "sort.h"
 #include "render.h"
+#include "encoder.h"
 
 template<> inline String str(const Matrix& A) {
     array<char> s;
@@ -48,6 +49,7 @@ struct Test : Widget {
 
     //Decoder video {"test.jpg"};
     Decoder video {"test.mp4"};
+    Encoder output {"output.mp4"};
     unique<Window> window = nullptr;
 
     Image8 Y;
@@ -75,6 +77,10 @@ struct Test : Widget {
         window = ::window(this, int2(video.size/*/2u*/), mainThread, 0);
         window->show();
         //window->actions[Space] = [this]{ step(); window->render(); };
+
+        output.setH264(video.size, video.videoTimeDen, video.videoTimeNum);
+        //output.setH265(video.size, video.framePerSeconds);
+        output.open();
     }
 
     bool step() {
@@ -328,8 +334,12 @@ struct Test : Widget {
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
         const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
         render(renderTarget);
+        Time time {true};
+        output.writeVideoFrame(renderTarget);
+        log("Encode", fmt(time.reset().milliseconds())+"ms"_);
         //downsample(renderTarget, target);
         if(!window->actions.contains(Space))
             if(step()) window->render();
     }
 } static test;
+
