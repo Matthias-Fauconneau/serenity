@@ -28,6 +28,7 @@ template<> inline String str(const Matrix& A) {
 // Right handed
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
+inline int cross(uint2 a, uint2 b) { return int(a.x*b.y) - int(a.y*b.x); }
 
 typedef ref<float> vector;
 
@@ -181,27 +182,95 @@ struct Test : Widget {
 #endif
 
 #if 1 // Hull of main region
-        uint2 start = Y.size/2u;
-        while(Y(start+uint2(1,0))>threshold) start.x++; // FIXME: holes
-        buffer<uint2> H (Y.ref::size, 0); // Hull
+        // Floodfill outside
+        buffer<uint2> stack (Y.ref::size, 0);
+        // Assumes one of the edge connects to the main background
+        for(int x: range(Y.size.x)) {
+            stack.append(uint2(x,0));
+            stack.append(uint2(x,Y.size.y-1));
+        }
+        for(int y: range(Y.size.y)) {
+            stack.append(uint2(0,y));
+            stack.append(uint2(Y.size.x-1,y));
+        }
+
+        R = ImageT</*bool*/float>(Y.size); R.clear(1);
+
+        time.reset();
+        while(stack) {
+            const uint2& p0 = stack.pop();
+            for(int2 dp: {int2(0,-1),int2(-1,0),int2(1,0),int2(0,1)}) { // 4-way connectivity
+                uint2 p = uint2(int2(p0)+dp);
+                if(anyGE(p, R.size)) continue;
+                if(Y(p) > threshold) continue;
+                if(R(p) == 0) continue; // Already marked
+                R(p) = 0;
+                stack.append(p);
+            }
+        }
+        time.reset(); //log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
+
+        uint2 start = R.size/2u;
+        while(R(start+uint2(1,0))) start.x++;
+        buffer<uint2> H (R.ref::size, 0); // Hull
         uint2 p = start;
-        R = ImageT</*bool*/float>(Y.size); R.clear(0); //
         for(;;) { // Walk CCW
             const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2(0,+1),int2(1,+1),int2(1, 0),int2(1,-1),int2(0,-1)};
+            const uint previousSize = H.size;
             for(int i: range(8)) { // Searches for a CCW background->foreground transition
                 uint2 bg (int2(p)+CCW[i]);
                 uint2 fg (int2(p)+CCW[(i+1)%8]);
-                if(Y(bg)<=threshold && Y(fg)>threshold) { // Assumes only one Bg->Fg transition (no holes)
-                    R(p) = 1;
+                if(R(bg)==0 && R(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
                     //assert_(H.size < H.capacity, H.size, H.capacity, start, p, bg, fg); // Infinite loop
-                    if(!(H.size < H.capacity)) { log(frameIndex, H.size, H.capacity, start, p, bg, fg); return false; }
-                    H.append(p);
-                    p = fg;
-                    break;
+                    //if(!(H.size < H.capacity)) { log(frameIndex, H.size, H.capacity, start, p, bg, fg, H.slice(H.size-256, 256)); return false; }
+                    H.append(fg);
                 }
+            }
+            uint nofTransitions = H.size - previousSize;
+            if(nofTransitions == 2) {
+                assert_(H.size >= 4);
+                if(H[H.size-1] == H[H.size-4]) H.pop();
+                else if(H[H.size-2] == H[H.size-4]) { H[H.size-2]=H[H.size-1]; H.pop(); }
+                nofTransitions = H.size - previousSize;
+            }
+            if(nofTransitions == 1) {
+                p = H.last();
+            } else {
+                log(H);
+                log(nofTransitions);
+                {
+                    uint count = 0;
+                    for(int i: range(8)) { // Counts foreground neighbours
+                        uint2 n (int2(p)+CCW[i]);
+                        if(R(n)) count++;
+                    }
+                    log(p, count);
+                }
+                for(uint2 p: H.slice(previousSize)) {
+                    uint count = 0;
+                    for(int i: range(8)) { // Counts foreground neighbours
+                        uint2 n (int2(p)+CCW[i]);
+                        if(R(n)) count++;
+                    }
+                    log(p, count);
+                }
+                array<char> S;
+                for(uint y: range(p.y-2, p.y+2 +1)) {
+                    for(uint x: range(p.x-2, p.x+2 +1)) {
+                        S.append(R(x,y)?'x':'.');
+                    }
+                    S.append('\n');
+                }
+                log(S);
+                error(nofTransitions);
             }
             if(p == start) break;
         }
+
+        //if(H.size > 3 && cross(H[H.size-1]-H[H.size-2], H[H.size-2]-H[H.size-3]) <= 0) H.pop();
+
+        R = ImageT</*bool*/float>(Y.size); R.clear(0); //
+        for(uint2 h: H) R(h) = 1;
 #else // PCA
         // Floodfill
         buffer<uint2> stack (Y.ref::size, 0);
