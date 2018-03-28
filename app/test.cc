@@ -43,6 +43,7 @@ static uint draw(Random& random, const ref<uint> DPD, const uint64 sum) {
 }
 
 struct Test : Widget {
+    //Decoder video {"test.jpg"};
     Decoder video {"test.mp4"};
     unique<Window> window = nullptr;
 
@@ -51,7 +52,7 @@ struct Test : Widget {
     array<uint2> Q;
 
     const float y = 210./297;
-    const ref<vec2> modelQ = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
+    const buffer<vec2> modelQ = copyRef(ref<vec2>{{-1,-y},{1,-y},{1,y},{-1,y}}); // FIXME: normalize origin and average distance ~ √2
 
     mat4 M;
 
@@ -72,7 +73,8 @@ struct Test : Widget {
         Time time {true};
         if(!video.read()) return false;
         //const ImageF I = luminance(video.YUV(0));
-        const Image8 Y = video.YUV(0);
+        Image8 Y = video.YUV(0);
+        //rotateHalfTurn(Y);
         time.reset(); //log("Decode", fmt(time.reset().milliseconds())+"ms"_);
         Array<uint, 256> histogram; histogram.clear(0);
         //const float maxY = ::max(Y);
@@ -265,7 +267,7 @@ struct Test : Widget {
         Rt[2] = vec4(cross(H[0],H[1]), 0);
         Rt[3] = vec4(-H[2], 1); // Z-
         Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well
-        assert_(abs(1-((mat3)Rt).det())<0.05,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
+        assert_(abs(1-((mat3)Rt).det())<0.09,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
 
         const float near = K(1,1);
         const float far = 1000/focalLength*near; //mm

@@ -117,7 +117,7 @@ Image decodeImage(const ref<byte> file);
 
 // -- Rotate --
 
-Image rotateHalfTurn(Image&& target);
+generic void rotateHalfTurn(const ImageT<T>& target);
 
 // -- Resample --
 

@@ -90,11 +90,11 @@ Image decodeImage(const ref<byte> file) {
 
 // -- Rotate --
 
-Image rotateHalfTurn(Image&& target) {
+generic void rotateHalfTurn(const ImageT<T>& target) {
     for(size_t y: range(target.size.y)) for(size_t x: range(target.size.x/2)) swap(target(x,y), target(target.size.x-1-x, y)); // Reverse rows
     for(size_t y: range(target.size.y/2)) for(size_t x: range(target.size.x)) swap(target(x,y), target(x, target.size.y-1-y)); // Reverse columns
-    return move(target);
 }
+template void rotateHalfTurn(const Image8& target);
 
 // -- Resample --
 
