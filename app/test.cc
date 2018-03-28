@@ -48,10 +48,10 @@ struct Test : Widget {
 
     ImageT</*bool*/float> R;
 
-    vec2 μ, e0, e1;
+    array<uint2> Q;
 
     const float y = 210./297;
-    const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
+    const ref<vec2> modelQ = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
 
     mat4 M;
 
@@ -102,7 +102,7 @@ struct Test : Widget {
                 clusters[k] = i;
             }
 
-            /*for(auto_: range(4))*/ for(;;) {
+            for(;;) {
                 Array(uint64, Σ, clusters.size); Σ.clear();
                 Array(uint, N, clusters.size); N.clear();
                 for(const uint i: range(histogram.size)) {
@@ -127,15 +127,13 @@ struct Test : Widget {
                     if(clusters[k] != c) changed = true;
                     clusters[k] = c;
                 }
-                //log(Σ, N, clusters);
                 sort(clusters);
                 if(!changed) break;
             }
             threshold = ((clusters[K-3]+clusters[K-2])/2+clusters[K-1])/2;
-            //log(clusters, threshold);
         }
 
-        // Floodfill outside
+        // Floodfill outside to remove holes
         buffer<uint2> stack (Y.ref::size, 0);
         // Assumes one of the edge connects to the main background
         for(int x: range(Y.size.x)) {
@@ -163,26 +161,24 @@ struct Test : Widget {
         }
         if(0) time.reset(); else log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
 
+        // Walk contour of main region (CCW)
+        array<uint2> C (R.ref::size); // Contour
         uint2 start = R.size/2u;
-        while(R(start+uint2(1,0))) start.x++;
-        array<uint2> H (R.ref::size); // Hull
+        while(R(start+uint2(1,0))) start.x++; // Seed
         uint2 p = start;
         uint previousI = 0;
-        //H.append(start);
-        for(;;) { // Walk CCW
-            const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2( 0,+1),int2(+1,+1),int2(+1, 0),int2(+1,-1),int2( 0,-1)};
-            //const uint previousSize = H.size;
+        for(;;) {
+            //const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2( 0,+1),int2(+1,+1),int2(+1, 0),int2(+1,-1),int2( 0,-1)};
+            const int2 CCW[8] = {int2(-1,-1),int2( 0,-1),int2(+1,-1),int2(+1, 0),int2(+1,+1),int2( 0,+1),int2(-1,+1),int2(-1, 0)};
             for(int i: range(8)) { // Searches for a CCW background->foreground transition
                 const uint I = (previousI+5+i)%8; // Always start search from opposite direction ("concavest")
                 const uint2 bg (int2(p)+CCW[I%8]);
                 const uint2 fg (int2(p)+CCW[(I+1)%8]);
                 if(R(bg)==0 && R(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
-                    assert_(H.size < H.capacity);
+                    assert_(C.size < C.capacity);
                     p = fg;
-                    //if(H.size >= 2 && cross(int2(H[H.size-1])-int2(H[H.size-2]), int2(p)-int2(H[H.size-1])) <= 0) H.last() = fg;
-                    //else H.append(fg);
                     //if(i>=4) // FIXME
-                    H.append(uint2(fg.x, R.size.y-1-fg.y)); // Flip Y axis from Y top down to Y bottom up
+                    C.append(uint2(fg.x, R.size.y-1-fg.y)); // Flip Y axis from Y top down to Y bottom up
                     previousI = I;
                     break;
                 }
@@ -190,95 +186,52 @@ struct Test : Widget {
             if(p == start) break;
         }
 
-        //R = ImageT</*bool*/float>(Y.size);
-        for(float& r: R) r /= 8;
-
-        auto line = [this](vec2 p0, vec2 p1) {
-            if(anyGE(uint2(p0), R.size)) return;
-            if(anyGE(uint2(p1), R.size)) return;
-            float dx = p1.x - p0.x, dy = p1.y - p0.y;
-            bool transpose=false;
-            if(abs(dx) < abs(dy)) { swap(p0.x, p0.y); swap(p1.x, p1.y); swap(dx, dy); transpose=true; }
-            if(p0.x > p1.x) { swap(p0.x, p1.x); swap(p0.y, p1.y); }
-            const float gradient = dy / dx;
-            float intery = p0.y + gradient * (round(p0.x) - p0.x) + gradient;
-            for(int x: range(p0.x, p1.x +1)) {
-                (transpose ? R(intery, x) : R(x, intery)) = 1;
-                intery += gradient;
-            }
-        };
-
-#if 0
-        // Fit OBB
-        float minA = inff; typedef vec2 OBB[4]; OBB obb;
-        for(const uint i: range(H.size)) {
-            const vec2 e0 = normalize(vec2(H[(i+1)%H.size])-vec2(H[i]));
-            const vec2 e1 = normal(e0);
-            vec2 min=vec2(inff), max=vec2(-inff);
-            for(uint2 h: H) {
-                min.x = ::min(min.x, dot(e0, vec2(h)));
-                max.x = ::max(max.x, dot(e0, vec2(h)));
-                min.y = ::min(min.y, dot(e1, vec2(h)));
-                max.y = ::max(max.y, dot(e1, vec2(h)));
-            }
-            float A = dotSq(max-min);
-            if(A < minA) {
-                obb[0] = mat2(e0, e1) * vec2(min.x, min.y);
-                obb[1] = mat2(e0, e1) * vec2(max.x, min.y);
-                obb[2] = mat2(e0, e1) * vec2(max.x, max.y);
-                obb[3] = mat2(e0, e1) * vec2(min.x, max.y);
-            }
-        }
-        for(uint i: range(4)) line(obb[i], obb[(i+1)%4]);
-#endif
-
         // Simplifies polygon to 4 corners
-        array<uint2> C = copy(H);
-        while(C.size > 4) {
+        /*array<uint2>*/ Q = copy(C);
+        while(Q.size > 4) {
             float minA = inff; int bestI = -1;
-            for(const uint i: range(C.size)) {
-                int2 p0 (C[i]);
-                int2 p1 (C[(i+1)%C.size]);
-                int2 p2 (C[(i+2)%C.size]);
-                int A = cross(p1-p0, p2-p0);
-                if(A < minA) { minA = A; bestI = (i+1)%C.size; }
+            for(const uint i: range(Q.size)) {
+                int2 p0 (Q[i]);
+                int2 p1 (Q[(i+1)%Q.size]);
+                int2 p2 (Q[(i+2)%Q.size]);
+                int A = cross(p2-p0, p1-p0);
+                if(A < minA) { minA = A; bestI = (i+1)%Q.size; }
             }
-            C.removeAt(bestI);
+            Q.removeAt(bestI);
         }
 
         // Corner optimization (maximize total area)
         for(uint i: range(4)) {
-            const uint2 C3 = C[(i+3)%4];
-            uint2& C0 = C[(i+0)%4];
-            const uint2 C1 = C[(i+1)%4];
-            int A0 = cross(int2(C1)-int2(C0), int2(C3)-int2(C0));
-            for(const uint2& h : H) {
-                const int A = cross(int2(C1)-int2(h), int2(C3)-int2(h));
+            const uint2 Q3 = Q[(i+3)%4];
+            uint2& Q0 = Q[(i+0)%4];
+            const uint2 Q1 = Q[(i+1)%4];
+            int A0 = cross(int2(Q1)-int2(Q0), int2(Q3)-int2(Q0));
+            for(const uint2& c : C) {
+                const int A = cross(int2(Q3)-int2(c), int2(Q1)-int2(c));
                 if(A > A0) {
                     A0 = A;
-                    C0 = h;
+                    Q0 = c;
                 }
             }
         }
 
-        //for(uint i: range(H.size)) line(vec2(H[i]), vec2(H[(i+1)%H.size]));
-        const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        for(uint i: range(C.size)) line(flipY2*vec2(C[i]), flipY2*vec2(C[(i+1)%C.size]));
-
+        // First edge is long edge (FIXME: preserve orientation across track)
+        float lx = ::length(Q[1]-Q[0])+::length(Q[3]-Q[2]);
+        float ly = ::length(Q[2]-Q[1])+::length(Q[0]-Q[3]);
+        if(ly > lx) { uint2 q = Q[0]; Q.removeAt(0); Q.append(q); }
         //log("Corner", fmt(time.reset().milliseconds())+"ms"_);
-#if 0
+
         static constexpr uint N = 4;
 
-        mat2 U = V.inverse();
         mat3 K;
         const float focalLength = 4.2, pixelPitch = 0.0014;
         K(0,0) = 2/(R.size.x*pixelPitch/focalLength);
         K(1,1) = 2/(R.size.y*pixelPitch/focalLength);
         K(2,2) = 1;
         const mat3 K¯¹ = K.¯¹();
-        const buffer<vec2> X´ = apply(ref<vec2>(C), [&](vec2 x){ return K¯¹*(2.f*(μ+U*x)/vec2(R.size)-vec2(1)); });
+        const buffer<vec2> X´ = apply(Q, [&](uint2 q){ return K¯¹*(2.f*vec2(q)/vec2(R.size)-vec2(1)); });
 
-        const ref<vec2> TX = modelC;
+        const ref<vec2> TX = modelQ;
         const ref<vec2> TX´ = X´;
 
         // DLT: Ah = 0
@@ -287,18 +240,18 @@ struct Test : Widget {
             const uint I = i*2;
             A(I+0, 0) = -TX[i].x;
             A(I+0, 1) = -TX[i].y;
-            A(I+0, 2) = -1; // -1
+            A(I+0, 2) = -1;
             A(I+0, 3) = 0; A(I+0, 4) = 0; A(I+0, 5) = 0;
             A(I+1, 0) = 0; A(I+1, 1) = 0; A(I+1, 2) = 0;
             A(I+1, 3) = -TX[i].x;
             A(I+1, 4) = -TX[i].y;
-            A(I+1, 5) = -1; // -1
+            A(I+1, 5) = -1;
             A(I+0, 6) = TX´[i].x*TX[i].x;
             A(I+0, 7) = TX´[i].x*TX[i].y;
-            A(I+0, 8) = TX´[i].x; // -1
+            A(I+0, 8) = TX´[i].x;
             A(I+1, 6) = TX´[i].y*TX[i].x;
             A(I+1, 7) = TX´[i].y*TX[i].y;
-            A(I+1, 8) = TX´[i].y; // -1
+            A(I+1, 8) = TX´[i].y;
         }
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
@@ -322,32 +275,34 @@ struct Test : Widget {
                 .translate(vec3(1)); // -1, 1 -> 0, 2
         const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
         M = flipY*NDC*projection*Rt;
-#endif
         return true;
     }
     void render(const Image& target) {
         Time time {true};
-        sRGB(target, R, 1);
+        target.clear(byte4(byte3(0),0xFF));
+        //sRGB(target, R, 1);
 
         const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        line(target, flipY2*μ, flipY2*(μ+256.f*e0), bgr3f(0,0,1));
-        line(target, flipY2*μ, flipY2*(μ+256.f*e1), bgr3f(0,1,0));
+        line(target, flipY2*vec2(Q[0]), flipY2*vec2(Q[1]), bgr3f(0,0,1));
+        line(target, flipY2*vec2(Q[1]), flipY2*vec2(Q[2]), bgr3f(0,1,0));
+        line(target, flipY2*vec2(Q[2]), flipY2*vec2(Q[3]), bgr3f(1,0,0));
+        line(target, flipY2*vec2(Q[3]), flipY2*vec2(Q[0]), bgr3f(0,1,1));
 
-        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(0,0,1));
-        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(0,1,0));
-        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1,0,0));
-        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(0,1,1));
+        line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[1], 0)).xy(), bgr3f(0,0,1));
+        line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[2], 0)).xy(), bgr3f(0,1,0));
+        line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[3], 0)).xy(), bgr3f(1,0,0));
+        line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[0], 0)).xy(), bgr3f(0,1,1));
 
         const float z = 0.1;
-        line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(1));
+        line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1));
 
-        line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(0,0,1));
-        line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(0,1,0));
-        line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1,0,0));
-        line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(0,1,1));
+        line(target, (M*vec3(modelQ[0], z)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(0,0,1));
+        line(target, (M*vec3(modelQ[1], z)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(0,1,0));
+        line(target, (M*vec3(modelQ[2], z)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1,0,0));
+        line(target, (M*vec3(modelQ[3], z)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(0,1,1));
         //log("Render", fmt(time.reset().milliseconds())+"ms"_);
     }
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
