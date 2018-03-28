@@ -214,28 +214,39 @@ struct Test : Widget {
         while(R(start+uint2(1,0))) start.x++;
         buffer<uint2> H (R.ref::size, 0); // Hull
         uint2 p = start;
+        uint startI = 0;
         for(;;) { // Walk CCW
-            const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2(0,+1),int2(1,+1),int2(1, 0),int2(1,-1),int2(0,-1)};
-            const uint previousSize = H.size;
+            const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2( 0,+1),int2(+1,+1),int2(+1, 0),int2(+1,-1),int2( 0,-1)};
+            //const uint previousSize = H.size;
             for(int i: range(8)) { // Searches for a CCW background->foreground transition
-                uint2 bg (int2(p)+CCW[i]);
-                uint2 fg (int2(p)+CCW[(i+1)%8]);
+                uint2 bg (int2(p)+CCW[(startI+i)%8]);
+                uint2 fg (int2(p)+CCW[(startI+i+1)%8]);
                 if(R(bg)==0 && R(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
                     //assert_(H.size < H.capacity, H.size, H.capacity, start, p, bg, fg); // Infinite loop
-                    //if(!(H.size < H.capacity)) { log(frameIndex, H.size, H.capacity, start, p, bg, fg, H.slice(H.size-256, 256)); return false; }
+                    if(!(H.size < H.capacity)) {
+                        log(frameIndex, H.size, H.capacity, start, p, bg, fg, H.slice(H.size-256, 256));
+                        array<char> S;
+                        for(uint y: range(p.y-2, p.y+2 +1)) {
+                            for(uint x: range(p.x-2, p.x+2 +1)) {
+                                S.append(R(x,y)?'x':'.');
+                            }
+                            S.append('\n');
+                        }
+                        error(S);
+                    }
                     H.append(fg);
+                    startI = (startI+i+5)%8; // Always start from opposite direction
+                    break;
                 }
             }
-            uint nofTransitions = H.size - previousSize;
+            /*uint nofTransitions = H.size - previousSize;
             if(nofTransitions == 2) {
                 assert_(H.size >= 4);
                 if(H[H.size-1] == H[H.size-4]) H.pop();
                 else if(H[H.size-2] == H[H.size-4]) { H[H.size-2]=H[H.size-1]; H.pop(); }
                 nofTransitions = H.size - previousSize;
             }
-            if(nofTransitions == 1) {
-                p = H.last();
-            } else {
+            if(nofTransitions != 1) {
                 log(H);
                 log(nofTransitions);
                 {
@@ -263,7 +274,8 @@ struct Test : Widget {
                 }
                 log(S);
                 error(nofTransitions);
-            }
+            }*/
+            p = H.last();
             if(p == start) break;
         }
 
