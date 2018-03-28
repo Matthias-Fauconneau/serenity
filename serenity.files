@@ -4,6 +4,7 @@ app/jacobi.h
 app/lens.cc
 app/quad.h
 app/render.cc
+app/render.h
 app/sphere.cc
 app/test.cc
 build.sh

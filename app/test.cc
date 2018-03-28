@@ -10,6 +10,7 @@
 #include "plot.h"
 #include "png.h"
 #include "sort.h"
+#include "render.h"
 
 template<> inline String str(const Matrix& A) {
     array<char> s;
@@ -43,10 +44,13 @@ static uint draw(Random& random, const ref<uint> DPD, const uint64 sum) {
 }
 
 struct Test : Widget {
+    Render scene;
+
     //Decoder video {"test.jpg"};
     Decoder video {"test.mp4"};
     unique<Window> window = nullptr;
 
+    Image8 Y;
     ImageT</*bool*/float> R;
 
     array<uint2> Q;
@@ -54,14 +58,21 @@ struct Test : Widget {
     const float y = 210./297;
     const buffer<vec2> modelQ = copyRef(ref<vec2>{{-1,-y},{1,-y},{1,y},{-1,y}}); // FIXME: normalize origin and average distance ~ √2
 
-    mat4 M;
+    mat3 K;
+    const float focalLength = 4.2, pixelPitch = 0.0014;
+
+    mat4 Rt;
 
     uint frameIndex = 0;
 
     Test() {
+        K(0,0) = 2/(video.size.x*pixelPitch/focalLength);
+        K(1,1) = 2/(video.size.y*pixelPitch/focalLength);
+        K(2,2) = 1;
+
         for(auto_: range(1)) step();
         //while(step()) {}
-        window = ::window(this, int2(R.size/*/2u*/), mainThread, 0);
+        window = ::window(this, int2(video.size/*/2u*/), mainThread, 0);
         window->show();
         //window->actions[Space] = [this]{ step(); window->render(); };
     }
@@ -73,7 +84,7 @@ struct Test : Widget {
         Time time {true};
         if(!video.read()) return false;
         //const ImageF I = luminance(video.YUV(0));
-        Image8 Y = video.YUV(0);
+        Y = video.YUV(0);
         //rotateHalfTurn(Y);
         time.reset(); //log("Decode", fmt(time.reset().milliseconds())+"ms"_);
         Array<uint, 256> histogram; histogram.clear(0);
@@ -225,11 +236,6 @@ struct Test : Widget {
 
         static constexpr uint N = 4;
 
-        mat3 K;
-        const float focalLength = 4.2, pixelPitch = 0.0014;
-        K(0,0) = 2/(R.size.x*pixelPitch/focalLength);
-        K(1,1) = 2/(R.size.y*pixelPitch/focalLength);
-        K(2,2) = 1;
         const mat3 K¯¹ = K.¯¹();
         const buffer<vec2> X´ = apply(Q, [&](uint2 q){ return K¯¹*(2.f*vec2(q)/vec2(R.size)-vec2(1)); });
 
@@ -261,27 +267,24 @@ struct Test : Widget {
         for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];// / h[8];
         H = mat3(vec3(1/sqrt(::length(H[0])*::length(H[1])))) * H; // Normalizes by geometric mean of the 2 rotation vectors
 
-        mat4 Rt;
+        //mat4 Rt;
         Rt[0] = vec4(H[0], 0);
         Rt[1] = vec4(H[1], 0);
         Rt[2] = vec4(cross(H[0],H[1]), 0);
         Rt[3] = vec4(-H[2], 1); // Z-
-        Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well
+#if 1
+        Rt = Rt * mat4(vec4(-1,1,-1,1)); // Aligns direcion of scene Z+ to image bottom up
+#endif
+        Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well to match Z- flip
         assert_(abs(1-((mat3)Rt).det())<0.09,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
 
-        const float near = K(1,1);
-        const float far = 1000/focalLength*near; //mm
-        const mat4 projection = perspective(near, far).scale(vec3(float(R.size.y)/float(R.size.x), 1, 1));
-        const mat4 NDC = mat4()
-                .scale(vec3(vec2(R.size)/2.f, 1))
-                .translate(vec3(1)); // -1, 1 -> 0, 2
-        const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
-        M = flipY*NDC*projection*Rt;
         return true;
     }
     void render(const Image& target) {
         Time time {true};
-        target.clear(byte4(byte3(0),0xFF));
+        //target.clear(byte4(byte3(0),0xFF));
+        for(uint i: range(target.ref::size)) target[i] = byte4(byte3(Y[i]), 0xFF); // FIXME
+
         //sRGB(target, R, 1);
 
         const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
@@ -290,21 +293,36 @@ struct Test : Widget {
         line(target, flipY2*vec2(Q[2]), flipY2*vec2(Q[3]), bgr3f(1,0,0));
         line(target, flipY2*vec2(Q[3]), flipY2*vec2(Q[0]), bgr3f(0,1,1));
 
-        line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[1], 0)).xy(), bgr3f(0,0,1));
-        line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[2], 0)).xy(), bgr3f(0,1,0));
-        line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[3], 0)).xy(), bgr3f(1,0,0));
-        line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[0], 0)).xy(), bgr3f(0,1,1));
+        const float near = K(1,1);
+        const float far = 1000/focalLength*near; //mm
+        const mat4 projection = perspective(near, far).scale(vec3(float(R.size.y)/float(R.size.x), 1, 1));
 
-        const float z = 0.1;
-        line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(1));
-        line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1));
+        {
+            const mat4 NDC = mat4()
+                    .scale(vec3(vec2(R.size)/2.f, 1))
+                    .translate(vec3(1)); // -1, 1 -> 0, 2
+            const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+            const mat4 M = flipY*NDC*projection*Rt;
 
-        line(target, (M*vec3(modelQ[0], z)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(0,0,1));
-        line(target, (M*vec3(modelQ[1], z)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(0,1,0));
-        line(target, (M*vec3(modelQ[2], z)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1,0,0));
-        line(target, (M*vec3(modelQ[3], z)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(0,1,1));
+            line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[1], 0)).xy(), bgr3f(0,0,1));
+            line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[2], 0)).xy(), bgr3f(0,1,0));
+            line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[3], 0)).xy(), bgr3f(1,0,0));
+            line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[0], 0)).xy(), bgr3f(0,1,1));
+
+            const float z = 0.1;
+            line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(1));
+            line(target, (M*vec3(modelQ[1], 0)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(1));
+            line(target, (M*vec3(modelQ[2], 0)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(1));
+            line(target, (M*vec3(modelQ[3], 0)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1));
+
+            line(target, (M*vec3(modelQ[0], z)).xy(), (M*vec3(modelQ[1], z)).xy(), bgr3f(0,0,1));
+            line(target, (M*vec3(modelQ[1], z)).xy(), (M*vec3(modelQ[2], z)).xy(), bgr3f(0,1,0));
+            line(target, (M*vec3(modelQ[2], z)).xy(), (M*vec3(modelQ[3], z)).xy(), bgr3f(1,0,0));
+            line(target, (M*vec3(modelQ[3], z)).xy(), (M*vec3(modelQ[0], z)).xy(), bgr3f(0,1,1));
+        }
+
+        const mat4 view = Rt * mat4().scale(vec3(1./2));
+        scene.render(target, view, projection, Y);
         //log("Render", fmt(time.reset().milliseconds())+"ms"_);
     }
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {

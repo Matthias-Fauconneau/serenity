@@ -1,8 +1,8 @@
+#include "render.h"
 #include "parse.h"
 #include "matrix.h"
 #include "window.h"
 #include "image-render.h"
-#include "mwc.h"
 #include "algorithm.h"
 #include "drag.h"
 #include "jpeg.h"
@@ -36,7 +36,7 @@ genericVecT1 Vec mask(const vec<V,T1,N>& c, const Vec& t) { return apply(mask<T>
 genericVecT1 Vec select(const vec<V,T1,N>& c, const Vec& t, const Vec& f) { return apply(select, c, t, f); }
 
 template<template<Type> Type V, Type T, uint N, Type T1, decltype(sizeof(T1)/T1()[0]==N) = 0> static inline constexpr
- Vec mask(const T1& c, const Vec& t) { return apply([c](const T& t){return ::mask(c, t);}, t); }
+Vec mask(const T1& c, const Vec& t) { return apply([c](const T& t){return ::mask(c, t);}, t); }
 
 template<template<Type> Type V, uint N, Type T> auto getᵀ(const vec<V,T,N>& M, const uint i) {
     vec<V,Type remove_reference<decltype(T()[0])>::type, N> v;
@@ -92,9 +92,9 @@ static inline bool operator <(Quad A, Quad B) { return opCmp(A, B) < 0; }
 
 static constexpr uint K = 8;
 typedef conditional<(K>1), float32 __attribute((ext_vector_type(K))),
-                           vec<::x, float32, 1>                       >::type floatv;
+vec<::x, float32, 1>                       >::type floatv;
 typedef conditional<(K>1), int32 __attribute((ext_vector_type(K))),
-                           vec<::x, bool, 1>                       >::type boolv;
+vec<::x, bool, 1>                       >::type boolv;
 typedef vec<bgr, floatv, 3> bgr3fv;
 typedef vec<xyz, floatv, 3> vec3v;
 
@@ -133,24 +133,6 @@ static inline boolv intersect(const vec3 v0, const vec3 v1, const vec3 v2, const
 static inline boolv intersect(const array<vec3>& vertices, const uint4& quad, const vec3 O, const vec3v D, vec3& N, floatv& nearestT, floatv& u, floatv& v) {
     return intersect(vertices[quad[0]], vertices[quad[1]], vertices[quad[2]], vertices[quad[3]], O, D, N, nearestT, u, v);
 }
-
-struct Scene {
-    struct Quad {
-        uint4 quad;
-        Image3f outgoingRadiance; // for real surfaces: differential
-        bool real = true;
-        Image3f realOutgoingRadiance; // Faster rendering of synthetic real surfaces for synthetic test
-        //const bgr3f albedo = 1;
-    };
-
-    array<vec3> vertices;
-    array<Quad> quads;
-
-    struct QuadLight { vec3 O, T, B, N; bgr3f emissiveFlux; };
-
-    const float lightSize = 1;
-    Scene::QuadLight light {{-lightSize/2,-lightSize/2,2}, {lightSize,0,0}, {0,lightSize,0}, {0,0,-sq(lightSize)}, bgr3f(2)/*lightSize/sq(lightSize)*/};
-};
 
 static inline boolv intersect(const Scene& scene, const Scene::Quad& quad, const vec3 O, const vec3v D, vec3& N, floatv& nearestT, floatv& u, floatv& v) {
     return intersect(scene.vertices, quad.quad, O, D, N, nearestT, u, v);
@@ -278,11 +260,183 @@ template<Type V> V parseMat(TextData& s) {
 }
 template<> inline mat4 parse<mat4>(TextData& s) { return parseMat<mat4>(s); }
 
-struct Render : Drag {
-    Scene scene;
+Render::Render() {
+    {
+        const uint2 size = uint2(128/*512*/); // FIXME: auto resolution
+        const float s = 3./2;
+        scene.quads.append(Scene::Quad{uint4(
+                                       scene.vertices.add(vec3(-s,-s,0)), scene.vertices.add(vec3(+s,-s,0)),
+                                       scene.vertices.add(vec3(+s,+s,0)), scene.vertices.add(vec3(-s,+s,0))),
+                                       Image3f(size), true, Image3f(size)});
+    }
 
-    Random random;
+    importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), false);
+    importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
+    importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
+    importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
 
+    step(scene, random);
+}
+
+void Render::render(const Image& target, const mat4 view, const mat4 projection, const Image8& realImage) {
+    Time time {true};
+
+    // Transform
+    buffer<vec3> viewVertices (scene.vertices.size);
+    for(const uint i: range(scene.vertices.size)) viewVertices[i] = view * scene.vertices[i];
+
+    buffer<uint> quads (scene.quads.size, 0);
+    for(const uint i: range(scene.quads.size)) {
+        vec3 A[4]; for(const uint v: ::range(4)) A[v] = viewVertices[scene.quads[i].quad[v]];
+        const vec3 N = cross(A[1]-A[0], A[3]-A[0]);
+        if(dot(N, A[0]) >= 0) continue; // Back facing
+        quads.append(i);
+    }
+
+    { // Z-Order polygon quick sort
+        typedef uint T;
+        const mref<T> at = quads;
+
+        int2 stack[32];
+        stack[0] = {0, int(at.size)-1};
+        int top = 0;
+        while(top >= 0) {
+            const int2 range = stack[top];
+            top--;
+
+            const int left  = range[0];
+            const int right = range[1];
+
+            if(left < right) { // If the list has 2 or more items
+                swap(at[(left + right)/2], at[right]);
+                const T& pivot = at[right];
+                int pivotIndex = left;
+                for(const uint i: ::range(left,right)) { // Split
+                    Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A[v] = viewVertices[a[v]]; }
+                    Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B[v] = viewVertices[b[v]]; }
+                    if(A < B) {
+                        swap(at[pivotIndex], at[i]);
+                        pivotIndex++;
+                    }
+                }
+                swap(at[pivotIndex], at[right]);
+                // Push larger partition first to start with smaller partition and guarantee stack < log2 N
+                if(pivotIndex-left > right-pivotIndex) {
+                    top++;
+                    stack[top] = {left, pivotIndex-1};
+                    top++;
+                    stack[top] = {pivotIndex+1, right};
+                } else {
+                    top++;
+                    stack[top] = {pivotIndex+1, right};
+                    top++;
+                    stack[top] = {left, pivotIndex-1};
+                }
+            }
+        }
+    }
+
+    static constexpr int32 pixel = 16; // 11.4
+    const mat4 NDC = mat4()
+            .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
+            .translate(vec3(1)); // -1, 1 -> 0, 2
+    const mat4 M = NDC * projection;
+
+    buffer<uint64> coverageBuffer (target.ref::size/64); // Bitmask of covered samples
+    coverageBuffer.clear(0);
+
+    for(const uint quadIndex: quads) { // Z-sorted
+        Scene::Quad& quad = scene.quads[quadIndex];
+
+        int2 V[4];
+        float iw[4]; // FIXME: float
+        for(const uint i: range(4)) {
+            vec3 xyw = (M * vec4(viewVertices[quad.quad[i]], 1)).xyw();
+            iw[i] = 1 / xyw[2]; // FIXME: float
+            V[i] = int2(iw[i] * xyw.xy());
+        }
+
+        const int2 min = ::min<int2>(V);
+        const int2 max = ::max<int2>(V);
+
+        // Setup
+        int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
+        int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
+        int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
+        int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
+
+        typedef float T;
+        typedef vec3 vecN;
+        const vecN A0 = vecN(0, 0, 1);
+        const vecN A1 = vecN(1, 0, 1);
+        const vecN A2 = vecN(1, 1, 1);
+        const vecN A3 = vecN(0, 1, 1);
+
+        const vecN a0 = iw[0] * A0;
+        const vecN a1 = iw[1] * A1;
+        const vecN a2 = iw[2] * A2;
+        const vecN a3 = iw[3] * A3;
+
+        const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
+
+        const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
+        const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
+        const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
+
+        const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
+        const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
+        const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
+
+        e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
+        e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
+        e23z += (e23x>0/*dy<0*/ || (e23x==0/*dy=0*/ && e23y<0/*dx<0*/));
+        e30z += (e30x>0/*dy<0*/ || (e30x==0/*dy=0*/ && e30y<0/*dx<0*/));
+
+        for(const uint targetY: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
+            const uint Y = pixel*targetY + pixel/2;
+            for(const uint targetX: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
+                const uint targetI = targetY*target.size.x+targetX;
+                if(coverageBuffer[targetI/64]&(1ull<<(targetI%64))) continue;
+
+                const uint X = pixel*targetX + pixel/2;
+
+                const int step01 = e01z + e01x*X + e01y*Y;
+                const int step12 = e12z + e12x*X + e12y*Y;
+                const int step23 = e23z + e23x*X + e23y*Y;
+                const int step30 = e30z + e30x*X + e30y*Y;
+
+                if(step01>0 && step12>0 && step23>0 && step30>0) {
+                    const int step13 = e13z + e13x*X + e13y*Y;
+                    const vecN a = step13>0 ? vecN(e013z + e013x*T(X) + e013y*T(Y)) :
+                                              vecN(e123z + e123x*T(X) + e123y*T(Y)) ;
+                    const vecN A = a / a[2]; // FIXME: float
+                    const float u = A.x;
+                    const float v = A.y;
+
+                    // FIXME: fold texSize in UV vertex attributes
+                    const uint2 texSize = quad.outgoingRadiance.size;
+                    const uint texX = u*(texSize.x-1)+1.f/2;
+                    const uint texY = v*(texSize.y-1)+1.f/2;
+
+                    assert_(texX < texSize.x && texY < texSize.y, texX, texY, texSize, u, v);
+                    // FIXME: synthetic test case
+                    //const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0);
+                    const bgr3f realOutgoingRadiance = quad.real ? bgr3f(sRGB_reverse[realImage(targetX, target.size.y-1-targetY)]) : bgr3f(0);
+                    const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
+                    const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
+                    target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance), 0xFF);
+
+                    coverageBuffer[targetI/64] |= (1ull<<targetI%64);
+                }
+            }
+        }
+    }
+    if(time.milliseconds()>100) log(time.milliseconds(),"ms");
+    //writeFile("test+.jpg", encodeJPEG(target), currentWorkingDirectory(), true);
+}
+
+#if 0
+struct RenderApp : Render, Drag {
     vec3 viewPosition = vec3(0,0,0); //vec3(-1./2,0,0);
 
     const Image I_sRGB = rotateHalfTurn(decodeImage(Map("test.jpg")));
@@ -292,260 +446,20 @@ struct Render : Drag {
     unique<Window> window = ::window(this, int2(I.size/2u), mainThread, 0);
 
     Render() : Drag(vec2(0,-π/3)) {
-        {
-            const uint2 size = uint2(128/*512*/); // FIXME: auto resolution
-            const float s = 3./2;
-            scene.quads.append(Scene::Quad{uint4(
-                                           scene.vertices.add(vec3(-s,-s,0)), scene.vertices.add(vec3(+s,-s,0)),
-                                           scene.vertices.add(vec3(+s,+s,0)), scene.vertices.add(vec3(-s,+s,0))),
-                                           Image3f(size), true, Image3f(size)});
-        }
-
-        importSTL(scene, "Cube.stl", vec3(-1./2, 0, +1./4+ε), false);
-        importSTL(scene, "Cube.stl", vec3(+1./2, 0, +1./4+ε), false);
-        importSTL(scene, "Cube.stl", vec3(0, -1./2, +1./4+ε), false);
-        importSTL(scene, "Cube.stl", vec3(0, +1./2, +1./4+ε), false);
-
-        step(scene, random);
-
         window->show();
     }
     void render(RenderTarget2D& renderTarget_, vec2, vec2) override {
         const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
         Image target(renderTarget.size*2u, true);
         //const Image& target = (ImageRenderTarget&)renderTarget_;
-#if 0
-        {const float near = 3, far = near + 3; // FIXME: fit far
-        const mat4 view = mat4().translate({0,0,-near-1}).rotateX(Drag::value.y).rotateZ(Drag::value.x);
-        log("view\n"+str(view));}const mat4 view;
-#else
-        mat4 view = parse<mat4>("\
-                                -0.9567	  -0.1928	   -0.083	   0.0072 \
-                                0.0348	  -0.6842	   0.7443	   0.0014 \
-                                -0.1593	   0.7459	   0.6613	   -2.036 \
-                                0	        0	        0	        1"
-                                );
-        //view = view * mat4().scale(vec3(210./297));
-        view = view * mat4().scale(vec3(1./2));
-#endif
-
-        Time time {true};
-
         //target.clear(byte4(0,0,0,0xFF));
         //target.copy(I_sRGB);
         //target.copy(sRGB(I, 1));
         target.copy(sRGB_I);
-
-        // Transform
-        buffer<vec3> viewVertices (scene.vertices.size);
-        for(const uint i: range(scene.vertices.size)) viewVertices[i] = view * scene.vertices[i];
-
-        buffer<uint> quads (scene.quads.size, 0);
-        for(const uint i: range(scene.quads.size)) {
-            vec3 A[4]; for(const uint v: ::range(4)) A[v] = viewVertices[scene.quads[i].quad[v]];
-            const vec3 N = cross(A[1]-A[0], A[3]-A[0]);
-            if(dot(N, A[0]) >= 0) continue; // Back facing
-            quads.append(i);
-        }
-
-        { // Z-Order polygon quick sort
-            typedef uint T;
-            const mref<T> at = quads;
-
-            int2 stack[32];
-            stack[0] = {0, int(at.size)-1};
-            int top = 0;
-            while(top >= 0) {
-                const int2 range = stack[top];
-                top--;
-
-                const int left  = range[0];
-                const int right = range[1];
-
-                if(left < right) { // If the list has 2 or more items
-                    swap(at[(left + right)/2], at[right]);
-                    const T& pivot = at[right];
-                    int pivotIndex = left;
-                    for(const uint i: ::range(left,right)) { // Split
-                        Quad A; { const uint4 a = scene.quads[at[i]].quad; for(const uint v: ::range(4)) A[v] = viewVertices[a[v]]; }
-                        Quad B; { const uint4 b = scene.quads[pivot].quad; for(const uint v: ::range(4)) B[v] = viewVertices[b[v]]; }
-                        if(A < B) {
-                            swap(at[pivotIndex], at[i]);
-                            pivotIndex++;
-                        }
-                    }
-                    swap(at[pivotIndex], at[right]);
-                    // Push larger partition first to start with smaller partition and guarantee stack < log2 N
-                    if(pivotIndex-left > right-pivotIndex) {
-                        top++;
-                        stack[top] = {left, pivotIndex-1};
-                        top++;
-                        stack[top] = {pivotIndex+1, right};
-                    } else {
-                        top++;
-                        stack[top] = {pivotIndex+1, right};
-                        top++;
-                        stack[top] = {left, pivotIndex-1};
-                    }
-                }
-            }
-        }
-
-#if 0
-        const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
-        log("projection\n"+str(projection));
-#else
-        /*const mat4 projection = parse<mat4>("\
-                                            1.4881	    0	        0	        0 \
-                                            0	   1.4881	        0	        0 \
-                                            0	        0	        0	        0 \
-                                            0	        0	        0	        1 ");*/
-        const float focalLength = 4.2, pixelPitch = 0.0014;
-        const float near = 2/(target.size.y*pixelPitch/focalLength);
-        const float far = 1000/focalLength*near; //mm
-        //const mat4 projection = perspective(near, far, float(target.size.x)/float(target.size.y)); // .scale(vec3(1, W/H, 1))
-        const mat4 projection = perspective(near, far).scale(vec3(float(target.size.y)/float(target.size.x), 1, 1));
-#endif
-#if 0
-        {
-            const float y = 210./297;
-            const ref<vec2> modelC = {{-1,-y},{1,-y},{1,y},{-1,y}}; // FIXME: normalize origin and average distance ~ √2
-
-            const mat4 NDC = mat4()
-                    .scale(vec3(vec2(target.size)/2.f, 1))
-                    .translate(vec3(1)); // -1, 1 -> 0, 2
-            const mat4 flipY = mat4().translate(vec3(0, target.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
-            {
-                const mat4 P = projection*view;
-                const mat4 M = flipY*NDC*P;
-
-                line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[1], 0)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[2], 0)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[3], 0)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[0], 0)).xy(), bgr3f(1));
-
-                const float z = 0.1;
-                line(target, (M*vec3(modelC[0], 0)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[1], 0)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[2], 0)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[3], 0)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
-
-                line(target, (M*vec3(modelC[0], z)).xy(), (M*vec3(modelC[1], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[1], z)).xy(), (M*vec3(modelC[2], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[2], z)).xy(), (M*vec3(modelC[3], z)).xy(), bgr3f(1));
-                line(target, (M*vec3(modelC[3], z)).xy(), (M*vec3(modelC[0], z)).xy(), bgr3f(1));
-            }
-
-            const mat4 M = flipY*NDC*projection;
-            for(const uint quadIndex: quads) { // Z-sorted
-                Scene::Quad& quad = scene.quads[quadIndex];
-                vec3 V[4];
-                for(const uint i: range(4)) V[i] = M * viewVertices[quad.quad[i]];
-                for(const uint i: range(4)) line(target, V[i].xy(), V[(i+1)%4].xy(), bgr3f(i==2,i==1||i==3,i==0||i==3));
-            }
-        }
-#endif
-#if 1
-        static constexpr int32 pixel = 16; // 11.4
-        const mat4 NDC = mat4()
-                .scale(vec3(vec2(target.size*uint(pixel/2u)), 1<<13)) // 0, 2 -> 11.4, .14
-                .translate(vec3(1)); // -1, 1 -> 0, 2
-        const mat4 M = NDC * projection;
-
-        buffer<uint64> coverageBuffer (target.ref::size/64); // Bitmask of covered samples
-        coverageBuffer.clear(0);
-
-        for(const uint quadIndex: quads) { // Z-sorted
-            Scene::Quad& quad = scene.quads[quadIndex];
-
-            int2 V[4];
-            float iw[4]; // FIXME: float
-            for(const uint i: range(4)) {
-                vec3 xyw = (M * vec4(viewVertices[quad.quad[i]], 1)).xyw();
-                iw[i] = 1 / xyw[2]; // FIXME: float
-                V[i] = int2(iw[i] * xyw.xy());
-            }
-
-            const int2 min = ::min<int2>(V);
-            const int2 max = ::max<int2>(V);
-
-            // Setup
-            int e01x = V[0].y - V[1].y, e01y = V[1].x - V[0].x, e01z = V[0].x * V[1].y - V[1].x * V[0].y;
-            int e12x = V[1].y - V[2].y, e12y = V[2].x - V[1].x, e12z = V[1].x * V[2].y - V[2].x * V[1].y;
-            int e23x = V[2].y - V[3].y, e23y = V[3].x - V[2].x, e23z = V[2].x * V[3].y - V[3].x * V[2].y;
-            int e30x = V[3].y - V[0].y, e30y = V[0].x - V[3].x, e30z = V[3].x * V[0].y - V[0].x * V[3].y;
-
-            typedef float T;
-            typedef vec3 vecN;
-            const vecN A0 = vecN(0, 0, 1);
-            const vecN A1 = vecN(1, 0, 1);
-            const vecN A2 = vecN(1, 1, 1);
-            const vecN A3 = vecN(0, 1, 1);
-
-            const vecN a0 = iw[0] * A0;
-            const vecN a1 = iw[1] * A1;
-            const vecN a2 = iw[2] * A2;
-            const vecN a3 = iw[3] * A3;
-
-            const int e13x = V[1].y - V[3].y, e13y = V[3].x - V[1].x, e13z = V[1].x * V[3].y - V[3].x * V[1].y;
-
-            const vecN e013x = T(e01x)*a3 + T(e13x)*a0 + T(e30x)*a1;
-            const vecN e013y = T(e01y)*a3 + T(e13y)*a0 + T(e30y)*a1;
-            const vecN e013z = T(e01z)*a3 + T(e13z)*a0 + T(e30z)*a1;
-
-            const vecN e123x = T(e12x)*a3 + T(e23x)*a1 - T(e13x)*a2;
-            const vecN e123y = T(e12y)*a3 + T(e23y)*a1 - T(e13y)*a2;
-            const vecN e123z = T(e12z)*a3 + T(e23z)*a1 - T(e13z)*a2;
-
-            e01z += (e01x>0/*dy<0*/ || (e01x==0/*dy=0*/ && e01y<0/*dx<0*/));
-            e12z += (e12x>0/*dy<0*/ || (e12x==0/*dy=0*/ && e12y<0/*dx<0*/));
-            e23z += (e23x>0/*dy<0*/ || (e23x==0/*dy=0*/ && e23y<0/*dx<0*/));
-            e30z += (e30x>0/*dy<0*/ || (e30x==0/*dy=0*/ && e30y<0/*dx<0*/));
-
-            for(const uint targetY: range(::max(0, min.y/pixel), ::min<uint>(target.size.y-1, max.y/pixel+1))) {
-                const uint Y = pixel*targetY + pixel/2;
-                for(const uint targetX: range(::max(0, min.x/pixel), ::min<uint>(target.size.x-1, max.x/pixel+1))) {
-                    const uint targetI = targetY*target.size.x+targetX;
-                    if(coverageBuffer[targetI/64]&(1ull<<(targetI%64))) continue;
-
-                    const uint X = pixel*targetX + pixel/2;
-
-                    const int step01 = e01z + e01x*X + e01y*Y;
-                    const int step12 = e12z + e12x*X + e12y*Y;
-                    const int step23 = e23z + e23x*X + e23y*Y;
-                    const int step30 = e30z + e30x*X + e30y*Y;
-
-                    if(step01>0 && step12>0 && step23>0 && step30>0) {
-                        const int step13 = e13z + e13x*X + e13y*Y;
-                        const vecN a = step13>0 ? vecN(e013z + e013x*T(X) + e013y*T(Y)) :
-                                                  vecN(e123z + e123x*T(X) + e123y*T(Y)) ;
-                        const vecN A = a / a[2]; // FIXME: float
-                        const float u = A.x;
-                        const float v = A.y;
-
-                        // FIXME: fold texSize in UV vertex attributes
-                        const uint2 texSize = quad.outgoingRadiance.size;
-                        const uint texX = u*(texSize.x-1)+1.f/2;
-                        const uint texY = v*(texSize.y-1)+1.f/2;
-
-                        assert_(texX < texSize.x && texY < texSize.y, texX, texY, texSize, u, v);
-                        // FIXME: synthetic test case
-                        //const bgr3f realOutgoingRadiance = quad.real ? quad.realOutgoingRadiance(texX, texY) : bgr3f(0);
-                        const bgr3f realOutgoingRadiance = quad.real ? bgr3f(I(targetX, target.size.y-1-targetY)) : bgr3f(0);
-                        const bgr3f differentialOutgoingRadiance = quad.outgoingRadiance(texX, texY); // FIXME: bilinear
-                        const bgr3f finalOutgoingRadiance = realOutgoingRadiance + differentialOutgoingRadiance;
-                        target(targetX, target.size.y-1-targetY) = byte4(sRGB(finalOutgoingRadiance), 0xFF);
-
-                        coverageBuffer[targetI/64] |= (1ull<<targetI%64);
-                    }
-                }
-            }
-        }
         if(time.milliseconds()>100) log(time.milliseconds(),"ms");
         //value.x = __builtin_fmod(value.x + π*(3-sqrt(5.)), 2*π);
         //value.y = __builtin_fmod(value.y + π*(3-sqrt(5.)), 2*π);
         //window->render();
-#endif
         //assert_(I.size == target.size, I.size, target.size);
         //blit(I, target);
         writeFile("test+.jpg", encodeJPEG(target), currentWorkingDirectory(), true);
@@ -558,3 +472,4 @@ struct Render : Drag {
         return value;
     }
 } static render;
+#endif
