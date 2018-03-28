@@ -246,7 +246,7 @@ struct Test : Widget {
                 int2 p2 (H[(i+2)%H.size]);
                 int A = cross(p2-p0, p1-p0);
                 //assert_(A >= 0, A);
-                if(A < minA) { minA = A; bestI = i; }
+                if(A < minA) { minA = A; bestI = (i+1)%H.size; }
             }
             H.removeAt(bestI);
         }
