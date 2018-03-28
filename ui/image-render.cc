@@ -97,7 +97,7 @@ static inline void blend(const Image& target, uint x, uint y, bgr3f color, float
     blend(target(x,y), color, opacity);
 }
 
-void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity/*, bool hint*/) {
+void line(const Image& target, vec2 p0, vec2 p1, bgr3f color, float opacity/*, bool hint*/) {
 #if 0
     //if(hint && p1.y == p2.y) p1.y = p2.y = round(p1.y); // Hints
     if(hint) { // TODO: preprocess
@@ -110,16 +110,16 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity/*, b
     //if(p1.x >= target.size.x || p2.x < 0) return; // Assumes p1.x < p2.x
     assert(bgr3f(0) <= color && color <= bgr3f(1));
 
-    float dx = p2.x - p1.x, dy = p2.y - p1.y;
+    float dx = p1.x - p0.x, dy = p1.y - p0.y;
     bool transpose=false;
-    if(abs(dx) < abs(dy)) { swap(p1.x, p1.y); swap(p2.x, p2.y); swap(dx, dy); transpose=true; }
-    if(p1.x > p2.x) { swap(p1.x, p2.x); swap(p1.y, p2.y); }
+    if(abs(dx) < abs(dy)) { swap(p0.x, p0.y); swap(p1.x, p1.y); swap(dx, dy); transpose=true; }
+    if(p0.x > p1.x) { swap(p0.x, p1.x); swap(p0.y, p1.y); }
     if(dx==0) return; //p1==p2
     float gradient = dy / dx;
     int i1; float intery;
     {
-        float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
-        float xgap = 1 - fract(p1.x + 1./2);
+        float xend = round(p0.x), yend = p0.y + gradient * (xend - p0.x);
+        float xgap = 1 - fract(p0.x + 1./2);
         blend(target, xend, yend, color, (1-fract(yend)) * xgap * opacity, transpose);
         blend(target, xend, yend+1, color, fract(yend) * xgap * opacity, transpose);
         i1 = int(xend);
@@ -127,8 +127,8 @@ void line(const Image& target, vec2 p1, vec2 p2, bgr3f color, float opacity/*, b
     }
     int i2;
     {
-        float xend = round(p2.x), yend = p2.y + gradient * (xend - p2.x);
-        float xgap = fract(p2.x + 1./2);
+        float xend = round(p1.x), yend = p1.y + gradient * (xend - p1.x);
+        float xgap = fract(p1.x + 1./2);
         blend(target, xend, yend, color, (1-fract(yend)) * xgap * opacity, transpose);
         blend(target, xend, yend+1, color, fract(yend) * xgap * opacity, transpose);
         i2 = int(xend);

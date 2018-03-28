@@ -28,7 +28,7 @@ template<> inline String str(const Matrix& A) {
 // Right handed
 inline vec2 normal(vec2 a) { return vec2(-a.y, a.x); }
 inline float cross(vec2 a, vec2 b) { return a.x*b.y - a.y*b.x; }
-inline int cross(uint2 a, uint2 b) { return int(a.x*b.y) - int(a.y*b.x); }
+inline int cross(int2 a, int2 b) { return a.x*b.y - a.y*b.x; }
 
 typedef ref<float> vector;
 
@@ -208,81 +208,70 @@ struct Test : Widget {
                 stack.append(p);
             }
         }
-        time.reset(); //log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
+        if(0) time.reset(); else log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
 
         uint2 start = R.size/2u;
         while(R(start+uint2(1,0))) start.x++;
-        buffer<uint2> H (R.ref::size, 0); // Hull
+        array<uint2> H (R.ref::size); // Hull
         uint2 p = start;
-        uint startI = 0;
+        uint previousI = 0;
+        //H.append(start);
         for(;;) { // Walk CCW
             const int2 CCW[8] = {int2(-1,-1),int2(-1, 0),int2(-1,+1),int2( 0,+1),int2(+1,+1),int2(+1, 0),int2(+1,-1),int2( 0,-1)};
             //const uint previousSize = H.size;
             for(int i: range(8)) { // Searches for a CCW background->foreground transition
-                uint2 bg (int2(p)+CCW[(startI+i)%8]);
-                uint2 fg (int2(p)+CCW[(startI+i+1)%8]);
+                const uint I = (previousI+5+i)%8; // Always start search from opposite direction ("concavest")
+                const uint2 bg (int2(p)+CCW[I%8]);
+                const uint2 fg (int2(p)+CCW[(I+1)%8]);
                 if(R(bg)==0 && R(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
-                    //assert_(H.size < H.capacity, H.size, H.capacity, start, p, bg, fg); // Infinite loop
-                    if(!(H.size < H.capacity)) {
-                        log(frameIndex, H.size, H.capacity, start, p, bg, fg, H.slice(H.size-256, 256));
-                        array<char> S;
-                        for(uint y: range(p.y-2, p.y+2 +1)) {
-                            for(uint x: range(p.x-2, p.x+2 +1)) {
-                                S.append(R(x,y)?'x':'.');
-                            }
-                            S.append('\n');
-                        }
-                        error(S);
-                    }
-                    H.append(fg);
-                    startI = (startI+i+5)%8; // Always start from opposite direction
+                    assert_(H.size < H.capacity);
+                    p = fg;
+                    //if(H.size >= 2 && cross(int2(H[H.size-1])-int2(H[H.size-2]), int2(p)-int2(H[H.size-1])) <= 0) H.last() = fg;
+                    //else H.append(fg);
+                    //if(i>=4)
+                        H.append(fg); // FIXME
+                    previousI = I;
                     break;
                 }
             }
-            /*uint nofTransitions = H.size - previousSize;
-            if(nofTransitions == 2) {
-                assert_(H.size >= 4);
-                if(H[H.size-1] == H[H.size-4]) H.pop();
-                else if(H[H.size-2] == H[H.size-4]) { H[H.size-2]=H[H.size-1]; H.pop(); }
-                nofTransitions = H.size - previousSize;
-            }
-            if(nofTransitions != 1) {
-                log(H);
-                log(nofTransitions);
-                {
-                    uint count = 0;
-                    for(int i: range(8)) { // Counts foreground neighbours
-                        uint2 n (int2(p)+CCW[i]);
-                        if(R(n)) count++;
-                    }
-                    log(p, count);
-                }
-                for(uint2 p: H.slice(previousSize)) {
-                    uint count = 0;
-                    for(int i: range(8)) { // Counts foreground neighbours
-                        uint2 n (int2(p)+CCW[i]);
-                        if(R(n)) count++;
-                    }
-                    log(p, count);
-                }
-                array<char> S;
-                for(uint y: range(p.y-2, p.y+2 +1)) {
-                    for(uint x: range(p.x-2, p.x+2 +1)) {
-                        S.append(R(x,y)?'x':'.');
-                    }
-                    S.append('\n');
-                }
-                log(S);
-                error(nofTransitions);
-            }*/
-            p = H.last();
             if(p == start) break;
         }
 
-        //if(H.size > 3 && cross(H[H.size-1]-H[H.size-2], H[H.size-2]-H[H.size-3]) <= 0) H.pop();
+        // Simplifies polygon to 4 corners
+        while(H.size > 4) {
+            float minA = inff; int bestI = -1;
+            for(const uint i: range(H.size)) {
+                int2 p0 (H[i]);
+                int2 p1 (H[(i+1)%H.size]);
+                int2 p2 (H[(i+2)%H.size]);
+                int A = cross(p2-p0, p1-p0);
+                //assert_(A >= 0, A);
+                if(A < minA) { minA = A; bestI = i; }
+            }
+            H.removeAt(bestI);
+        }
 
-        R = ImageT</*bool*/float>(Y.size); R.clear(0); //
+        R = ImageT</*bool*/float>(Y.size); R.clear(0);
+#if 0
         for(uint2 h: H) R(h) = 1;
+#else
+        for(uint i: range(H.size)) {
+            int2 p0 (H[i]);
+            int2 p1 (H[(i+1)%H.size]);
+            float dx = p1.x - p0.x, dy = p1.y - p0.y;
+            bool transpose=false;
+            if(abs(dx) < abs(dy)) { swap(p0.x, p0.y); swap(p1.x, p1.y); swap(dx, dy); transpose=true; }
+            if(p0.x > p1.x) { swap(p0.x, p1.x); swap(p0.y, p1.y); }
+            float gradient = dy / dx;
+            int i1 = int(round(p0.x));
+            float intery = p0.y + gradient * (round(p0.x) - p0.x) + gradient;
+            int i2 = round(p1.x);
+            for(int x: range(i1, i2 +1)) {
+                (transpose ? R(intery, x) : R(x, intery)) = 1;
+                intery += gradient;
+            }
+        }
+#endif
 #else // PCA
         // Floodfill
         buffer<uint2> stack (Y.ref::size, 0);
@@ -372,7 +361,7 @@ struct Test : Widget {
             }
         }
 #endif
-        log("Corner", fmt(time.reset().milliseconds())+"ms"_);
+        //log("Corner", fmt(time.reset().milliseconds())+"ms"_);
 #if 0
         static constexpr uint N = 4;
 
