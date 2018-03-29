@@ -1,7 +1,7 @@
 #pragma once
 /// file matrix.h 3x3 homogeneous transformation matrix
 #include "vector.h"
-#include "math.h"
+//#include "math.h"
 
 inline struct mat2 operator*(float s, mat2 M);
 /// 2D linear transformation
@@ -159,6 +159,7 @@ struct mat4 {
 
     mat4& translate(vec3 v) { for(int i=0;i<4;i++) A(i,3) += A(i,0)*v.x + A(i,1)*v.y + A(i,2)*v.z; return *this; }
     mat4& scale(vec3 v) { for(int j=0;j<3;j++) for(int i=0;i<4;i++) A(i,j)*=v[j]; return *this; }
+#if 0
     mat4& rotate(float angle, vec3 u) {
         float x=u.x, y=u.y, z=u.z;
         float c=cos(angle), s=sin(angle), ic=1-c;
@@ -169,9 +170,10 @@ struct mat4 {
         r(0,3) = 0; r(1,3) = 0; r(2,3) = 0; r(3,3) = 1;
         return *this = *this * r;
     }
-    mat4& rotateX(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r(1,1) = c; r(2,2) = c; r(1,2) = -s; r(2,1) = s; return *this = *this * r; }
-    mat4& rotateY(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r(0,0) = c; r(2,2) = c; r(2,0) = -s; r(0,2) = s; return *this = *this * r; }
-    mat4& rotateZ(float angle) { float c=cos(angle),s=sin(angle); mat4 r; r(0,0) = c; r(1,1) = c; r(0,1) = -s; r(1,0) = s; return *this = *this * r; }
+    mat4& rotateX(float angle) { float c=cos(angle), s=sin(angle); mat4 r; r(1,1) = c; r(2,2) = c; r(1,2) = -s; r(2,1) = s; return *this = *this * r; }
+    mat4& rotateY(float angle) { float c=cos(angle), s=sin(angle); mat4 r; r(0,0) = c; r(2,2) = c; r(2,0) = -s; r(0,2) = s; return *this = *this * r; }
+    mat4& rotateZ(float angle) { float c=cos(angle), s=sin(angle); mat4 r; r(0,0) = c; r(1,1) = c; r(0,1) = -s; r(1,0) = s; return *this = *this * r; }
+#endif
 };
 inline mat4 operator*(float s, mat4 A) {mat4 r; for(int j=0;j<4;j++) for(int i=0;i<4;i++) r(i,j)=s*A(i,j); return r; }
 

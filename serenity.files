@@ -82,3 +82,8 @@ video/video.h
 video/video.cc
 video/encoder.h
 video/encoder.cc
+
+RobustPlanarPoseEstimation/RPP.h
+RobustPlanarPoseEstimation/RPP.cc
+RobustPlanarPoseEstimation/Rpoly.h
+RobustPlanarPoseEstimation/Rpoly.cc

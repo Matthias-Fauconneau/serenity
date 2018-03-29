@@ -12,6 +12,7 @@
 #include "sort.h"
 #include "render.h"
 #include "encoder.h"
+#include "RobustPlanarPoseEstimation/RPP.h"
 
 template<> inline String str(const Matrix& A) {
     array<char> s;
@@ -53,7 +54,7 @@ struct Test : Widget {
     unique<Window> window = nullptr;
 
     Image8 Y;
-    ImageT</*bool*/float> R;
+    //ImageT</*bool*/float> R;
 
     array<uint2> Q;
 
@@ -63,6 +64,7 @@ struct Test : Widget {
     mat3 K;
     const float focalLength = 4.2, pixelPitch = 0.0014;
 
+    mat3 R;
     mat4 Rt;
 
     uint frameIndex = 0;
@@ -164,26 +166,26 @@ struct Test : Widget {
             stack.append(uint2(Y.size.x-1,y));
         }
 
-        R = ImageT</*bool*/float>(Y.size); R.clear(1);
+        ImageT</*bool*/float> mask = ImageT</*bool*/float>(Y.size); mask.clear(1);
 
         time.reset();
         while(stack) {
             const uint2& p0 = stack.pop();
             for(int2 dp: {int2(0,-1),int2(-1,0),int2(1,0),int2(0,1)}) { // 4-way connectivity
                 uint2 p = uint2(int2(p0)+dp);
-                if(anyGE(p, R.size)) continue;
+                if(anyGE(p, mask.size)) continue;
                 if(Y(p) > threshold) continue;
-                if(R(p) == 0) continue; // Already marked
-                R(p) = 0;
+                if(mask(p) == 0) continue; // Already marked
+                mask(p) = 0;
                 stack.append(p);
             }
         }
         if(0) time.reset(); else log("Floodfill", fmt(time.reset().milliseconds())+"ms"_);
 
         // Walk contour of main region (CCW)
-        array<uint2> C (R.ref::size); // Contour
-        uint2 start = R.size/2u;
-        while(R(start+uint2(1,0))) start.x++; // Seed
+        array<uint2> C (mask.ref::size); // Contour
+        uint2 start = mask.size/2u;
+        while(mask(start+uint2(1,0))) start.x++; // Seed
         uint2 p = start;
         uint previousI = 0;
         for(;;) {
@@ -193,11 +195,11 @@ struct Test : Widget {
                 const uint I = (previousI+5+i)%8; // Always start search from opposite direction ("concavest")
                 const uint2 bg (int2(p)+CCW[I%8]);
                 const uint2 fg (int2(p)+CCW[(I+1)%8]);
-                if(R(bg)==0 && R(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
+                if(mask(bg)==0 && mask(fg)==1) { // Assumes only one Bg->Fg transition (no holes)
                     assert_(C.size < C.capacity);
                     p = fg;
                     //if(i>=4) // FIXME
-                    C.append(uint2(fg.x, R.size.y-1-fg.y)); // Flip Y axis from Y top down to Y bottom up
+                    C.append(uint2(fg.x, mask.size.y-1-fg.y)); // Flip Y axis from Y top down to Y bottom up
                     previousI = I;
                     break;
                 }
@@ -240,50 +242,50 @@ struct Test : Widget {
         if(ly > lx) { uint2 q = Q[0]; Q.removeAt(0); Q.append(q); }
         //log("Corner", fmt(time.reset().milliseconds())+"ms"_);
 
-        static constexpr uint N = 4;
+        //static constexpr uint N = 4;
 
         const mat3 K¯¹ = K.¯¹();
-        const buffer<vec2> X´ = apply(Q, [&](uint2 q){ return K¯¹*(2.f*vec2(q)/vec2(R.size)-vec2(1)); });
+        const buffer<vec2> imageQ = apply(Q, [&](uint2 q){ return K¯¹*(2.f*vec2(q)/vec2(mask.size)-vec2(1)); });
 
-        const ref<vec2> TX = modelQ;
-        const ref<vec2> TX´ = X´;
-
+#if 1
+        vec3 t; int i; double objε, imgε;
+        Rpp(modelQ, imageQ, R, t, i, objε, imgε); // Estimation is initialized with previous frame estimation
+        Rt = mat4().translate(-t) * mat4(R);
+#else
         // DLT: Ah = 0
         Matrix A(N*2, 9);
         for(uint i: range(N)) {
             const uint I = i*2;
-            A(I+0, 0) = -TX[i].x;
-            A(I+0, 1) = -TX[i].y;
+            A(I+0, 0) = -modelQ[i].x;
+            A(I+0, 1) = -modelQ[i].y;
             A(I+0, 2) = -1;
             A(I+0, 3) = 0; A(I+0, 4) = 0; A(I+0, 5) = 0;
             A(I+1, 0) = 0; A(I+1, 1) = 0; A(I+1, 2) = 0;
-            A(I+1, 3) = -TX[i].x;
-            A(I+1, 4) = -TX[i].y;
+            A(I+1, 3) = -modelQ[i].x;
+            A(I+1, 4) = -modelQ[i].y;
             A(I+1, 5) = -1;
-            A(I+0, 6) = TX´[i].x*TX[i].x;
-            A(I+0, 7) = TX´[i].x*TX[i].y;
-            A(I+0, 8) = TX´[i].x;
-            A(I+1, 6) = TX´[i].y*TX[i].x;
-            A(I+1, 7) = TX´[i].y*TX[i].y;
-            A(I+1, 8) = TX´[i].y;
+            A(I+0, 6) = imageQ[i].x*modelQ[i].x;
+            A(I+0, 7) = imageQ[i].x*modelQ[i].y;
+            A(I+0, 8) = imageQ[i].x;
+            A(I+1, 6) = imageQ[i].y*modelQ[i].x;
+            A(I+1, 7) = imageQ[i].y*modelQ[i].y;
+            A(I+1, 8) = imageQ[i].y;
         }
         const USV usv = SVD(A);
         const vector h = usv.V[usv.V.N-1];
         mat3 H;
         for(int i: range(usv.V.M)) H(i/3, i%3) = h[i];// / h[8];
         H = mat3(vec3(1/sqrt(::length(H[0])*::length(H[1])))) * H; // Normalizes by geometric mean of the 2 rotation vectors
-
-        //mat4 Rt;
         Rt[0] = vec4(H[0], 0);
         Rt[1] = vec4(H[1], 0);
         Rt[2] = vec4(cross(H[0],H[1]), 0);
         Rt[3] = vec4(-H[2], 1); // Z-
+#endif
 #if 1
         Rt = Rt * mat4(vec4(-1,1,-1,1)); // Aligns direcion of scene Z+ to image bottom up
 #endif
         Rt = mat4(vec4(-1,-1,1,1)) * Rt; // Flips X & Y as well to match Z- flip
         assert_(abs(1-((mat3)Rt).det())<0.09,((mat3)Rt).det(), abs(1-((mat3)Rt).det()));
-
         return true;
     }
     void render(const Image& target) {
@@ -293,7 +295,7 @@ struct Test : Widget {
 
         //sRGB(target, R, 1);
 
-        const mat3 flipY2 = mat3().translate(vec2(0, R.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
+        const mat3 flipY2 = mat3().translate(vec2(0, Y.size.y-1)).scale(vec2(1, -1)); // Flips Y axis from Y bottom up to Y top down for ::line
         line(target, flipY2*vec2(Q[0]), flipY2*vec2(Q[1]), bgr3f(0,0,1));
         line(target, flipY2*vec2(Q[1]), flipY2*vec2(Q[2]), bgr3f(0,1,0));
         line(target, flipY2*vec2(Q[2]), flipY2*vec2(Q[3]), bgr3f(1,0,0));
@@ -301,13 +303,13 @@ struct Test : Widget {
 
         const float near = K(1,1);
         const float far = 1000/focalLength*near; //mm
-        const mat4 projection = perspective(near, far).scale(vec3(float(R.size.y)/float(R.size.x), 1, 1));
+        const mat4 projection = perspective(near, far).scale(vec3(float(Y.size.y)/float(Y.size.x), 1, 1));
 
         {
             const mat4 NDC = mat4()
-                    .scale(vec3(vec2(R.size)/2.f, 1))
+                    .scale(vec3(vec2(Y.size)/2.f, 1))
                     .translate(vec3(1)); // -1, 1 -> 0, 2
-            const mat4 flipY = mat4().translate(vec3(0, R.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
+            const mat4 flipY = mat4().translate(vec3(0, Y.size.y-1, 0)).scale(vec3(1, -1, 1)); // Flips Y axis from Y bottom up to Y top down for ::line
             const mat4 M = flipY*NDC*projection*Rt;
 
             line(target, (M*vec3(modelQ[0], 0)).xy(), (M*vec3(modelQ[1], 0)).xy(), bgr3f(0,0,1));
