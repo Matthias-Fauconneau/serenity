@@ -335,7 +335,7 @@ struct Test : Widget {
         const Image& renderTarget = (ImageRenderTarget&)renderTarget_;
         render(renderTarget);
         Time time {true};
-        output.writeVideoFrame(renderTarget);
+        output.writeVideoFrame(renderTarget, video.videoTime);
         log("Encode", fmt(time.reset().milliseconds())+"ms"_);
         //downsample(renderTarget, target);
         if(!window->actions.contains(Space))

@@ -1,20 +1,24 @@
 #pragma once
 #include "function.h"
 #include "core/image.h"
+struct AVFormatContext;
+struct AVStream;
+struct AVCodecContext;
+struct AVFrame;
+struct SwsContext;
 
 /// Generic video/audio encoder (using ffmpeg/x264)
 struct Encoder {
     String path;
 
     uint2 size = 0_;
-    uint videoTimeNum = 0, videoTimeDen = 0;
+    int videoTimeNum = 0, videoTimeDen = 0;
 
-    struct AVFormatContext* context = nullptr;
-    struct AVStream* videoStream = nullptr;
-    struct AVCodecContext* videoCodec = nullptr;
-    int videoTime = 0, videoEncodeTime = 0;
-    struct AVFrame* frame = nullptr;
-    struct SwsContext* swsContext = nullptr;
+    handle<AVFormatContext*> file;
+    handle<AVStream*> videoStream;
+    handle<AVCodecContext*> videoCodec;
+    handle<AVFrame*> frame;
+    handle<SwsContext*> swsContext;
 
     /// Starts a new file recording video
     Encoder(string name);
@@ -25,8 +29,9 @@ struct Encoder {
     void open();
     /// Flushes all encoders and close the file
     ~Encoder();
-    operator bool() { return context; }
+    operator bool() { return file; }
 
     /// Writes a video frame
-    void writeVideoFrame(const Image& image);
+    void writeVideoFrame(const Image& image, int64 pts);
+    void writeFrame(AVCodecContext* context, const AVStream* stream);
 };
